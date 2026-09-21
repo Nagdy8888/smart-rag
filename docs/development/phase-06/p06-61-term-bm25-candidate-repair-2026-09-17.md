@@ -2,7 +2,7 @@
 title: P06-61 term and BM25 candidate repair
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers
 ---
 
@@ -80,9 +80,13 @@ Hosted `pg_proc` is seven-argument `SECURITY INVOKER` with
 `app_api` only, `functiondef_md5=ad1db6b68caa0ec1236b9c6d5caa6770`.
 Three-question Smoke A recorded `term_unavailable=0`.
 
+Live reindex of one canonical test version completed in P06-67
+(`hybrid_index_done`; search terms 3871 → 4913). See
+[p06-67-canonical-document-title-2026-09-21.md](./p06-67-canonical-document-title-2026-09-21.md).
+
 ## Unverified
 
-- Live reindex of one canonical test version (P06-67).
+- Ask-path checkpoint diagnostics (P06-68).
 
 ## Rollback
 

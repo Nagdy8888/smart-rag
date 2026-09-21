@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 67
-status: pending
+status: complete
 title: "Add owner/admin document title rename and reindex one canonical copy."
 requirement_ids: [P06-67]
 ---

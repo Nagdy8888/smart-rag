@@ -41,7 +41,7 @@ The table below is the complete maintained map. Packet evidence under
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-09-16 | eng, frontend, security |
 | [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
 | [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-09-14 | eng, frontend, security |
-| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
+| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-09-21 | eng, frontend |
 | [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_A11Y_SECURITY.md](./frontend/STITCH_A11Y_SECURITY.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
@@ -57,7 +57,7 @@ The table below is the complete maintained map. Packet evidence under
 | [development/phase-08-frontend-integration-evidence.md](./development/phase-08-frontend-integration-evidence.md) | engineering-lead | draft | 2026-08-25 | eng, reviewers |
 | [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [evaluation/PHASE6_EVAL_REGISTRY.md](./evaluation/PHASE6_EVAL_REGISTRY.md) | engineering-lead | draft | 2026-08-26 | eng, reviewers |
-| [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-09-16 | eng, security |
+| [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-09-21 | eng, security |
 | [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
 | [deployment/STREAMING_TIMEOUTS.md](./deployment/STREAMING_TIMEOUTS.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [deployment/LOCAL_RUNTIME_ROLES.md](./deployment/LOCAL_RUNTIME_ROLES.md) | engineering-lead | draft | 2026-08-25 | eng, ops |
@@ -159,8 +159,8 @@ The table below is the complete maintained map. Packet evidence under
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-15 | eng |
 | [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-16 | eng, ops |
-| [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-27 | eng |
-| [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-08-19 | eng, security |
+| [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-09-21 | eng |
+| [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-09-21 | eng, security |
 | [ingestion/PARSER_SANDBOX.md](./ingestion/PARSER_SANDBOX.md) | engineering-lead | draft | 2026-09-16 | eng, security, ops |
 | [runbooks/CLAMAV_SCAN_AND_PROMOTION.md](./runbooks/CLAMAV_SCAN_AND_PROMOTION.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [ingestion/CRAWL_POLICY.md](./ingestion/CRAWL_POLICY.md) | engineering-lead | draft | 2026-08-19 | eng, security |
@@ -180,7 +180,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |
-| [security/AUTHORIZATION_MODEL.md](./security/AUTHORIZATION_MODEL.md) | engineering-lead | draft | 2026-09-15 | eng, security |
+| [security/AUTHORIZATION_MODEL.md](./security/AUTHORIZATION_MODEL.md) | engineering-lead | draft | 2026-09-21 | eng, security |
 | [security/IDENTITY_PROPAGATION.md](./security/IDENTITY_PROPAGATION.md) | engineering-lead | draft | 2026-08-25 | eng, security |
 | [security/AUTH_RATE_LIMIT_OWNERSHIP.md](./security/AUTH_RATE_LIMIT_OWNERSHIP.md) | engineering-lead | draft | 2026-08-25 | eng, security |
 | [adr/ADR-privileged-auth-administration-boundary.md](./adr/ADR-privileged-auth-administration-boundary.md) | engineering-lead | accepted | 2026-08-13 | eng, security |

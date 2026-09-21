@@ -115,7 +115,7 @@ Packets P06-09 through P06-72 are additive after the completed historical packet
 64. [ ] [Qualify disjoint retrieval classes, rerun the company-document regression, and publish redacted evidence.](./06-phase-agent-intelligence/packets/64-live-qualification-evidence.md)
 65. [x] [Authorize the detailed honest accuracy overlay, ADR, and packets P06-66 through P06-72.](./06-phase-agent-intelligence/packets/65-honest-rag-accuracy-amendment.md)
 66. [x] [Deploy the reviewed seven-argument term RPC and prove live term_unavailable is gone.](./06-phase-agent-intelligence/packets/66-term-rpc-live.md)
-67. [ ] [Add owner/admin document title rename and reindex one canonical copy.](./06-phase-agent-intelligence/packets/67-canonical-document-title.md)
+67. [x] [Add owner/admin document title rename and reindex one canonical copy.](./06-phase-agent-intelligence/packets/67-canonical-document-title.md)
 68. [ ] [Persist ID-only Hybrid branch diagnostics and de-hardcode promotion inputs.](./06-phase-agent-intelligence/packets/68-stage-diagnostics.md)
 69. [ ] [Seal private aliases, isolation-slice gold, and the frozen 30-question acceptance sample.](./06-phase-agent-intelligence/packets/69-seal-private-gold.md)
 70. [ ] [Run the four-arm isolation experiment and name the owning failure stage.](./06-phase-agent-intelligence/packets/70-stage-isolation.md)

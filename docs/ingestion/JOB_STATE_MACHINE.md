@@ -2,7 +2,7 @@
 title: Durable job state machine
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-21
 audience: engineering
 ---
 
@@ -148,6 +148,8 @@ stateDiagram-v2
   parsing --> failed: terminal ingest failure
   hybrid_ready --> graph_pending: company-visible graph eligible
   hybrid_ready --> graph_ineligible: restricted or ineligible
+  graph_ineligible --> graph_ineligible: title-term refresh
+  hybrid_ready --> hybrid_ready: title-term refresh
   hybrid_ready --> deletion_pending: delete or ACL downgrade
   graph_pending --> deletion_pending: delete or ACL downgrade
   graph_ineligible --> deletion_pending: delete or ACL downgrade

@@ -3473,6 +3473,23 @@
         "title": "ToolSeedRequest",
         "type": "object"
       },
+      "UpdateDocumentTitleRequest": {
+        "additionalProperties": false,
+        "description": "Owner/admin document title body. Max length matches finalize.\n\nAttributes:\n    title: Non-empty trimmed title, at most 512 characters.",
+        "properties": {
+          "title": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "UpdateDocumentTitleRequest",
+        "type": "object"
+      },
       "UsageResponse": {
         "description": "Usage totals without prompt text.",
         "properties": {
@@ -7601,6 +7618,154 @@
           }
         },
         "summary": "Get Document Route",
+        "tags": [
+          "documents"
+        ]
+      },
+      "patch": {
+        "description": "Rename one document. Owner/admin only.\n\nArgs:\n    request: Active request for rate limits.\n    document_id: Document id.\n    body: Trimmed title, 1-512 characters.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Updated document summary.\n\nRaises:\n    HTTPException: 404 when missing or unauthorized; 403 when a visible\n        document is not owner/admin-renamable; 422 when the title is\n        empty or too long.",
+        "operationId": "update_document_title_route_documents__document_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDocumentTitleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Document Title Route",
         "tags": [
           "documents"
         ]

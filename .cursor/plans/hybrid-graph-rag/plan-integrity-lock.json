@@ -6,7 +6,7 @@
     ".cursor/plans/hybrid-graph-rag/03-phase-ingestion.md": "25f823c33b337fef910cc1196f6841d741433f965f19adccd285acd642852452",
     ".cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md": "2da5f270d73c26db7320189d8b26aeafc95c2bbb50cb4ca820eeeb2404acd67c",
     ".cursor/plans/hybrid-graph-rag/05-phase-graphrag.md": "c94458ffcb42b711c3f71f4ad1fd3bbe0ea71914c7cd9878d53ae50f81d8e9e6",
-    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md": "0df9716470f177058ca18e1eac9822db43c4f14231acd87275035c114b7405ee",
+    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md": "9bf608c7f8e6d43b9c97aaedca9656e97ef6068cb9adc306d885aa91c4230bf8",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/00-shared-contracts.md": "8edbf86bce1c67ee0ced92f24d1fd5e3aef23a32b73fc0fc45497564ca0f3f13",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/01-admission-budgets.md": "13336cf420c9175a0acd729ef78ac8f599a7f1bf9c9681595658bb17b26ff1c7",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/02-profiling-routing.md": "c94cc38f3d050d1ee3e1bdb38ff37e5ce3f75104cc48e5487977fd14ba4ecd9e",
@@ -74,7 +74,7 @@
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/64-live-qualification-evidence.md": "7c18b27ad81366ab61072a44db7d1195bfe4ff22558cc124ddb92b02aba4843c",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/65-honest-rag-accuracy-amendment.md": "6f9c4c9453e988326f3eaaca9f9338298e55faadceaee6cd5385f3a2f9f4fdac",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/66-term-rpc-live.md": "764873629ec3817155dc50d276e08f60eeedcd9bcbaf56cba0950219233648a9",
-    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/67-canonical-document-title.md": "b147ed23be616ee2da34b48530b82a0c3e270145ee3788168b0c95b5c046e439",
+    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/67-canonical-document-title.md": "28a321e17eb88852bb9eebf137198a56392465bf7ce67ed6adebd1d2092efff6",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/68-stage-diagnostics.md": "aacd35fccf5c0b90e237cadc6d652b904a83346bfacf0f0b600c65f7f1a6ff2a",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/69-seal-private-gold.md": "9057d2be4c37f566769c798d9d0778010d92e1f7d9d93358da4561f9a4b975de",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/70-stage-isolation.md": "140dde37ac77729a8802313c64a47854fab90f0da9e800091d034f61dd5b1a2b",
@@ -229,6 +229,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-09-21T12:21:41.273330+00:00",
+  "generated_at": "2026-09-21T12:44:50.903264+00:00",
   "schema_version": 1
 }

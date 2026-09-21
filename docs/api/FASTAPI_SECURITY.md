@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-21
 audience: engineering, security
 ---
 
@@ -62,6 +62,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | GET | `/documents` | authenticated | `list_visible_documents_page` ACL | LOW_RISK_READ; `limit` default 50 max 200; keyset `cursor=created_at,id` |
 | GET | `/documents/{id}` | authenticated | ACL + current version | 404 if missing/unauthorized |
 | DELETE | `/documents/{id}` | owner/admin | `delete_visible_document` wraps `exclude_version_from_retrieval` | COST_MUTATION; unseen **404**; visible member **403**; **204** |
+| PATCH | `/documents/{id}` | owner/admin | `update_document_title` | COST_MUTATION; body `{title}` 1–512 trimmed chars; unseen **404**; visible member **403**; empty/too-long **422**; **200** |
 | POST | `/documents/uploads` | member+ `upload_enabled` | quota reserve | COST_MUTATION; `signed_url` is null locally (Phase 10 CloudFront) |
 | POST | `/documents/uploads/finalize` | member+ upload | finalize RPC | COST_MUTATION |
 | POST/GET | `/conversations` | authenticated | creator insert / `list_user_conversations_page` | COST_MUTATION on create; GET `limit` default 50 max 200; keyset `cursor` |

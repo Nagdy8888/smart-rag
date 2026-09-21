@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from smart_rag_core.feedback.tags import FeedbackTag
 from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.tables.plan import TableQueryPlan
@@ -256,6 +256,38 @@ class DocumentResponse(BaseModel):
     current_version_id: UUID | None
     visibility_generation: int
     created_at: datetime | None = None
+
+
+class UpdateDocumentTitleRequest(BaseModel):
+    """Owner/admin document title body. Max length matches finalize.
+
+    Attributes:
+        title: Non-empty trimmed title, at most 512 characters.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    title: str = Field(min_length=1, max_length=512)
+
+    @field_validator("title")
+    @classmethod
+    def title_not_blank(cls, value: str) -> str:
+        """Reject whitespace-only titles after trim.
+
+        Args:
+            value: Submitted title.
+
+        Returns:
+            Trimmed title.
+
+        Raises:
+            ValueError: When the trimmed title is empty.
+        """
+
+        trimmed = value.strip()
+        if trimmed == "":
+            raise ValueError("title_required")
+        return trimmed
 
 
 class SignedUploadRequest(BaseModel):

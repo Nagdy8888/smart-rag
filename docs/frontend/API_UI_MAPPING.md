@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-21
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -185,6 +185,7 @@ No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 | GET | `/documents` | `document_id`, `title?`, `visibility`, `current_version_id?`, `visibility_generation`, `created_at?`; query `limit` (default 50, max 200), `cursor` | ACL |
 | GET | `/documents/{document_id}` | same fields including `created_at` | ACL else 404 |
 | DELETE | `/documents/{document_id}` | **204**; unseen **404**; visible non-owner/admin **403** | owner/admin; COST_MUTATION |
+| PATCH | `/documents/{document_id}` | body `{title}` 1–512; **200**; unseen **404**; visible non-owner/admin **403**; empty/too-long **422** | owner/admin; COST_MUTATION |
 | POST | `/documents/uploads` | req `declared_bytes` ≤ 104857600, `idempotency_key`; resp `reservation_id`, `storage_bucket`, `storage_path`, `expires_at`, `signed_url?`, `upload_method` | not viewer; `upload_enabled`; MFA when privileged. Local `signed_url` is **null** |
 | POST | `/documents/uploads/finalize` | req `reservation_id`, `object_name`, `content_hash`, `actual_bytes`, `media_type?`, `declared_category`, `attestation_policy_version`, `idempotency_key`, `document_title?`; resp `reservation_id`, `document_id`, `version_id`, `job_id` | same upload gate |
 | GET | `/ingestion/versions/{version_id}/status` | lifecycle `status` plus nested `scan`, `review`, `ocr`, `chunks_tables`, `embedding`, `bm25`, `queue_age`, `graph_handoff`, `retry_allowed` | authenticated; unauthorized **404**; `retry_allowed` owner/admin only |

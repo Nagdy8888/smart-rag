@@ -184,6 +184,57 @@ class DocumentService:
         if row is None or row[0] is None:
             raise QueryAdmissionError("not_found")
 
+    def update_title(
+        self,
+        caller: CallerContext,
+        *,
+        document_id: UUID,
+        title: str,
+    ) -> DocumentRecord:
+        """Rename one visible document. Owner/admin only.
+
+        Args:
+            caller: Authenticated caller.
+            document_id: Document id.
+            title: Already-trimmed title, 1-512 characters.
+
+        Returns:
+            The updated visible document.
+
+        Raises:
+            QueryAdmissionError: ``not_found`` when missing or unauthorized;
+                ``forbidden`` when a visible document is not owner/admin;
+                ``invalid_title`` when the RPC rejects the title.
+
+        Side Effects:
+            Calls ``app.update_document_title`` then reloads through
+            ``app.get_visible_document``.
+        """
+
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT app.update_document_title(%s, %s, %s, %s, %s)
+                        """,
+                        (
+                            caller.user_id,
+                            caller.rpc_role(),
+                            caller.rpc_authorization_version(),
+                            document_id,
+                            title,
+                        ),
+                    )
+                    row = cursor.fetchone()
+                connection.commit()
+        except psycopg.Error as exc:
+            _raise_documents(exc)
+        if row is None or row[0] is None:
+            raise QueryAdmissionError("not_found")
+        return self.get(caller, document_id=document_id)
+
     def reserve_upload(
         self,
         caller: CallerContext,

@@ -2,7 +2,7 @@
 title: Scan before hybrid index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-09-21
 audience: engineering, security
 ---
 
@@ -27,7 +27,8 @@ flowchart TD
   event --> gate{Current clean scan?}
   gate -->|no| fail[Fail crawl or index job]
   gate -->|yes| hybrid[Enqueue or run hybrid_index]
-  hybrid --> parse[mark_parsing only from uploaded or scanning]
+  hybrid --> parse[mark_parsing from uploaded or scanning]
+  hybrid --> refresh[Already-indexed title-term refresh]
 ```
 
 ## File uploads
@@ -47,11 +48,15 @@ the crawl job and **does not** enqueue `hybrid_index`.
 ## Index gate
 
 `mark_parsing_for_index` refuses `uploaded` without a current clean scan except
-explicit `APP_ENV=test` fixtures that set `allow_index_without_scan`. Crawl
-runs require a current clean event for **every** snapshot hash. Index
-governance loads scan freshness, attestation policy version, declared
-category, and `subprocessor_matrix_verified` from worker settings. Content
-class is `real_company` unless the payload explicitly says `synthetic`.
+explicit `APP_ENV=test` fixtures that set `allow_index_without_scan`. Already
+indexed public statuses (`hybrid_ready`, `graph_ineligible`) skip parse/scan
+and call
+`app.sync_document_title_search_terms` so a title rename can refresh terms
+without a full re-parse. Crawl runs require a current clean event for
+**every** snapshot hash. Index governance loads scan freshness, attestation
+policy version, declared category, and `subprocessor_matrix_verified` from
+worker settings. Content class is `real_company` unless the payload explicitly
+says `synthetic`.
 
 ## Verification
 

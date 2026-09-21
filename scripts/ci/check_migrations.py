@@ -98,6 +98,8 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260915140000_pdf_paragraph_citations_v1.sql",
     "20260916100000_conversation_transcript_run_links_v3.sql",
     "20260917120000_retrieve_term_candidates_extra_terms_v1.sql",
+    "20260921140000_update_document_title_v1.sql",
+    "20260921150000_sync_document_title_search_terms_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
