@@ -325,7 +325,7 @@ User approval on 2026-09-16: bound company evidence to the existing model input 
 
 - Recorded in `docs/adr/ADR-live-rag-failure-remediation.md`.
 - Integrity keeps packet numbers contiguous after P06-48, so overlay packets are P06-49 through P06-57. Do not reuse P06-44 through P06-48.
-- Execute after P06-48, then P06-58 through P06-64, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
+- Execute after P06-48, then P06-58 through P06-64, then P06-65 through P06-72, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
 - New company prompt pins are `answer_v3` and `verifier_v2` because `answer_v2` already owns PDF paragraph citations. Transcript SQL is `app.list_conversation_messages_v3` because v2 already returns `run_id`.
 - Company insufficient evidence never falls back to Web or general knowledge. SSE and transcript listings stay excerpt-free. Parser isolation stays `--network none` with no raw Docker socket.
 - Rollback stops using the fit/renderer/v3 transcript/citation-detail/reconnect/host-worker overlay in application code. Do not down-migrate populated rows.
@@ -336,9 +336,21 @@ User approval on 2026-09-17: repair the general Hybrid retrieval path for future
 
 - Recorded in `docs/adr/ADR-hybrid-retrieval-accuracy.md`.
 - Integrity keeps packet numbers contiguous after P06-57, so overlay packets are P06-58 through P06-64. Do not reuse P06-49 through P06-57.
-- Execute after P06-57, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
+- Execute after P06-57, then P06-65 through P06-72, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
 - Production code, prompts, profiles, migrations, and tests must contain no sample-PDF hash, book title, question ID, gold phrase, expected answer, page number, or benchmark-specific alias.
 - Do not mutate frozen `hybrid_default_v1` bytes in place. Do not pin the failed `hybrid_long_document_v1.json` digest. Do not raise `MODEL_INPUT_MAX_CHARS`. Company insufficient evidence never falls back to Web or general knowledge. Do not delete documents automatically.
+- Rollback disables the overlay in application code and restores prior frozen Hybrid pins. Do not down-migrate populated rows.
+
+## Approved planned deviation: honest RAG accuracy repair
+
+User approval on 2026-09-21: measure the live Hybrid path honestly, deploy the reviewed seven-argument term RPC, add owner/admin document title rename, reindex one canonical copy, persist ID-only diagnostics, human-seal private gold, isolate one owning failure stage, repair only that stage, qualify live Ask, merge only after GitHub jobs are green, then score a frozen 30-question PDF sample. Keep existing security, grounding, deadline, and cost gates.
+
+- Recorded in `docs/adr/ADR-honest-rag-accuracy.md`.
+- Integrity keeps packet numbers contiguous after P06-64, so overlay packets are P06-65 through P06-72. Do not reuse P06-58 through P06-64.
+- Execute after P06-64, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18. Do not check P06-62, P06-63, or P06-64 until live evidence proves remaining items.
+- Production code, prompts, profiles, migrations, and tests must contain no sample-PDF hash, book title, question ID, gold phrase, expected answer, page number, or benchmark-specific alias.
+- Missing required live fields are `unknown` and block promotion. `runs.route_family` is the admission envelope, not the effective retrieve route. Script exit 0 is not accuracy evidence.
+- Do not mutate frozen `hybrid_default_v1` bytes in place. Do not pin the failed `hybrid_long_document_v1.json` digest. Do not raise `MODEL_INPUT_MAX_CHARS`. Company insufficient evidence never falls back to Web or general knowledge. Do not delete documents automatically. Do not merge with `gh pr merge --admin`.
 - Rollback disables the overlay in application code and restores prior frozen Hybrid pins. Do not down-migrate populated rows.
 
 ## Approved planned deviation: paced verified-answer reveal and custom progress
