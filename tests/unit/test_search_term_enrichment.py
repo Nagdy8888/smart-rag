@@ -45,9 +45,7 @@ def _passage(text: str) -> CanonicalChunk:
 def test_acronym_and_mixed_case_fill_index_gaps() -> None:
     """Parenthetical acronyms and CamelCase tokens become searchable terms."""
 
-    chunk = _passage(
-        "Hypertext Transfer Protocol (HTTP) is defined beside OpenAPI."
-    )
+    chunk = _passage("Hypertext Transfer Protocol (HTTP) is defined beside OpenAPI.")
     title_only = ("Policy Handbook",)
     gaps = needle_in_index_gaps(("HTTP", "OpenAPI"), title_only)
     assert gaps == ("HTTP", "OpenAPI")

@@ -455,7 +455,9 @@ def _profile_without_source_selectors(
     if not isinstance(raw, list):
         return profile
     stripped = [
-        strip_source_selectors(str(item), selectors) for item in raw if str(item).strip()
+        strip_source_selectors(str(item), selectors)
+        for item in raw
+        if str(item).strip()
     ]
     return profile.model_copy(
         update={

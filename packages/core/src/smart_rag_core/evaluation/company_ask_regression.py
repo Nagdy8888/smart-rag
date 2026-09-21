@@ -11,7 +11,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import uuid4
 
 from smart_rag_core.evaluation.dual_metric import (
@@ -51,6 +51,8 @@ class ConversationFactory(Protocol):
         Returns:
             Opaque conversation id.
         """
+
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +110,8 @@ def load_ask_regression_credentials(
             "SMART_RAG_EVAL_EMAIL, SMART_RAG_EVAL_PASSWORD, and "
             "SMART_RAG_EVAL_BASE_URL must all be set"
         )
-    if len(password) < 8:
+    placeholder = password.casefold()
+    if placeholder in {"changeme", "your_password", "password", "todo", "secret"}:
         raise AskRegressionConfigError(
             "evaluator password must be loaded from a secret store"
         )
@@ -262,19 +265,25 @@ def load_private_gold(path: Path) -> tuple[CompanyAskQuestion, ...]:
         raise AskRegressionConfigError(
             "private gold must live under a .private-eval directory"
         )
-    payload = json.loads(resolved.read_text(encoding="utf-8"))
-    if not isinstance(payload, list):
+    payload_obj: object = json.loads(resolved.read_text(encoding="utf-8"))
+    if not isinstance(payload_obj, list):
         raise AskRegressionConfigError("private gold must be a JSON array")
     questions: list[CompanyAskQuestion] = []
-    for item in payload:
-        if not isinstance(item, dict):
-            raise AskRegressionConfigError("gold item must be an object")
-        question_id = str(item.get("id", "")).strip()
-        prompt = str(item.get("prompt", "")).strip()
-        raw_facts = item.get("facts", [])
+    for item in cast(list[object], payload_obj):
+        mapping = _as_mapping(item, kind="gold item")
+        question_id = str(mapping.get("id", "")).strip()
+        prompt = str(mapping.get("prompt") or mapping.get("question") or "").strip()
+        raw_facts: object = mapping.get("facts")
+        required = mapping.get("required")
+        if raw_facts is None and isinstance(required, list):
+            raw_facts = [
+                {"id": f"req-{index}", "canonical": [str(phrase)]}
+                for index, phrase in enumerate(cast(list[object], required))
+                if str(phrase).strip()
+            ]
         if not question_id or not prompt or not isinstance(raw_facts, list):
             raise AskRegressionConfigError("gold item is missing id, prompt, or facts")
-        facts = tuple(_fact_from_mapping(raw) for raw in raw_facts)
+        facts = tuple(_fact_from_mapping(raw) for raw in cast(list[object], raw_facts))
         questions.append(
             CompanyAskQuestion(
                 question_id=question_id,
@@ -339,17 +348,36 @@ def _fact_from_mapping(raw: object) -> RequiredFact:
         AskRegressionConfigError: If the object is malformed.
     """
 
-    if not isinstance(raw, dict):
-        raise AskRegressionConfigError("fact must be an object")
-    fact_id = str(raw.get("id", "")).strip()
-    canonical = raw.get("canonical", raw.get("phrases", []))
-    aliases = raw.get("aliases", [])
+    mapping = _as_mapping(raw, kind="fact")
+    fact_id = str(mapping.get("id", "")).strip()
+    canonical = mapping.get("canonical", mapping.get("phrases", []))
+    aliases = mapping.get("aliases", [])
     if not isinstance(canonical, list) or not canonical:
         raise AskRegressionConfigError("fact canonical phrases are required")
     if not isinstance(aliases, list):
         raise AskRegressionConfigError("fact aliases must be an array")
     return RequiredFact(
         fact_id=fact_id or "fact",
-        canonical_phrases=tuple(str(item) for item in canonical),
-        approved_aliases=tuple(str(item) for item in aliases),
+        canonical_phrases=tuple(str(item) for item in cast(list[object], canonical)),
+        approved_aliases=tuple(str(item) for item in cast(list[object], aliases)),
     )
+
+
+def _as_mapping(value: object, *, kind: str) -> dict[str, object]:
+    """Coerce a JSON object to a string-keyed mapping.
+
+    Args:
+        value: Parsed JSON value.
+        kind: Error label for a non-object.
+
+    Returns:
+        String-keyed mapping.
+
+    Raises:
+        AskRegressionConfigError: When the value is not an object.
+    """
+
+    if not isinstance(value, dict):
+        raise AskRegressionConfigError(f"{kind} must be an object")
+    typed = cast(dict[object, object], value)
+    return {str(key): item for key, item in typed.items()}

@@ -669,7 +669,7 @@ async def _counted_query_callback(
         consumed = consume_query_reservation(
             typed_connection,
             caller=caller,
-            reservation_id=reservation_id,
+            reservation_id=cast(UUID, reservation_id),
             expected_version=budget.expected_version,
             amount_usd=usd_cap,
             prompt_tokens=prompt_cap,
@@ -683,8 +683,8 @@ async def _counted_query_callback(
             record_query_llm_usage(
                 typed_connection,
                 caller=caller,
-                run_id=run_id,
-                reservation_id=reservation_id,
+                run_id=cast(UUID, run_id),
+                reservation_id=cast(UUID, reservation_id),
                 reservation_version=consumed.optimistic_version,
                 usage_kind=usage_kind,
                 model_id=model_id,
@@ -700,8 +700,8 @@ async def _counted_query_callback(
         record_query_llm_usage(
             typed_connection,
             caller=caller,
-            run_id=run_id,
-            reservation_id=reservation_id,
+            run_id=cast(UUID, run_id),
+            reservation_id=cast(UUID, reservation_id),
             reservation_version=consumed.optimistic_version,
             usage_kind=usage_kind,
             model_id=model_id,

@@ -11,6 +11,7 @@ import json
 import sys
 from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 from smart_rag_core.evaluation.company_ask_regression import (
     AskRegressionConfigError,
@@ -113,19 +114,21 @@ def _parse_answers(
     stages: dict[str, RetrievalStageAttribution] = {}
     statuses: dict[str, str] = {}
     reasons: dict[str, str] = {}
-    for key, raw in payload.items():
+    typed_payload = cast(dict[object, object], payload)
+    for key, raw in typed_payload.items():
         question_id = str(key)
         if isinstance(raw, str):
             answers[question_id] = raw
             continue
         if not isinstance(raw, dict):
             raise AskRegressionConfigError("answer row must be a string or object")
-        answers[question_id] = str(raw.get("answer_text", ""))
-        if raw.get("status"):
-            statuses[question_id] = str(raw["status"])
-        if raw.get("reason"):
-            reasons[question_id] = str(raw["reason"])
-        stages[question_id] = _stage_from_mapping(raw.get("stages", {}))
+        row = _json_mapping(cast(object, raw))
+        answers[question_id] = str(row.get("answer_text", ""))
+        if row.get("status"):
+            statuses[question_id] = str(row["status"])
+        if row.get("reason"):
+            reasons[question_id] = str(row["reason"])
+        stages[question_id] = _stage_from_mapping(row.get("stages", {}))
     return answers, stages, statuses, reasons
 
 
@@ -141,29 +144,30 @@ def _stage_from_mapping(raw: object) -> RetrievalStageAttribution:
 
     if not isinstance(raw, Mapping):
         return RetrievalStageAttribution()
-    resolution = str(raw.get("source_resolution", "unscoped"))
+    mapping = _json_mapping(cast(object, raw))
+    resolution = str(mapping.get("source_resolution", "unscoped"))
     try:
         source_resolution = SourceResolutionStage(resolution)
     except ValueError:
         source_resolution = SourceResolutionStage.UNSCOPED
     return RetrievalStageAttribution(
         source_resolution=source_resolution,
-        dense_hit=_optional_bool(raw.get("dense_hit")),
-        bm25_hit=_optional_bool(raw.get("bm25_hit")),
-        term_hit=_optional_bool(raw.get("term_hit")),
-        fused_rank=_optional_int(raw.get("fused_rank")),
-        rerank_rank=_optional_int(raw.get("rerank_rank")),
+        dense_hit=_optional_bool(mapping.get("dense_hit")),
+        bm25_hit=_optional_bool(mapping.get("bm25_hit")),
+        term_hit=_optional_bool(mapping.get("term_hit")),
+        fused_rank=_optional_int(mapping.get("fused_rank")),
+        rerank_rank=_optional_int(mapping.get("rerank_rank")),
         rerank_fallback=(
-            str(raw["rerank_fallback"]) if raw.get("rerank_fallback") else None
+            str(mapping["rerank_fallback"]) if mapping.get("rerank_fallback") else None
         ),
-        post_mmr_rank=_optional_int(raw.get("post_mmr_rank")),
-        coverage_score=_optional_float(raw.get("coverage_score")),
-        correction_outcome=str(raw.get("correction_outcome", "none")),
-        fused_count=int(raw.get("fused_count", 0) or 0),
+        post_mmr_rank=_optional_int(mapping.get("post_mmr_rank")),
+        coverage_score=_optional_float(mapping.get("coverage_score")),
+        correction_outcome=str(mapping.get("correction_outcome", "none")),
+        fused_count=_as_int(mapping.get("fused_count", 0)),
         verifier_status=(
-            str(raw["verifier_status"]) if raw.get("verifier_status") else None
+            str(mapping["verifier_status"]) if mapping.get("verifier_status") else None
         ),
-        retrieval_empty=bool(raw.get("retrieval_empty", False)),
+        retrieval_empty=bool(mapping.get("retrieval_empty", False)),
     )
 
 
@@ -194,7 +198,13 @@ def _optional_int(value: object) -> int | None:
 
     if value is None or value == "":
         return None
-    return int(value)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value)
+    raise ValueError("invalid_optional_int")
 
 
 def _optional_float(value: object) -> float | None:
@@ -209,7 +219,48 @@ def _optional_float(value: object) -> float | None:
 
     if value is None or value == "":
         return None
-    return float(value)
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return float(value)
+    raise ValueError("invalid_optional_float")
+
+
+def _json_mapping(value: object) -> dict[str, object]:
+    """Coerce JSON objects to a string-keyed mapping.
+
+    Args:
+        value: Parsed JSON value.
+
+    Returns:
+        String-keyed mapping, or empty when the value is not an object.
+    """
+
+    if not isinstance(value, Mapping):
+        return {}
+    typed = cast(Mapping[object, object], value)
+    return {str(key): item for key, item in typed.items()}
+
+
+def _as_int(value: object) -> int:
+    """Coerce a JSON number to int.
+
+    Args:
+        value: Parsed JSON value.
+
+    Returns:
+        Integer, or ``0`` when the value is missing or not numeric.
+    """
+
+    if isinstance(value, bool) or value is None:
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip():
+        return int(value)
+    return 0
 
 
 if __name__ == "__main__":

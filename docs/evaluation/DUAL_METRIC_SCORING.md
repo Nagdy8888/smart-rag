@@ -51,7 +51,8 @@ flowchart TD
 ## Commands
 
 ```powershell
-uv run python -m pytest tests/unit/test_retrieval_dual_metric_scorer.py -q
+uv run python -m pytest tests/unit/test_retrieval_dual_metric_scorer.py tests/unit/test_accuracy_promotion.py -q
+uv run python scripts/run_company_ask.py --gold .private-eval/pdf-gold-100.json --out .private-eval/p06-64-dual-summary.json --credentials .private-eval/eval-credentials.json
 uv run python scripts/rescore_company_ask.py --gold .private-eval/gold.json --answers .private-eval/answers.json --out .private-eval/dual-summary.json
 ```
 
@@ -62,4 +63,4 @@ committed tests.
 
 This scorer does not replace citation, Recall@10, faithfulness, ACL,
 latency, or cost gates. Generalization remains unverified until disjoint
-qualification in P06-64.
+real documents are scored. Packet 64 records that claim explicitly.

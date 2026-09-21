@@ -84,7 +84,9 @@ def test_counted_retrieve_send_fails_closed_without_connection() -> None:
         run_id=uuid4(),
         reservation_id=uuid4(),
     )
-    with pytest.raises(QueryBudgetError, match="retrieve_accounting_connection_missing"):
+    with pytest.raises(
+        QueryBudgetError, match="retrieve_accounting_connection_missing"
+    ):
         counted_retrieve_send(
             budget,
             usage_kind="embedding",

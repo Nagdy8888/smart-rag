@@ -111,9 +111,7 @@ def needle_in_index_gaps(
     """
 
     indexed = {
-        normalize_arabic_v1(item).casefold()
-        for item in indexed_terms
-        if item.strip()
+        normalize_arabic_v1(item).casefold() for item in indexed_terms if item.strip()
     }
     missing: list[str] = []
     seen: set[str] = set()

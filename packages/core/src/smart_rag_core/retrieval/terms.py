@@ -114,14 +114,8 @@ class TermRetriever:
                 extra_terms=extra_terms,
                 fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
             )
-        scored = {
-            UUID(str(row[0])): float(row[4])
-            for row in rows
-        }
-        match_kinds = {
-            UUID(str(row[0])): str(row[3])
-            for row in rows
-        }
+        scored = {UUID(str(row[0])): float(row[4]) for row in rows}
+        match_kinds = {UUID(str(row[0])): str(row[3]) for row in rows}
         survivors = recheck_retrieval_candidates(
             self._connection,
             caller=caller,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from smart_rag_core.retrieval.context import passages_from_context
 from smart_rag_core.retrieval.context_loader import ChunkContext
@@ -15,7 +15,9 @@ from smart_rag_core.retrieval.source_scope import strip_source_selectors
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
 
-def _candidate(document=None, chunk=None) -> RetrievalCandidate:
+def _candidate(
+    document: UUID | None = None, chunk: UUID | None = None
+) -> RetrievalCandidate:
     """Build one fused candidate.
 
     Args:
@@ -35,7 +37,9 @@ def _candidate(document=None, chunk=None) -> RetrievalCandidate:
     )
 
 
-def _passage(*, text: str, document=None, chunk=None) -> RerankPassage:
+def _passage(
+    *, text: str, document: UUID | None = None, chunk: UUID | None = None
+) -> RerankPassage:
     """Build one authorized rerank passage.
 
     Args:

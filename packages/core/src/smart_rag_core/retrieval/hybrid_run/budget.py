@@ -141,8 +141,8 @@ def counted_retrieve_send(
         result, consumed, _usage_id = execute_counted_model_call(
             cast("psycopg.Connection[tuple[Any, ...]]", connection),
             caller=caller,
-            run_id=run_id,
-            reservation_id=reservation_id,
+            run_id=cast(UUID, run_id),
+            reservation_id=cast(UUID, reservation_id),
             expected_version=budget.expected_version,
             usage_kind=usage_kind,
             model_id=model_id,

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from types import SimpleNamespace
 from uuid import uuid4
 
 import psycopg
+import pytest
 from smart_rag_core.retrieval.hybrid_run.channels import (
     collect_term_lists,
     unpack_term,
@@ -120,13 +122,17 @@ def test_collect_term_lists_queries_extracted_tokens() -> None:
             return (hit,)
         return ()
 
-    lists = collect_term_lists(_retrieve, caller=_caller(), texts=("What is INV-1001?",))
+    lists = collect_term_lists(
+        _retrieve, caller=_caller(), texts=("What is INV-1001?",)
+    )
     assert "What is INV-1001?" in seen
     assert "inv-1001" in seen
     assert any(hit.chunk_id == item.chunk_id for variant in lists for item in variant)
 
 
-def test_term_retriever_binds_extra_terms_and_rechecks(monkeypatch) -> None:
+def test_term_retriever_binds_extra_terms_and_rechecks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Live retrieve passes extra needles as a bound array, then rechecks."""
 
     captured: dict[str, object] = {}
@@ -173,7 +179,13 @@ def test_term_retriever_binds_extra_terms_and_rechecks(monkeypatch) -> None:
             """
 
             return [
-                (allowed.chunk_id, allowed.document_id, allowed.version_id, "exact", 1.0),
+                (
+                    allowed.chunk_id,
+                    allowed.document_id,
+                    allowed.version_id,
+                    "exact",
+                    1.0,
+                ),
                 (denied.chunk_id, denied.document_id, denied.version_id, "exact", 1.0),
             ]
 
@@ -190,7 +202,7 @@ def test_term_retriever_binds_extra_terms_and_rechecks(monkeypatch) -> None:
             return _Cursor()
 
     @contextmanager
-    def _txn(*_args: object, **_kwargs: object):
+    def _txn(*_args: object, **_kwargs: object) -> Generator[None, None, None]:
         """Skip SET LOCAL for the unit test.
 
         Yields:
@@ -199,13 +211,22 @@ def test_term_retriever_binds_extra_terms_and_rechecks(monkeypatch) -> None:
 
         yield
 
+    def _recheck(*_args: object, **_kwargs: object) -> tuple[RetrievalCandidate, ...]:
+        """Keep the authorized candidate.
+
+        Returns:
+            Rechecked survivors.
+        """
+
+        return (allowed,)
+
     monkeypatch.setattr(
         "smart_rag_core.retrieval.terms.retrieval_transaction",
         _txn,
     )
     monkeypatch.setattr(
         "smart_rag_core.retrieval.terms.recheck_retrieval_candidates",
-        lambda *_args, **_kwargs: (allowed,),
+        _recheck,
     )
     result = TermRetriever(_Connection()).retrieve(  # type: ignore[arg-type]
         caller=_caller(),
@@ -219,7 +240,7 @@ def test_term_retriever_binds_extra_terms_and_rechecks(monkeypatch) -> None:
     assert denied.chunk_id not in {item.chunk_id for item in result.candidates}
 
 
-def test_term_outage_is_named(monkeypatch) -> None:
+def test_term_outage_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
     """Database failures record term_unavailable without fake success."""
 
     class _Connection:
@@ -235,7 +256,7 @@ def test_term_outage_is_named(monkeypatch) -> None:
             raise psycopg.OperationalError("term_outage")
 
     @contextmanager
-    def _txn(*_args: object, **_kwargs: object):
+    def _txn(*_args: object, **_kwargs: object) -> Generator[None, None, None]:
         """Skip SET LOCAL.
 
         Yields:

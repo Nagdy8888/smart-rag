@@ -122,7 +122,7 @@ def test_runner_requires_env_credentials_and_fresh_conversations(
         load_ask_regression_credentials(
             {
                 "SMART_RAG_EVAL_EMAIL": "eval@example.test",
-                "SMART_RAG_EVAL_PASSWORD": "short",
+                "SMART_RAG_EVAL_PASSWORD": "changeme",
                 "SMART_RAG_EVAL_BASE_URL": "http://127.0.0.1:8000",
             }
         )
@@ -189,6 +189,13 @@ def test_private_gold_must_stay_under_private_eval(tmp_path: Path) -> None:
     )
     loaded = load_private_gold(gold)
     assert loaded[0].facts[0].canonical_phrases == ("INV-1001",)
+    required_gold = private_dir / "required.json"
+    required_gold.write_text(
+        '[{"id":"syn-2","question":"code?","required":["INV-1001"]}]',
+        encoding="utf-8",
+    )
+    required_loaded = load_private_gold(required_gold)
+    assert required_loaded[0].facts[0].canonical_phrases == ("INV-1001",)
     classes = {item.query_class for item in synthetic_disjoint_cases()}
     assert "acronym" in classes
     assert "bm25_outage" in classes

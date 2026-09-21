@@ -14,8 +14,10 @@ ISBN 978-1-098-17650-1). The agent was used as a signed-in user on
 **company documents only**. This is a product eval, not the sealed Phase 4
 holdout and not a unit test.
 
-**Headline: 37 of 100 questions fully correct (37% strict pass).**
-Pass-or-partial is 38%. Required-fact recall is 50 / 143 (35%).
+**Historical headline (shared conversation): 37 of 100 questions fully
+correct (37% strict pass).** The P06-64 rebuilt-API rerun is a dual-metric
+score: **35 / 100 strict and 35 / 100 grounded fact**, with **4** product
+deadline failures. Sample promotion is **not** claimed.
 
 Related: [PDF_HYBRID_EVALUATION.md](./PDF_HYBRID_EVALUATION.md) ·
 [PDF_EVAL_WORKSPACE.md](./PDF_EVAL_WORKSPACE.md) ·
@@ -67,6 +69,49 @@ This run does **not** claim generalization to other PDFs, web search,
 Combined scope, or graph-only questions. Re-runs must use the dual-metric
 scorer in [DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md), a fresh
 conversation per question, and environment-sourced credentials.
+
+## P06-64 dual-metric rerun (rebuilt API)
+
+Live Ask on 2026-09-17 after rebuilding `smart-rag-api` from
+`fix/general-rag-retrieval-accuracy`. Each question used a **fresh
+conversation**. Gold stayed under gitignored `.private-eval/`. Credentials
+were not committed.
+
+```mermaid
+flowchart TB
+  asked["100 company-document questions"] --> strict["Strict phrase 35"]
+  asked --> refuse["Verifier refusal after fusion 5"]
+  asked --> wrong["Wrong phrasing 50"]
+  asked --> deadline["Deadline 4"]
+  asked --> partial["Partial 3"]
+  asked --> error["Error 3"]
+```
+
+| Metric | Historical 2026-09-17 | P06-64 rebuilt API |
+| --- | ---: | ---: |
+| Strict pass | 37 / 100 | 35 / 100 |
+| Grounded fact pass | not scored | 35 / 100 |
+| Deadline failures | 8 | 4 |
+| Verifier refusal after fusion | 33 (legacy “no evidence”) | 5 |
+| Wrong phrasing | 21 | 50 |
+| Empty retrieval proven | not proven | 0 (3 error terminals had no SSE coverage) |
+| Fresh conversation per question | no | yes |
+| `holdout_opened` | false | false |
+| Sample promoted (≥95% grounded, 0 deadlines) | n/a | **false** |
+| Generalization | unverified | unverified |
+
+Promotion failed: grounded fact rate `0.35` is below `0.95`, and four
+product-deadline failures remain. Remaining misses are attributed as
+wrong phrasing (candidate/ranking), verifier refusal after fusion
+(coverage), deadline (retrieve/answer envelope), and three error
+terminals without a streamed answer. Company-to-Web fallback was not
+observed: every question requested `company_documents`.
+
+Disjoint real documents besides this sample were not available, so
+generalization stays **unverified**. Synthetic query-class fixtures exist
+in the dual-metric module. P06-17, P06-18, and Phase 6 remain incomplete.
+
+Private dual-metric JSON is gitignored. Public counts only.
 
 ## How the test was run
 

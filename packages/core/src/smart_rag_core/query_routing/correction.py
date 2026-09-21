@@ -281,9 +281,7 @@ def _ranking_form(text: str, selectors: Sequence[str]) -> str:
     return coverage_term_key(stripped)
 
 
-def _term_focused_query(
-    prep: QueryPreparation, selectors: Sequence[str]
-) -> str | None:
+def _term_focused_query(prep: QueryPreparation, selectors: Sequence[str]) -> str | None:
     """Build a focused retry from profile codes and entities.
 
     Args:

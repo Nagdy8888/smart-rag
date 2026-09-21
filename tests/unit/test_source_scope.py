@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.source_scope import (
     SourceResolution,
@@ -55,13 +56,13 @@ def test_low_confidence_requested_names_are_dropped() -> None:
     assert kept == ("Policy Handbook",)
 
 
-def test_contained_title_query_is_forwarded(monkeypatch) -> None:
+def test_contained_title_query_is_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
     """A unique title inside the question can still uniquely scope retrieve."""
 
     version = uuid4()
     captured: dict[str, object] = {}
 
-    def _search(*_args, **kwargs) -> tuple[tuple[object, str], ...]:
+    def _search(*_args: object, **kwargs: object) -> tuple[tuple[object, str], ...]:
         """Capture search kwargs for the contained-title assertion.
 
         Returns:
@@ -105,13 +106,25 @@ def test_unscoped_without_connection_is_indistinguishable() -> None:
     assert scope.candidate_profile_id == HYBRID_DEFAULT_PROFILE_ID
 
 
-def test_exact_one_match_scopes_and_records_selector(monkeypatch) -> None:
+def test_exact_one_match_scopes_and_records_selector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Exactly one authorized title becomes a version scope selector."""
 
     version = uuid4()
+
+    def _exact(*_args: object, **_kwargs: object) -> tuple[tuple[object, str], ...]:
+        """Return one authorized version/title pair.
+
+        Returns:
+            One match.
+        """
+
+        return ((version, "Policy Handbook"),)
+
     monkeypatch.setattr(
         "smart_rag_core.retrieval.source_scope._search_authorized_versions",
-        lambda *_args, **_kwargs: ((version, "Policy Handbook"),),
+        _exact,
     )
     scope = resolve_retrieval_scope(
         caller=_caller(),
@@ -125,14 +138,35 @@ def test_exact_one_match_scopes_and_records_selector(monkeypatch) -> None:
     assert scope.selector_texts == ("Policy Handbook",)
 
 
-def test_ambiguous_and_empty_matches_stay_unscoped(monkeypatch) -> None:
+def test_ambiguous_and_empty_matches_stay_unscoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Multiple or zero authorized matches never become a hard filter."""
 
     first = uuid4()
     second = uuid4()
+
+    def _ambiguous(*_args: object, **_kwargs: object) -> tuple[tuple[object, str], ...]:
+        """Return two authorized matches.
+
+        Returns:
+            Two version/title pairs.
+        """
+
+        return ((first, "Alpha"), (second, "Beta"))
+
+    def _empty(*_args: object, **_kwargs: object) -> tuple[tuple[object, str], ...]:
+        """Return no authorized matches.
+
+        Returns:
+            Empty tuple.
+        """
+
+        return ()
+
     monkeypatch.setattr(
         "smart_rag_core.retrieval.source_scope._search_authorized_versions",
-        lambda *_args, **_kwargs: ((first, "Alpha"), (second, "Beta")),
+        _ambiguous,
     )
     ambiguous = resolve_retrieval_scope(
         caller=_caller(),
@@ -145,7 +179,7 @@ def test_ambiguous_and_empty_matches_stay_unscoped(monkeypatch) -> None:
     assert ambiguous.selector_texts == ()
     monkeypatch.setattr(
         "smart_rag_core.retrieval.source_scope._search_authorized_versions",
-        lambda *_args, **_kwargs: (),
+        _empty,
     )
     missing = resolve_retrieval_scope(
         caller=_caller(),

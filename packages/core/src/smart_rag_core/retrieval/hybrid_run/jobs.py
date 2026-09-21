@@ -189,11 +189,11 @@ class HybridChannelJobsMixin:
         if term is not None:
             term_retriever = cast(TermRetrieverLike, term)
 
-            def _term_job() -> VariantLists:
+            def _term_job() -> object:
                 """Run term retrieve per fused query text.
 
                 Returns:
-                    Per-variant term candidate lists.
+                    Per-variant term candidate lists, or a named term outage.
                 """
 
                 if self._supabase_dsn:

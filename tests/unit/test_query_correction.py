@@ -157,7 +157,9 @@ def test_same_route_retry_without_relationship() -> None:
         (_hybrid_result(runtime, coverage=0.20, query=query),),
     )
     assert any(branch.branch_id == "corr-retry" for branch in updated.branches)
-    retry = next(branch for branch in updated.branches if branch.branch_id == "corr-retry")
+    retry = next(
+        branch for branch in updated.branches if branch.branch_id == "corr-retry"
+    )
     assert retry.query_text != query
     assert retry.bypass_retrieval_cache is True
     assert decision.alternate_query == retry.query_text
@@ -170,9 +172,20 @@ def test_identical_cached_retry_is_rejected(monkeypatch: pytest.MonkeyPatch) -> 
     query = "What is the status of INV-SR-1001?"
     prep = prepare_query(query, runtime=runtime)
     plan = compile_retrieval_plan(prep, runtime)
+
+    def _no_alternate(_prep: object, _cached: object) -> None:
+        """Force an identical retry so the correction must refuse.
+
+        Args:
+            _prep: Unused preparation.
+            _cached: Unused cached ranking query.
+        """
+
+        return None
+
     monkeypatch.setattr(
         "smart_rag_core.query_routing.correction.alternate_retry_query",
-        lambda _prep, _cached: None,
+        _no_alternate,
     )
     decision = decide_correction(
         plan,
@@ -426,7 +439,7 @@ def test_post_correction_coverage_is_recomputed_before_answer() -> None:
     plan = compile_retrieval_plan(prep, runtime)
     results = (_hybrid_result(runtime, coverage=0.20, query=query),)
     state = pending_query_state(runtime.model_dump(mode="json"), user_query=query)
-    state["status"] = "retrieved"
+    state["status"] = "branches_executed"
     state["remaining_corrections"] = 1
     state["remaining_model_calls"] = 6
     state["retrieval_plan"] = plan.model_dump(mode="json")

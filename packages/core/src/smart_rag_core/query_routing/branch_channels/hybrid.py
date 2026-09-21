@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Literal, Protocol, cast
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -26,6 +26,34 @@ from smart_rag_core.retrieval.cache_store import RetrievalCacheMode
 from smart_rag_core.retrieval.context import ContextFn
 from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.security.identity import CallerContext
+
+
+class _HybridRetrieveWithCacheLike(Protocol):
+    """Hybrid retrieve surface that accepts a cache mode."""
+
+    def retrieve(
+        self,
+        *,
+        query: str,
+        caller: CallerContext,
+        profile: object | None = None,
+        deadline_seconds: float | None = None,
+        cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
+    ) -> object:
+        """Run one Hybrid retrieve, optionally bypassing the rank cache.
+
+        Args:
+            query: Branch query text.
+            caller: Server-derived caller.
+            profile: Typed query profile.
+            deadline_seconds: Remaining retrieval slice.
+            cache_mode: Rank-cache mode. ``cold_bypass`` skips get/put.
+
+        Returns:
+            Object with ``ranked_ids`` and ``coverage`` attributes.
+        """
+
+        ...
 
 
 def run_hybrid(
@@ -66,19 +94,32 @@ def run_hybrid(
             status="degraded",
             fallback_reason=FALLBACK_RETRIEVERS_UNBOUND,
         )
-    retrieve_kwargs: dict[str, object] = {
-        "query": spec.query_text,
-        "caller": caller,
-        "profile": prep.profile,
-        "deadline_seconds": min(remaining, 8.0),
-    }
+    deadline_seconds = min(remaining, 8.0)
+    outcome: object
     if spec.bypass_retrieval_cache:
-        retrieve_kwargs["cache_mode"] = RetrievalCacheMode.COLD_BYPASS
-    try:
-        outcome = hybrid_retriever.retrieve(**retrieve_kwargs)
-    except TypeError:
-        retrieve_kwargs.pop("cache_mode", None)
-        outcome = hybrid_retriever.retrieve(**retrieve_kwargs)
+        cached = cast(_HybridRetrieveWithCacheLike, hybrid_retriever)
+        try:
+            outcome = cached.retrieve(
+                query=spec.query_text,
+                caller=caller,
+                profile=prep.profile,
+                deadline_seconds=deadline_seconds,
+                cache_mode=RetrievalCacheMode.COLD_BYPASS,
+            )
+        except TypeError:
+            outcome = hybrid_retriever.retrieve(
+                query=spec.query_text,
+                caller=caller,
+                profile=prep.profile,
+                deadline_seconds=deadline_seconds,
+            )
+    else:
+        outcome = hybrid_retriever.retrieve(
+            query=spec.query_text,
+            caller=caller,
+            profile=prep.profile,
+            deadline_seconds=deadline_seconds,
+        )
     ranked = ranked_ids(outcome)
     coverage_score, ratio, uncovered = coverage_bits(outcome, whole_document)
     status: Literal["ok", "degraded", "refused", "failed"] = "ok"

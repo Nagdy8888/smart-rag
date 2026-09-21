@@ -212,7 +212,9 @@ def resolve_retrieval_scope(
         if len(unique_versions) == 1:
             version_id = unique_versions[0]
             resolution = SourceResolution.EXACT_ONE
-            selector_texts = tuple(dict.fromkeys(item[1] for item in matches if item[1]))
+            selector_texts = tuple(
+                dict.fromkeys(item[1] for item in matches if item[1])
+            )
         elif len(unique_versions) > 1:
             resolution = SourceResolution.AMBIGUOUS
     counted = representative_count
@@ -237,7 +239,9 @@ def resolve_retrieval_scope(
         candidate_profile_id=profile_id,
         eligibility_reason=reason,
         resolution=resolution,
-        selector_texts=selector_texts if resolution is SourceResolution.EXACT_ONE else (),
+        selector_texts=selector_texts
+        if resolution is SourceResolution.EXACT_ONE
+        else (),
     )
 
 

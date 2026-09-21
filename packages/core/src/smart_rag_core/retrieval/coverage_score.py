@@ -149,7 +149,9 @@ def exclude_source_selector_terms(
         selector_only = key in phrases or (
             bool(parts) and all(part in tokens for part in parts)
         )
-        if selector_only and not any(any(ch.isdigit() for ch in part) for part in parts):
+        if selector_only and not any(
+            any(ch.isdigit() for ch in part) for part in parts
+        ):
             continue
         kept.append(term)
     return tuple(kept)

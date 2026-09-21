@@ -25,9 +25,7 @@ from smart_rag_core.retrieval.source_scope import (
     select_runtime_profile,
 )
 
-_FAILED_V1_DIGEST = (
-    "d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22"
-)
+_FAILED_V1_DIGEST = "d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22"
 _FORBIDDEN_PROFILE_KEYS = frozenset(
     {"pdf_sha", "question_id", "gold_phrase", "page_number", "isbn"}
 )
