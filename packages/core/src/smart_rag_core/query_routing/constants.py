@@ -44,6 +44,10 @@ FALLBACK_TABLE_PLAN_INCOMPLETE = "table_plan_incomplete"
 FALLBACK_MEMORY_UNAVAILABLE = "memory_unavailable"
 FALLBACK_RETRIEVERS_UNBOUND = "retrievers_unbound"
 LIMITATION_VERIFIER_OMITTED_LINKS = "verifier_omitted_links"
+LIMITATION_CITATION_LEAF_UNRESOLVED = "citation_leaf_unresolved"
+"""Limitation code when one or more passage citations could not be pinned
+to a single leaf and were omitted from the released answer."""
+
 LIMITATION_VERIFIER_SKIPPED = "verifier_skipped"
 """Limitation code when the one verifier call failed or timed out and the
 deterministically checked answer was released as ``verified_partial``."""
@@ -63,6 +67,7 @@ __all__ = [
     "FALLBACK_MEMORY_UNAVAILABLE",
     "FALLBACK_RETRIEVERS_UNBOUND",
     "FALLBACK_TABLE_PLAN_INCOMPLETE",
+    "LIMITATION_CITATION_LEAF_UNRESOLVED",
     "LIMITATION_VERIFIER_OMITTED_LINKS",
     "LIMITATION_VERIFIER_SKIPPED",
     "MAX_CORRECTIONS",

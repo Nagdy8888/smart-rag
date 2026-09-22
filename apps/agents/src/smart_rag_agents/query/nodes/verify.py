@@ -13,6 +13,7 @@ from smart_rag_core.query_admission.exceptions import (
 )
 from smart_rag_core.query_admission.service import summarize_run_usage
 from smart_rag_core.query_answer.citations import (
+    drop_skipped_citations,
     maybe_persist_verified_citations,
     persist_web_answer_citations,
 )
@@ -86,9 +87,12 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         verifier payload never terminate ``verified``. Omitted IDs force
         ``verified_partial`` and ``verifier_omitted_links``. Invalid
         verifier JSON degrades to ``verified_partial`` with the
-        already-generated answer. A verifier timeout or gateway failure
+        already-generated answer.         A verifier timeout or gateway failure
         degrades to ``verified_partial`` with detail
         ``verifier_skipped:<reason>`` and still persists citations.
+        Leaf-unresolved citations are skipped: some remaining citations
+        become ``verified_partial`` with ``citation_leaf_unresolved``;
+        zero persisted citations stay ``insufficient_evidence``.
         Company answers without valid paragraph
         mappings become a citation-free refusal; fusion passages are never
         backfilled as citations.
@@ -269,6 +273,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         checked = checked.model_copy(
             update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
         )
+    skipped_citation_count = 0
     if is_web:
         checked = checked.model_copy(
             update={
@@ -294,7 +299,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 detail = "web_evidence_insufficient"
     else:
         try:
-            maybe_persist_verified_citations(
+            persisted = maybe_persist_verified_citations(
                 deps.connection,
                 caller=caller_from_runtime(context) if context is not None else None,
                 run_id=context.run_id if context is not None else None,
@@ -305,12 +310,23 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             if deps.connection is not None and context is not None:
                 terminal = "insufficient_evidence"
                 detail = "citation_persist_failed"
+        else:
+            if persisted.skipped:
+                skipped_citation_count = len(persisted.skipped)
+                checked = drop_skipped_citations(checked, persisted.skipped)
+                if not persisted.ids:
+                    terminal = "insufficient_evidence"
+                    detail = "citation_leaf_unresolved"
+                elif terminal in {"verified", "verified_partial"}:
+                    terminal = "verified_partial"
+                    detail = "citation_leaf_unresolved"
     result = VerificationResult(
         answer=checked,
         deterministic_failures=failures,
         verifier_call_count=1 if verifier_calls else 0,
         omitted_link_ids=omitted,
         verifier_skipped_reason=verifier_skipped_reason,
+        skipped_citation_count=skipped_citation_count,
         status=terminal
         if terminal
         in {"verified", "verified_partial", "refused", "insufficient_evidence"}

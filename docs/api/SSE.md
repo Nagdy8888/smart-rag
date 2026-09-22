@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-22
 audience: engineering, frontend
 ---
 
@@ -107,9 +107,9 @@ one is available, an optional `limitation`, and exactly one `partial`.
 They are not `error` and not `empty_answer`. `empty_answer` is reserved
 for a supposedly releasable `verified` payload that is blank. A finished
 answer whose verifier call failed uses limitation code `verifier_skipped`
-("The answer passed citation checks, but the final verification step timed out. Treat it as partial.")
 and a `partial` terminal. `deadline` is emitted only when no answer was
-produced. Unknown faults stay one sanitized `error`. Generate-time expected refusals skip
+produced. A released answer that dropped one or more leaf-unresolved
+citations uses limitation code `citation_leaf_unresolved`. Unknown faults stay one sanitized `error`. Generate-time expected refusals skip
 the verifier node; the mapper still emits `verify_answer` completed so
 Ask can accept the refusal tokens.
 

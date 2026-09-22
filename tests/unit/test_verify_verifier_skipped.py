@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from smart_rag_agents.query.state import QueryGraphState
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.query_answer.citations import CitationPersistResult
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
@@ -120,7 +121,7 @@ def _run_skipped(
         "smart_rag_agents.query.nodes.verify.assert_call_available",
         _keep_remaining,
     )
-    persist = MagicMock(return_value=())
+    persist = MagicMock(return_value=CitationPersistResult())
     monkeypatch.setattr(
         "smart_rag_agents.query.nodes.verify.maybe_persist_verified_citations",
         persist,

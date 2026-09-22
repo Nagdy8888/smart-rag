@@ -58,7 +58,7 @@ The table below is the complete maintained map. Packet evidence under
 | [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [evaluation/PHASE6_EVAL_REGISTRY.md](./evaluation/PHASE6_EVAL_REGISTRY.md) | engineering-lead | draft | 2026-08-26 | eng, reviewers |
 | [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-09-22 | eng, security |
-| [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
+| [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-09-22 | eng, frontend |
 | [deployment/STREAMING_TIMEOUTS.md](./deployment/STREAMING_TIMEOUTS.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [deployment/LOCAL_RUNTIME_ROLES.md](./deployment/LOCAL_RUNTIME_ROLES.md) | engineering-lead | draft | 2026-08-25 | eng, ops |
 | [deployment/STAGING_COMPOSE.md](./deployment/STAGING_COMPOSE.md) | engineering-lead | draft | 2026-08-19 | eng, ops |

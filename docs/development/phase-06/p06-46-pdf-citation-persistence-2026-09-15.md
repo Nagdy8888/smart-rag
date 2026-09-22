@@ -2,7 +2,7 @@
 title: P06-46 ACL-safe PDF citation persistence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-22
 audience: engineering, reviewers, security
 ---
 
@@ -107,3 +107,40 @@ Typed HTTP fields: `paragraph_index`, `document_title`,
 `citations`. Excerpt is never copied into `provenance`. Inline UI is
 recorded in
 [p06-47-inline-pdf-citation-ui-2026-09-15.md](./p06-47-inline-pdf-citation-ui-2026-09-15.md).
+
+## Leaf-unresolved citations (2026-09)
+
+`insert_run_citation_v2` still requires a span to sit inside exactly one
+search-representative child. Python only checks that the span is inside
+the cited chunk, so a span that straddles two children, or a sentence
+repeated in two children, raises `span_not_contained`, `leaf_ambiguous`,
+or `page_ambiguous`.
+
+`persist_answer_citations` isolates each passage attempt with
+`SAVEPOINT citation_leaf`. On those three reasons it retries once with
+the leading sentence when that sentence is at least 24 characters and
+strictly shorter than the span. If the retry fails for the same class of
+reason, that citation is skipped and later citations still insert. Any
+other database reason still raises and the verify node still terminates
+`insufficient_evidence` with `citation_persist_failed`.
+
+When at least one citation row was inserted, the run is
+`verified_partial` with detail `citation_leaf_unresolved` and SSE
+limitation code `citation_leaf_unresolved`. Skipped chips are removed
+from the released payload. When none were inserted, the terminal stays
+`insufficient_evidence` with the same detail. The function does not
+commit; the SSE consume loop still commits after verify.
+
+```mermaid
+sequenceDiagram
+  participant Verify as verify_answer_node
+  participant Citations as citations.py
+  participant Postgres as insert_run_citation_v2
+  Verify->>Citations: persist_answer_citations
+  Citations->>Postgres: SAVEPOINT citation_leaf
+  Postgres-->>Citations: span_not_contained
+  Citations->>Postgres: ROLLBACK TO SAVEPOINT citation_leaf
+  Citations->>Postgres: retry leading sentence
+  Postgres-->>Citations: citation_id or leaf reason
+  Citations-->>Verify: CitationPersistResult
+```

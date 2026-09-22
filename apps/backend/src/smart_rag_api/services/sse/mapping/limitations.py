@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import cast
 
 from smart_rag_core.query_routing.constants import (
+    LIMITATION_CITATION_LEAF_UNRESOLVED,
     LIMITATION_VERIFIER_OMITTED_LINKS,
     LIMITATION_VERIFIER_SKIPPED,
 )
@@ -19,8 +20,9 @@ def limitations_from_update(
         update: Node return mapping.
 
     Returns:
-        ``limitation`` events in emission order: omitted links first, then
-        skipped verifier. Empty when the update carries none.
+        ``limitation`` events in emission order: omitted links, skipped
+        verifier, then unresolved citation leaves. Empty when the update
+        carries none.
     """
 
     verification = update.get("verification")
@@ -32,6 +34,13 @@ def limitations_from_update(
         events.append(("limitation", {"code": LIMITATION_VERIFIER_OMITTED_LINKS}))
     if typed_verification.get("verifier_skipped_reason"):
         events.append(("limitation", {"code": LIMITATION_VERIFIER_SKIPPED}))
+    raw_skipped = typed_verification.get("skipped_citation_count") or 0
+    if (
+        isinstance(raw_skipped, int)
+        and not isinstance(raw_skipped, bool)
+        and raw_skipped > 0
+    ):
+        events.append(("limitation", {"code": LIMITATION_CITATION_LEAF_UNRESOLVED}))
     return events
 
 
