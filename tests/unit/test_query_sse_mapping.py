@@ -643,3 +643,27 @@ def test_mapper_verify_update_is_idempotent() -> None:
     assert "SECOND_VERIFY_MUST_NOT_EMIT" not in str(second)
     assert mapper.finish() == []
     assert _terminal_events(first) == [("completed", {})]
+
+
+def test_mapper_verifier_skipped_is_partial_not_deadline() -> None:
+    """A skipped verifier releases the answer as partial with a limitation."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified_partial",
+                "detail": "verifier_skipped:deadline_exhausted",
+                "answer": _payload("Refund period is 30 days.", status="complete"),
+                "verification": {
+                    "omitted_link_ids": [],
+                    "verifier_skipped_reason": "deadline_exhausted",
+                },
+            }
+        }
+    )
+    types = [item[0] for item in events]
+    assert "deadline" not in types
+    assert ("limitation", {"code": "verifier_skipped"}) in events
+    assert types[-1] == "partial"
+    assert events[-1][1] == {"reason": "verified_partial"}

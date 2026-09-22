@@ -216,6 +216,8 @@ class VerificationResult(BaseModel):
         deterministic_failures: Reason codes from current/ACL/span checks.
         verifier_call_count: ``0`` or ``1``. Never 2.
         omitted_link_ids: Lower-priority links excluded from the batch.
+        verifier_skipped_reason: Verifier failure code when the call was
+            skipped and the checked answer was still released.
         status: Terminal status. Never fake success.
     """
 
@@ -225,4 +227,5 @@ class VerificationResult(BaseModel):
     deterministic_failures: tuple[str, ...] = ()
     verifier_call_count: Literal[0, 1] = 0
     omitted_link_ids: tuple[str, ...] = ()
+    verifier_skipped_reason: str | None = Field(default=None, max_length=64)
     status: Literal["verified", "verified_partial", "refused", "insufficient_evidence"]

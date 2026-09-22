@@ -44,6 +44,13 @@ FALLBACK_TABLE_PLAN_INCOMPLETE = "table_plan_incomplete"
 FALLBACK_MEMORY_UNAVAILABLE = "memory_unavailable"
 FALLBACK_RETRIEVERS_UNBOUND = "retrievers_unbound"
 LIMITATION_VERIFIER_OMITTED_LINKS = "verifier_omitted_links"
+LIMITATION_VERIFIER_SKIPPED = "verifier_skipped"
+"""Limitation code when the one verifier call failed or timed out and the
+deterministically checked answer was released as ``verified_partial``."""
+
+VERIFIER_SKIPPED_DETAIL_PREFIX = "verifier_skipped:"
+"""Prefix for ``detail`` when the verifier was skipped. Never equal to a
+``DEADLINE_REASONS`` member, so the SSE mapper does not emit ``deadline``."""
 
 ROUTING_CORRECTION_HYBRID_TO_COMBINED = "hybrid_to_combined"
 ROUTING_CORRECTION_SAME_ROUTE_RETRY = "same_route_retry"
@@ -57,6 +64,7 @@ __all__ = [
     "FALLBACK_RETRIEVERS_UNBOUND",
     "FALLBACK_TABLE_PLAN_INCOMPLETE",
     "LIMITATION_VERIFIER_OMITTED_LINKS",
+    "LIMITATION_VERIFIER_SKIPPED",
     "MAX_CORRECTIONS",
     "MAX_GRAPH_EXPANSIONS",
     "MAX_PREP_MODEL_CALLS",
@@ -70,5 +78,6 @@ __all__ = [
     "SUBQUESTION_CEILING",
     "USAGE_KIND_PROFILE",
     "VARIANT_CEILING",
+    "VERIFIER_SKIPPED_DETAIL_PREFIX",
     "WHOLE_DOCUMENT_SECTION_COVERAGE",
 ]

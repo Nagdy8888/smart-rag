@@ -105,8 +105,11 @@ deadline/budget partials (`deadline_exhausted`,
 `answer_deadline_reserve_exhausted`) emit a non-empty refusal token when
 one is available, an optional `limitation`, and exactly one `partial`.
 They are not `error` and not `empty_answer`. `empty_answer` is reserved
-for a supposedly releasable `verified` payload that is blank. Unknown
-faults stay one sanitized `error`. Generate-time expected refusals skip
+for a supposedly releasable `verified` payload that is blank. A finished
+answer whose verifier call failed uses limitation code `verifier_skipped`
+("The answer passed citation checks, but the final verification step timed out. Treat it as partial.")
+and a `partial` terminal. `deadline` is emitted only when no answer was
+produced. Unknown faults stay one sanitized `error`. Generate-time expected refusals skip
 the verifier node; the mapper still emits `verify_answer` completed so
 Ask can accept the refusal tokens.
 

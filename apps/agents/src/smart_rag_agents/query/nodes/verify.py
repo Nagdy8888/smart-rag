@@ -33,6 +33,7 @@ from smart_rag_core.query_answer.verifier import run_verifier_batch
 from smart_rag_core.query_routing.constants import (
     FALLBACK_RETRIEVERS_UNBOUND,
     LIMITATION_VERIFIER_OMITTED_LINKS,
+    VERIFIER_SKIPPED_DETAIL_PREFIX,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
@@ -61,7 +62,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         ``remaining_model_calls``, ``verifier_call_count``.
 
     State outputs:
-        ``verification``, accumulated ``prompt_tokens`` /
+        ``verification`` (including ``verifier_skipped_reason`` when the
+        verifier call failed), accumulated ``prompt_tokens`` /
         ``completion_tokens``, and possibly decremented remaining calls.
 
     Persistence writes:
@@ -84,7 +86,10 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         verifier payload never terminate ``verified``. Omitted IDs force
         ``verified_partial`` and ``verifier_omitted_links``. Invalid
         verifier JSON degrades to ``verified_partial`` with the
-        already-generated answer. Company answers without valid paragraph
+        already-generated answer. A verifier timeout or gateway failure
+        degrades to ``verified_partial`` with detail
+        ``verifier_skipped:<reason>`` and still persists citations.
+        Company answers without valid paragraph
         mappings become a citation-free refusal; fusion passages are never
         backfilled as citations.
 
@@ -156,6 +161,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     omitted: tuple[str, ...] = ()
     added_prompt_tokens = 0
     added_completion_tokens = 0
+    verifier_skipped_reason: str | None = None
     if checked.atomic_links and not is_web:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
@@ -192,20 +198,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 already_called=verifier_calls,
             )
         except (AnswerError, QueryCeilingError) as exc:
-            reason = getattr(exc, "reason", str(exc) or "verifier_failed")
-            if str(reason) == "model_call_exhausted":
-                return {
-                    **state,
-                    "status": "verified_partial",
-                    "detail": "model_call_exhausted",
-                    "answer": checked.model_dump(mode="json"),
-                }
-            return {
-                **state,
-                "status": "verified_partial",
-                "detail": str(reason),
-                "answer": checked.model_dump(mode="json"),
-            }
+            reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
+            verifier_skipped_reason = str(reason)[:64]
     if company_release_applies(checked, is_web=is_web):
         checked = render_verified_company_answer(
             checked, fusion=fusion, tables=tables.records
@@ -233,6 +227,12 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     else:
         terminal = "verified"
         detail = "answer verified"
+    if verifier_skipped_reason is not None and terminal in {
+        "verified",
+        "verified_partial",
+    }:
+        terminal = "verified_partial"
+        detail = f"{VERIFIER_SKIPPED_DETAIL_PREFIX}{verifier_skipped_reason}"[:128]
     if (
         terminal == "verified"
         and deps.model_gateway is None
@@ -310,6 +310,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         deterministic_failures=failures,
         verifier_call_count=1 if verifier_calls else 0,
         omitted_link_ids=omitted,
+        verifier_skipped_reason=verifier_skipped_reason,
         status=terminal
         if terminal
         in {"verified", "verified_partial", "refused", "insufficient_evidence"}

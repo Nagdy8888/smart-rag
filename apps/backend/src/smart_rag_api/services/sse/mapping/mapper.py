@@ -11,7 +11,7 @@ from smart_rag_api.services.sse.mapping.contracts import (
     PARTIAL_STATUSES,
     VERIFY_ANSWER_NODE,
 )
-from smart_rag_api.services.sse.mapping.limitations import limitation_from_update
+from smart_rag_api.services.sse.mapping.limitations import limitations_from_update
 from smart_rag_api.services.sse.mapping.progress import CustomProgressDecoder
 from smart_rag_api.services.sse.mapping.status import (
     reject_terminal_events,
@@ -143,9 +143,7 @@ class QuerySseMapper:
                 }
             events.append(status_event(node_name, update))
             self._progress.note_stage_terminal(node_name[:64])
-            limitation = limitation_from_update(update)
-            if limitation is not None:
-                events.append(limitation)
+            events.extend(limitations_from_update(update))
             parsed = payload_from_update(update)
             if node_name in DRAFT_ANSWER_NODES and parsed is not None:
                 self._draft = parsed

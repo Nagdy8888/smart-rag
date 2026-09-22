@@ -57,8 +57,13 @@ passage. A chain whose every link is supported remains an inference.
    link does not trigger another call. When omitted IDs exist, answer
    status is forced `partial` and SSE surfaces `verifier_omitted_links`.
    Status must not remain `complete`.
-3. Deadline or step exhaustion emits terminal `verified_partial` or
-   `insufficient_evidence`. It is not fake success.
+3. Deadline or step exhaustion before an answer exists emits terminal
+   `verified_partial` or `insufficient_evidence`. It is not fake success.
+   When the deterministic checks already passed and only the verifier
+   call times out or fails, the terminal is `verified_partial` with
+   detail `verifier_skipped:<reason>`. Citations still persist. SSE emits
+   limitation `verifier_skipped` and does not emit `deadline`. `deadline`
+   stays reserved for runs that produced no answer.
 4. `verified` requires a non-null model gateway. Unbound gateway or
    unbound Hybrid on a retrieval route is `verified_partial` or
    `insufficient_evidence`, never `verified`. Citations with

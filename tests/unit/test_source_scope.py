@@ -210,7 +210,9 @@ def test_unscoped_small_corpus_selects_long_document(
 ) -> None:
     """A small authorized corpus with one long document routes to v2 unscoped."""
 
-    def _no_matches(*_args: object, **_kwargs: object) -> tuple[tuple[object, str], ...]:
+    def _no_matches(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[object, str], ...]:
         """Return no title matches.
 
         Returns:
