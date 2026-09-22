@@ -13,6 +13,7 @@ from smart_rag_core.ingestion.parser.types import (
     SourceLocator,
     TypedElement,
 )
+from smart_rag_core.query_answer.versions import PARAGRAPH_DELIMITER
 
 # PyMuPDF 1.25.5 span ``flags`` bit 4 (``TEXT_FONT_BOLD``).
 PDF_TEXT_FONT_BOLD = 1 << 4
@@ -33,12 +34,14 @@ class PdfTextBlock(NamedTuple):
         bbox: ``(x0, y0, x1, y1)`` from the vendor line, else the parent block.
         max_size: Largest span size on the line.
         bold: True when any span has ``TEXT_FONT_BOLD``.
+        block_index: Position of the parent block in the page ``blocks`` list.
     """
 
     text: str
     bbox: tuple[float, float, float, float]
     max_size: float
     bold: bool
+    block_index: int
 
 
 def _union_pdf_bbox(
@@ -61,6 +64,36 @@ def _union_pdf_bbox(
         max(left[2], right[2]),
         max(left[3], right[3]),
     )
+
+
+def join_pdf_lines(pending: PdfTextBlock, block: PdfTextBlock) -> str:
+    """Join two paragraph lines without a mid-word break or a mid-block newline.
+
+    A trailing hyphen after a letter is removed when the next line starts with
+    a lowercase letter. Lines from the same PyMuPDF block are separated by a
+    space. Lines from different blocks use ``PARAGRAPH_DELIMITER`` so citation
+    spans can still see paragraph boundaries.
+
+    Args:
+        pending: Paragraph accumulated so far.
+        block: Next paragraph line in reading order.
+
+    Returns:
+        Joined text. Neither input is mutated.
+    """
+
+    left = pending.text
+    right = block.text
+    if (
+        len(left) >= 2
+        and left.endswith("-")
+        and left[-2].isalpha()
+        and right[:1].islower()
+    ):
+        return f"{left[:-1]}{right}"
+    if pending.block_index == block.block_index:
+        return f"{left} {right}"
+    return f"{left}{PARAGRAPH_DELIMITER}{right}"
 
 
 def merge_consecutive_pdf_paragraphs(
@@ -89,10 +122,11 @@ def merge_consecutive_pdf_paragraphs(
                 pending = block
                 continue
             pending = PdfTextBlock(
-                text=f"{pending.text}\n{block.text}",
+                text=join_pdf_lines(pending, block),
                 bbox=_union_pdf_bbox(pending.bbox, block.bbox),
                 max_size=max(pending.max_size, block.max_size),
                 bold=pending.bold or block.bold,
+                block_index=block.block_index,
             )
             continue
         if pending is not None:
@@ -394,7 +428,7 @@ def extract_pdf_text_blocks(
         return (), ()
     collected: list[PdfTextBlock] = []
     sizes: list[float] = []
-    for block in blocks:
+    for block_index, block in enumerate(blocks):
         if not isinstance(block, dict):
             continue
         block_map = cast(dict[object, object], block)
@@ -452,7 +486,13 @@ def extract_pdf_text_blocks(
                 continue
             bbox = _pdf_block_bbox(line_map.get("bbox")) or block_bbox
             collected.append(
-                PdfTextBlock(text=cleaned, bbox=bbox, max_size=max_size, bold=bold)
+                PdfTextBlock(
+                    text=cleaned,
+                    bbox=bbox,
+                    max_size=max_size,
+                    bold=bold,
+                    block_index=block_index,
+                )
             )
     return tuple(collected), tuple(sizes)
 

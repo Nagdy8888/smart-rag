@@ -160,7 +160,7 @@ The table below is the complete maintained map. Packet evidence under
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-15 | eng |
-| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-16 | eng, ops |
+| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-22 | eng, ops |
 | [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-09-21 | eng |
 | [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-09-21 | eng, security |
 | [ingestion/PARSER_SANDBOX.md](./ingestion/PARSER_SANDBOX.md) | engineering-lead | draft | 2026-09-16 | eng, security, ops |
