@@ -134,6 +134,8 @@ updated `daily.cld` to version 28131 and the contract tier then passed.
 - Citation deterministic failures above are text-artifact shaped.
   Grounded is below 27/30, so the optional PDF reflow packet is in
   scope after this record and must not block merge if it is still open.
+  The reflow re-ingest counts are in
+  [p06-post-fix-v2-acceptance-2026-09-22.md](./p06-post-fix-v2-acceptance-2026-09-22.md).
 - Two runs ended before a Hybrid coverage score was stored.
 
 ## Follow-ups
