@@ -33,6 +33,7 @@ from smart_rag_api.services.auth_team import (
 )
 from smart_rag_api.services.conversations import ConversationTitleResult
 from smart_rag_api.services.documents_http import DocumentRecord
+from smart_rag_api.services.upload_finalize import DuplicateContentError
 from smart_rag_core.conversations import ConversationRecord
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
@@ -1294,6 +1295,59 @@ def test_document_title_patch_is_owner_admin_only(
     paths = json_object(schema.get("paths", {}))
     document_path = json_object(paths["/documents/{document_id}"])
     assert "patch" in document_path
+
+
+def test_finalize_duplicate_content_is_409(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Finalize maps DuplicateContentError to HTTP 409 duplicate_content."""
+
+    class _DuplicateFinalizeService(_FakeDocumentService):
+        """Finalize stand-in that reports an existing content hash."""
+
+        def finalize_upload(self, caller: object, *, request: object) -> object:
+            """Reject every finalize as duplicate content.
+
+            Args:
+                caller: Authenticated caller.
+                request: Finalize payload.
+
+            Raises:
+                DuplicateContentError: Always.
+            """
+
+            del caller, request
+            raise DuplicateContentError("duplicate_content")
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.documents.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_document_service] = lambda: (
+        _DuplicateFinalizeService()
+    )
+    body = {
+        "reservation_id": str(uuid4()),
+        "object_name": "member/reservation/sample.txt",
+        "content_hash": "a" * 64,
+        "actual_bytes": 12,
+        "declared_category": "allowed",
+        "attestation_policy_version": "2026-08-13",
+        "idempotency_key": "idem-duplicate-1",
+    }
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        response = client.post(
+            "/documents/uploads/finalize",
+            headers=_identity(_MEMBER, "member"),
+            json=body,
+        )
+    assert response.status_code == 409
+    assert json_object(response.json())["detail"] == "duplicate_content"
 
 
 def test_citation_and_transcript_schemas_include_pdf_trace_fields() -> None:

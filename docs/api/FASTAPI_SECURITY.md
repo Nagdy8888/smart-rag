@@ -64,7 +64,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | DELETE | `/documents/{id}` | owner/admin | `delete_visible_document` wraps `exclude_version_from_retrieval` | COST_MUTATION; unseen **404**; visible member **403**; **204** |
 | PATCH | `/documents/{id}` | owner/admin | `update_document_title` | COST_MUTATION; body `{title}` 1–512 trimmed chars; unseen **404**; visible member **403**; empty/too-long **422**; **200** |
 | POST | `/documents/uploads` | member+ `upload_enabled` | quota reserve | COST_MUTATION; `signed_url` is null locally (Phase 10 CloudFront) |
-| POST | `/documents/uploads/finalize` | member+ upload | finalize RPC | COST_MUTATION |
+| POST | `/documents/uploads/finalize` | member+ upload | finalize RPC; same visible content hash is **409** `duplicate_content` before quota is consumed | COST_MUTATION |
 | POST/GET | `/conversations` | authenticated | creator insert / `list_user_conversations_page` | COST_MUTATION on create; GET `limit` default 50 max 200; keyset `cursor` |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |

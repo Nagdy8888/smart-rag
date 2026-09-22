@@ -1,4 +1,22 @@
 /**
+ * Message shown when finalize returns ``duplicate_content``.
+ */
+export const DUPLICATE_CONTENT_MESSAGE = "This file is already in the library.";
+
+/**
+ * Map a finalize failure the import banner should show verbatim.
+ *
+ * @param error - Mutation error from reserve, storage, or finalize.
+ * @returns The duplicate-content sentence, or null for other failures.
+ */
+export function uploadImportErrorMessage(error: unknown): string | null {
+  if (error instanceof Error && error.message === "duplicate_content") {
+    return DUPLICATE_CONTENT_MESSAGE;
+  }
+  return null;
+}
+
+/**
  * Reserve → upload → finalize and website crawl mutations.
  */
 

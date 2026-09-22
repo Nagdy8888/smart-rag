@@ -14,6 +14,7 @@ import { isClassifiedApiError } from "../../lib/api";
 import { apiFailureBanner } from "../../lib/failure-copy";
 import { DECLARED_CATEGORIES, type DeclaredCategory } from "../../lib/attestation";
 import styles from "./documents.module.css";
+import { uploadImportErrorMessage } from "./hooks/use-document-library-import";
 
 export type ImportFileTabProps = {
   /** Selected file. */
@@ -154,11 +155,12 @@ export function ImportFileTab({
       {uploadNote ? <p className={styles.muted}>{uploadNote}</p> : null}
       {uploadError ? (
         <StatusBanner kind="error" role="alert">
-          {uploadError.message.startsWith("storage_upload_failed")
-            ? "The file did not finish uploading. Try again after the storage write succeeds."
-            : isClassifiedApiError(uploadError)
-              ? apiFailureBanner(uploadError.failure)
-              : "Upload rejected. Server authorization is authoritative."}
+          {uploadImportErrorMessage(uploadError) ??
+            (uploadError.message.startsWith("storage_upload_failed")
+              ? "The file did not finish uploading. Try again after the storage write succeeds."
+              : isClassifiedApiError(uploadError)
+                ? apiFailureBanner(uploadError.failure)
+                : "Upload rejected. Server authorization is authoritative.")}
         </StatusBanner>
       ) : null}
     </div>

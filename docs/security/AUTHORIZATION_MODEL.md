@@ -96,6 +96,7 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `app.list_user_conversations_page` | caller context, limit, keyset cursor | Default 50, max 200, `created_at,id` cursor |
 | `app.get_version_ingestion_status` | caller context, version_id | DEFINER ACL status. Empty set when unauthorized (HTTP 404) |
 | `app.delete_visible_document` | caller context, document_id | Owner/admin tombstone wrapping `exclude_version_from_retrieval`. Unreadable ids return NULL |
+| `app.find_visible_document_by_content_hash` | caller context, content_hash | Oldest ACL-visible non-deleted document with that version hash. `SECURITY DEFINER`. NULL when none. Finalize returns HTTP 409 `duplicate_content` before quota is consumed |
 | `app.update_document_title` | caller context, document_id, title | Owner/admin rename. `SECURITY INVOKER`. Unreadable or deleted ids return NULL. Empty or over-long titles raise `documents:invalid_title`. Calls `app.sync_document_title_search_terms`. Does not delete copies |
 | `app.sync_document_title_search_terms` | document_id, title | Inserts the current title onto representative chunks of the current version. `SECURITY DEFINER` with fixed `search_path`. `EXECUTE` for `app_api` and `app_worker`. Does not re-parse or replace chunk ids |
 | `app.list_run_citations` | caller context, run_id | Creator-only. ACL + current-version recheck nulls `chunk_id` when unavailable |

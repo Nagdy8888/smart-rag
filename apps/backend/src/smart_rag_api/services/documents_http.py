@@ -15,6 +15,7 @@ from smart_rag_core.security.untrusted import isolate_untrusted_text
 
 from smart_rag_api.services.keyset import parse_created_at_id_cursor
 from smart_rag_api.services.upload_finalize import (
+    DuplicateContentError,
     UploadFinalizeError,
     UploadFinalizeOutcome,
     UploadFinalizeRequest,
@@ -290,6 +291,7 @@ class DocumentService:
 
         Raises:
             QueryAdmissionError: Viewers or callers without upload capability.
+            DuplicateContentError: Visible document already has this hash.
             UploadFinalizeError: Finalize RPC failure.
         """
 
@@ -374,6 +376,7 @@ def _document_row(row: object) -> DocumentRecord:
 __all__ = [
     "DocumentRecord",
     "DocumentService",
+    "DuplicateContentError",
     "UploadFinalizeError",
     "UploadQuotaError",
 ]

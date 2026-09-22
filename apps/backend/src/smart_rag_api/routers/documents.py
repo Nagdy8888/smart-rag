@@ -25,7 +25,10 @@ from smart_rag_api.services.documents_http import (
     UploadQuotaError,
 )
 from smart_rag_api.services.http_errors import raise_admission_http
-from smart_rag_api.services.upload_finalize import UploadFinalizeRequest
+from smart_rag_api.services.upload_finalize import (
+    DuplicateContentError,
+    UploadFinalizeRequest,
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -177,6 +180,11 @@ def finalize_upload_route(
         outcome = service.finalize_upload(caller, request=finalize_request)
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
+    except DuplicateContentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="duplicate_content",
+        ) from exc
     except UploadFinalizeError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
