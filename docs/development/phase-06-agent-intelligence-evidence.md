@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-21
+last-reviewed: 2026-09-22
 audience: engineering, reviewers
 ---
 
@@ -100,6 +100,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-71 — Deadline-budget exact admission repair (2026-09-21) | [phase-06/p06-71-proven-stage-repair-2026-09-21.md](./phase-06/p06-71-proven-stage-repair-2026-09-21.md) | 90 |
 | P06-72 — Live qualification (2026-09-21) | [phase-06/p06-72-live-qualification-2026-09-21.md](./phase-06/p06-72-live-qualification-2026-09-21.md) | 147 |
 | Post-merge 30-question acceptance (2026-09-21) | [phase-06/p06-post-merge-acceptance-2026-09-21.md](./phase-06/p06-post-merge-acceptance-2026-09-21.md) | 87 |
+| Post-fix 30-question acceptance (2026-09-22) | [phase-06/p06-post-fix-acceptance-2026-09-22.md](./phase-06/p06-post-fix-acceptance-2026-09-22.md) | 142 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |
