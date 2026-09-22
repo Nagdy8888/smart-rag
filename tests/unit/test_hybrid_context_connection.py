@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
 from smart_rag_agents.query.runtime.adapters_hybrid import (
     context_loader_for_connection,
 )
@@ -11,7 +12,7 @@ from smart_rag_core.security.identity import CallerContext, UserRole
 
 
 def test_context_loader_for_connection_reuses_the_given_connection(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Two loads use the injected connection and do not open another."""
 

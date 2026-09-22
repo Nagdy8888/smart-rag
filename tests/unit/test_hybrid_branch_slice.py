@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from uuid import uuid4
 
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.branch_channels.hybrid import run_hybrid
 from smart_rag_core.query_routing.models import BranchKind, BranchSpec
@@ -16,6 +17,8 @@ from tests.support.query_runtime import authorized_runtime
 
 class _RecordingRetriever:
     """Records the deadline passed into Hybrid retrieve."""
+
+    query_budget: QueryRetrieveBudget | None = None
 
     def __init__(self) -> None:
         """Start with no observed slice."""
@@ -29,7 +32,6 @@ class _RecordingRetriever:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
-        cache_mode: object | None = None,
     ) -> SimpleNamespace:
         """Record ``deadline_seconds`` and return an empty Hybrid outcome.
 
@@ -38,13 +40,12 @@ class _RecordingRetriever:
             caller: Server-derived caller.
             profile: Typed profile, unused.
             deadline_seconds: Slice under test.
-            cache_mode: Optional cache mode, unused.
 
         Returns:
             Outcome with no ranked IDs.
         """
 
-        del query, caller, profile, cache_mode
+        del query, caller, profile
         self.deadlines.append(deadline_seconds)
         return SimpleNamespace(
             ranked_ids=(),
