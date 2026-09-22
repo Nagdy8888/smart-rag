@@ -197,7 +197,7 @@ def build_query_process_bindings(
         crawl_proxy_gateway=crawl_gateway,
         web_critique_prompt_text=web_critique_prompt_text(),
         web_answer_prompt_text=web_answer_prompt_text(),
-        model_input_max_chars=int(getattr(loaded, "model_input_max_chars", 16_384)),
+        model_input_max_chars=int(getattr(loaded, "model_input_max_chars", 32_768)),
     )
 
 

@@ -17,7 +17,7 @@
   "section_quota": 2,
   "rerank_pool_size": 20,
   "final_evidence_max": 12,
-  "final_token_budget": 3500,
+  "final_token_budget": 6000,
   "coverage_thresholds": {
     "exact_code": 0.65,
     "alias": 0.65,

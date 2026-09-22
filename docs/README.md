@@ -32,7 +32,7 @@ The table below is the complete maintained map. Packet evidence under
 | [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
-| [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-16 | eng, reviewers |
+| [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-27 | eng, security |
 | [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
@@ -100,7 +100,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/DATASET_SPEC.md](./evaluation/DATASET_SPEC.md) | engineering-lead | draft | 2026-08-20 | eng, SME, reviewers |
 | [evaluation/QUERY_PROFILE_LABELING.md](./evaluation/QUERY_PROFILE_LABELING.md) | engineering-lead | draft | 2026-08-14 | eng, SME |
 | [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-18 | eng |
-| [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-09-16 | eng |
+| [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-27 | eng, ops, security |
 | [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-25 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
@@ -156,7 +156,7 @@ The table below is the complete maintained map. Packet evidence under
 | [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [retrieval/BM25_PROJECTION_CONTRACT.md](./retrieval/BM25_PROJECTION_CONTRACT.md) | engineering-lead | draft | 2026-09-09 | eng |
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
-| [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-08-14 | eng |
+| [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-15 | eng |
 | [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-16 | eng, ops |

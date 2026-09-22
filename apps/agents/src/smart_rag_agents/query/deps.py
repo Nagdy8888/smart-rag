@@ -100,7 +100,7 @@ class QueryGraphDeps:
     web_search_configured: bool = False
     exa_search_gateway: object | None = None
     crawl_proxy_gateway: object | None = None
-    model_input_max_chars: int = 16_384
+    model_input_max_chars: int = 32_768
     now: Callable[[], datetime] | None = None
 
 

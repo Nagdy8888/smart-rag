@@ -472,7 +472,7 @@ def run_oracle_answer(
         user_query=query,
         fusion=fusion,
         tables=(),
-        max_input_chars=16_384,
+        max_input_chars=32_768,
         route=fusion.effective_route,
     )
     fusion = fit.fusion

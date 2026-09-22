@@ -70,4 +70,4 @@ class QueryGraphProcessBindings:
     crawl_proxy_gateway: object | None = None
     web_critique_prompt_text: str = ""
     web_answer_prompt_text: str = ""
-    model_input_max_chars: int = 16_384
+    model_input_max_chars: int = 32_768

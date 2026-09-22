@@ -73,7 +73,7 @@ class SharedSettings(BaseSettings):
             ``phase-1-foundation-v1``.
         model_input_max_chars: Maximum model input size from
             ``MODEL_INPUT_MAX_CHARS``. Public, bounded from 1 through 65536,
-            default 16384 characters.
+            default 32768 characters.
         openai_chat_model_id: Default OpenAI chat model from
             ``OPENAI_CHAT_MODEL_ID``. Public, default ``gpt-4o-mini``.
         openai_embedding_model: OpenAI embedding model from
@@ -190,7 +190,7 @@ class SharedSettings(BaseSettings):
         json_schema_extra={"security": "internal"},
     )
     model_input_max_chars: int = Field(
-        default=16_384,
+        default=32_768,
         validation_alias="MODEL_INPUT_MAX_CHARS",
         ge=1,
         le=65_536,

@@ -29,7 +29,7 @@ Validation errors list field paths and categories but omit source values.
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
 | `LANGSMITH_EXPORT_IO` | boolean; `false` | public | Local-only. When `true` with `APP_ENV=local` and tracing on, LangSmith receives the user message, assistant reply, model prompts, and completions. Token counts and estimated USD export even when this flag is false. Staging and production reject the flag. API keys, JWTs, and embedding vectors stay omitted. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) and [ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md) |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
-| `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 16,384 | public | Deployable gateway input bound |
+| `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 32,768 | public | Deployable gateway input bound |
 | `VALKEY_LIMITS_URL` | optional URL | secret | Rate-limit Valkey. Packet 5 connects per command at request time, never at import. Unset falls back to Postgres for mutations |
 | `VALKEY_CACHE_URL` | optional URL | secret | Cache Valkey. Never authority; retrieval hits recheck Postgres |
 | `PARADEDB_URL` | optional URL | secret | Worker/API ParadeDB DSN. Packet 8 host pytest uses `docker-compose.packet8.yml` loopback `:54329` |

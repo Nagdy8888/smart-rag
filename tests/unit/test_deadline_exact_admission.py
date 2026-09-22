@@ -165,7 +165,7 @@ def test_deadline_repair_does_not_raise_ceilings_or_mutate_default() -> None:
     """ACL-adjacent ceilings and frozen default bytes stay unchanged."""
 
     settings = SharedSettings()
-    assert settings.model_input_max_chars == 16_384
+    assert settings.model_input_max_chars == 32_768
     assert HYBRID_DEADLINE_SECONDS == 25
     assert RERANK_RESERVED_SECONDS == 3.0
     payload = json.loads(FROZEN_PROFILE_PATH.read_text(encoding="utf-8"))

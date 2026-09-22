@@ -93,7 +93,7 @@ def generate_grounded_answer(
         user_query=user_query,
         fusion=fusion,
         tables=tables,
-        max_input_chars=16_384,
+        max_input_chars=32_768,
         route=fusion.effective_route,
     )
     if fit.trim_reason == "input_bound_exceeded":

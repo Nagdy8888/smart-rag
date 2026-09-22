@@ -226,7 +226,7 @@ flowchart TD
   mmrSkip --> parents["Recheck parents. Adjacent from authorized pool"]
   rrf --> parents
   mmr --> parents
-  parents --> trim["Cap 12 units / 3500 tokens. Canonical raw_text only"]
+  parents --> trim["Cap 12 units / 6000 tokens. Canonical raw_text only"]
 ```
 
 Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md).
@@ -241,7 +241,7 @@ Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.
 | Excerpt bound | chars / passage | Input bound | 1–400 | **400** | `RERANK_EXCERPT_CHARS` | Canonical `raw_text` only | retrieval | 400 | Token miss |
 | MMR lambda | mix | Plan | (0, 1] | **0.7** provisional | Jaccard on `arabic_norm_v1` | Unit diversity test | retrieval | 0.7 | Packet 6 |
 | Document / section quota | passages | Plan | ≥1 | **2 / 2** | unit quota | Retrieval MMR keeps this floor. Post-fusion `apply_document_section_quotas` raises it with `max(floor, ceil(limit / distinct))` so a single-document corpus can fill 12 slots | retrieval | 2 | Packet 6 |
-| Final evidence | units / tokens | Plan ~8–12 | ≤12 / ≤3500 | **12 / 3500** | trim after parents | Recheck after expansion | retrieval | 12 / 3500 | Packet 6 |
+| Final evidence | units / tokens | Plan ~8–12 | ≤12 / ≤6000 | **12 / 6000** | trim after parents | Recheck after expansion | retrieval | 12 / 3500 | Packet 6 |
 | Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip; Packet 6 did not retune | retrieval | same | Live always-rerank |
 
 `app.fetch_authorized_chunk_context` still raises `context_batch_exceeds_limit`
@@ -289,7 +289,7 @@ flowchart TD
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Coverage threshold (all classes) | score | Development baseline 0.65 | 0.50–0.90 | **0.65** | `hybrid_default_v1` SHA-256 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` | [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) | retrieval | 0.65 | Independently sealed holdout (not opened in Packet 8) |
+| Coverage threshold (all classes) | score | Development baseline 0.65 | 0.50–0.90 | **0.65** | `hybrid_default_v1` SHA-256 `37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0` | [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) | retrieval | 0.65 | Independently sealed holdout (not opened in Packet 8) |
 | False-supported loss weight | weight | Plan | >0 | **2** | occupancy eval | Qualification confirm | retrieval | 2 | Label revision |
 | Unnecessary-refusal loss weight | weight | Plan | >0 | **1** | occupancy eval | Qualification confirm | retrieval | 1 | Label revision |
 | Profile id | id | Packet 3 | allow-listed | **`hybrid_default_v1`** | hashed JSON | Unknown id fails closed | retrieval | `hybrid_packet5_v1` docs-only | Hash mismatch |

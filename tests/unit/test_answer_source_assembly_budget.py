@@ -169,6 +169,26 @@ def test_q15_sized_passages_fit_under_model_input_bound() -> None:
     assert set(fit.included_chunk_ids).isdisjoint(fit.dropped_chunk_ids)
 
 
+def test_twelve_passages_fit_under_32768_input_bound() -> None:
+    """Twelve 1500-character passages stay inside the 32768 input bound."""
+
+    passages = tuple(
+        _passage(index=index, text=f"{index:04d}" + ("a" * 1496))
+        for index in range(1, 13)
+    )
+    fusion = _fusion(passages)
+    fit = fit_source_records(
+        user_query="List the named items.",
+        fusion=fusion,
+        tables=(),
+        max_input_chars=32_768,
+        route="hybrid",
+    )
+    assert fit.trim_reason == ""
+    assert fit.included_chunk_ids == tuple(item.chunk_id for item in passages)
+    assert fit.dropped_chunk_ids == ()
+
+
 def test_exact_normalized_duplicates_keep_highest_ranked() -> None:
     """Two chunk IDs with identical normalized text keep the first ranked ID."""
 
