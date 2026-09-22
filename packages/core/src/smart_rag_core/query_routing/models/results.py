@@ -62,6 +62,8 @@ class HybridBranchDiagnostics(BaseModel):
         term_ids: Authorized term IDs, capped at 30.
         fused_ids: Authorized fused IDs, capped at 100.
         selected_ids: Final evidence IDs, capped at 12.
+        rerank_pool_ids: Chunk IDs that entered the one-shot rerank pool,
+            in pool order, capped at 100.
         coverage_score: Frozen min() coverage when computed.
         term_coverage: Required-term component.
         subquestion_coverage: Subquestion component.
@@ -84,6 +86,7 @@ class HybridBranchDiagnostics(BaseModel):
     term_ids: tuple[str, ...] = Field(default=(), max_length=30)
     fused_ids: tuple[str, ...] = Field(default=(), max_length=100)
     selected_ids: tuple[str, ...] = Field(default=(), max_length=12)
+    rerank_pool_ids: tuple[str, ...] = Field(default=(), max_length=100)
     coverage_score: float | None = Field(default=None, ge=0.0, le=1.0)
     term_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
     subquestion_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -97,6 +100,7 @@ class HybridBranchDiagnostics(BaseModel):
         "term_ids",
         "fused_ids",
         "selected_ids",
+        "rerank_pool_ids",
     )
     @classmethod
     def ids_are_uuid_strings(cls, value: tuple[str, ...]) -> tuple[str, ...]:

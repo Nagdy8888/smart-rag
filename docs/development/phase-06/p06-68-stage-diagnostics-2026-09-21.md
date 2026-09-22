@@ -56,6 +56,7 @@ flowchart TD
 | `term_ids` | UUID strings, max 30 |
 | `fused_ids` | UUID strings, max 100 |
 | `selected_ids` | UUID strings, max 12 |
+| `rerank_pool_ids` | UUID strings, max 100, copied from `HybridRunResult.rerank_order` |
 | coverage components | optional 0.0–1.0 |
 | `effective_route` | executed branch family |
 
