@@ -949,3 +949,134 @@ def test_verify_node_rejects_ungrounded_mcp_expansion() -> None:
     payload = AnswerPayload.model_validate(verified["answer"])
     assert verified["status"] != "verified"
     assert "Method Call Protocol" not in payload.answer_text
+
+
+def test_binder_retargets_parent_citation_to_unique_leaf() -> None:
+    """A span inside exactly one nested evidence chunk cites that chunk."""
+
+    child_text = "Refund period is 30 days from purchase."
+    parent_text = f"Intro paragraph. {child_text} Shipping is refunded too."
+    fusion = verifier_fusion(
+        verifier_passage(1, text=parent_text),
+        verifier_passage(2, text=child_text),
+    )
+    parent_id = fusion.evidence[0].chunk_id
+    child_id = fusion.evidence[1].chunk_id
+    payload = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="Refunds take 30 days.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=parent_id,
+                span=child_text,
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="Refunds take 30 days.",
+                chunk_ids=(parent_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    bound = bind_company_atomic_links(payload, fusion=fusion)
+    assert bound.citations[0].chunk_id == child_id
+    assert child_id in bound.atomic_links[0].chunk_ids
+    checked, failures = deterministic_check_answer(
+        bound, fusion=fusion, tables=(), require_paragraphs=True
+    )
+    assert "citation_link_mismatch" not in failures
+    assert "paragraph_unmapped" not in failures
+    assert "unauthorized_or_missing_passage" not in failures
+    assert checked.status != "refused"
+
+
+def test_binder_repairs_link_id_and_link_chunks() -> None:
+    """A wrong atomic_link_id and a missing link chunk are repaired, not refused."""
+
+    text = "Refund period is 30 days from purchase."
+    fusion = verifier_fusion(verifier_passage(1, text=text))
+    chunk_id = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="Refunds take 30 days.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=text,
+                paragraph_index=0,
+                atomic_link_id="wrong",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(link_id="l1", claim="Refunds take 30 days.", chunk_ids=()),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    bound = bind_company_atomic_links(payload, fusion=fusion)
+    assert bound.citations[0].atomic_link_id == "l1"
+    assert bound.atomic_links[0].chunk_ids == (chunk_id,)
+    _, failures = deterministic_check_answer(
+        bound, fusion=fusion, tables=(), require_paragraphs=True
+    )
+    assert "citation_link_mismatch" not in failures
+    assert "paragraph_unmapped" not in failures
+
+
+def test_binder_does_not_retarget_when_two_leaves_match() -> None:
+    """A repeated sentence in two nested chunks keeps the parent citation."""
+
+    repeated = "Refund period is 30 days from purchase."
+    parent_text = f"{repeated} Some more text. {repeated}"
+    fusion = verifier_fusion(
+        verifier_passage(1, text=parent_text),
+        verifier_passage(2, text=repeated),
+        verifier_passage(3, text=f"{repeated} Some more text."),
+    )
+    parent_id = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="Refunds take 30 days.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=parent_id,
+                span=repeated,
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="Refunds take 30 days.",
+                chunk_ids=(parent_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    bound = bind_company_atomic_links(payload, fusion=fusion)
+    assert bound.citations[0].chunk_id == parent_id

@@ -174,6 +174,12 @@ non-gold evidence in `k28`, `k02`, and `k44`. `k44` still passed, so the
 code does not always replace the answer, but paragraph mapping is
 unreliable across the run, not just on these two questions.
 
+The binder repair in
+[p06-51-grounded-claim-release-2026-09-16.md](../development/phase-06/p06-51-grounded-claim-release-2026-09-16.md)
+retargets a parent citation to a unique in-evidence leaf and repairs
+link-id and link-chunk bookkeeping before the paragraph contract. It
+does not change the contract's failure codes.
+
 ### 3d. Deadline and rerank timeout, 3
 
 - `k24`: gold page in evidence, no answer produced
