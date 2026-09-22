@@ -14,6 +14,8 @@ Scoring rules:
 [DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md).
 Root-cause analysis of the 33 misses:
 [KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md).
+Repair rerun:
+[KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md).
 
 Fifty questions whose required phrases were checked against the current
 indexed book, version `e119bf87-1c70-4e10-abb1-5666c4f728c4`. Each

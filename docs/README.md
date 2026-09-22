@@ -183,6 +183,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
+| [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |

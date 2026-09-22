@@ -14,6 +14,8 @@ Scoring rules:
 [DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md).
 Retrieval contract:
 [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md).
+Repair rerun:
+[KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md).
 
 The review document reports what the run showed. This document names
 the defects behind the 33 misses, ties each one to the code path that
