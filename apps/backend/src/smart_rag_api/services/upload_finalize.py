@@ -18,6 +18,10 @@ class UploadFinalizeError(Exception):
     """Raised when quarantine upload finalization fails closed."""
 
 
+class DuplicateContentError(UploadFinalizeError):
+    """Raised when the finalize content hash already belongs to a visible document."""
+
+
 @dataclass(frozen=True, slots=True)
 class UploadFinalizeRequest:
     """Server-side upload finalization inputs."""
@@ -44,6 +48,54 @@ class UploadFinalizeOutcome:
     job_id: UUID
 
 
+def _visible_document_id(
+    postgres_url: str,
+    *,
+    caller_user_id: UUID,
+    caller_role: str,
+    caller_authorization_version: int,
+    content_hash: str,
+) -> UUID | None:
+    """Return a visible document that already stores this content hash.
+
+    Args:
+        postgres_url: Database URL used with ``SET ROLE app_api``.
+        caller_user_id: Server-derived subject.
+        caller_role: Server-derived role text.
+        caller_authorization_version: Live authorization snapshot.
+        content_hash: Lowercase SHA-256 hex of the uploaded bytes.
+
+    Returns:
+        Document id when the caller can read a non-deleted match.
+        ``None`` when no visible document has this hash.
+
+    Raises:
+        UploadFinalizeError: When the lookup RPC fails.
+    """
+
+    try:
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            row = connection.execute(
+                """
+                SELECT app.find_visible_document_by_content_hash(
+                  %s::uuid, %s::text, %s::bigint, %s::text
+                )
+                """,
+                (
+                    caller_user_id,
+                    caller_role,
+                    caller_authorization_version,
+                    content_hash,
+                ),
+            ).fetchone()
+    except psycopg.Error as exc:
+        raise UploadFinalizeError(str(exc)) from exc
+    if row is None or row[0] is None:
+        return None
+    return UUID(str(row[0]))
+
+
 def finalize_quarantine_upload(
     postgres_url: str,
     *,
@@ -65,12 +117,25 @@ def finalize_quarantine_upload(
         Quota finalize result plus created document/version/job ids.
 
     Raises:
+        DuplicateContentError: When a non-deleted visible document already
+            stores this content hash. Raised before quota is consumed.
         UploadFinalizeError: When quota, authorization, or RPC validation fails.
 
     Side Effects:
         Commits reservation finalize, creates document/version/job rows, appends
-        audit event through SQL RPC.
+        audit event through SQL RPC. No write when the content hash is already
+        visible.
     """
+
+    existing = _visible_document_id(
+        postgres_url,
+        caller_user_id=caller_user_id,
+        caller_role=caller_role,
+        caller_authorization_version=caller_authorization_version,
+        content_hash=request.content_hash.lower(),
+    )
+    if existing is not None:
+        raise DuplicateContentError("duplicate_content")
 
     quota = finalize_upload_quota(
         postgres_url,

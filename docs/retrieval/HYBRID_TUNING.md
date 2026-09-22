@@ -28,7 +28,7 @@ Related: [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md) ·
 | --- | --- |
 | Profile id | `hybrid_default_v1` |
 | Artifact | `packages/core/src/smart_rag_core/retrieval/frozen/hybrid_default_v1.json` |
-| SHA-256 | `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` |
+| SHA-256 | `37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0` |
 | Rollback id | `hybrid_packet5_v1` (signals only; not a live runtime profile) |
 | Coverage threshold | `0.65` for every labeled query class |
 | Unequal channel weights | not selected |

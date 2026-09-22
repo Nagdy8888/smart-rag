@@ -34,7 +34,7 @@ Related: [COMBINED_FUSION.md](./COMBINED_FUSION.md) ·
 
 Source records are delimited as `<<untrusted-source>>`. Embedded
 instructions stay inside the record. Company answers fit whole records
-under the existing `MODEL_INPUT_MAX_CHARS` bound (16,384) with
+under the existing `MODEL_INPUT_MAX_CHARS` bound (32,768) with
 `fit_source_records`. Later exact normalized duplicates drop. Passages
 are never truncated to fill leftover bytes. Overflow after fitting is
 `input_bound_exceeded` with a non-empty refusal. Dropped IDs cannot be

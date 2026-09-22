@@ -47,7 +47,10 @@ from smart_rag_core.query_fusion.models import (
     GraphPassage,
     GraphPathInput,
     HybridPassage,
+    PassageOrigin,
+    ScoredPassage,
 )
+from smart_rag_core.query_fusion.quotas import apply_document_section_quotas
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.models import BranchKind, BranchResult
 from smart_rag_core.retrieval.graph import GRAPH_SURVIVAL_FALLBACK_THRESHOLD
@@ -687,3 +690,66 @@ def test_resolved_path_fusion_beats_naive_union_on_dev_fixtures() -> None:
     assert atlas.hybrid_success is False
     assert multi.fusion_success is True
     assert multi.union_success is False
+
+
+def _scored(index: int, *, doc: int, section: str) -> ScoredPassage:
+    """Build one hybrid scored passage for quota tests.
+
+    Args:
+        index: Chunk discriminator.
+        doc: Document discriminator.
+        section: First heading.
+
+    Returns:
+        Scored passage in stable rank order.
+    """
+
+    return ScoredPassage(
+        chunk_id=_uid(index),
+        document_id=_uid(10_000 + doc),
+        version_id=_uid(20_000),
+        citation_text="passage",
+        hybrid_rank=index,
+        combined_score=1.0 / index,
+        origin=PassageOrigin.HYBRID,
+        graph_discovered_only=False,
+        section_path=(section,),
+    )
+
+
+def test_single_document_quota_scales_to_limit() -> None:
+    """One document and one heading can fill all 12 evidence slots."""
+
+    ordered = tuple(_scored(index, doc=1, section="Chapter") for index in range(1, 13))
+    selected = apply_document_section_quotas(ordered)
+    assert len(selected) == 12
+
+
+def test_two_documents_quota_is_six_each() -> None:
+    """Two documents each keep half of the 12-slot limit."""
+
+    ordered = tuple(
+        _scored(index, doc=1 if index <= 8 else 2, section=f"S{1 if index <= 8 else 2}")
+        for index in range(1, 17)
+    )
+    selected = apply_document_section_quotas(ordered)
+    counts: dict[str, int] = {}
+    for item in selected:
+        counts[item.document_id] = counts.get(item.document_id, 0) + 1
+    assert len(selected) == 12
+    assert sorted(counts.values()) == [6, 6]
+
+
+def test_eight_documents_keep_frozen_quota_two() -> None:
+    """Eight documents stay at the frozen floor of two passages each."""
+
+    ordered = tuple(
+        _scored(index, doc=(index - 1) // 3 + 1, section=f"S{(index - 1) // 3 + 1}")
+        for index in range(1, 25)
+    )
+    selected = apply_document_section_quotas(ordered)
+    counts: dict[str, int] = {}
+    for item in selected:
+        counts[item.document_id] = counts.get(item.document_id, 0) + 1
+    assert len(selected) == 12
+    assert max(counts.values()) == 2

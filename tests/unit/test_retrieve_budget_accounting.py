@@ -176,9 +176,9 @@ def test_retrieve_budget_binds_run_connection() -> None:
 
 
 def test_rerank_reserve_is_inside_retrieval_slice_not_answer_stage() -> None:
-    """Rerank time comes from the 8s retrieve slice, not the answer reserve."""
+    """Rerank time comes from the 10s retrieve slice, not the answer reserve."""
 
-    assert RERANK_RESERVED_SECONDS == 2.0
+    assert RERANK_RESERVED_SECONDS == 3.0
     assert RERANK_RESERVED_SECONDS != ANSWER_STAGE_MIN_SECONDS
     assert ANSWER_STAGE_MIN_SECONDS == 8.0
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from smart_rag_core.query_fusion.constants import (
     FUSION_DOCUMENT_QUOTA,
     FUSION_FINAL_EVIDENCE_MAX,
@@ -19,28 +21,43 @@ def apply_document_section_quotas(
     section_quota: int = FUSION_SECTION_QUOTA,
     limit: int = FUSION_FINAL_EVIDENCE_MAX,
 ) -> tuple[ScoredPassage, ...]:
-    """Keep at most ``limit`` passages with frozen per-document/section quotas.
+    """Keep at most ``limit`` passages with per-document and per-section quotas.
+
+    The frozen values (2 and 2) are a floor. When the pool has fewer distinct
+    documents or first headings than ``limit / floor``, the effective quota
+    rises so one document can fill the evidence limit. Six or more distinct
+    documents keep the floor of 2.
 
     Args:
         ordered: Passages in Combined (or union) score/rank order.
-        document_quota: Max passages per document. Frozen at 2.
-        section_quota: Max passages per first heading. Frozen at 2.
+        document_quota: Minimum passages per document. Frozen floor is 2.
+        section_quota: Minimum passages per first heading. Frozen floor is 2.
         limit: Final evidence cap. Frozen at 12.
 
     Returns:
         Selected passages in input order.
     """
 
+    distinct_docs = len({item.document_id for item in ordered})
+    distinct_sections = len(
+        {item.section_path[0] for item in ordered if item.section_path}
+    )
+    effective_doc_quota = max(document_quota, math.ceil(limit / max(1, distinct_docs)))
+    effective_section_quota = (
+        max(section_quota, math.ceil(limit / distinct_sections))
+        if distinct_sections
+        else section_quota
+    )
     selected: list[ScoredPassage] = []
     doc_counts: dict[str, int] = {}
     section_counts: dict[str, int] = {}
     for item in ordered:
         if len(selected) >= limit:
             break
-        if doc_counts.get(item.document_id, 0) >= document_quota:
+        if doc_counts.get(item.document_id, 0) >= effective_doc_quota:
             continue
         section = item.section_path[0] if item.section_path else ""
-        if section and section_counts.get(section, 0) >= section_quota:
+        if section and section_counts.get(section, 0) >= effective_section_quota:
             continue
         selected.append(item)
         doc_counts[item.document_id] = doc_counts.get(item.document_id, 0) + 1

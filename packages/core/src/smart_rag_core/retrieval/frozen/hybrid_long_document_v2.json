@@ -17,7 +17,7 @@
   "section_quota": 2,
   "rerank_pool_size": 20,
   "final_evidence_max": 12,
-  "final_token_budget": 3500,
+  "final_token_budget": 6000,
   "rerank_max_per_document": 20,
   "excerpt_chars": 800,
   "mmr_candidate_depth": 20,

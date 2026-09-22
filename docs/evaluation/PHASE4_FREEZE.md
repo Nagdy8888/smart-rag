@@ -44,7 +44,7 @@ flowchart TD
 - Open splits `293`
 - Holdout ids in sealed manifest `112`
 - Deferred later-phase labels on open splits `81`
-- Profile `hybrid_default_v1` SHA-256 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`
+- Profile `hybrid_default_v1` SHA-256 `37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0`
 
 ## Artifact hashes
 
@@ -52,8 +52,8 @@ flowchart TD
 | --- | --- |
 | `corpus_meta_file` | `887f770355041d65ed6238b1cd1f23ceacf13feadb964e07e5dabedd34399b7e` |
 | `holdout_manifest_file` | `afcd733c02f65d18d2b745933e0b74ca4aec165c6279d651bb2ba6d491a2b052` |
-| `hybrid_default_v1` | `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` |
-| `hybrid_default_v1_file` | `6fddae55bf127828192f93479f5454618ae1e5c71c2970d105ed868806f4aaa4` |
+| `hybrid_default_v1` | `37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0` |
+| `hybrid_default_v1_file` | `c7d3cf97029b08c7934ac6148c0d49f8ca6affeabd283078a0042ae3a449334d` |
 | `manifest_development` | `9dcbe2c564d33a38fba096253d60d2c8172fb9dd6c76bf95627446c857f89264` |
 | `manifest_holdout` | `7c70b4267efbd9df46247c099333ef7e82ed4ccc6df906727d8997e7bcacada2` |
 | `manifest_qualification` | `716ea031255217a82fa8ce2a1d7f89dbf17e841a99e7b1f4dc4de3a51d42cc14` |

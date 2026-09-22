@@ -222,6 +222,17 @@ describe("DocumentLibrary upload", () => {
     expect(reserveUpload).not.toHaveBeenCalled();
   });
 
+  it("says the file is already in the library when finalize is duplicate_content", async () => {
+    finalizeUpload.mockRejectedValueOnce(new Error("duplicate_content"));
+    renderSurface(<DocumentLibrary />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Import source" }))[0]);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File(["hello"], "policy.pdf", { type: "application/pdf" }));
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    expect(await screen.findByText("This file is already in the library.")).toBeInTheDocument();
+  });
+
   it("shows a failure banner when finalize rejects and keeps the same retry key", async () => {
     finalizeUpload.mockRejectedValueOnce(new Error("upload_finalize_rejected"));
     renderSurface(<DocumentLibrary />);

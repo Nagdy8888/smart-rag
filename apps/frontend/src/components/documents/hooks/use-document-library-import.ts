@@ -1,7 +1,3 @@
-/**
- * Reserve → upload → finalize and website crawl mutations.
- */
-
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +25,24 @@ import {
   uploadReservedObject,
 } from "../../../lib/upload-client";
 import type { ImportSourceTab } from "../import-source-sheet";
+
+/**
+ * Message shown when finalize returns ``duplicate_content``.
+ */
+export const DUPLICATE_CONTENT_MESSAGE = "This file is already in the library.";
+
+/**
+ * Map a finalize failure the import banner should show verbatim.
+ *
+ * @param error - Mutation error from reserve, storage, or finalize.
+ * @returns The duplicate-content sentence, or null for other failures.
+ */
+export function uploadImportErrorMessage(error: unknown): string | null {
+  if (error instanceof Error && error.message === "duplicate_content") {
+    return DUPLICATE_CONTENT_MESSAGE;
+  }
+  return null;
+}
 
 /**
  * Own import drawer state and paid upload/crawl mutations.

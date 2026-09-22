@@ -65,7 +65,7 @@ kind cap and is not enlarged. Company answer plus verifier reserve two
 model calls and eight seconds: optional profile/correction/retrieve spends
 must leave `ANSWER_STAGE_RESERVED_MODEL_CALLS` (2) and
 `ANSWER_STAGE_MIN_SECONDS` (8.0). Retrieve-time OpenAI rerank additionally
-requires `RERANK_RESERVED_SECONDS` (2.0) remaining in the existing 8s
+requires `RERANK_RESERVED_SECONDS` (3.0) remaining in the 10s
 Hybrid retrieve slice; when that reserve is unmet, retrieve records
 `rerank_timeout` and continues with RRF. Version-scoped exact dense
 additionally requires `EXACT_START_MIN_SLICE_SECONDS` (25.0) remaining

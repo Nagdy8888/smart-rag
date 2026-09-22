@@ -6,8 +6,9 @@ the 90-day ``recent`` window, and the 25-second Hybrid deadline. Packet 5 freeze
 the top-20 rerank pool, max five passages per document, MMR lambda 0.7, and
 parent/context bounds. Packet 6 freezes per-class ``coverage_score`` thresholds
 at ``0.65`` in ``retrieval/frozen/hybrid_default_v1.json``. Packet 9 Wave 1A
-freezes ``RETRIEVAL_SLICE_SECONDS`` at the 8s statement-timeout bound and
 adds named fallbacks for dense/term/auth/empty retrieve failures.
+``RETRIEVAL_SLICE_SECONDS`` is 10s for channels plus rerank. The 8000 ms
+statement timeout stays the per-SQL bound and no longer defines the slice.
 """
 
 from __future__ import annotations
@@ -44,8 +45,9 @@ METADATA_FACTOR_MIN = 1.0
 METADATA_FACTOR_MAX = 1.15
 RECENT_WINDOW_DAYS = 90
 HYBRID_DEADLINE_SECONDS = 25
-RETRIEVAL_SLICE_SECONDS = RETRIEVAL_STATEMENT_TIMEOUT_MS / 1000.0
-RERANK_RESERVED_SECONDS = 2.0
+RETRIEVAL_SLICE_SECONDS = 10.0
+"""Channel plus rerank slice. Independent of the 8000 ms SQL timeout."""
+RERANK_RESERVED_SECONDS = 3.0
 """Minimum remaining slice seconds required to start OpenAI rerank."""
 EXACT_START_MIN_SLICE_SECONDS = HYBRID_DEADLINE_SECONDS
 """Exact dense starts only when the retrieve slice is at least the Hybrid
@@ -61,7 +63,7 @@ RERANK_EXCERPT_CHARS = 400
 RERANK_PROMPT_VERSION = "rerank_v1"
 RERANK_MAX_OUTPUT_TOKENS = 2_048
 FINAL_EVIDENCE_MAX = 12
-FINAL_TOKEN_BUDGET = 3_500
+FINAL_TOKEN_BUDGET = 6_000
 MMR_LAMBDA = 0.7
 MMR_CANDIDATE_DEPTH = 20
 DOCUMENT_QUOTA = 2

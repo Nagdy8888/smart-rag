@@ -203,6 +203,30 @@ def build_pdf_text_fixture() -> tuple[bytes, str]:
     return payload, sha256_bytes(payload)
 
 
+def build_pdf_hyphen_fixture() -> tuple[bytes, str]:
+    """Build a one-page PDF whose body is split on a trailing hyphen.
+
+    Returns:
+        PDF bytes and SHA-256 digest.
+    """
+
+    document = _open_pdf()
+    page = _call_vendor(document, "new_page")
+    _call_vendor(
+        page, "insert_text", (72, 120), "The parser rejoins hyphen-", fontsize=11
+    )
+    _call_vendor(
+        page,
+        "insert_text",
+        (72, 136),
+        "ated words in body copy.",
+        fontsize=11,
+    )
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
+    return payload, sha256_bytes(payload)
+
+
 def build_pdf_page_label_fixture() -> tuple[bytes, str]:
     """Build a one-page PDF whose printed label is 50, not file page 1.
 
