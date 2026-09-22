@@ -10,6 +10,7 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.sse import store as sse_store_mod
 from smart_rag_core.sse.store import (
     EVENT_STORE_LOCK_TIMEOUT_SQL,
+    EVENT_STORE_SESSION_SQL,
     PostgresRunEventStore,
     sqlstate_of,
 )
@@ -79,9 +80,10 @@ def test_postgres_event_store_reuses_and_closes_session(monkeypatch: Any) -> Non
     store.close()
 
     assert calls.count("CONNECT postgresql://hosted PREPARE None") == 1
-    assert calls.count("SET ROLE app_api") == 2
-    assert calls.count(EVENT_STORE_LOCK_TIMEOUT_SQL) == 2
-    assert calls.index("SET ROLE app_api") < calls.index(EVENT_STORE_LOCK_TIMEOUT_SQL)
+    assert calls.count(EVENT_STORE_SESSION_SQL) == 2
+    assert "SET ROLE app_api" in EVENT_STORE_SESSION_SQL
+    assert EVENT_STORE_LOCK_TIMEOUT_SQL in EVENT_STORE_SESSION_SQL
+    assert calls.index(EVENT_STORE_SESSION_SQL) < calls.index("COMMIT")
     assert calls.count("COMMIT") == 2
     assert calls[-1] == "CLOSE"
 

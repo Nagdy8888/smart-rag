@@ -29,6 +29,10 @@ LOGGER = logging.getLogger(__name__)
 _REASON_PREFIX = "query_admission:"
 EVENT_STORE_LOCK_TIMEOUT = "2s"
 EVENT_STORE_LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout TO '2s'"
+EVENT_STORE_SESSION_SQL = f"SET ROLE app_api; {EVENT_STORE_LOCK_TIMEOUT_SQL}"
+"""One parameter-free round trip that selects the API role and bounds lock
+waits for the transaction. Psycopg 3 sends parameter-free multi-statement
+strings with the simple query protocol."""
 EVENT_STORE_IDLE_SECONDS = 60.0
 
 
@@ -484,12 +488,13 @@ class PostgresRunEventStore:
         the configured Supabase transaction pooler can switch server sessions.
         A session idle for 60 seconds or more is closed before the next yield.
         The lock prevents concurrent executor, heartbeat, and replay operations
-        from sharing a Psycopg transaction. Each transaction sets
-        ``lock_timeout`` to two seconds after ``SET ROLE app_api`` so a
-        run-row lock wait fails closed instead of sitting until the login
-        role's 120-second statement timeout. Autocommit stays off. Any
-        operation error rolls back best-effort, discards the session, and
-        re-raises. Append/terminal callers must not replay the write.
+        from sharing a Psycopg transaction. Each transaction runs one
+        parameter-free statement that does ``SET ROLE app_api`` and sets
+        ``lock_timeout`` to two seconds so a run-row lock wait fails closed
+        instead of sitting until the login role's 120-second statement
+        timeout. Autocommit stays off. Any operation error rolls back
+        best-effort, discards the session, and re-raises. Append/terminal
+        callers must not replay the write.
 
         Yields:
             Open connection with ``app_api`` selected for this transaction.
@@ -501,8 +506,7 @@ class PostgresRunEventStore:
         with self._connection_lock:
             connection = self._session()
             try:
-                connection.execute("SET ROLE app_api")
-                connection.execute(EVENT_STORE_LOCK_TIMEOUT_SQL)
+                connection.execute(EVENT_STORE_SESSION_SQL)
                 yield connection
                 connection.commit()
                 self._last_used = self._monotonic_clock()

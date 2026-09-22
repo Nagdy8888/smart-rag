@@ -206,10 +206,12 @@ Postgres wait cannot freeze the SSE event loop or LangGraph `astream`.
 Sequence order is unchanged: each append is awaited before the next event.
 Exactly one terminal remains required.
 
-`PostgresRunEventStore` keeps autocommit off. After `SET ROLE app_api` each
-transaction applies `SET LOCAL lock_timeout TO '2s'`. That matches the
-intended `app_api` GUC. Hosted login-role sessions do not always inherit
-role timeouts after `SET ROLE`, so the store must set the limit itself.
+`PostgresRunEventStore` keeps autocommit off. Each transaction runs one
+parameter-free statement, `SET ROLE app_api; SET LOCAL lock_timeout TO '2s'`,
+so both settings share one round trip. That matches the intended `app_api`
+GUC. Hosted login-role sessions do not always inherit role timeouts after
+`SET ROLE`, so the store must set the limit itself. `app.append_run_event`
+stays a separate parameterized statement.
 
 `app.append_run_event` takes `SELECT … FROM app.runs FOR UPDATE`. An
 uncommitted `llm_usage` insert on the graph `app_api` connection holds

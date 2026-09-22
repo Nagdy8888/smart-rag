@@ -44,6 +44,9 @@ def test_event_store_transaction_applies_lock_timeout(db_url: str) -> None:
             shown = connection.execute("SHOW lock_timeout").fetchone()
             assert shown is not None
             assert str(shown[0]) in {EVENT_STORE_LOCK_TIMEOUT, "00:00:02"}
+            role = connection.execute("SELECT current_user").fetchone()
+            assert role is not None
+            assert str(role[0]) == "app_api"
     finally:
         store.close()
 
