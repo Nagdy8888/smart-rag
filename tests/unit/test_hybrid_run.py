@@ -301,10 +301,10 @@ def test_flatten_channel_candidates_dedupes_first_seen() -> None:
     assert tuple(item.chunk_id for item in flat) == (first.chunk_id, second.chunk_id)
 
 
-def test_retrieval_slice_is_statement_timeout_bound() -> None:
-    """The retrieve+rerank slice is the 8s statement-timeout bound, not 25s."""
+def test_retrieval_slice_is_ten_seconds_within_ask_envelope() -> None:
+    """The retrieve+rerank slice is 10s and stays inside the 25s envelope."""
 
-    assert RETRIEVAL_SLICE_SECONDS == 8.0
+    assert RETRIEVAL_SLICE_SECONDS == 10.0
     assert RetrievalFallbackReason.DENSE_UNAVAILABLE == "dense_unavailable"
     assert RetrievalFallbackReason.TERM_UNAVAILABLE == "term_unavailable"
     assert RetrievalFallbackReason.AUTH_CONTEXT_INVALID == "auth_context_invalid"

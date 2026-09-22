@@ -40,8 +40,8 @@ The failed `hybrid_long_document_v1` digest
 stays unfrozen. Frozen `hybrid_default_v1` bytes are unchanged
 (`def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`).
 OpenAI rerank starts only when remaining retrieve-slice seconds are at
-least `RERANK_RESERVED_SECONDS` (2.0). That reserve is inside the existing
-8s retrieve slice and is not `ANSWER_STAGE_MIN_SECONDS` (8.0). Live
+least `RERANK_RESERVED_SECONDS` (3.0). That reserve is inside the 10s
+retrieve slice and is not `ANSWER_STAGE_MIN_SECONDS` (8.0). Live
 grounded-fact qualification of this pin remains Packet 64. Packet 64 did
 not promote the sample: CLI Recall@10 stayed 0.0 and Ask grounded fact
 stayed 35%. `holdout_opened=false`.

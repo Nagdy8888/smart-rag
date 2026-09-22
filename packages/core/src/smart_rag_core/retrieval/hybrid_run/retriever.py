@@ -100,9 +100,10 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         At most one rerank call through the injected ``rerank`` callback.
 
     Deadline:
-        ``RETRIEVAL_SLICE_SECONDS`` (8s statement-timeout bound) covers
-        parallel channels plus rerank after the embedding batch. Embedding
-        time is not subtracted from that slice. The 25s
+        ``RETRIEVAL_SLICE_SECONDS`` (10s) covers parallel channels plus
+        rerank after the embedding batch. The 8000 ms statement timeout
+        stays the per-SQL bound. Embedding time is not subtracted from
+        that slice. The 25s
         ``HYBRID_DEADLINE_SECONDS`` value is the Phase 6 full-run budget
         and is not used here.
 

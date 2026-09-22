@@ -6,6 +6,7 @@ from typing import Literal, Protocol, cast
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.usage_caps import ANSWER_STAGE_MIN_SECONDS
 from smart_rag_core.query_fusion.models import HybridPassage
 from smart_rag_core.query_routing.branch_results import (
     coverage_bits,
@@ -26,6 +27,7 @@ from smart_rag_core.query_routing.protocols import HybridRetrieveLike
 from smart_rag_core.retrieval.cache_store import RetrievalCacheMode
 from smart_rag_core.retrieval.context import ContextFn
 from smart_rag_core.retrieval.context_loader import ChunkContext
+from smart_rag_core.retrieval.profiles import RETRIEVAL_SLICE_SECONDS
 from smart_rag_core.security.identity import CallerContext
 
 
@@ -75,7 +77,8 @@ def run_hybrid(
         prep: Preparation.
         runtime: Authorized context.
         caller: Caller snapshot.
-        remaining: Remaining seconds.
+        remaining: Remaining seconds. The slice passed to retrieve is
+            ``max(2, min(remaining - 8, 10))`` seconds.
         hybrid_retriever: Optional retriever.
         whole_document: Whether section coverage must be 1.0.
         chunk_loader: Canonical text loader for ranked-ID fallbacks.
@@ -100,7 +103,10 @@ def run_hybrid(
                 fallback_reason=FALLBACK_RETRIEVERS_UNBOUND,
             ),
         )
-    deadline_seconds = min(remaining, 8.0)
+    deadline_seconds = max(
+        2.0,
+        min(remaining - ANSWER_STAGE_MIN_SECONDS, RETRIEVAL_SLICE_SECONDS),
+    )
     outcome: object
     if spec.bypass_retrieval_cache:
         cached = cast(_HybridRetrieveWithCacheLike, hybrid_retriever)

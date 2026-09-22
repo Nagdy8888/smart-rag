@@ -167,7 +167,7 @@ def test_deadline_repair_does_not_raise_ceilings_or_mutate_default() -> None:
     settings = SharedSettings()
     assert settings.model_input_max_chars == 16_384
     assert HYBRID_DEADLINE_SECONDS == 25
-    assert RERANK_RESERVED_SECONDS == 2.0
+    assert RERANK_RESERVED_SECONDS == 3.0
     payload = json.loads(FROZEN_PROFILE_PATH.read_text(encoding="utf-8"))
     assert canonical_profile_digest(payload) == FROZEN_HYBRID_PROFILE_SHA256
     default = load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)

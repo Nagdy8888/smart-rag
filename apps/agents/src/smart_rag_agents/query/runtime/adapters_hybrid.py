@@ -183,8 +183,9 @@ class ProcessHybridRetriever:
             ``HybridRunResult`` with ranked IDs. BM25 snippets are never evidence.
 
         Side Effects:
-            Embedding gateway call plus per-channel Postgres (and optional
-            ParadeDB) connections.
+            Embedding gateway call, per-channel Postgres (and optional
+            ParadeDB) connections, and one shared context connection for
+            preload, parent expansion, and locator reload.
         """
 
         typed_profile = profile if isinstance(profile, ExpectedProfile) else None
@@ -234,30 +235,31 @@ class ProcessHybridRetriever:
                 )
 
             rerank_fn = _rerank
-        inner = HybridRetriever(
-            embedding_gateway=self._embedding_gateway,
-            supabase=None,
-            paradedb=None,
-            supabase_dsn=self._supabase_dsn,
-            dense=_DsnChannelMarker(),
-            bm25=self._bm25,
-            term=_DsnChannelMarker(),
-            load_context=context_loader(self._supabase_dsn, caller),
-            rerank=rerank_fn,  # type: ignore[arg-type]
-            retrieval_profile=retrieval_profile,
-            retrieval_cache=self._retrieval_cache,
-        )
-        budget = query_budget if query_budget is not None else self.query_budget
-        inner.query_budget = budget  # type: ignore[assignment]
-        result = inner.retrieve(
-            query=ranking_query,
-            caller=caller,
-            profile=typed_profile,
-            deadline_seconds=deadline_seconds,
-            restrict_version_id=restrict_version_id,
-            cache_mode=cache_mode,
-            source_selectors=scope.selector_texts if scope is not None else (),
-        )
+        with connect_postgres(self._supabase_dsn) as context_connection:
+            inner = HybridRetriever(
+                embedding_gateway=self._embedding_gateway,
+                supabase=None,
+                paradedb=None,
+                supabase_dsn=self._supabase_dsn,
+                dense=_DsnChannelMarker(),
+                bm25=self._bm25,
+                term=_DsnChannelMarker(),
+                load_context=context_loader_for_connection(context_connection, caller),
+                rerank=rerank_fn,  # type: ignore[arg-type]
+                retrieval_profile=retrieval_profile,
+                retrieval_cache=self._retrieval_cache,
+            )
+            budget = query_budget if query_budget is not None else self.query_budget
+            inner.query_budget = budget  # type: ignore[assignment]
+            result = inner.retrieve(
+                query=ranking_query,
+                caller=caller,
+                profile=typed_profile,
+                deadline_seconds=deadline_seconds,
+                restrict_version_id=restrict_version_id,
+                cache_mode=cache_mode,
+                source_selectors=scope.selector_texts if scope is not None else (),
+            )
         resolution = (
             scope.resolution.value
             if scope is not None
@@ -400,6 +402,44 @@ class RunScopedHybrid:
         """
 
         return self.inner.authorized_chunk_loader(caller)
+
+
+def context_loader_for_connection(
+    connection: psycopg.Connection,
+    caller: CallerContext,
+) -> Callable[[tuple[UUID, ...]], tuple[ChunkContext, ...]]:
+    """Build a context loader that reuses one open connection.
+
+    Preload, parent expansion, and locator reload share this connection
+    for a single retrieve. ``_resolve_scope`` and
+    ``authorized_chunk_loader`` keep their own connections.
+
+    Args:
+        connection: Open canonical Postgres connection. The loader does
+            not close it.
+        caller: Retrieve caller captured for ACL.
+
+    Returns:
+        ``ContextFn`` used by ``HybridRetriever``.
+    """
+
+    def load(chunk_ids: tuple[UUID, ...]) -> tuple[ChunkContext, ...]:
+        """Load authorized chunk context on the retrieve connection.
+
+        Args:
+            chunk_ids: Canonical IDs.
+
+        Returns:
+            Authorized rows. Unauthorized IDs are omitted.
+        """
+
+        return fetch_authorized_chunk_context(
+            connection,
+            caller=caller,
+            chunk_ids=chunk_ids,
+        )
+
+    return load
 
 
 def context_loader(
