@@ -240,7 +240,7 @@ Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.
 | SDK retries | count | Plan one-operation | 0 | **0** | OpenAI client `max_retries=0` | Timeout/429 fall back to RRF | retrieval | 0 | SDK bump |
 | Excerpt bound | chars / passage | Input bound | 1–400 | **400** | `RERANK_EXCERPT_CHARS` | Canonical `raw_text` only | retrieval | 400 | Token miss |
 | MMR lambda | mix | Plan | (0, 1] | **0.7** provisional | Jaccard on `arabic_norm_v1` | Unit diversity test | retrieval | 0.7 | Packet 6 |
-| Document / section quota | passages | Plan | ≥1 | **2 / 2** | unit quota | Stable ID tie-break | retrieval | 2 | Packet 6 |
+| Document / section quota | passages | Plan | ≥1 | **2 / 2** | unit quota | Retrieval MMR keeps this floor. Post-fusion `apply_document_section_quotas` raises it with `max(floor, ceil(limit / distinct))` so a single-document corpus can fill 12 slots | retrieval | 2 | Packet 6 |
 | Final evidence | units / tokens | Plan ~8–12 | ≤12 / ≤3500 | **12 / 3500** | trim after parents | Recheck after expansion | retrieval | 12 / 3500 | Packet 6 |
 | Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip; Packet 6 did not retune | retrieval | same | Live always-rerank |
 

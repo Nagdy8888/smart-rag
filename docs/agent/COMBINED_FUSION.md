@@ -33,7 +33,7 @@ Related: [ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md) ·
 | Graph-discovered-only cap | `40%` | Share of final evidence units |
 | Survival fallback | `0.50` | Combined with survival below this is effective Hybrid |
 | Final evidence | `12` | Phase 4 `FINAL_EVIDENCE_MAX` |
-| Per-document / section quota | `2` / `2` | Phase 4 Hybrid quotas |
+| Per-document / section quota | floor `2` / `2` | Effective quota is `max(floor, ceil(12 / distinct))` so one document can fill all 12 slots. Six or more distinct documents or headings keep 2 |
 
 Hops are at most three. Hybrid rank is post-rerank `hybrid_rank`, or the
 narrow allowed RRF fallback rank when rerank was skipped.
