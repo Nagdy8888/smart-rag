@@ -28,6 +28,9 @@ from smart_rag_core.retrieval.profiles import (
 from smart_rag_core.retrieval.types import RetrievalCandidate
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
+CHANNEL_HEAD_PIN = 5
+"""Top-N authorized IDs from dense and from BM25 that always enter the pool."""
+
 
 class RerankFallbackReason(StrEnum):
     """Typed safe routes when the OpenAI reranker cannot be used."""
@@ -226,11 +229,46 @@ def _query_aware_window(raw_text: str, *, query: str, limit: int) -> str:
     return raw_text[start:end]
 
 
+def channel_head_pins(
+    *,
+    dense_ids: Sequence[UUID],
+    bm25_ids: Sequence[UUID],
+    fused_ids: Sequence[UUID],
+    head: int = CHANNEL_HEAD_PIN,
+) -> tuple[UUID, ...]:
+    """Return the channel-head IDs that must enter the rerank pool.
+
+    RRF with ``rrf_k=60`` ranks any chunk returned by two channels above a
+    chunk returned by one channel at rank 1. Pinning the first ``head``
+    authorized IDs of each channel keeps single-channel top hits visible to
+    the reranker without changing fusion weights.
+
+    Args:
+        dense_ids: Dense IDs in channel-rank order.
+        bm25_ids: BM25 IDs in channel-rank order.
+        fused_ids: Authorized fused IDs. Pins outside this set are dropped,
+            so pins can never add an ID the ACL recheck removed.
+        head: Per-channel pin count.
+
+    Returns:
+        Distinct pins, dense first then BM25, each within ``fused_ids``.
+    """
+
+    authorized = set(fused_ids)
+    pins: list[UUID] = []
+    for channel in (dense_ids, bm25_ids):
+        for chunk_id in tuple(channel)[: max(0, head)]:
+            if chunk_id in authorized and chunk_id not in pins:
+                pins.append(chunk_id)
+    return tuple(pins)
+
+
 def rerank_preload_ids(
     fused: tuple[RetrievalCandidate, ...],
     *,
     pool_size: int = RERANK_POOL_SIZE,
     max_per_document: int = RERANK_MAX_PER_DOCUMENT,
+    pinned_ids: Sequence[UUID] = (),
 ) -> tuple[UUID, ...]:
     """Return fused IDs that occupy the one-shot rerank pool.
 
@@ -242,15 +280,22 @@ def rerank_preload_ids(
         fused: Authorized fused candidates in rank order.
         pool_size: Global rerank pool cap.
         max_per_document: Per-document cap inside the pool.
+        pinned_ids: Channel-head IDs that bypass the per-document cap.
 
     Returns:
         Distinct chunk IDs, at most ``pool_size``, matching
         ``build_rerank_pool`` membership before content collapse.
     """
 
-    seen: set[UUID] = set()
-    per_document: dict[UUID, int] = {}
+    pinned = set(pinned_ids)
     selected: list[UUID] = []
+    for item in fused:
+        if item.chunk_id in pinned and item.chunk_id not in selected:
+            selected.append(item.chunk_id)
+            if len(selected) >= pool_size:
+                return tuple(selected)
+    seen: set[UUID] = set(selected)
+    per_document: dict[UUID, int] = {}
     for item in fused:
         if item.chunk_id in seen:
             continue
@@ -305,12 +350,14 @@ def build_rerank_pool(
     excerpt_chars: int = RERANK_EXCERPT_CHARS,
     query: str | None = None,
     excerpt_strategy: str = "prefix",
+    pinned_ids: Sequence[UUID] = (),
 ) -> tuple[RerankPassage, ...]:
     """Collapse exact-content duplicates and cap the pool with per-document limits.
 
     Exact duplicate collapse is by normalized citation text after ACL
     recheck, not by document id. Duplicate files therefore cannot consume
-    independent document quotas. Documents are not deleted.
+    independent document quotas. Documents are not deleted. Pins bypass
+    the per-document cap, count toward ``pool_size``, and keep fused order.
 
     Args:
         passages: Fused-order authorized passages with canonical text.
@@ -319,17 +366,33 @@ def build_rerank_pool(
         excerpt_chars: Excerpt character budget.
         query: Original query for query-aware excerpts.
         excerpt_strategy: ``prefix`` or ``query_aware``.
+        pinned_ids: Channel-head IDs that bypass the per-document cap.
 
     Returns:
         Pool in fused order after exact-content collapse, per-document, and
         global caps.
     """
 
-    seen: set[UUID] = set()
+    ordered = collapse_exact_duplicate_passages(passages)
+    pinned = set(pinned_ids)
+    chosen: set[UUID] = set()
     seen_content: set[str] = set()
+    for item in ordered:
+        chunk_id = item.candidate.chunk_id
+        if chunk_id not in pinned or chunk_id in chosen:
+            continue
+        digest = content_hash(item.raw_text)
+        if digest in seen_content:
+            continue
+        seen_content.add(digest)
+        chosen.add(chunk_id)
+        if len(chosen) >= pool_size:
+            break
+    seen: set[UUID] = set(chosen)
     per_document: dict[UUID, int] = {}
-    selected: list[RerankPassage] = []
-    for item in collapse_exact_duplicate_passages(passages):
+    for item in ordered:
+        if len(chosen) >= pool_size:
+            break
         chunk_id = item.candidate.chunk_id
         if chunk_id in seen:
             continue
@@ -343,27 +406,60 @@ def build_rerank_pool(
         if used >= max_per_document:
             continue
         per_document[document_id] = used + 1
+        chosen.add(chunk_id)
+    emitted: set[UUID] = set()
+    selected: list[RerankPassage] = []
+    for item in ordered:
+        chunk_id = item.candidate.chunk_id
+        if chunk_id not in chosen or chunk_id in emitted:
+            continue
+        emitted.add(chunk_id)
         selected.append(
-            RerankPassage(
-                candidate=item.candidate,
-                raw_text=item.raw_text,
-                section_path=item.section_path,
-                page_number=item.page_number,
-                parent_chunk_id=item.parent_chunk_id,
-                chunk_index=item.chunk_index,
-                token_count=item.token_count or max(1, len(item.raw_text.split())),
-                channels=item.channels,
-                excerpt=excerpt_text(
-                    item.raw_text,
-                    limit=excerpt_chars,
-                    query=query,
-                    strategy=excerpt_strategy,
-                ),
+            _pool_passage(
+                item,
+                excerpt_chars=excerpt_chars,
+                query=query,
+                excerpt_strategy=excerpt_strategy,
             )
         )
-        if len(selected) >= pool_size:
-            break
     return tuple(selected)
+
+
+def _pool_passage(
+    item: RerankPassage,
+    *,
+    excerpt_chars: int,
+    query: str | None,
+    excerpt_strategy: str,
+) -> RerankPassage:
+    """Copy one pool member with its bounded rerank excerpt.
+
+    Args:
+        item: Authorized passage in fused order.
+        excerpt_chars: Excerpt character budget.
+        query: Original query for query-aware excerpts.
+        excerpt_strategy: ``prefix`` or ``query_aware``.
+
+    Returns:
+        Passage with ``excerpt`` set; citation ``raw_text`` unchanged.
+    """
+
+    return RerankPassage(
+        candidate=item.candidate,
+        raw_text=item.raw_text,
+        section_path=item.section_path,
+        page_number=item.page_number,
+        parent_chunk_id=item.parent_chunk_id,
+        chunk_index=item.chunk_index,
+        token_count=item.token_count or max(1, len(item.raw_text.split())),
+        channels=item.channels,
+        excerpt=excerpt_text(
+            item.raw_text,
+            limit=excerpt_chars,
+            query=query,
+            strategy=excerpt_strategy,
+        ),
+    )
 
 
 def should_skip_trivial_exact(

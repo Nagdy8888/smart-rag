@@ -91,3 +91,68 @@ def test_exact_one_long_document_selects_v2() -> None:
         visibility_generation=1,
     )
     assert len(key) == 64
+
+
+def test_small_corpus_long_document_selects_v2() -> None:
+    """Unscoped questions on a small corpus with a long document use v2."""
+
+    profile_id, reason = select_runtime_profile(
+        resolution=SourceResolution.UNSCOPED,
+        version_id=None,
+        representative_count=1015,
+        query_class="factual_definition",
+        authorized_document_count=4,
+    )
+    assert profile_id == LONG_DOCUMENT_PROFILE_ID
+    assert reason == "small_corpus_long_document"
+
+
+def test_large_corpus_and_short_documents_stay_default() -> None:
+    """Nine documents, or only short documents, keep the default profile."""
+
+    large, large_reason = select_runtime_profile(
+        resolution=SourceResolution.UNSCOPED,
+        version_id=None,
+        representative_count=1015,
+        query_class=None,
+        authorized_document_count=9,
+    )
+    short, short_reason = select_runtime_profile(
+        resolution=SourceResolution.AMBIGUOUS,
+        version_id=None,
+        representative_count=5,
+        query_class=None,
+        authorized_document_count=2,
+    )
+    unknown, unknown_reason = select_runtime_profile(
+        resolution=SourceResolution.UNSCOPED,
+        version_id=None,
+        representative_count=1015,
+        query_class=None,
+    )
+    assert (large, large_reason) == (
+        HYBRID_DEFAULT_PROFILE_ID,
+        "default_profile_required",
+    )
+    assert (short, short_reason) == (
+        HYBRID_DEFAULT_PROFILE_ID,
+        "default_profile_required",
+    )
+    assert (unknown, unknown_reason) == (
+        HYBRID_DEFAULT_PROFILE_ID,
+        "default_profile_required",
+    )
+
+
+def test_small_corpus_trivial_exact_stays_default() -> None:
+    """Trivial exact classes stay on the default profile even when eligible."""
+
+    profile_id, reason = select_runtime_profile(
+        resolution=SourceResolution.UNSCOPED,
+        version_id=None,
+        representative_count=1015,
+        query_class="exact_code",
+        authorized_document_count=4,
+    )
+    assert profile_id == HYBRID_DEFAULT_PROFILE_ID
+    assert reason == "trivial_exact_default_profile"

@@ -82,7 +82,11 @@ from smart_rag_core.retrieval.profiles import (
     RETRIEVAL_SLICE_SECONDS,
     RetrievalFallbackReason,
 )
-from smart_rag_core.retrieval.rerank import RerankFallbackReason, rerank_preload_ids
+from smart_rag_core.retrieval.rerank import (
+    RerankFallbackReason,
+    channel_head_pins,
+    rerank_preload_ids,
+)
 from smart_rag_core.retrieval.types import Bm25RetrievalResult
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
@@ -389,10 +393,16 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         else:
             pool_size = RERANK_POOL_SIZE
             max_per_document = RERANK_MAX_PER_DOCUMENT
+        pinned_ids = channel_head_pins(
+            dense_ids=dense_ids,
+            bm25_ids=bm25_ids,
+            fused_ids=fused_ids,
+        )
         preload_ids = rerank_preload_ids(
             assembled.fused,
             pool_size=pool_size,
             max_per_document=max_per_document,
+            pinned_ids=pinned_ids,
         )
         contexts = loader(preload_ids) if preload_ids else ()
         rerank_fn: RerankFn = counted_rerank(
@@ -419,6 +429,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 load_context=loader,
                 remaining_deadline_seconds=remaining,
                 retrieval_profile=selection_profile,
+                pinned_ids=pinned_ids,
             )
             if selection.usage is not None:
                 rerank_calls = selection.usage.model_calls

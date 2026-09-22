@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from uuid import UUID
 
 from smart_rag_core.evaluation.schema import ExpectedProfile
@@ -177,6 +177,7 @@ def select_hybrid_context(
     load_context: ContextFn,
     remaining_deadline_seconds: float,
     retrieval_profile: FrozenHybridProfile | None = None,
+    pinned_ids: Sequence[UUID] = (),
 ) -> ContextSelection:
     """Run pool, optional one-shot rerank, MMR, quotas, and parent expansion.
 
@@ -192,6 +193,8 @@ def select_hybrid_context(
         remaining_deadline_seconds: Remaining Hybrid deadline share.
         retrieval_profile: Optional frozen/candidate bounds. ``None`` uses
             ``hybrid_default_v1`` constants.
+        pinned_ids: Channel-head IDs that bypass the per-document pool cap.
+            Must already be authorized fused IDs.
 
     Returns:
         Final evidence plus decision metadata. No answer text.
@@ -240,6 +243,7 @@ def select_hybrid_context(
         excerpt_chars=excerpt_chars,
         query=query,
         excerpt_strategy=excerpt_strategy,
+        pinned_ids=pinned_ids,
     )
     if len(pool) < 2:
         expanded, parent_ids = expand_parents(pool, load_context, pool=pool)
