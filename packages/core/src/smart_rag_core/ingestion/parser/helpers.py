@@ -13,7 +13,7 @@ from smart_rag_core.ingestion.parser.types import (
     SourceLocator,
     TypedElement,
 )
-from smart_rag_core.query_answer.versions import PARAGRAPH_DELIMITER
+from smart_rag_core.text_constants import PARAGRAPH_DELIMITER
 
 # PyMuPDF 1.25.5 span ``flags`` bit 4 (``TEXT_FONT_BOLD``).
 PDF_TEXT_FONT_BOLD = 1 << 4

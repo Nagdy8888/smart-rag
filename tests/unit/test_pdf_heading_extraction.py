@@ -137,6 +137,23 @@ def test_hyphenated_lines_join_across_blocks(tmp_path: Path) -> None:
     )
 
 
+def test_pdf_reflow_delimiter_matches_answer_paragraphs() -> None:
+    """PDF block joins use the same separator as answer paragraphs.
+
+    The parser image cannot import ``query_answer`` (that package pulls
+    ``tiktoken``). The shared constant lives in ``text_constants``.
+    """
+
+    import smart_rag_core.ingestion.parser.helpers as helpers
+    import smart_rag_core.text_constants as text_constants
+    from smart_rag_core.query_answer.versions import (
+        PARAGRAPH_DELIMITER as answer_delimiter,
+    )
+
+    assert helpers.PARAGRAPH_DELIMITER is text_constants.PARAGRAPH_DELIMITER
+    assert helpers.PARAGRAPH_DELIMITER == answer_delimiter == "\n\n"
+
+
 def test_mixed_script_short_title_is_heading() -> None:
     """Short mixed-script titles still classify as headings."""
 
