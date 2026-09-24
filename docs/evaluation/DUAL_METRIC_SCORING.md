@@ -48,6 +48,11 @@ flowchart TD
 - Stage fields come from checkpoint `HybridBranchDiagnostics` plus
   `llm_usage` via `scripts/eval_ask_stage_export.py`. Missing required
   fields are `unknown` and increment `unknown_required_fields`.
+- `stage_timings_ms` in the stage export copies the numeric
+  `HybridBranchDiagnostics.stage_timings_ms` values (milliseconds per
+  Hybrid sub-stage). It is not a required field; runs recorded before
+  latency packet L0 export `{}`. See
+  [QUERY_LATENCY_REPORT.md](./QUERY_LATENCY_REPORT.md).
 - `run_company_ask.py` must not hard-code `source_resolution`,
   `bm25_degraded_explicit`, or `rerank_accounting_ok`.
 - Private gold stays under gitignored `.private-eval/`.

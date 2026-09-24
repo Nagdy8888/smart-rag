@@ -182,6 +182,8 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
 | [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers, client-approver |
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
+| [evaluation/QUERY_LATENCY_REPORT.md](./evaluation/QUERY_LATENCY_REPORT.md) | engineering-lead | active | 2026-09-24 | eng, reviewers |
+| [evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md](./evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-23 | eng, reviewers |
