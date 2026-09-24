@@ -119,12 +119,15 @@ class RerankRanking:
         rank: 1-based order.
         support: Bounded ranking feature in ``[0, 1]``.
         supported_subquestion_indices: Optional 0-based subquestion indices.
+        appended: True when the model did not rank this candidate and the
+            server appended it in pool order (``rerank_v2`` partial output).
     """
 
     chunk_id: UUID
     rank: int
     support: float
     supported_subquestion_indices: tuple[int, ...] = ()
+    appended: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +168,9 @@ class ContextSelection:
             rerank. None on identity/skip/failure.
         supported_subquestion_indices: Validated 0-based subquestion indices
             from a completed rerank payload. Empty on fallback.
+        rerank_ranked_count: Candidates the model ranked. 0 on fallback.
+        rerank_appended_count: Candidates appended by the server after a
+            partial ranking. 0 on fallback or a full ranking.
     """
 
     passages: tuple[RerankPassage, ...]
@@ -176,6 +182,8 @@ class ContextSelection:
     skipped_counterfactual: bool
     rerank_top_support: float | None = None
     supported_subquestion_indices: tuple[int, ...] = ()
+    rerank_ranked_count: int = 0
+    rerank_appended_count: int = 0
 
 
 def rerank_input_hash(

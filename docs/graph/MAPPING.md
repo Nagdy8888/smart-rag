@@ -2,7 +2,7 @@
 title: Canonical graph evidence mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-09-24
 audience: engineering, reviewers
 phase_packet: Phase 5 Packet 4
 ---
@@ -101,7 +101,7 @@ Production mapping Hybrid:
   (cap 100). It does **not** pass `supabase_dsn` (that would `SET ROLE
   postgres` during Hybrid temporal loads) and does not require ParadeDB.
 - Sets Hybrid `rerank=None`. Mapping owns the one OpenAI support rerank via
-  `rerank_pool` and pinned `rerank_v1.md`.
+  `rerank_pool` and pinned `rerank_v2.md`.
 - Orders the support-rerank pool from Hybrid `ranked_ids` (cap 20). Empty
   ranked IDs or fewer than two survivors skip rerank; the mapper does not
   score every canonical in the version.

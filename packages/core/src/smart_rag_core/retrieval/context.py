@@ -308,8 +308,12 @@ def select_hybrid_context(
     rankings, usage, reason = rerank(query, pool, remaining_deadline_seconds)
     ordered = pool
     fallback = reason
+    ranked_count = 0
+    appended_count = 0
     if reason is RerankFallbackReason.NONE:
         ordered = apply_rankings(pool, rankings)
+        appended_count = sum(1 for item in rankings if item.appended)
+        ranked_count = len(rankings) - appended_count
     mmr_selected, dropped = apply_mmr(
         ordered,
         query=query,
@@ -351,4 +355,6 @@ def select_hybrid_context(
         skipped_counterfactual=False,
         rerank_top_support=top_support,
         supported_subquestion_indices=indices,
+        rerank_ranked_count=ranked_count,
+        rerank_appended_count=appended_count,
     )

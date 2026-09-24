@@ -30,6 +30,7 @@ from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.retrieval.profiles import (
     HYBRID_STAGE_TIMING_KEYS,
     RERANK_INVALID_SUBCODES,
+    RERANK_POOL_SIZE,
     RETRIEVAL_SLICE_SECONDS,
 )
 from smart_rag_core.security.identity import CallerContext
@@ -241,6 +242,11 @@ def hybrid_diagnostics_from_outcome(
         rerank_invalid_subcode=_invalid_subcode(
             getattr(outcome, "rerank_invalid_subcode", "")
         ),
+        rerank_partial=_bounded_count(getattr(outcome, "rerank_appended_count", 0)) > 0,
+        rerank_ranked_count=_bounded_count(getattr(outcome, "rerank_ranked_count", 0)),
+        rerank_appended_count=_bounded_count(
+            getattr(outcome, "rerank_appended_count", 0)
+        ),
     )
 
 
@@ -309,6 +315,23 @@ def _invalid_subcode(value: object) -> str:
     if isinstance(value, str) and value in RERANK_INVALID_SUBCODES:
         return value
     return ""
+
+
+def _bounded_count(value: object) -> int:
+    """Return a rerank count in ``[0, RERANK_POOL_SIZE]``, else 0.
+
+    Args:
+        value: Count from the retrieve outcome, or anything.
+
+    Returns:
+        The integer when it is a non-boolean int in range, else ``0``.
+    """
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    if value < 0 or value > RERANK_POOL_SIZE:
+        return 0
+    return value
 
 
 def chunk_loader(

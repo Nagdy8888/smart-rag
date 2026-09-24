@@ -277,6 +277,11 @@ def stage_record(
         "rerank_invalid_subcode": _subcode_or_unknown(
             diagnostics.get("rerank_invalid_subcode")
         ),
+        "rerank_partial": _bool_or_unknown(diagnostics.get("rerank_partial")),
+        "rerank_ranked_count": _int_or_unknown(diagnostics.get("rerank_ranked_count")),
+        "rerank_appended_count": _int_or_unknown(
+            diagnostics.get("rerank_appended_count")
+        ),
     }
 
 
@@ -356,6 +361,21 @@ def _subcode_or_unknown(value: object) -> str:
     if value and value not in RERANK_INVALID_SUBCODES:
         return "unknown"
     return value
+
+
+def _bool_or_unknown(value: object) -> bool | str:
+    """Return a JSON boolean or ``unknown``.
+
+    Args:
+        value: JSON value.
+
+    Returns:
+        The boolean, or ``unknown`` when missing or not a boolean.
+    """
+
+    if isinstance(value, bool):
+        return value
+    return "unknown"
 
 
 def _int_or_unknown(value: object) -> int | str:

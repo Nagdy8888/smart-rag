@@ -19,6 +19,7 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | `web_critique_v1` | 2026-09-15 | At most two follow-up public-web queries. No company retrieval. |
 | `web_answer_v1` | 2026-09-15 | One Web answer from persisted excerpts. Cite only `web_source_id`. |
 | `rerank_v1` | 2026-08-14 | Structured top-20 rerank. No answer generation or tools. |
+| `rerank_v2` | 2026-09-24 | Pool-order labels `c01`-`c20` instead of chunk IDs; ordered label array plus per-label support; no echoed hash. Server appends unranked labels in fused order. `rerank_v1` stays immutable. |
 | `answer_v1` | 2026-08-16 | One grounded answer from canonical passages and deterministic table values. |
 | `answer_v2` | 2026-09-15 | Paragraph-mapped company answers with exact 1–1000 character spans. Provider omits `answer_text`. Chat scores leaves and PDF toolbar pages, never printed `page_label`. |
 | `answer_v3` | 2026-09-16 | Surviving atomic-link claims only. Acronym expansions must be spelled in a supplied source. `answer_v2` stays immutable. |

@@ -145,7 +145,7 @@ class ProcessHybridRetriever:
             bm25: Optional per-retrieve ParadeDB adapter. ``None`` degrades
                 BM25 (approved dense+term Hybrid).
             model_gateway: Shared model gateway for the one-shot reranker.
-            rerank_prompt_text: Pinned ``rerank_v1`` body. Missing prompt
+            rerank_prompt_text: Pinned ``rerank_v2`` body. Missing prompt
                 leaves identity fallback.
             retrieval_cache: Optional ID/rank cache. Hits still recheck ACL.
         """

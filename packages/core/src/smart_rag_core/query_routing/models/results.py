@@ -17,6 +17,7 @@ from smart_rag_core.query_routing.models.plan import BranchKind, CorrectionKind
 from smart_rag_core.retrieval.profiles import (
     HYBRID_STAGE_TIMING_KEYS,
     RERANK_INVALID_SUBCODES,
+    RERANK_POOL_SIZE,
 )
 
 
@@ -80,6 +81,10 @@ class HybridBranchDiagnostics(BaseModel):
         rerank_invalid_subcode: Rerank validation sub-code (``json``,
             ``hash``, ``length``, ``duplicate``, ``unknown_id``) when
             ``rerank_fallback`` is ``rerank_schema_invalid``, else empty.
+        rerank_partial: True when ``rerank_v2`` ranked only part of the
+            pool and the server appended the rest in fused order.
+        rerank_ranked_count: Candidates the model ranked.
+        rerank_appended_count: Candidates appended by the server.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -105,6 +110,9 @@ class HybridBranchDiagnostics(BaseModel):
     effective_route: str = Field(min_length=1, max_length=64)
     stage_timings_ms: dict[str, int] = Field(default_factory=dict[str, int])
     rerank_invalid_subcode: str = Field(default="", max_length=16)
+    rerank_partial: bool = False
+    rerank_ranked_count: int = Field(default=0, ge=0, le=RERANK_POOL_SIZE)
+    rerank_appended_count: int = Field(default=0, ge=0, le=RERANK_POOL_SIZE)
 
     @field_validator(
         "dense_ids",

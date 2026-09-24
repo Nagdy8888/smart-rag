@@ -298,7 +298,7 @@ def test_prompt_hash_matches_checked_in_file() -> None:
         / "src"
         / "smart_rag_agents"
         / "prompts"
-        / "rerank_v1.md"
+        / "rerank_v2.md"
     )
     digest = hashlib.sha256(
         prompt_path.read_bytes().replace(b"\r\n", b"\n")

@@ -86,7 +86,7 @@ The table below is the complete maintained map. Packet evidence under
 | [graph/LIGHTRAG_CONTRACT.md](./graph/LIGHTRAG_CONTRACT.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [graph/ADAPTER_LIFECYCLE.md](./graph/ADAPTER_LIFECYCLE.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [graph/WORKSPACE_LIFECYCLE.md](./graph/WORKSPACE_LIFECYCLE.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
-| [graph/MAPPING.md](./graph/MAPPING.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
+| [graph/MAPPING.md](./graph/MAPPING.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [graph/GRAPH_MAPPING_CONTRACT.md](./graph/GRAPH_MAPPING_CONTRACT.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [graph/RETRIEVAL.md](./graph/RETRIEVAL.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/ENTITY_RULES.md](./graph/ENTITY_RULES.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |

@@ -440,6 +440,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         rerank_order: tuple[UUID, ...] = fused_ids
         rerank_fallback = ""
         rerank_invalid_subcode = ""
+        rerank_ranked_count = 0
+        rerank_appended_count = 0
         rerank_top_support: float | None = None
         selection_profile = self._retrieval_profile
         coverage = assembled.coverage
@@ -466,6 +468,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             selected_ids = tuple(item.candidate.chunk_id for item in selection.passages)
             rerank_order = selection.rerank_order
             rerank_fallback = selection.fallback_reason.value
+            rerank_ranked_count = selection.rerank_ranked_count
+            rerank_appended_count = selection.rerank_appended_count
             locator_started = time.perf_counter()
             locator_rows = loader(selected_ids) if selected_ids else ()
             timings["locator_reload_ms"] = int(elapsed_ms(locator_started))
@@ -561,4 +565,6 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 "retrieve_total_ms": int(elapsed_ms(started)),
             },
             rerank_invalid_subcode=rerank_invalid_subcode,
+            rerank_ranked_count=rerank_ranked_count,
+            rerank_appended_count=rerank_appended_count,
         )

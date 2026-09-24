@@ -176,6 +176,9 @@ class HybridRunResult:
             ``channel_*_ms`` key. Treat as read-only.
         rerank_invalid_subcode: ``RerankPayloadError.subcode`` when the
             rerank payload failed validation, else empty.
+        rerank_ranked_count: Candidates the model ranked (``rerank_v2``).
+        rerank_appended_count: Candidates the server appended after a
+            partial ranking.
     """
 
     ranked_ids: tuple[UUID, ...]
@@ -199,3 +202,5 @@ class HybridRunResult:
     source_resolution: str = ""
     stage_timings_ms: dict[str, int] = field(default_factory=dict[str, int])
     rerank_invalid_subcode: str = ""
+    rerank_ranked_count: int = 0
+    rerank_appended_count: int = 0

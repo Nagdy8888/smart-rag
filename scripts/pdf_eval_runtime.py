@@ -164,7 +164,7 @@ def load_profile_for_eval(profile_id: str) -> object:
 
 
 def bind_live_rerank(settings: SharedSettings) -> Callable[..., object]:
-    """Bind production ``rerank_pool`` with the pinned ``rerank_v1`` prompt.
+    """Bind production ``rerank_pool`` with the pinned ``rerank_v2`` prompt.
 
     Args:
         settings: Process settings with a live OpenAI key.

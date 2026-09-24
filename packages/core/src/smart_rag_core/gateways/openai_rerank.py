@@ -16,7 +16,10 @@ from smart_rag_core.retrieval.profiles import (
     RERANK_MAX_OUTPUT_TOKENS,
     RERANK_MODEL_ID,
 )
-from smart_rag_core.retrieval.rerank import rerank_json_schema
+from smart_rag_core.retrieval.rerank_labels import (
+    rerank_label_json_schema,
+    rerank_labels,
+)
 from smart_rag_core.retrieval.rerank_versions import (
     RERANK_PROMPT_SHA256,
     RERANK_PROMPT_VERSION,
@@ -60,9 +63,9 @@ def execute_openai_rerank(
         prompt_version: Expected prompt version.
         model_id: Allow-listed model.
         query: Original query.
-        candidate_ids: Pool IDs.
-        excerpts: Canonical excerpts aligned with IDs.
-        input_hash: Canonical request hash the model must echo.
+        candidate_ids: Pool IDs. Only their count reaches the model, as labels.
+        excerpts: Canonical excerpts aligned with IDs and labels.
+        input_hash: Canonical request hash. Traced for audit; never sent to the model.
         timeout_seconds: Client timeout. SDK retries are disabled.
 
     Returns:
@@ -87,13 +90,13 @@ def execute_openai_rerank(
     client = traced_openai_client(
         api_key=api_key, max_retries=0, timeout=timeout_seconds
     )
-    schema = rerank_json_schema(candidate_ids, input_hash=input_hash)
+    labels = rerank_labels(len(candidate_ids))
+    schema = rerank_label_json_schema(labels)
     user_payload = {
         "query": query,
-        "input_hash": input_hash,
         "candidates": [
-            {"chunk_id": chunk_id, "excerpt": excerpt}
-            for chunk_id, excerpt in zip(candidate_ids, excerpts, strict=True)
+            {"label": label, "excerpt": excerpt}
+            for label, excerpt in zip(labels, excerpts, strict=True)
         ],
     }
     try:

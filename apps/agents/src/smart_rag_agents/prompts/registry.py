@@ -75,6 +75,7 @@ def _entry(prompt_id: str, filename: str) -> PromptVersion:
 PROMPT_REGISTRY: dict[str, PromptVersion] = {
     "query_profile_v1": _entry("query_profile_v1", "query_profile_v1.md"),
     "rerank_v1": _entry("rerank_v1", "rerank_v1.md"),
+    "rerank_v2": _entry("rerank_v2", "rerank_v2.md"),
     "answer_v1": _entry("answer_v1", "answer_v1.md"),
     "answer_v2": _entry("answer_v2", "answer_v2.md"),
     "answer_v3": _entry("answer_v3", "answer_v3.md"),

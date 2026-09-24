@@ -254,8 +254,8 @@ flowchart TD
   fused["Authorized fused IDs"] --> pool["Top-20 pool: profile cap per document, plus channel-head pins"]
   pool --> skip{"Trivial exact and two channels?"}
   skip -->|yes| mmrSkip["MMR plus quotas. No model call"]
-  skip -->|no| oneCall["One Responses json_schema call. max_retries=0. No tools"]
-  oneCall --> valid{"Set-equality and ranks valid?"}
+  skip -->|no| oneCall["One Responses json_schema call with c01-c20 labels. max_retries=0. No tools"]
+  oneCall --> valid{"Valid shape and at least one known label?"}
   valid -->|no| rrf["Keep fused RRF order. Typed fallback"]
   valid -->|yes| mmr["MMR plus document/section quotas"]
   mmrSkip --> parents["Recheck parents. Adjacent from authorized pool"]
@@ -265,6 +265,23 @@ flowchart TD
 ```
 
 Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md).
+
+`rerank_v2` (answer-loss repair A3) sends each pool candidate as a
+label `c01` to `c20` in pool order plus its canonical excerpt. Chunk
+UUIDs and the input hash never reach the model; the adapter still
+computes the hash and traces it. The strict schema is
+`{status, ranking, support}`: `ranking` is an array of label enum
+values (1 to pool-size items) and `support` maps every label to
+`[0, 1]`. The schema depends only on the pool size. The server maps
+labels back to IDs, keeps the first occurrence of each label, ignores
+unknown labels, and appends unranked candidates in fused order with
+support 0. A partial ranking still counts as a completed rerank
+(`rerank_fallback` `none`); diagnostics record `rerank_partial`,
+`rerank_ranked_count`, and `rerank_appended_count`. A payload that
+fails the shape check (`json`), an empty ranking (`length`), or a
+ranking with no known label (`unknown_id`) is `rerank_schema_invalid`
+with that sub-code. Provider text that is not JSON stays
+`rerank_schema_invalid` with an empty sub-code. One call, no retry.
 
 The frozen `hybrid_default_v1` numbers in the table below are unchanged.
 At runtime the pool is fused order under that profile's per-document cap,
@@ -280,7 +297,7 @@ corpus selects `hybrid_long_document_v2` instead, whose own frozen cap is
 | Rerank pool | IDs | Plan | 2–20 | **20** | `hybrid_default_v1` | `build_rerank_pool` | retrieval | 20 | Packet 6 |
 | Max passages per document in pool | IDs | Plan | 1–5 | **5** | unit quota test | Duplicates cannot crowd the pool | retrieval | 5 | Packet 6 |
 | Rerank model | model id | OpenAI Responses structured output | allow-listed | **`gpt-4o-mini`** | `openai==2.26.0` | Mock identity in CI; live unverified | retrieval | `gpt-4o-mini` | Packet 6 live bake-off |
-| Rerank prompt | version | Packet 5 | `rerank_v1` | **`rerank_v1`** | SHA-256 `4767049107cfe6e8591c84d3b1d202393dfd2564383e6c5bfa0bd5fece8f1925` | Changelog | retrieval | `rerank_v1` | Prompt edit |
+| Rerank prompt | version | Answer-loss repair A3 | `rerank_v1`, `rerank_v2` | **`rerank_v2`** | SHA-256 `995a87d869b3330aac0b5e2d64b764a32cc8542c7d85d9182118945ce9560cab`; `rerank_v1` stays pinned as `RERANK_V1_PROMPT_SHA256` | Changelog | retrieval | `rerank_v1` | Prompt edit |
 | SDK retries | count | Plan one-operation | 0 | **0** | OpenAI client `max_retries=0` | Timeout/429 fall back to RRF | retrieval | 0 | SDK bump |
 | Excerpt bound | chars / passage | Input bound | 1–400 | **400** | `RERANK_EXCERPT_CHARS` | Canonical `raw_text` only | retrieval | 400 | Token miss |
 | MMR lambda | mix | Plan | (0, 1] | **0.7** provisional | Jaccard on `arabic_norm_v1` | Unit diversity test | retrieval | 0.7 | Packet 6 |
