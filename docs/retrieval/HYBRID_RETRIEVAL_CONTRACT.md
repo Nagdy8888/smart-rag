@@ -70,6 +70,14 @@ SHA-256 `9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8`
 replaces the rule "falls back to deterministic RRF", approved in
 [ADR-retrieved-answer-loss-repair.md](../adr/ADR-retrieved-answer-loss-repair.md).
 
+Channel-phase window (answer-loss repair A5): channels wait only
+`min(slice, max(CHANNEL_MIN_SECONDS, slice - RERANK_RESERVED_SECONDS - CHANNEL_PHASE_RESERVE_SECONDS))`
+with `CHANNEL_MIN_SECONDS` 2.0 and `CHANNEL_PHASE_RESERVE_SECONDS` 1.5
+(p90 of measured post-channel work, approved as decision D5). A channel still
+running then is a channel timeout, as before. The slice, the 25 s Hybrid
+deadline, and the 50 s run deadline are unchanged. Cutting a channel early can
+cost recall; see [HYBRID_STAGE_TIMINGS_2026-09.md](../evaluation/HYBRID_STAGE_TIMINGS_2026-09.md).
+
 ## Stage timings and rerank sub-codes
 
 `HybridBranchDiagnostics` carries two ID-free fields.

@@ -49,6 +49,11 @@ RETRIEVAL_SLICE_SECONDS = 10.0
 """Channel plus rerank slice. Independent of the 8000 ms SQL timeout."""
 RERANK_RESERVED_SECONDS = 3.0
 """Minimum remaining slice seconds required to start OpenAI rerank."""
+CHANNEL_PHASE_RESERVE_SECONDS = 1.5
+"""Post-channel work (assemble, temporal load, pool preload) kept free before the
+rerank reserve. p90 of A2 ``post_channel_ms`` rounded up to 0.5 s; approved in D5."""
+CHANNEL_MIN_SECONDS = 2.0
+"""Floor for the channel-phase deadline. Equals the Hybrid branch slice floor."""
 EXACT_START_MIN_SLICE_SECONDS = HYBRID_DEADLINE_SECONDS
 """Exact dense starts only when the retrieve slice is at least the Hybrid
 envelope. Production Ask remaining is below this after profile/embed, so

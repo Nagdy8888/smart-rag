@@ -66,6 +66,30 @@ flowchart LR
 
 Rerank outcomes: none=1, rerank_schema_invalid=4, rerank_timeout (provider)=5. Schema-invalid sub-codes: duplicate=4.
 
+## Results after A5 (full 50)
+
+| Key | n | p50 ms | p90 ms | max ms |
+| --- | --- | --- | --- | --- |
+| `scope_ms` | 50 | 941 | 1068 | 1287 |
+| `embed_ms` | 50 | 728 | 923 | 2083 |
+| `channels_ms` | 50 | 1347 | 2069 | 2471 |
+| `channel_dense_ms` | 50 | 1334 | 2068 | 2471 |
+| `channel_bm25_ms` | 50 | 998 | 1167 | 1572 |
+| `channel_term_ms` | 50 | 780 | 1116 | 1487 |
+| `assemble_ms` | 50 | 2 | 3 | 4 |
+| `temporal_load_ms` | 50 | 638 | 656 | 868 |
+| `pool_preload_ms` | 50 | 463 | 528 | 752 |
+| `rerank_gate_remaining_ms` | 50 | 7972 | 8109 | 8121 |
+| `rerank_call_ms` | 50 | 3370 | 4397 | 8444 |
+| `selection_ms` | 50 | 3932 | 4872 | 9023 |
+| `locator_reload_ms` | 50 | 0 | 0 | 0 |
+| `retrieve_total_ms` | 50 | 7332 | 8624 | 12230 |
+| `post_channel_ms` | 50 | 1103 | 1185 | 1438 |
+
+Rerank outcomes: none=28, none_partial=21, rerank_timeout (provider)=1. Schema-invalid sub-codes: none.
+
+Run-total p90: 24.4 s (latency_probe TOTAL p90).
+
 ## Reading
 
 `selection_ms` takes most of the 10 s retrieve slice (p50 8565 ms, p90 8993 ms). The rerank callback ran on 10 of 10 questions, so the remaining-slice gate skipped none; 5 of those 10 still finished as a provider `rerank_timeout`. `post_channel_ms` p90 is 1213 ms.

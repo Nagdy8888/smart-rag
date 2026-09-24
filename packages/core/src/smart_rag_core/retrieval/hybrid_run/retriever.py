@@ -28,6 +28,7 @@ from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.hybrid import run_channels_parallel
 from smart_rag_core.retrieval.hybrid_run.assemble import (
     call_assemble_hybrid,
+    channel_phase_deadline_seconds,
     closed_result,
     compute_principal_scope_hash,
     elapsed_ms,
@@ -113,6 +114,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         that slice. The 25s
         ``HYBRID_DEADLINE_SECONDS`` value is the Phase 6 full-run budget
         and is not used here.
+        Channels wait only ``channel_phase_deadline_seconds(slice)`` so rerank keeps its reserve.
 
     Failure/fallback:
         Empty or over-long queries fail closed with ``retrieval_empty``.
@@ -278,7 +280,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         channel_ms: dict[str, int] = {}
         completed, timed_out, exhausted = run_channels_parallel(
             jobs,
-            deadline_seconds=slice_seconds,
+            deadline_seconds=channel_phase_deadline_seconds(slice_seconds),
             durations_ms=channel_ms,
         )
         post_channel_started = time.perf_counter()

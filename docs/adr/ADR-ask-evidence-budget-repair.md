@@ -3,7 +3,7 @@ title: ADR — Ask evidence budget repair
 adr_id: ADR-ask-evidence-budget-repair
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-09-22
+last-reviewed: 2026-09-24
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-09-22"
 audience: engineering, reviewers
@@ -70,6 +70,17 @@ flowchart TD
 
 Scope (~1 s) + embed (~0.7 s) + slice (<= 10 s) + context (~1 s) +
 answer reserve (<= 8 s) + verifier (~3 s) stays under 25 s.
+
+## Amendment (answer-loss repair A5)
+
+The retrieve slice and `RERANK_RESERVED_SECONDS` (3) stay. Inside the
+slice, channels now stop at
+`max(CHANNEL_MIN_SECONDS, slice - RERANK_RESERVED_SECONDS - CHANNEL_PHASE_RESERVE_SECONDS)`
+(capped at the slice), so assembly, temporal load, and pool preload no
+longer consume the rerank reserve. Values: `CHANNEL_MIN_SECONDS` 2.0,
+`CHANNEL_PHASE_RESERVE_SECONDS` 1.5. Rollback: set
+`CHANNEL_PHASE_RESERVE_SECONDS` to 0 and pass the whole slice to channels.
+See [ADR-retrieved-answer-loss-repair.md](./ADR-retrieved-answer-loss-repair.md) Fix 2 step 4.
 
 ## Alternatives rejected
 
