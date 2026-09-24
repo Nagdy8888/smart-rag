@@ -7,7 +7,11 @@ import json
 from dataclasses import dataclass
 
 from smart_rag_core.models.env_pins import EMBEDDING_MODEL, RERANK_MODEL_ID
-from smart_rag_core.retrieval.frozen_profile import FROZEN_HYBRID_PROFILE_SHA256
+from smart_rag_core.retrieval.frozen_profile import (
+    FROZEN_HYBRID_PROFILE_SHA256,
+    FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256,
+    LONG_DOCUMENT_V3_PROFILE_ID,
+)
 from smart_rag_core.retrieval.profiles import (
     BM25_INDEX_SCHEMA_VERSION,
     HYBRID_DEFAULT_PROFILE_ID,
@@ -49,6 +53,8 @@ def capture_exam_candidate_fingerprint() -> ExamCandidateFingerprint:
         "cache_mode": EXAM_CACHE_MODE,
         "profile_id": HYBRID_DEFAULT_PROFILE_ID,
         "profile_sha256": FROZEN_HYBRID_PROFILE_SHA256,
+        "long_document_profile_id": LONG_DOCUMENT_V3_PROFILE_ID,
+        "long_document_profile_sha256": FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256,
         "bm25_index_schema_version": BM25_INDEX_SCHEMA_VERSION,
         "normalization_version": NORMALIZATION_VERSION,
         "rerank_prompt_version": RERANK_PROMPT_VERSION,

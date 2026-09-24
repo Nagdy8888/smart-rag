@@ -280,29 +280,34 @@ def channel_head_pins(
     bm25_ids: Sequence[UUID],
     fused_ids: Sequence[UUID],
     head: int = CHANNEL_HEAD_PIN,
+    dense_head: int | None = None,
 ) -> tuple[UUID, ...]:
     """Return the channel-head IDs that must enter the rerank pool.
 
     RRF with ``rrf_k=60`` ranks any chunk returned by two channels above a
-    chunk returned by one channel at rank 1. Pinning the first ``head``
-    authorized IDs of each channel keeps single-channel top hits visible to
-    the reranker without changing fusion weights.
+    chunk returned by one channel at rank 1. Pinning the first authorized
+    IDs of each channel keeps single-channel top hits visible to the
+    reranker without changing fusion weights.
 
     Args:
         dense_ids: Dense IDs in channel-rank order.
         bm25_ids: BM25 IDs in channel-rank order.
         fused_ids: Authorized fused IDs. Pins outside this set are dropped,
             so pins can never add an ID the ACL recheck removed.
-        head: Per-channel pin count.
+        head: BM25 pin count, and the dense pin count when ``dense_head``
+            is ``None``.
+        dense_head: Dense pin count from the frozen profile
+            (``dense_head_pin``). ``None`` uses ``head``.
 
     Returns:
         Distinct pins, dense first then BM25, each within ``fused_ids``.
     """
 
     authorized = set(fused_ids)
+    dense_limit = head if dense_head is None else dense_head
     pins: list[UUID] = []
-    for channel in (dense_ids, bm25_ids):
-        for chunk_id in tuple(channel)[: max(0, head)]:
+    for channel, limit in ((dense_ids, dense_limit), (bm25_ids, head)):
+        for chunk_id in tuple(channel)[: max(0, limit)]:
             if chunk_id in authorized and chunk_id not in pins:
                 pins.append(chunk_id)
     return tuple(pins)

@@ -34,8 +34,8 @@ round-robins variants so one variant cannot consume the survivor cap.
 
 ## Long-document runtime profile (P06-62)
 
-`hybrid_long_document_v2` is the measured immutable long-document
-profile. Runtime retrieve loads it after an exact-one authorized
+`hybrid_long_document_v3` is the runtime long-document profile (answer-loss
+repair A4). Runtime retrieve loads it after an exact-one authorized
 version scope with more than five representatives, and also when the
 question stays unscoped or ambiguous, the caller can read 1 to 8 current
 documents, and the largest of those documents has more than five
@@ -51,6 +51,24 @@ ANN starts first. The 25s Hybrid ceiling is not raised. The P06-70
 gate that required this admission is
 [p06-70-stage-isolation-2026-09-21.md](../development/phase-06/p06-70-stage-isolation-2026-09-21.md)
 (`deadline_budget`).
+
+`hybrid_long_document_v3` copies `hybrid_long_document_v2` and adds two
+fields. `dense_head_pin` 12 pins the first 12 authorized dense IDs into
+the rerank pool; the BM25 pin stays `CHANNEL_HEAD_PIN` (5), and pins still
+cannot add an ID outside the fused list. `fallback_order` `dense_first`
+applies only when rerank does not complete (the reserve gate skipped it,
+or the call returned a fallback reason other than `none`): pool members
+found by dense search come first in dense-rank order, then the rest in
+fused order. A partial `rerank_v2` ranking counts as completed; only its
+appended tail uses that order. MMR, quotas, parent expansion, the 12-unit
+cap, and the 6000-token budget are unchanged. Both fields default to the
+old behavior (`5`, `rrf`), so `hybrid_default_v1` and
+`hybrid_long_document_v2` bytes and digests are unchanged. Canonical
+SHA-256 `9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8`
+(`FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256`). Rollback: route to
+`hybrid_long_document_v2`, which stays pinned and loadable. For v3 this
+replaces the rule "falls back to deterministic RRF", approved in
+[ADR-retrieved-answer-loss-repair.md](../adr/ADR-retrieved-answer-loss-repair.md).
 
 ## Stage timings and rerank sub-codes
 
@@ -256,7 +274,7 @@ flowchart TD
   skip -->|yes| mmrSkip["MMR plus quotas. No model call"]
   skip -->|no| oneCall["One Responses json_schema call with c01-c20 labels. max_retries=0. No tools"]
   oneCall --> valid{"Valid shape and at least one known label?"}
-  valid -->|no| rrf["Keep fused RRF order. Typed fallback"]
+  valid -->|no| rrf["Fused RRF order, or dense-first on v3. Typed fallback"]
   valid -->|yes| mmr["MMR plus document/section quotas"]
   mmrSkip --> parents["Recheck parents. Adjacent from authorized pool"]
   rrf --> parents
@@ -274,7 +292,7 @@ computes the hash and traces it. The strict schema is
 values (1 to pool-size items) and `support` maps every label to
 `[0, 1]`. The schema depends only on the pool size. The server maps
 labels back to IDs, keeps the first occurrence of each label, ignores
-unknown labels, and appends unranked candidates in fused order with
+unknown labels, and appends unranked candidates in fallback order (fused, or dense-first under `hybrid_long_document_v3`) with
 support 0. A partial ranking still counts as a completed rerank
 (`rerank_fallback` `none`); diagnostics record `rerank_partial`,
 `rerank_ranked_count`, and `rerank_appended_count`. A payload that
@@ -288,8 +306,8 @@ At runtime the pool is fused order under that profile's per-document cap,
 plus up to five dense heads and five BM25 heads that are already in the
 authorized fused list (`CHANNEL_HEAD_PIN`). Pins bypass the per-document
 cap, count toward the pool size, and keep fused order. A small authorized
-corpus selects `hybrid_long_document_v2` instead, whose own frozen cap is
-20 and whose document quota is 12. See
+corpus selects `hybrid_long_document_v3` instead, whose own frozen cap is
+20, whose document quota is 12, and whose dense pin is 12. See
 [ADR-small-corpus-long-document-and-channel-pins.md](../adr/ADR-small-corpus-long-document-and-channel-pins.md).
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |

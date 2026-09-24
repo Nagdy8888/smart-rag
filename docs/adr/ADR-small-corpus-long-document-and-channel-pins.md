@@ -3,7 +3,7 @@ title: ADR — Small-corpus long-document profile and channel-head pins
 adr_id: ADR-small-corpus-long-document-and-channel-pins
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-09-22
+last-reviewed: 2026-09-24
 approver: "user (accepted the KA50 accuracy repair plan)"
 approval_date: "2026-09-22"
 audience: engineering, reviewers, security
@@ -16,6 +16,14 @@ audience: engineering, reviewers, security
 `accepted` on 2026-09-22. This extends eligibility for the already-frozen
 `hybrid_long_document_v2` profile and adds channel-head pins to the rerank
 pool. It does not change any frozen JSON or digest.
+
+**Superseded in part (answer-loss repair A4).** Decisions 1 and 2 now
+select `hybrid_long_document_v3` instead of `hybrid_long_document_v2`, and
+v3 pins 12 dense heads instead of 5 (decision 3; the BM25 pin stays 5).
+The eligibility rules and the 8-document limit are unchanged. v2 stays
+pinned as the rollback. See
+[ADR-retrieved-answer-loss-repair.md](./ADR-retrieved-answer-loss-repair.md)
+Fix 2 step 5.
 
 ## Context
 

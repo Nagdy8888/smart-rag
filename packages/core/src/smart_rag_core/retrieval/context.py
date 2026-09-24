@@ -166,6 +166,43 @@ def apply_rankings(
     return tuple(by_id[item.chunk_id] for item in rankings)
 
 
+def fallback_pool_order(
+    pool: tuple[RerankPassage, ...],
+    *,
+    retrieval_profile: FrozenHybridProfile | None,
+    dense_ids: Sequence[UUID],
+) -> tuple[RerankPassage, ...]:
+    """Order the pool used when rerank did not complete.
+
+    ``rrf`` (every profile before ``hybrid_long_document_v3`` and the
+    default constants) keeps fused order. ``dense_first`` moves passages
+    the dense channel returned to the front in dense-rank order and keeps
+    the rest in fused order. MMR, quotas, parent expansion, and token trim
+    then run unchanged on the returned order.
+
+    Args:
+        pool: Passages in fused order.
+        retrieval_profile: Frozen profile, or ``None`` for default constants.
+        dense_ids: Dense IDs in channel-rank order. IDs outside ``pool`` are
+            ignored, so this never adds a passage.
+
+    Returns:
+        The same passages, reordered. Never adds or drops a passage.
+    """
+
+    if retrieval_profile is None or retrieval_profile.fallback_order != "dense_first":
+        return pool
+    dense_rank: dict[UUID, int] = {}
+    for index, chunk_id in enumerate(dense_ids):
+        dense_rank.setdefault(chunk_id, index)
+    dense = sorted(
+        (item for item in pool if item.candidate.chunk_id in dense_rank),
+        key=lambda item: dense_rank[item.candidate.chunk_id],
+    )
+    rest = [item for item in pool if item.candidate.chunk_id not in dense_rank]
+    return (*dense, *rest)
+
+
 def select_hybrid_context(
     *,
     query: str,
@@ -178,6 +215,7 @@ def select_hybrid_context(
     remaining_deadline_seconds: float,
     retrieval_profile: FrozenHybridProfile | None = None,
     pinned_ids: Sequence[UUID] = (),
+    dense_ids: Sequence[UUID] = (),
 ) -> ContextSelection:
     """Run pool, optional one-shot rerank, MMR, quotas, and parent expansion.
 
@@ -195,6 +233,8 @@ def select_hybrid_context(
             ``hybrid_default_v1`` constants.
         pinned_ids: Channel-head IDs that bypass the per-document pool cap.
             Must already be authorized fused IDs.
+        dense_ids: Dense IDs in channel-rank order. Used only by the
+            ``dense_first`` fallback order when rerank did not complete.
 
     Returns:
         Final evidence plus decision metadata. No answer text.
@@ -285,8 +325,11 @@ def select_hybrid_context(
     from smart_rag_core.retrieval.profiles import RERANK_RESERVED_SECONDS
 
     if remaining_deadline_seconds < RERANK_RESERVED_SECONDS:
+        fallback_pool = fallback_pool_order(
+            pool, retrieval_profile=retrieval_profile, dense_ids=dense_ids
+        )
         mmr_selected, dropped = apply_mmr(
-            pool,
+            fallback_pool,
             query=query,
             lambda_mult=mmr_lambda,
             document_quota=document_quota,
@@ -298,7 +341,7 @@ def select_hybrid_context(
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
         return ContextSelection(
             passages=trimmed,
-            rerank_order=tuple(item.candidate.chunk_id for item in pool),
+            rerank_order=tuple(item.candidate.chunk_id for item in fallback_pool),
             fallback_reason=RerankFallbackReason.TIMEOUT,
             mmr_dropped=dropped,
             expanded_parent_ids=parent_ids,
@@ -314,6 +357,16 @@ def select_hybrid_context(
         ordered = apply_rankings(pool, rankings)
         appended_count = sum(1 for item in rankings if item.appended)
         ranked_count = len(rankings) - appended_count
+        if appended_count:
+            ordered = ordered[:ranked_count] + fallback_pool_order(
+                ordered[ranked_count:],
+                retrieval_profile=retrieval_profile,
+                dense_ids=dense_ids,
+            )
+    else:
+        ordered = fallback_pool_order(
+            pool, retrieval_profile=retrieval_profile, dense_ids=dense_ids
+        )
     mmr_selected, dropped = apply_mmr(
         ordered,
         query=query,

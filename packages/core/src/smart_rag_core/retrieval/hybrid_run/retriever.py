@@ -85,6 +85,7 @@ from smart_rag_core.retrieval.profiles import (
     RetrievalFallbackReason,
 )
 from smart_rag_core.retrieval.rerank import (
+    CHANNEL_HEAD_PIN,
     RerankFallbackReason,
     channel_head_pins,
     rerank_preload_ids,
@@ -409,13 +410,16 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         if self._retrieval_profile is not None:
             pool_size = self._retrieval_profile.rerank_pool_size
             max_per_document = self._retrieval_profile.rerank_max_per_document
+            dense_head = self._retrieval_profile.dense_head_pin
         else:
             pool_size = RERANK_POOL_SIZE
             max_per_document = RERANK_MAX_PER_DOCUMENT
+            dense_head = CHANNEL_HEAD_PIN
         pinned_ids = channel_head_pins(
             dense_ids=dense_ids,
             bm25_ids=bm25_ids,
             fused_ids=fused_ids,
+            dense_head=dense_head,
         )
         preload_ids = rerank_preload_ids(
             assembled.fused,
@@ -458,6 +462,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 remaining_deadline_seconds=remaining,
                 retrieval_profile=selection_profile,
                 pinned_ids=pinned_ids,
+                dense_ids=dense_ids,
             )
             timings["selection_ms"] = int(elapsed_ms(selection_started))
             if rerank_call_ms:

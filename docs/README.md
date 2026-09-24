@@ -146,7 +146,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-sse-ordered-background-writer.md](./adr/ADR-sse-ordered-background-writer.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
 | [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
-| [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers, security |
+| [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
 | [adr/ADR-llm-conversation-titles.md](./adr/ADR-llm-conversation-titles.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security |
