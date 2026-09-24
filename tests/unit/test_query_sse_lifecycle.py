@@ -856,3 +856,329 @@ def test_stream_commits_and_terminal_persist_run_off_event_loop(
     assert loop_threads[0] not in open_threads
     assert loop_threads[0] not in commit_threads
     assert loop_threads[0] not in persist_threads
+
+
+class _TimedExecutor:
+    """Executor that records when each yielded draft is handed back."""
+
+    def __init__(self, count: int) -> None:
+        """Configure the stream.
+
+        Args:
+            count: Status drafts before ``completed``.
+        """
+
+        self.count = count
+        self.resumed_at: list[float] = []
+
+    async def execute(
+        self,
+        *,
+        context: Any,
+        message: str,
+        cancel_event: asyncio.Event,
+    ) -> AsyncIterator[tuple[str, dict[str, object]]]:
+        """Yield status drafts without delay, then ``completed``.
+
+        Args:
+            context: Unused authorized context.
+            message: Unused user text.
+            cancel_event: Unused cancel flag.
+
+        Yields:
+            Catalog drafts.
+        """
+
+        del context, message, cancel_event
+        for index in range(self.count):
+            yield ("status", {"stage": f"stage_{index}", "status": "running"})
+            self.resumed_at.append(time.monotonic())
+        yield ("completed", {})
+
+
+def test_executor_does_not_wait_for_non_terminal_appends() -> None:
+    """Five status drafts are handed back before their slow appends finish."""
+
+    store = _BlockingAppendStore(0.1, threading.Event())
+    executor = _TimedExecutor(count=5)
+    service = SseStreamService(
+        store=store,
+        registry=QueryRunRegistry(),
+        executor=executor,
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _drain() -> list[str]:
+        """Attach once and read every frame through the terminal.
+
+        Returns:
+            ``event:`` lines in stream order.
+        """
+
+        lines: list[str] = []
+        async for frame in service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        ):
+            lines.extend(
+                line for line in frame.splitlines() if line.startswith("event:")
+            )
+        return lines
+
+    lines = asyncio.run(_drain())
+    assert lines.count("event: status") == 5
+    assert lines[-1] == "event: completed"
+    assert executor.resumed_at[4] - executor.resumed_at[0] < 0.1
+    events = store.list_after(caller, run_id=runtime.run_id, after=0)
+    stages = [
+        event.payload.get("stage") for event in events if event.event_type == "status"
+    ]
+    assert stages == [f"stage_{index}" for index in range(5)]
+    assert events[-1].event_type == "completed"
+
+
+class _TerminalProbeExecutor:
+    """Executor that checks, after ``completed``, whether it is persisted."""
+
+    def __init__(self, store: MemoryRunEventStore, caller: Any, run_id: Any) -> None:
+        """Keep the store handle used for the check.
+
+        Args:
+            store: Event store the service writes to.
+            caller: Run owner.
+            run_id: Run id.
+        """
+
+        self.store = store
+        self.caller = caller
+        self.run_id = run_id
+        self.completed_persisted: bool | None = None
+
+    async def execute(
+        self,
+        *,
+        context: Any,
+        message: str,
+        cancel_event: asyncio.Event,
+    ) -> AsyncIterator[tuple[str, dict[str, object]]]:
+        """Yield status and ``completed``, then record what is persisted.
+
+        Args:
+            context: Unused authorized context.
+            message: Unused user text.
+            cancel_event: Unused cancel flag.
+
+        Yields:
+            Catalog drafts.
+        """
+
+        del context, message, cancel_event
+        yield ("status", {"stage": "admitted", "status": "running"})
+        yield ("completed", {})
+        events = self.store.list_after(self.caller, run_id=self.run_id, after=0)
+        self.completed_persisted = any(
+            event.event_type == "completed" for event in events
+        )
+
+
+def test_terminal_flush_precedes_post_terminal_work() -> None:
+    """Code after ``yield completed`` sees the terminal already persisted."""
+
+    store = _BlockingAppendStore(0.05, threading.Event())
+    caller = make_caller()
+    runtime = make_runtime()
+    executor = _TerminalProbeExecutor(store, caller, runtime.run_id)
+    service = SseStreamService(
+        store=store,
+        registry=QueryRunRegistry(),
+        executor=executor,
+        sse_schema_version="1",
+    )
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _drain() -> None:
+        """Attach through the terminal, then wait for the executor check."""
+
+        async for _frame in service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        ):
+            pass
+        for _ in range(100):
+            if executor.completed_persisted is not None:
+                return
+            await asyncio.sleep(0.01)
+
+    asyncio.run(_drain())
+    assert executor.completed_persisted is True
+
+
+class _CancelWaitExecutor:
+    """Executor that yields status drafts at once, then waits for cancel."""
+
+    def __init__(self, count: int) -> None:
+        """Configure the stream.
+
+        Args:
+            count: Status drafts yielded before waiting.
+        """
+
+        self.count = count
+
+    async def execute(
+        self,
+        *,
+        context: Any,
+        message: str,
+        cancel_event: asyncio.Event,
+    ) -> AsyncIterator[tuple[str, dict[str, object]]]:
+        """Yield status drafts, then end when cancel is requested.
+
+        Args:
+            context: Unused authorized context.
+            message: Unused user text.
+            cancel_event: Ends the stream when set.
+
+        Yields:
+            Catalog drafts.
+        """
+
+        del context, message
+        for index in range(self.count):
+            yield ("status", {"stage": f"stage_{index}", "status": "running"})
+        await cancel_event.wait()
+
+
+def test_cancel_skips_queued_drafts_and_keeps_one_terminal() -> None:
+    """Cancel keeps one ``cancelled`` and skips queued status drafts."""
+
+    store = _BlockingAppendStore(0.1, threading.Event())
+    registry = QueryRunRegistry()
+    service = SseStreamService(
+        store=store,
+        registry=registry,
+        executor=_CancelWaitExecutor(count=5),
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _run() -> None:
+        """Start the run, cancel after the first status row, then wait."""
+
+        agen = service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        )
+        await agen.__anext__()
+        for _ in range(200):
+            rows = store.list_after(caller, run_id=runtime.run_id, after=0)
+            if any(row.event_type == "status" for row in rows):
+                break
+            await asyncio.sleep(0.01)
+        live = registry.get(runtime.run_id)
+        assert live is not None
+        executor_task = live.executor_task
+        assert executor_task is not None
+        service.notify_cancel(caller, run_id=runtime.run_id)
+        try:
+            await asyncio.wait_for(executor_task, timeout=3.0)
+        except asyncio.CancelledError:
+            pass
+        close = getattr(agen, "aclose", None)
+        if callable(close):
+            closed = close()
+            if inspect.isawaitable(closed):
+                await closed
+
+    asyncio.run(_run())
+    types = [
+        row.event_type
+        for row in store.list_after(caller, run_id=runtime.run_id, after=0)
+    ]
+    assert types.count("cancelled") == 1
+    assert types.count("completed") + types.count("error") == 0
+    assert types.count("status") <= 2
+    assert len(types) - types.index("cancelled") - 1 <= 1
+
+
+class _FailingStatusStore(MemoryRunEventStore):
+    """Memory store whose append raises for the status stage ``boom``."""
+
+    def append(
+        self,
+        caller: Any,
+        *,
+        run_id: Any,
+        event_type: str,
+        payload: dict[str, object],
+    ) -> Any:
+        """Raise for stage ``boom``, otherwise persist.
+
+        Args:
+            caller: Owner.
+            run_id: Run id.
+            event_type: Allow-listed type.
+            payload: Candidate payload.
+
+        Returns:
+            Persisted event from the memory store.
+
+        Raises:
+            RuntimeError: For the ``boom`` status draft.
+        """
+
+        if event_type == "status" and payload.get("stage") == "boom":
+            raise RuntimeError("store exploded")
+        return super().append(
+            caller, run_id=run_id, event_type=event_type, payload=payload
+        )
+
+
+def test_writer_failure_becomes_single_error_terminal() -> None:
+    """An unexpected append failure ends the run with one sanitized error."""
+
+    store = _FailingStatusStore()
+    service = SseStreamService(
+        store=store,
+        registry=QueryRunRegistry(),
+        executor=FixtureQueryRunExecutor(
+            extra_events=(
+                ("status", {"stage": "boom", "status": "running"}),
+                ("status", {"stage": "after", "status": "running"}),
+            ),
+        ),
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _drain() -> list[str]:
+        """Attach once and read every frame through the terminal.
+
+        Returns:
+            ``event:`` lines in stream order.
+        """
+
+        lines: list[str] = []
+        async for frame in service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        ):
+            lines.extend(
+                line for line in frame.splitlines() if line.startswith("event:")
+            )
+        return lines
+
+    lines = asyncio.run(_drain())
+    assert lines[-1] == "event: error"
+    events = store.list_after(caller, run_id=runtime.run_id, after=0)
+    types = [event.event_type for event in events]
+    stages = [
+        event.payload.get("stage") for event in events if event.event_type == "status"
+    ]
+    assert types.count("error") == 1
+    assert "completed" not in types
+    assert "boom" not in stages
+    assert "after" not in stages

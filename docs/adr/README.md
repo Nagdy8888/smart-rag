@@ -32,6 +32,7 @@ audience: engineering
 | Stitch-first production UX | accepted | 8 UX | [ADR-stitch-first-ux.md](./ADR-stitch-first-ux.md) |
 | Frontend functional overhaul | accepted | 8 remediation | [ADR-frontend-functional-overhaul.md](./ADR-frontend-functional-overhaul.md) |
 | Verified-answer paced reveal and custom progress | accepted | 6/8 amendment | [ADR-verified-answer-paced-reveal.md](./ADR-verified-answer-paced-reveal.md) |
+| SSE ordered background event writer | accepted | latency L3 | [ADR-sse-ordered-background-writer.md](./ADR-sse-ordered-background-writer.md) |
 | Ink & Indigo visual refresh | accepted | 8 UX | [ADR-ink-indigo-visual-refresh.md](./ADR-ink-indigo-visual-refresh.md) |
 | General-chat strict split | accepted | 6/8 amendment | [ADR-general-chat-strict-split.md](./ADR-general-chat-strict-split.md) |
 | Local PDF evaluation workspace | superseded | 6 overlay | [ADR-local-pdf-evaluation-workspace.md](./ADR-local-pdf-evaluation-workspace.md) |

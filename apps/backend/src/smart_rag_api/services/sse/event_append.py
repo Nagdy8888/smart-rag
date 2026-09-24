@@ -83,8 +83,9 @@ class EventAppendMixin:
 
         Heartbeat and executor orchestration must use this helper so a
         synchronous run-row lock wait cannot freeze ``astream`` or SSE
-        attach. Callers still await each append before the next event so
-        sequence order and exactly-one terminal stay unchanged. After the
+        attach. Executor drafts reach it through one ``RunEventWriter`` per
+        run, so they still persist one at a time in yield order and
+        exactly-one terminal stays unchanged. After the
         write returns, attach loops waiting on this run are woken, also when
         the append was replaced by a sanitized ``error`` or skipped.
 

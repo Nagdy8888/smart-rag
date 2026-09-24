@@ -37,6 +37,7 @@ STREAM_OWNERS: tuple[str, ...] = (
     "apps/backend/src/smart_rag_api/services/sse/run_settlement.py",
     "apps/backend/src/smart_rag_api/services/sse/replay_cancel.py",
     "apps/backend/src/smart_rag_api/services/sse/run_summary.py",
+    "apps/backend/src/smart_rag_api/services/sse/event_writer.py",
 )
 
 MAPPING_OWNERS: tuple[str, ...] = (

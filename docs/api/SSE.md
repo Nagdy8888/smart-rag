@@ -203,8 +203,23 @@ sequenceDiagram
 
 Heartbeat and executor appends run in `asyncio.to_thread` so a synchronous
 Postgres wait cannot freeze the SSE event loop or LangGraph `astream`.
-Sequence order is unchanged: each append is awaited before the next event.
 Exactly one terminal remains required.
+
+Since latency packet L3, the executor does not wait for each append. It
+hands drafts to a per-run `RunEventWriter`
+(`smart_rag_api.services.sse.event_writer`): one background task persists
+them in yield order, so sequence order is still the executor yield order.
+The queue holds at most `EVENT_WRITER_MAX_PENDING` = 32 drafts; a full
+queue makes the executor wait. After a terminal draft the executor waits
+until the writer has persisted it, so `commit_successful_terminal` and
+reservation settlement still run after a durable terminal. After a cancel
+request, queued non-terminal drafts are skipped because `cancelled` is
+already persisted. An unexpected append exception stops the writer; the
+executor then persists one sanitized `error` terminal if none exists.
+Heartbeats keep their own direct append path. Frames still come only from
+persisted rows, so `app.run_events.created_at` is persist time and can lag
+the graph by up to the queue length. See
+[ADR-sse-ordered-background-writer.md](../adr/ADR-sse-ordered-background-writer.md).
 
 `PostgresRunEventStore` keeps autocommit off and lends sessions from a
 pool of at most 4 per API process (see
