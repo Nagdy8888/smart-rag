@@ -143,6 +143,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-hybrid-retrieval-accuracy.md](./adr/ADR-hybrid-retrieval-accuracy.md) | engineering-lead | accepted | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-honest-rag-accuracy.md](./adr/ADR-honest-rag-accuracy.md) | engineering-lead | accepted | 2026-09-21 | eng, reviewers, security |
 | [adr/ADR-ask-evidence-budget-repair.md](./adr/ADR-ask-evidence-budget-repair.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers |
+| [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
@@ -183,7 +184,10 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
-| [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
+| [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-23 | eng, reviewers |
+| [evaluation/FRESH_KNOWN_ANSWER_50_2026-09-23.md](./evaluation/FRESH_KNOWN_ANSWER_50_2026-09-23.md) | engineering-lead | draft | 2026-09-23 | eng, reviewers |
+| [evaluation/ANSWER_ONLY_50_2026-09-24.md](./evaluation/ANSWER_ONLY_50_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
+| [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |
