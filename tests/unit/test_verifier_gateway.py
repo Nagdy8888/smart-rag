@@ -263,7 +263,10 @@ def test_verify_answer_node_invalid_verifier_is_partial() -> None:
         ),
     )
     assert verified["status"] == "verified_partial"
-    assert verified["detail"] == "verifier_schema_invalid"
+    assert verified["detail"] == "verifier_skipped:verifier_schema_invalid"
+    verification = verified["verification"]
+    assert isinstance(verification, dict)
+    assert verification["verifier_skipped_reason"] == "verifier_schema_invalid"
     answer = AnswerPayload.model_validate(verified["answer"])
     assert answer.answer_text == "The refund period is 30 days."
 

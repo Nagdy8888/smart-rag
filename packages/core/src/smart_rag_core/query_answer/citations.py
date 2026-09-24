@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -10,7 +13,7 @@ import psycopg
 
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
-from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.web_research.models import WebSourceRecord
@@ -18,6 +21,65 @@ from smart_rag_core.web_research.models import WebSourceRecord
 LOGGER = logging.getLogger(__name__)
 
 _REASON_PREFIX = "query_citation:"
+
+LEAF_RESOLUTION_REASONS = frozenset(
+    {"span_not_contained", "leaf_ambiguous", "page_ambiguous"}
+)
+"""``insert_run_citation_v2`` reasons that describe one citation's leaf
+resolution rather than the run, the caller, or the transaction."""
+
+MIN_RETRY_SPAN_CHARS = 24
+"""Shortest leading sentence worth retrying as a narrower span."""
+
+_SENTENCE_END = re.compile(r"[.!?\u061f\u3002]\s|\n")
+
+
+@dataclass(frozen=True, slots=True)
+class SkippedCitation:
+    """One passage citation that could not be pinned to a single leaf.
+
+    Attributes:
+        chunk_id: Cited chunk id as text.
+        paragraph_index: Paragraph the citation belonged to, if any.
+        span: Span the model cited (already contained in the chunk text).
+        reason: Last ``insert_run_citation_v2`` leaf-resolution reason.
+    """
+
+    chunk_id: str
+    paragraph_index: int | None
+    span: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class CitationPersistResult:
+    """Outcome of one citation batch.
+
+    Attributes:
+        ids: Inserted ``app.citations`` ids in write order.
+        skipped: Passage citations skipped for leaf-resolution reasons.
+    """
+
+    ids: tuple[UUID, ...] = ()
+    skipped: tuple[SkippedCitation, ...] = ()
+
+
+def _citation_error_reason(exc: BaseException) -> str:
+    """Extract the ``query_citation:`` reason from a database error.
+
+    Args:
+        exc: Driver or database error.
+
+    Returns:
+        Reason token, or ``database_rejected`` when the message has none.
+    """
+
+    message = str(exc)
+    if _REASON_PREFIX in message:
+        start = message.find(_REASON_PREFIX) + len(_REASON_PREFIX)
+        tail = message[start:].split()[0].strip("\"'")
+        return tail.split("\n")[0]
+    return "database_rejected"
 
 
 def _raise_citation_error(exc: BaseException) -> None:
@@ -30,13 +92,62 @@ def _raise_citation_error(exc: BaseException) -> None:
         QueryAdmissionError: Always.
     """
 
-    message = str(exc)
-    reason = "database_rejected"
-    if _REASON_PREFIX in message:
-        start = message.find(_REASON_PREFIX) + len(_REASON_PREFIX)
-        tail = message[start:].split()[0].strip("\"'")
-        reason = tail.split("\n")[0]
-    raise QueryAdmissionError(reason) from exc
+    raise QueryAdmissionError(_citation_error_reason(exc)) from exc
+
+
+def leading_sentence(span: str, *, minimum: int = MIN_RETRY_SPAN_CHARS) -> str:
+    """Return the first sentence of a span when it is a strictly shorter retry.
+
+    Args:
+        span: Verbatim span already contained in the cited chunk text.
+        minimum: Shortest acceptable retry length.
+
+    Returns:
+        Leading sentence including its terminal punctuation, or an empty
+        string when the span has one sentence or the head is too short.
+    """
+
+    stripped = span.strip()
+    match = _SENTENCE_END.search(stripped)
+    if match is None:
+        return ""
+    head = stripped[: match.start() + 1].strip()
+    if len(head) < minimum or head == stripped:
+        return ""
+    return head
+
+
+def drop_skipped_citations(
+    answer: AnswerPayload,
+    skipped: Sequence[SkippedCitation],
+) -> AnswerPayload:
+    """Remove passage citations that were not persisted.
+
+    Args:
+        answer: Verified answer payload.
+        skipped: Citations skipped by ``persist_answer_citations``.
+
+    Returns:
+        Payload without the skipped citations. Paragraphs and atomic links
+        are unchanged. Unchanged when nothing was skipped.
+    """
+
+    if not skipped:
+        return answer
+    keys = {(item.chunk_id, item.paragraph_index, item.span) for item in skipped}
+    kept = tuple(
+        citation
+        for citation in answer.citations
+        if (
+            str(citation.chunk_id or ""),
+            citation.paragraph_index,
+            (citation.span or "").strip(),
+        )
+        not in keys
+    )
+    if len(kept) == len(answer.citations):
+        return answer
+    return answer.model_copy(update={"citations": kept})
 
 
 def _passage_locator_fields(scored: ScoredPassage | None) -> dict[str, object]:
@@ -125,6 +236,57 @@ def citation_provenance_payload(
     return payload
 
 
+def _insert_passage_citation(
+    cursor: psycopg.Cursor[Any],
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+    index: int,
+    citation: AnswerCitation,
+    span: str,
+    provenance: dict[str, object],
+) -> UUID | None:
+    """Run ``insert_run_citation_v2`` for one span attempt.
+
+    Args:
+        cursor: Open cursor inside the run transaction.
+        caller: Server-derived caller.
+        run_id: Admitted run.
+        index: Write index within the run.
+        citation: Passage citation.
+        span: Span attempt, at most 1000 chars.
+        provenance: Expand-only provenance jsonb.
+
+    Returns:
+        Inserted citation id, or None when the function returned no row.
+
+    Raises:
+        psycopg.Error: Any database rejection, including leaf resolution.
+    """
+
+    cursor.execute(
+        """
+        SELECT citation_id
+        FROM app.insert_run_citation_v2(
+          %s, %s, %s, %s, %s, %s::uuid, %s, %s, %s::jsonb
+        )
+        """,
+        (
+            caller.user_id,
+            caller.rpc_role(),
+            caller.rpc_authorization_version(),
+            str(run_id),
+            index,
+            citation.chunk_id,
+            span[:1000],
+            citation.paragraph_index,
+            _json(provenance),
+        ),
+    )
+    row = cursor.fetchone()
+    return UUID(str(row[0])) if row is not None else None
+
+
 def persist_answer_citations(
     connection: psycopg.Connection,
     *,
@@ -132,11 +294,13 @@ def persist_answer_citations(
     run_id: UUID,
     fusion: FusionResult,
     answer: AnswerPayload,
-) -> tuple[UUID, ...]:
+) -> CitationPersistResult:
     """Insert citation rows with fusion provenance. Expand-only on jsonb.
 
     Passage citations resolve one page-bounded leaf through
-    ``insert_run_citation_v2``. Table citations keep the v1 path.
+    ``insert_run_citation_v2``. A leaf-resolution failure retries once
+    with the leading sentence, then skips that citation. Table citations
+    keep the v1 path and still fail closed.
 
     Args:
         connection: Open ``app_api`` connection.
@@ -146,17 +310,20 @@ def persist_answer_citations(
         answer: Verified answer.
 
     Returns:
-        Inserted citation UUIDs.
+        Inserted ids and skipped leaf-unresolved citations.
 
     Raises:
-        QueryAdmissionError: Span, leaf, ACL, replay, or cap failure.
+        QueryAdmissionError: Any non-leaf reason: ACL, replay, cap, chunk
+            or span required, database error.
 
     Side Effects:
         Inserts into ``app.citations``. Does not create tables or columns.
         Writes are ordered by paragraph index, then original model order.
+        Does not commit. Each passage attempt uses ``SAVEPOINT citation_leaf``.
     """
 
     ids: list[UUID] = []
+    skipped: list[SkippedCitation] = []
     index = 0
     ordered_passages = sorted(
         enumerate(answer.citations),
@@ -183,31 +350,52 @@ def persist_answer_citations(
                 inference=citation.inference,
                 source_ranges=citation.source_ranges,
             )
-            try:
-                cursor.execute(
-                    """
-                    SELECT citation_id
-                    FROM app.insert_run_citation_v2(
-                      %s, %s, %s, %s, %s, %s::uuid, %s, %s, %s::jsonb
+            attempts: tuple[str, ...] = (span,)
+            retry = leading_sentence(span)
+            if retry:
+                attempts = (span, retry)
+            inserted: UUID | None = None
+            last_reason = ""
+            for attempt in attempts:
+                cursor.execute("SAVEPOINT citation_leaf")
+                try:
+                    inserted = _insert_passage_citation(
+                        cursor,
+                        caller=caller,
+                        run_id=run_id,
+                        index=index,
+                        citation=citation,
+                        span=attempt,
+                        provenance=provenance,
                     )
-                    """,
-                    (
-                        caller.user_id,
-                        caller.rpc_role(),
-                        caller.rpc_authorization_version(),
-                        str(run_id),
-                        index,
-                        citation.chunk_id,
-                        span[:1000],
-                        citation.paragraph_index,
-                        _json(provenance),
-                    ),
+                except psycopg.Error as exc:
+                    cursor.execute("ROLLBACK TO SAVEPOINT citation_leaf")
+                    cursor.execute("RELEASE SAVEPOINT citation_leaf")
+                    last_reason = _citation_error_reason(exc)
+                    if last_reason not in LEAF_RESOLUTION_REASONS:
+                        raise QueryAdmissionError(last_reason) from exc
+                    continue
+                cursor.execute("RELEASE SAVEPOINT citation_leaf")
+                break
+            if inserted is None:
+                skipped.append(
+                    SkippedCitation(
+                        chunk_id=str(citation.chunk_id),
+                        paragraph_index=citation.paragraph_index,
+                        span=span,
+                        reason=last_reason or "span_not_contained",
+                    )
                 )
-            except psycopg.Error as exc:
-                _raise_citation_error(exc)
-            row = cursor.fetchone()
-            if row is not None:
-                ids.append(UUID(str(row[0])))
+                LOGGER.info(
+                    "citation leaf unresolved",
+                    extra={
+                        "event": "query.verify.citation_leaf_unresolved",
+                        "run_id": str(run_id),
+                        "reason": last_reason,
+                    },
+                )
+                continue
+            ids.append(inserted)
             index += 1
         for citation in answer.table_citations:
             if index >= 12:
@@ -247,7 +435,7 @@ def persist_answer_citations(
             if row is not None:
                 ids.append(UUID(str(row[0])))
             index += 1
-    return tuple(ids)
+    return CitationPersistResult(ids=tuple(ids), skipped=tuple(skipped))
 
 
 def maybe_persist_verified_citations(
@@ -257,7 +445,7 @@ def maybe_persist_verified_citations(
     run_id: UUID | None,
     fusion: FusionResult,
     answer: AnswerPayload,
-) -> tuple[UUID, ...]:
+) -> CitationPersistResult:
     """Insert verified citations once per run when a durable connection exists.
 
     Args:
@@ -268,8 +456,9 @@ def maybe_persist_verified_citations(
         answer: Verified answer payload.
 
     Returns:
-        Inserted citation UUIDs, or an empty tuple when skipped because the
-        graph is unbound, the answer has no citations, or rows already exist.
+        Inserted ids and skipped citations, or an empty result when skipped
+        because the graph is unbound, the answer has no citations, or rows
+        already exist.
 
     Raises:
         QueryAdmissionError: Bound existence-check or persist failure. Callers
@@ -281,9 +470,9 @@ def maybe_persist_verified_citations(
     """
 
     if connection is None or caller is None or run_id is None:
-        return ()
+        return CitationPersistResult()
     if not answer.citations and not answer.table_citations:
-        return ()
+        return CitationPersistResult()
     try:
         existing = list_run_citations(connection, caller=caller, run_id=run_id)
     except QueryAdmissionError:
@@ -305,7 +494,7 @@ def maybe_persist_verified_citations(
         )
         raise QueryAdmissionError("database_rejected") from exc
     if existing:
-        return ()
+        return CitationPersistResult()
     try:
         return persist_answer_citations(
             connection,

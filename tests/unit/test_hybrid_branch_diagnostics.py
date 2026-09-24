@@ -98,6 +98,8 @@ def test_hybrid_diagnostics_enforce_id_caps() -> None:
         _diagnostics(term_ids=tuple(str(uuid4()) for _ in range(31)))
     with pytest.raises(ValidationError):
         _diagnostics(selected_ids=tuple(str(uuid4()) for _ in range(13)))
+    with pytest.raises(ValidationError):
+        _diagnostics(rerank_pool_ids=tuple(str(uuid4()) for _ in range(101)))
 
 
 def test_hybrid_diagnostics_reject_non_uuid_ids() -> None:
@@ -110,10 +112,13 @@ def test_hybrid_diagnostics_reject_non_uuid_ids() -> None:
 def test_hybrid_diagnostics_serialization_is_deterministic() -> None:
     """JSON dumps of the same diagnostics are byte-identical."""
 
-    row = _diagnostics()
+    pool_id = str(uuid4())
+    row = _diagnostics(rerank_pool_ids=(pool_id,))
     first = row.model_dump_json()
-    second = HybridBranchDiagnostics.model_validate_json(first).model_dump_json()
+    restored = HybridBranchDiagnostics.model_validate_json(first)
+    second = restored.model_dump_json()
     assert first == second
+    assert restored.rerank_pool_ids == (pool_id,)
 
 
 def test_branch_result_without_diagnostics_still_validates() -> None:
@@ -159,6 +164,7 @@ def test_hybrid_diagnostics_from_none_fallback_persist() -> None:
         term_ids=(chunk,),
         fused_ids=(chunk,),
         selected_ids=(chunk,),
+        rerank_order=(uuid4(), uuid4()),
         coverage=HybridCoverage(
             signal=CoverageSignal.NONE,
             coverage_score=0.8,
@@ -177,6 +183,7 @@ def test_hybrid_diagnostics_from_none_fallback_persist() -> None:
     assert row.fallback_reason == "none"
     assert row.source_resolution == "exact_one"
     assert row.dense_ids == (chunk,)
+    assert row.rerank_pool_ids == tuple(str(item) for item in outcome.rerank_order)
 
 
 def test_hybrid_diagnostics_omit_when_source_resolution_missing() -> None:
@@ -210,12 +217,14 @@ def test_stage_record_measures_accounting_and_bm25_explicit() -> None:
         "term_ids": [chunk],
         "fused_ids": [chunk],
         "selected_ids": [chunk],
+        "rerank_pool_ids": [chunk],
         "effective_route": "hybrid",
     }
     ok = stage_record(diagnostics, {"embedding", "rerank"})
     assert ok["rerank_accounting_ok"] is True
     assert ok["bm25_degraded_explicit"] is True
     assert ok["retrieval_empty"] is False
+    assert ok["rerank_pool_ids"] == [chunk]
     masked = stage_record(
         {**diagnostics, "fallback_reason": "term_unavailable"},
         {"embedding", "rerank"},
@@ -230,6 +239,7 @@ def test_stage_record_measures_accounting_and_bm25_explicit() -> None:
     missing = stage_record(None, set())
     assert missing["source_resolution"] == "unknown"
     assert missing["rerank_accounting_ok"] == "unknown"
+    assert missing["rerank_pool_ids"] == "unknown"
 
 
 def test_unknown_required_count_keeps_measured_zero() -> None:

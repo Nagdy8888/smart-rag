@@ -31,6 +31,7 @@ from smart_rag_core.retrieval.rerank import (
     RerankUsage,
     apply_mmr,
     build_rerank_pool,
+    channel_head_pins,
     rerank_input_hash,
     rerank_json_schema,
     rerank_preload_ids,
@@ -689,3 +690,68 @@ def test_invalid_json_schema_falls_back_to_rrf() -> None:
     assert rankings == ()
     assert usage is None
     assert reason is RerankFallbackReason.SCHEMA_INVALID
+
+
+def test_channel_head_pins_bypass_document_cap_and_keep_fused_order() -> None:
+    """A pinned eighth chunk of a dominant document enters the pool in place."""
+
+    document = uuid4()
+    dominant = tuple(_passage(document=document, text=f"same {i}") for i in range(8))
+    others = tuple(_passage(text=f"other {i}") for i in range(20))
+    fused = dominant + others
+    pinned = dominant[7].candidate.chunk_id
+    pool = build_rerank_pool(fused, pinned_ids=(pinned,))
+    ids = [item.candidate.chunk_id for item in pool]
+    assert pinned in ids
+    assert len(pool) <= RERANK_POOL_SIZE
+    assert (
+        sum(1 for item in pool if item.candidate.document_id == document)
+        == RERANK_MAX_PER_DOCUMENT + 1
+    )
+    position = {item.candidate.chunk_id: i for i, item in enumerate(fused)}
+    assert ids == sorted(ids, key=position.__getitem__)
+
+
+def test_pool_without_pins_is_unchanged() -> None:
+    """An empty pin set reproduces the legacy pool exactly."""
+
+    document = uuid4()
+    fused = tuple(_passage(document=document, text=f"d {i}") for i in range(8)) + tuple(
+        _passage(text=f"o {i}") for i in range(20)
+    )
+    legacy = [item.candidate.chunk_id for item in build_rerank_pool(fused)]
+    pinned = [
+        item.candidate.chunk_id for item in build_rerank_pool(fused, pinned_ids=())
+    ]
+    assert legacy == pinned
+
+
+def test_preload_ids_include_pins_and_stay_bounded() -> None:
+    """Preload membership includes pins so their contexts are loaded."""
+
+    document = uuid4()
+    overflow = tuple(_candidate(document=document) for _ in range(8))
+    others = tuple(_candidate() for _ in range(20))
+    pinned = overflow[7].chunk_id
+    preloaded = rerank_preload_ids(
+        overflow + others,
+        pool_size=RERANK_POOL_SIZE,
+        max_per_document=RERANK_MAX_PER_DOCUMENT,
+        pinned_ids=(pinned,),
+    )
+    assert pinned in preloaded
+    assert len(preloaded) == RERANK_POOL_SIZE
+    assert len(preloaded) == len(set(preloaded))
+
+
+def test_channel_head_pins_only_return_authorized_ids() -> None:
+    """Pins are the intersection of channel heads with fused authorized IDs."""
+
+    a, b, c, d, e, f, x = (uuid4() for _ in range(7))
+    pins = channel_head_pins(
+        dense_ids=(a, b, c, d, e, f),
+        bm25_ids=(x, b),
+        fused_ids=(b, c, x),
+    )
+    assert pins == (b, c, x)
+    assert channel_head_pins(dense_ids=(a,), bm25_ids=(), fused_ids=()) == ()

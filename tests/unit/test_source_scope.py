@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from smart_rag_core.retrieval.frozen_profile import LONG_DOCUMENT_PROFILE_ID
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.source_scope import (
     SourceResolution,
@@ -164,9 +165,22 @@ def test_ambiguous_and_empty_matches_stay_unscoped(
 
         return ()
 
+    def _no_corpus(*_args: object, **_kwargs: object) -> tuple[int, int]:
+        """Return an empty authorized corpus.
+
+        Returns:
+            Zero documents and zero representatives.
+        """
+
+        return (0, 0)
+
     monkeypatch.setattr(
         "smart_rag_core.retrieval.source_scope._search_authorized_versions",
         _ambiguous,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.retrieval.source_scope._count_authorized_corpus",
+        _no_corpus,
     )
     ambiguous = resolve_retrieval_scope(
         caller=_caller(),
@@ -189,3 +203,52 @@ def test_ambiguous_and_empty_matches_stay_unscoped(
     )
     assert missing.resolution is SourceResolution.UNSCOPED
     assert missing.version_id is None
+
+
+def test_unscoped_small_corpus_selects_long_document(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A small authorized corpus with one long document routes to v2 unscoped."""
+
+    def _no_matches(
+        *_args: object, **_kwargs: object
+    ) -> tuple[tuple[object, str], ...]:
+        """Return no title matches.
+
+        Returns:
+            Empty match list.
+        """
+
+        return ()
+
+    def _small_corpus(*_args: object, **_kwargs: object) -> tuple[int, int]:
+        """Return the measured four-document corpus.
+
+        Returns:
+            Document count and the largest representative count.
+        """
+
+        return (4, 1015)
+
+    monkeypatch.setattr(
+        "smart_rag_core.retrieval.source_scope._search_authorized_versions",
+        _no_matches,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.retrieval.source_scope._count_authorized_corpus",
+        _small_corpus,
+    )
+    scope = resolve_retrieval_scope(
+        caller=_caller(),
+        requested_sources=(),
+        whole_document=False,
+        connection=SimpleNamespace(),  # type: ignore[arg-type]
+        query_text="What does chapter three say about refunds?",
+    )
+    assert scope.resolution is SourceResolution.UNSCOPED
+    assert scope.version_id is None
+    assert scope.selector_texts == ()
+    assert scope.authorized_document_count == 4
+    assert scope.representative_count == 1015
+    assert scope.candidate_profile_id == LONG_DOCUMENT_PROFILE_ID
+    assert scope.eligibility_reason == "small_corpus_long_document"

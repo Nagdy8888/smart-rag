@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-21
+last-reviewed: 2026-09-22
 audience: engineering, reviewers, client-approver
 ---
 
@@ -58,7 +58,7 @@ The table below is the complete maintained map. Packet evidence under
 | [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [evaluation/PHASE6_EVAL_REGISTRY.md](./evaluation/PHASE6_EVAL_REGISTRY.md) | engineering-lead | draft | 2026-08-26 | eng, reviewers |
 | [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-09-22 | eng, security |
-| [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
+| [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-09-22 | eng, frontend |
 | [deployment/STREAMING_TIMEOUTS.md](./deployment/STREAMING_TIMEOUTS.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [deployment/LOCAL_RUNTIME_ROLES.md](./deployment/LOCAL_RUNTIME_ROLES.md) | engineering-lead | draft | 2026-08-25 | eng, ops |
 | [deployment/STAGING_COMPOSE.md](./deployment/STAGING_COMPOSE.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
@@ -144,6 +144,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-honest-rag-accuracy.md](./adr/ADR-honest-rag-accuracy.md) | engineering-lead | accepted | 2026-09-21 | eng, reviewers, security |
 | [adr/ADR-ask-evidence-budget-repair.md](./adr/ADR-ask-evidence-budget-repair.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
+| [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
 | [adr/ADR-llm-conversation-titles.md](./adr/ADR-llm-conversation-titles.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security |
@@ -180,6 +181,9 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
 | [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers, client-approver |
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
+| [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |
+| [evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
+| [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |

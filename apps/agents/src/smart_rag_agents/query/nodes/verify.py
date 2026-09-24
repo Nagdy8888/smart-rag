@@ -13,6 +13,7 @@ from smart_rag_core.query_admission.exceptions import (
 )
 from smart_rag_core.query_admission.service import summarize_run_usage
 from smart_rag_core.query_answer.citations import (
+    drop_skipped_citations,
     maybe_persist_verified_citations,
     persist_web_answer_citations,
 )
@@ -33,6 +34,7 @@ from smart_rag_core.query_answer.verifier import run_verifier_batch
 from smart_rag_core.query_routing.constants import (
     FALLBACK_RETRIEVERS_UNBOUND,
     LIMITATION_VERIFIER_OMITTED_LINKS,
+    VERIFIER_SKIPPED_DETAIL_PREFIX,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
@@ -61,7 +63,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         ``remaining_model_calls``, ``verifier_call_count``.
 
     State outputs:
-        ``verification``, accumulated ``prompt_tokens`` /
+        ``verification`` (including ``verifier_skipped_reason`` when the
+        verifier call failed), accumulated ``prompt_tokens`` /
         ``completion_tokens``, and possibly decremented remaining calls.
 
     Persistence writes:
@@ -84,7 +87,13 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         verifier payload never terminate ``verified``. Omitted IDs force
         ``verified_partial`` and ``verifier_omitted_links``. Invalid
         verifier JSON degrades to ``verified_partial`` with the
-        already-generated answer. Company answers without valid paragraph
+        already-generated answer.         A verifier timeout or gateway failure
+        degrades to ``verified_partial`` with detail
+        ``verifier_skipped:<reason>`` and still persists citations.
+        Leaf-unresolved citations are skipped: some remaining citations
+        become ``verified_partial`` with ``citation_leaf_unresolved``;
+        zero persisted citations stay ``insufficient_evidence``.
+        Company answers without valid paragraph
         mappings become a citation-free refusal; fusion passages are never
         backfilled as citations.
 
@@ -156,6 +165,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     omitted: tuple[str, ...] = ()
     added_prompt_tokens = 0
     added_completion_tokens = 0
+    verifier_skipped_reason: str | None = None
     if checked.atomic_links and not is_web:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
@@ -192,20 +202,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 already_called=verifier_calls,
             )
         except (AnswerError, QueryCeilingError) as exc:
-            reason = getattr(exc, "reason", str(exc) or "verifier_failed")
-            if str(reason) == "model_call_exhausted":
-                return {
-                    **state,
-                    "status": "verified_partial",
-                    "detail": "model_call_exhausted",
-                    "answer": checked.model_dump(mode="json"),
-                }
-            return {
-                **state,
-                "status": "verified_partial",
-                "detail": str(reason),
-                "answer": checked.model_dump(mode="json"),
-            }
+            reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
+            verifier_skipped_reason = str(reason)[:64]
     if company_release_applies(checked, is_web=is_web):
         checked = render_verified_company_answer(
             checked, fusion=fusion, tables=tables.records
@@ -233,6 +231,12 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     else:
         terminal = "verified"
         detail = "answer verified"
+    if verifier_skipped_reason is not None and terminal in {
+        "verified",
+        "verified_partial",
+    }:
+        terminal = "verified_partial"
+        detail = f"{VERIFIER_SKIPPED_DETAIL_PREFIX}{verifier_skipped_reason}"[:128]
     if (
         terminal == "verified"
         and deps.model_gateway is None
@@ -269,6 +273,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         checked = checked.model_copy(
             update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
         )
+    skipped_citation_count = 0
     if is_web:
         checked = checked.model_copy(
             update={
@@ -294,7 +299,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 detail = "web_evidence_insufficient"
     else:
         try:
-            maybe_persist_verified_citations(
+            persisted = maybe_persist_verified_citations(
                 deps.connection,
                 caller=caller_from_runtime(context) if context is not None else None,
                 run_id=context.run_id if context is not None else None,
@@ -305,11 +310,23 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             if deps.connection is not None and context is not None:
                 terminal = "insufficient_evidence"
                 detail = "citation_persist_failed"
+        else:
+            if persisted.skipped:
+                skipped_citation_count = len(persisted.skipped)
+                checked = drop_skipped_citations(checked, persisted.skipped)
+                if not persisted.ids:
+                    terminal = "insufficient_evidence"
+                    detail = "citation_leaf_unresolved"
+                elif terminal in {"verified", "verified_partial"}:
+                    terminal = "verified_partial"
+                    detail = "citation_leaf_unresolved"
     result = VerificationResult(
         answer=checked,
         deterministic_failures=failures,
         verifier_call_count=1 if verifier_calls else 0,
         omitted_link_ids=omitted,
+        verifier_skipped_reason=verifier_skipped_reason,
+        skipped_citation_count=skipped_citation_count,
         status=terminal
         if terminal
         in {"verified", "verified_partial", "refused", "insufficient_evidence"}

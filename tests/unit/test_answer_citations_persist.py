@@ -9,9 +9,14 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from smart_rag_agents.query.state import QueryGraphState
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
 from smart_rag_core.query_answer.citations import (
+    CitationPersistResult,
+    SkippedCitation,
+    drop_skipped_citations,
+    leading_sentence,
     maybe_persist_verified_citations,
     persist_answer_citations,
 )
@@ -46,7 +51,7 @@ def test_maybe_persist_skips_without_connection() -> None:
             fusion=fusion,
             answer=answer,
         )
-        == ()
+        == CitationPersistResult()
     )
 
 
@@ -71,7 +76,7 @@ def test_maybe_persist_delegates_once_when_bound() -> None:
         ) as list_existing,
         patch(
             "smart_rag_core.query_answer.citations.persist_answer_citations",
-            return_value=inserted,
+            return_value=CitationPersistResult(ids=inserted),
         ) as persist,
     ):
         first = maybe_persist_verified_citations(
@@ -89,8 +94,8 @@ def test_maybe_persist_delegates_once_when_bound() -> None:
             answer=answer,
         )
 
-    assert first == inserted
-    assert second == ()
+    assert first.ids == inserted
+    assert second == CitationPersistResult()
     persist.assert_called_once()
     assert list_existing.call_count == 2
 
@@ -198,6 +203,151 @@ def test_verify_bound_persist_failure_is_not_verified(
     assert verified["detail"] == "citation_persist_failed"
 
 
+def _verify_persisted(
+    monkeypatch: pytest.MonkeyPatch,
+    spans: tuple[str, ...],
+    *,
+    skipped_span: str | None,
+) -> QueryGraphState:
+    """Run verify with a recorded citation-persist result.
+
+    Args:
+        monkeypatch: Pytest patcher.
+        spans: Passage spans on the checked answer.
+        skipped_span: Span the persist result reports as leaf-unresolved.
+
+    Returns:
+        Verify node state.
+    """
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.verify import verify_answer_node
+    from smart_rag_agents.query.state import pending_query_state
+    from smart_rag_core.query_answer.models import AnswerParagraph, AtomicLink
+    from smart_rag_core.security.identity import UserRole
+
+    fusion = verifier_fusion(verifier_passage(1, text="Refund period is 30 days."))
+    chunk_id = str(fusion.evidence[0].chunk_id)
+    runtime = MagicMock()
+    runtime.user_id = uuid4()
+    runtime.role = UserRole.MEMBER
+    runtime.authorization_version = 1
+    runtime.session_id = None
+    runtime.run_id = uuid4()
+
+    def _runtime_from_state(_state: object) -> MagicMock:
+        """Return the mocked runtime regardless of graph state."""
+
+        return runtime
+
+    def _keep_answer(answer: AnswerPayload, **_kwargs: object) -> AnswerPayload:
+        """Skip paragraph rebuild so the test citations reach the drop step.
+
+        Args:
+            answer: Checked answer.
+            _kwargs: Fusion and table arguments ignored by this stub.
+
+        Returns:
+            The same payload.
+        """
+
+        return answer
+
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.runtime_from_state",
+        _runtime_from_state,
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.render_verified_company_answer",
+        _keep_answer,
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.summarize_run_usage",
+        MagicMock(side_effect=QueryAdmissionError("database_rejected")),
+    )
+    skipped = ()
+    if skipped_span is not None:
+        skipped = (
+            SkippedCitation(
+                chunk_id=chunk_id,
+                paragraph_index=0,
+                span=skipped_span,
+                reason="leaf_ambiguous",
+            ),
+        )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.maybe_persist_verified_citations",
+        MagicMock(
+            return_value=CitationPersistResult(
+                ids=() if skipped_span is not None and len(spans) == 1 else (uuid4(),),
+                skipped=skipped,
+            )
+        ),
+    )
+    state = pending_query_state(user_query="What is the refund period?")
+    state["status"] = "answered"
+    state["remaining_model_calls"] = 8
+    state["fusion"] = fusion.model_dump(mode="json")
+    state["answer"] = AnswerPayload(
+        answer_text="Refund period is 30 days.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="Refund period is 30 days.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=tuple(
+            AnswerCitation(chunk_id=chunk_id, span=span, paragraph_index=0)
+            for span in spans
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="Refund period is 30 days.",
+                chunk_ids=(chunk_id,),
+            ),
+        ),
+        status="complete",
+    ).model_dump(mode="json")
+    verified = verify_answer_node(state, QueryGraphDeps(connection=MagicMock()))
+    return verified
+
+
+def test_verify_partial_when_some_citations_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One skipped leaf leaves a partial answer backed by the rest."""
+
+    verified = _verify_persisted(
+        monkeypatch,
+        ("Refund period", "30 days"),
+        skipped_span="30 days",
+    )
+    assert verified["status"] == "verified_partial"
+    assert verified["detail"] == "citation_leaf_unresolved"
+    verification = verified["verification"]
+    assert isinstance(verification, dict)
+    assert verification["skipped_citation_count"] == 1
+    answer = verified["answer"]
+    released = AnswerPayload.model_validate(answer)
+    assert [item.span for item in released.citations] == ["Refund period"]
+
+
+def test_verify_insufficient_when_every_citation_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Zero persisted citations stay insufficient evidence."""
+
+    verified = _verify_persisted(
+        monkeypatch,
+        ("30 days",),
+        skipped_span="30 days",
+    )
+    assert verified["status"] == "insufficient_evidence"
+    assert verified["detail"] == "citation_leaf_unresolved"
+
+
 def test_live_persist_does_not_backfill_fusion_citations() -> None:
     """Citation persist never reconstructs rows from every fusion passage."""
 
@@ -218,7 +368,7 @@ def test_live_persist_does_not_backfill_fusion_citations() -> None:
         fusion=fusion,
         answer=answer,
     )
-    assert persisted == ()
+    assert persisted == CitationPersistResult()
 
 
 @pytest.fixture
@@ -330,13 +480,13 @@ def test_persist_answer_citations_lists_for_owned_run(
         fusion=fusion,
         answer=answer,
     )
-    assert inserted
+    assert inserted.ids
     records = list_run_citations(
         db_connection,
         caller=member,
         run_id=admitted.context.run_id,
     )
-    assert len(records) == len(inserted)
+    assert len(records) == len(inserted.ids)
     assert records[0].citation_index == 0
     assert records[0].chunk_id == UUID(str(chunk_id))
     assert records[0].provenance.get("page_number") == 12
@@ -347,3 +497,228 @@ def test_persist_answer_citations_lists_for_owned_run(
     assert records[0].pdf_page_number == 12
     assert records[0].evidence_excerpt == "Refund period is 30 days."
     assert "Refund period" not in str(records[0].provenance)
+
+
+class _FakeCursor:
+    """Cursor that fails chosen ``insert_run_citation_v2`` attempts."""
+
+    def __init__(self, failures: dict[int, str]) -> None:
+        """Record which 1-based insert attempts should raise.
+
+        Args:
+            failures: Attempt number to ``query_citation`` reason.
+        """
+
+        self.statements: list[str] = []
+        self.params: list[object] = []
+        self._failures = failures
+        self._attempts = 0
+        self._pending: tuple[object, ...] | None = None
+
+    def __enter__(self) -> _FakeCursor:
+        """Enter the cursor context.
+
+        Returns:
+            This cursor.
+        """
+
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        """Leave the cursor context without swallowing errors.
+
+        Args:
+            exc: Exception triple from the context manager protocol.
+
+        Returns:
+            False so errors propagate.
+        """
+
+        return False
+
+    def execute(self, sql: str, params: object = None) -> None:
+        """Record the statement and fail configured insert attempts.
+
+        Args:
+            sql: SQL text.
+            params: Bound parameters, if any.
+
+        Raises:
+            psycopg.errors.RaiseException: Configured leaf or ACL reason.
+        """
+
+        text = " ".join(sql.split())
+        self.statements.append(text)
+        self.params.append(params)
+        if "insert_run_citation_v2" in text:
+            self._attempts += 1
+            reason = self._failures.get(self._attempts)
+            if reason:
+                raise psycopg.errors.RaiseException(f"query_citation:{reason}")
+            self._pending = (uuid4(),)
+
+    def fetchone(self) -> tuple[object, ...] | None:
+        """Return the row queued by the last successful insert.
+
+        Returns:
+            One-column row, or None.
+        """
+
+        row, self._pending = self._pending, None
+        return row
+
+
+def _connection_with(cursor: _FakeCursor) -> MagicMock:
+    """Return a connection whose ``cursor()`` yields ``cursor``.
+
+    Args:
+        cursor: Fake cursor.
+
+    Returns:
+        Connection mock.
+    """
+
+    connection = MagicMock()
+    connection.cursor.return_value = cursor
+    return connection
+
+
+_TWO_SENTENCES = "Refund period is 30 days from purchase. Shipping is refunded too."
+
+
+def test_persist_retries_with_leading_sentence_then_succeeds() -> None:
+    """A straddling span is retried once with its first sentence."""
+
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    chunk_id = fusion.evidence[0].chunk_id
+    answer = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=_TWO_SENTENCES,
+                paragraph_index=0,
+            ),
+        ),
+        status="complete",
+    )
+    cursor = _FakeCursor(failures={1: "span_not_contained"})
+    result = persist_answer_citations(
+        _connection_with(cursor),
+        caller=MagicMock(user_id=uuid4()),
+        run_id=uuid4(),
+        fusion=fusion,
+        answer=answer,
+    )
+    assert len(result.ids) == 1
+    assert result.skipped == ()
+    inserts = [
+        params
+        for statement, params in zip(cursor.statements, cursor.params, strict=True)
+        if "insert_run_citation_v2" in statement
+    ]
+    assert len(inserts) == 2
+    second = inserts[1]
+    assert isinstance(second, tuple)
+    assert second[6] == leading_sentence(_TWO_SENTENCES)
+    assert "SAVEPOINT citation_leaf" in cursor.statements
+    assert "ROLLBACK TO SAVEPOINT citation_leaf" in cursor.statements
+
+
+def test_persist_skips_leaf_unresolved_and_keeps_other_citations() -> None:
+    """Two leaf failures skip one citation; the next citation still persists."""
+
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    chunk_id = fusion.evidence[0].chunk_id
+    answer = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=_TWO_SENTENCES,
+                paragraph_index=0,
+            ),
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="Shipping is refunded too.",
+                paragraph_index=0,
+            ),
+        ),
+        status="complete",
+    )
+    cursor = _FakeCursor(failures={1: "leaf_ambiguous", 2: "span_not_contained"})
+    result = persist_answer_citations(
+        _connection_with(cursor),
+        caller=MagicMock(user_id=uuid4()),
+        run_id=uuid4(),
+        fusion=fusion,
+        answer=answer,
+    )
+    assert len(result.ids) == 1
+    assert len(result.skipped) == 1
+    assert result.skipped[0].reason == "span_not_contained"
+    assert result.skipped[0].chunk_id == str(chunk_id)
+    assert cursor.statements.count("ROLLBACK TO SAVEPOINT citation_leaf") == 2
+
+
+def test_persist_non_leaf_reason_still_fails_closed() -> None:
+    """ACL and replay reasons raise as before."""
+
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    answer = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        citations=(
+            AnswerCitation(
+                chunk_id=fusion.evidence[0].chunk_id,
+                span=_TWO_SENTENCES,
+                paragraph_index=0,
+            ),
+        ),
+        status="complete",
+    )
+    cursor = _FakeCursor(failures={1: "authorization_rejected"})
+    with pytest.raises(QueryAdmissionError, match="authorization_rejected"):
+        persist_answer_citations(
+            _connection_with(cursor),
+            caller=MagicMock(user_id=uuid4()),
+            run_id=uuid4(),
+            fusion=fusion,
+            answer=answer,
+        )
+
+
+def test_leading_sentence_rules() -> None:
+    """Retry spans are strictly shorter, long enough, and end at a sentence."""
+
+    assert leading_sentence(_TWO_SENTENCES) == (
+        "Refund period is 30 days from purchase."
+    )
+    assert leading_sentence("Short one. Two.") == ""
+    assert leading_sentence("No terminal punctuation at all here") == ""
+    assert leading_sentence("Only one sentence but a long one indeed.") == ""
+
+
+def test_drop_skipped_citations_removes_only_matching_span() -> None:
+    """Dropping is keyed on chunk, paragraph, and span."""
+
+    chunk = uuid4()
+    answer = AnswerPayload(
+        answer_text="x",
+        citations=(
+            AnswerCitation(chunk_id=str(chunk), span="A sentence.", paragraph_index=0),
+            AnswerCitation(chunk_id=str(chunk), span="Another one.", paragraph_index=0),
+        ),
+        status="complete",
+    )
+    dropped = drop_skipped_citations(
+        answer,
+        (
+            SkippedCitation(
+                chunk_id=str(chunk),
+                paragraph_index=0,
+                span="A sentence.",
+                reason="leaf_ambiguous",
+            ),
+        ),
+    )
+    assert [citation.span for citation in dropped.citations] == ["Another one."]

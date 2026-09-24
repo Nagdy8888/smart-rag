@@ -643,3 +643,48 @@ def test_mapper_verify_update_is_idempotent() -> None:
     assert "SECOND_VERIFY_MUST_NOT_EMIT" not in str(second)
     assert mapper.finish() == []
     assert _terminal_events(first) == [("completed", {})]
+
+
+def test_mapper_verifier_skipped_is_partial_not_deadline() -> None:
+    """A skipped verifier releases the answer as partial with a limitation."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified_partial",
+                "detail": "verifier_skipped:deadline_exhausted",
+                "answer": _payload("Refund period is 30 days.", status="complete"),
+                "verification": {
+                    "omitted_link_ids": [],
+                    "verifier_skipped_reason": "deadline_exhausted",
+                },
+            }
+        }
+    )
+    types = [item[0] for item in events]
+    assert "deadline" not in types
+    assert ("limitation", {"code": "verifier_skipped"}) in events
+    assert types[-1] == "partial"
+    assert events[-1][1] == {"reason": "verified_partial"}
+
+
+def test_mapper_citation_leaf_unresolved_is_partial() -> None:
+    """A skipped leaf emits a limitation and keeps the partial terminal."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified_partial",
+                "detail": "citation_leaf_unresolved",
+                "answer": _payload("Refund period is 30 days.", status="complete"),
+                "verification": {
+                    "omitted_link_ids": [],
+                    "skipped_citation_count": 1,
+                },
+            }
+        }
+    )
+    assert ("limitation", {"code": "citation_leaf_unresolved"}) in events
+    assert events[-1] == ("partial", {"reason": "verified_partial"})

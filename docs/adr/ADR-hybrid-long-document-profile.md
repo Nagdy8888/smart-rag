@@ -69,6 +69,13 @@ remain the ADR long-document derivation (document quota 12, per-document
 rerank cap 20, query-aware 800-character excerpts, exact dense when
 version-scoped). Live grounded-fact qualification is Packet 64.
 
+## Superseded in part (2026-09-22)
+
+Exact-one eligibility in decision item 3 still stands. Small authorized
+corpora can also select `hybrid_long_document_v2` without a title match,
+and channel heads are pinned into the rerank pool. That rule is
+[ADR-small-corpus-long-document-and-channel-pins.md](./ADR-small-corpus-long-document-and-channel-pins.md).
+
 ## Links
 
 - [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md)

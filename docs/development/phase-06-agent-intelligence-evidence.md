@@ -101,7 +101,8 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-72 — Live qualification (2026-09-21) | [phase-06/p06-72-live-qualification-2026-09-21.md](./phase-06/p06-72-live-qualification-2026-09-21.md) | 147 |
 | Post-merge 30-question acceptance (2026-09-21) | [phase-06/p06-post-merge-acceptance-2026-09-21.md](./phase-06/p06-post-merge-acceptance-2026-09-21.md) | 87 |
 | Post-fix 30-question acceptance (2026-09-22) | [phase-06/p06-post-fix-acceptance-2026-09-22.md](./phase-06/p06-post-fix-acceptance-2026-09-22.md) | 144 |
-| Post-fix-v2 30-question acceptance (2026-09-22) | [phase-06/p06-post-fix-v2-acceptance-2026-09-22.md](./phase-06/p06-post-fix-v2-acceptance-2026-09-22.md) | 124 |
+| Post-fix-v2 30-question acceptance (2026-09-22) | [phase-06/p06-post-fix-v2-acceptance-2026-09-22.md](./phase-06/p06-post-fix-v2-acceptance-2026-09-22.md) | 127 |
+| Known-answer 50 review (2026-09-22) | [../evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](../evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | 218 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

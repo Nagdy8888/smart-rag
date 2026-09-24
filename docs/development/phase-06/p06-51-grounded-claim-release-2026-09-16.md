@@ -2,7 +2,7 @@
 title: P06-51 grounded claim release
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-22
 audience: engineering, reviewers, security
 ---
 
@@ -96,6 +96,27 @@ cannot drop those spans. Direct `deterministic_check_answer` still
 records `citation_span_mismatch` when that bind step is skipped. Wrong
 `Method Call Protocol` and `Multi-Channel Protocol` expansions remain
 refused.
+
+## Binder repairs (2026-09-22)
+
+`bind_company_atomic_links` repairs three bookkeeping slips before
+`apply_paragraph_contract`. None of them widen evidence: a chunk is
+added to a link only when a citation already cites it with a span the
+contract checks verbatim.
+
+- A parent citation whose span sits inside exactly one shorter evidence
+  chunk that is itself contained in the parent text is retargeted to
+  that leaf. Zero or several matching leaves keep the parent id.
+- A citation whose `atomic_link_id` is missing or not in its paragraph's
+  `link_ids` takes that paragraph's first link id.
+- Each atomic link's `chunk_ids` is extended with the chunks its
+  citations cite, capped at 12.
+
+`paragraph_unmapped` and `citation_link_mismatch` stay fail-closed when
+the span is not in an authorized passage. Tests:
+`test_binder_retargets_parent_citation_to_unique_leaf`,
+`test_binder_repairs_link_id_and_link_chunks`, and
+`test_binder_does_not_retarget_when_two_leaves_match`.
 
 ## Unverified
 

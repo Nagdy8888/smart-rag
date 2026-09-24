@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-21
+last-reviewed: 2026-09-22
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -35,10 +35,13 @@ round-robins variants so one variant cannot consume the survivor cap.
 ## Long-document runtime profile (P06-62)
 
 `hybrid_long_document_v2` is the measured immutable long-document
-profile. Runtime retrieve loads it only after an exact-one authorized
-version scope with more than five representatives. Trivial exact lookups
-stay on `hybrid_default_v1`. Ambiguous and unauthorized names stay
-unscoped. The failed `hybrid_long_document_v1.json` digest stays
+profile. Runtime retrieve loads it after an exact-one authorized
+version scope with more than five representatives, and also when the
+question stays unscoped or ambiguous, the caller can read 1 to 8 current
+documents, and the largest of those documents has more than five
+representatives (`small_corpus_long_document`). The small-corpus path
+does not apply a version filter. Trivial exact lookups stay on
+`hybrid_default_v1`. The failed `hybrid_long_document_v1.json` digest stays
 unfrozen. OpenAI rerank starts only when remaining retrieve-slice
 seconds are at least `RERANK_RESERVED_SECONDS` (3.0). Version-scoped
 exact dense starts only when the retrieve slice is at least
@@ -216,7 +219,7 @@ remaining USD or model calls cannot cover the kind cap.
 
 ```mermaid
 flowchart TD
-  fused["Authorized fused IDs"] --> pool["Top-20 pool, max 5 per document"]
+  fused["Authorized fused IDs"] --> pool["Top-20 pool: profile cap per document, plus channel-head pins"]
   pool --> skip{"Trivial exact and two channels?"}
   skip -->|yes| mmrSkip["MMR plus quotas. No model call"]
   skip -->|no| oneCall["One Responses json_schema call. max_retries=0. No tools"]
@@ -230,6 +233,15 @@ flowchart TD
 ```
 
 Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md).
+
+The frozen `hybrid_default_v1` numbers in the table below are unchanged.
+At runtime the pool is fused order under that profile's per-document cap,
+plus up to five dense heads and five BM25 heads that are already in the
+authorized fused list (`CHANNEL_HEAD_PIN`). Pins bypass the per-document
+cap, count toward the pool size, and keep fused order. A small authorized
+corpus selects `hybrid_long_document_v2` instead, whose own frozen cap is
+20 and whose document quota is 12. See
+[ADR-small-corpus-long-document-and-channel-pins.md](../adr/ADR-small-corpus-long-document-and-channel-pins.md).
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

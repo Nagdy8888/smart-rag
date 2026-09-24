@@ -228,13 +228,14 @@ def _persist(
     )
     connection.execute("SET ROLE app_api")
     try:
-        return persist_answer_citations(
+        result = persist_answer_citations(
             connection,
             caller=caller,
             run_id=run_id,
             fusion=fusion,
             answer=answer,
         )
+        return result.ids
     finally:
         connection.execute("RESET ROLE")
 

@@ -13,7 +13,7 @@ from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_ANSWER_PARAGRAPHS,
 )
-from smart_rag_core.query_fusion.models import FusionResult
+from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 
 
 def bind_company_atomic_links(
@@ -23,9 +23,17 @@ def bind_company_atomic_links(
 ) -> AnswerPayload:
     """Fill omitted atomic links, citation ids, and exact source spans.
 
-    Live ``answer_v3`` payloads sometimes omit paragraphs or atomic
-    links, or paraphrase citation spans. Deterministic paragraph mapping
-    requires those bindings and contained spans before verification.
+    Three evidence-preserving repairs run before the paragraph contract:
+
+    - A parent citation whose span sits inside exactly one nested evidence
+      chunk is retargeted to that leaf.
+    - A citation whose ``atomic_link_id`` is missing or not one of its
+      paragraph's link ids takes the paragraph's first link id.
+    - Each atomic link's ``chunk_ids`` gains the chunks its citations
+      already cite, capped at 12.
+
+    None of these repairs can add a chunk id that is not already cited by
+    a citation the paragraph contract will check verbatim.
 
     Args:
         payload: Company answer after invented-ID filtering.
@@ -34,7 +42,7 @@ def bind_company_atomic_links(
 
     Returns:
         Payload with synthesized fact links, citation ``atomic_link_id``
-        values, and contained spans when they can be derived.
+        values, contained spans, and repaired link chunk lists.
         Unchanged when paragraphs are ungrounded.
     """
 
@@ -61,8 +69,8 @@ def bind_company_atomic_links(
         if synthesized:
             working = working.model_copy(update={"atomic_links": synthesized})
     if fusion is None:
-        return working
-    return _align_citation_spans(working, fusion)
+        return _repair_link_chunk_ids(working)
+    return _repair_link_chunk_ids(_align_citation_spans(working, fusion))
 
 
 def _paragraphs_from_links(
@@ -168,15 +176,56 @@ def _align_citation_spans(
             continue
         text = passages[chunk_id].citation_text
         span = citation.span
-        if span and span in text:
-            aligned.append(citation)
-            continue
-        replacement = exact_source_span(text)
-        if not replacement:
-            aligned.append(citation)
-            continue
-        aligned.append(citation.model_copy(update={"span": replacement}))
+        if not (span and span in text):
+            replacement = exact_source_span(text)
+            if not replacement:
+                aligned.append(citation)
+                continue
+            span = replacement
+        leaf = _leaf_in_evidence(chunk_id, span, passages)
+        update: dict[str, object] = {"span": span}
+        if leaf is not None:
+            update["chunk_id"] = leaf
+        aligned.append(citation.model_copy(update=update))
     return payload.model_copy(update={"citations": tuple(aligned)})
+
+
+def _leaf_in_evidence(
+    chunk_id: str,
+    span: str,
+    passages: dict[str, ScoredPassage],
+) -> str | None:
+    """Return the one evidence chunk nested in ``chunk_id`` that holds ``span``.
+
+    Parent passages concatenate their children. When the model cites the
+    parent and the span sits inside exactly one child that is also in
+    evidence, the child is the page-precise citation target and the
+    database leaf rule will accept it.
+
+    Args:
+        chunk_id: Cited chunk id.
+        span: Verbatim span contained in the cited chunk's text.
+        passages: Fusion evidence by chunk id.
+
+    Returns:
+        Child chunk id, or None when zero or several children qualify.
+    """
+
+    parent_text = passages[chunk_id].citation_text
+    if not span or not parent_text:
+        return None
+    leaves = [
+        other_id
+        for other_id, other in passages.items()
+        if other_id != chunk_id
+        and other.citation_text
+        and len(other.citation_text) < len(parent_text)
+        and other.citation_text in parent_text
+        and span in other.citation_text
+    ]
+    if len(leaves) != 1:
+        return None
+    return leaves[0]
 
 
 def _citation_with_link_id(
@@ -190,11 +239,11 @@ def _citation_with_link_id(
         paragraphs: Ordered company paragraphs.
 
     Returns:
-        The citation, or a copy with the paragraph's first link id.
+        The citation, or a copy whose ``atomic_link_id`` is the
+        paragraph's first link id when it was missing or not one of the
+        paragraph's links.
     """
 
-    if citation.atomic_link_id:
-        return citation
     paragraph = next(
         (
             item
@@ -204,6 +253,8 @@ def _citation_with_link_id(
         None,
     )
     if paragraph is None or not paragraph.link_ids:
+        return citation
+    if citation.atomic_link_id and citation.atomic_link_id in paragraph.link_ids:
         return citation
     return citation.model_copy(update={"atomic_link_id": paragraph.link_ids[0]})
 
@@ -261,3 +312,45 @@ def _links_from_paragraphs(payload: AnswerPayload) -> tuple[AtomicLink, ...]:
             )
         )
     return tuple(synthesized)
+
+
+def _repair_link_chunk_ids(payload: AnswerPayload) -> AnswerPayload:
+    """Extend each link's ``chunk_ids`` with the chunks its citations cite.
+
+    The paragraph contract rejects a citation whose chunk is not listed on
+    its link. Citations are the stronger signal because their spans are
+    checked verbatim against authorized passages; links are bookkeeping.
+    The cap of 12 matches the link synthesis slice in this module.
+
+    Args:
+        payload: Company answer after link-id binding and span alignment.
+
+    Returns:
+        Payload whose links list every cited chunk, capped at 12 per link.
+        Unchanged when nothing was missing.
+    """
+
+    cited: dict[str, list[str]] = {}
+    for citation in payload.citations:
+        if not citation.atomic_link_id or not citation.chunk_id:
+            continue
+        bucket = cited.setdefault(citation.atomic_link_id, [])
+        if citation.chunk_id not in bucket:
+            bucket.append(citation.chunk_id)
+    changed = False
+    links: list[AtomicLink] = []
+    for link in payload.atomic_links:
+        missing = [
+            chunk_id
+            for chunk_id in cited.get(link.link_id, [])
+            if chunk_id not in link.chunk_ids
+        ]
+        if not missing:
+            links.append(link)
+            continue
+        changed = True
+        merged = (*link.chunk_ids, *missing)[:12]
+        links.append(link.model_copy(update={"chunk_ids": merged}))
+    if not changed:
+        return payload
+    return payload.model_copy(update={"atomic_links": tuple(links)})

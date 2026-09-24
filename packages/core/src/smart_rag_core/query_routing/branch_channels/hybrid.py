@@ -224,6 +224,9 @@ def hybrid_diagnostics_from_outcome(
         selected_ids=_uuid_ids(getattr(outcome, "selected_ids", ()), 12)
         if outcome is not None
         else (),
+        rerank_pool_ids=_uuid_ids(getattr(outcome, "rerank_order", ()), 100)
+        if outcome is not None
+        else (),
         coverage_score=getattr(coverage, "coverage_score", None),
         term_coverage=getattr(coverage, "term_coverage", None),
         subquestion_coverage=getattr(coverage, "subquestion_coverage", None),

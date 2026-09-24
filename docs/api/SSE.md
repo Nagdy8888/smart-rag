@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-22
 audience: engineering, frontend
 ---
 
@@ -105,8 +105,11 @@ deadline/budget partials (`deadline_exhausted`,
 `answer_deadline_reserve_exhausted`) emit a non-empty refusal token when
 one is available, an optional `limitation`, and exactly one `partial`.
 They are not `error` and not `empty_answer`. `empty_answer` is reserved
-for a supposedly releasable `verified` payload that is blank. Unknown
-faults stay one sanitized `error`. Generate-time expected refusals skip
+for a supposedly releasable `verified` payload that is blank. A finished
+answer whose verifier call failed uses limitation code `verifier_skipped`
+and a `partial` terminal. `deadline` is emitted only when no answer was
+produced. A released answer that dropped one or more leaf-unresolved
+citations uses limitation code `citation_leaf_unresolved`. Unknown faults stay one sanitized `error`. Generate-time expected refusals skip
 the verifier node; the mapper still emits `verify_answer` completed so
 Ask can accept the refusal tokens.
 
@@ -203,10 +206,12 @@ Postgres wait cannot freeze the SSE event loop or LangGraph `astream`.
 Sequence order is unchanged: each append is awaited before the next event.
 Exactly one terminal remains required.
 
-`PostgresRunEventStore` keeps autocommit off. After `SET ROLE app_api` each
-transaction applies `SET LOCAL lock_timeout TO '2s'`. That matches the
-intended `app_api` GUC. Hosted login-role sessions do not always inherit
-role timeouts after `SET ROLE`, so the store must set the limit itself.
+`PostgresRunEventStore` keeps autocommit off. Each transaction runs one
+parameter-free statement, `SET ROLE app_api; SET LOCAL lock_timeout TO '2s'`,
+so both settings share one round trip. That matches the intended `app_api`
+GUC. Hosted login-role sessions do not always inherit role timeouts after
+`SET ROLE`, so the store must set the limit itself. `app.append_run_event`
+stays a separate parameterized statement.
 
 `app.append_run_event` takes `SELECT … FROM app.runs FOR UPDATE`. An
 uncommitted `llm_usage` insert on the graph `app_api` connection holds

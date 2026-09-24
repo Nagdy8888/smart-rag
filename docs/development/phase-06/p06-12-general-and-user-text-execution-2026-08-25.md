@@ -139,8 +139,9 @@ statement timeout.
 Repair:
 
 - Heartbeat and executor appends use `asyncio.to_thread`.
-- `PostgresRunEventStore` sets `SET LOCAL lock_timeout TO '2s'` after
-  `SET ROLE app_api` on every transaction. Autocommit stays off.
+- `PostgresRunEventStore` sets `SET ROLE app_api` and
+  `SET LOCAL lock_timeout TO '2s'` in one parameter-free statement on
+  every transaction. Autocommit stays off.
 - Append failures emit sanitized `sse.append_failed` logs (`run_id`,
   type, SQLSTATE/reason, elapsed seconds). Heartbeats degrade; status
   and terminal None-return semantics are unchanged.

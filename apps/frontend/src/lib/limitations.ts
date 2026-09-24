@@ -41,6 +41,10 @@ const LIMITATION_COPY: Record<string, string> = {
     "The graph is not ready for these documents yet. Hybrid remains usable. Graph-only is not an answering mode.",
   retrievers_unbound:
     "Retrieval was not attached to this run. Answers are not grounded in Hybrid or graph evidence.",
+  verifier_skipped:
+    "The answer passed citation checks, but the final verification step timed out. Treat it as partial.",
+  citation_leaf_unresolved:
+    "Some citations could not be pinned to a single page and were left out. The remaining citations are verified.",
 };
 
 /**

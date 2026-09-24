@@ -122,3 +122,6 @@ as false positives on the earlier ingest of this file.
 - Error terminals remain 2, with no stored Hybrid coverage.
 - Citation deterministic failures above are still present after reflow.
 - This packet does not block the merge.
+
+Later diagnostic on a separate 50-question set:
+[KNOWN_ANSWER_50_REVIEW_2026-09-22.md](../../evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md).

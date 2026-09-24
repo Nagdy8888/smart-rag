@@ -21,6 +21,10 @@ from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 RERANK_PER_DOCUMENT_LEGACY_CAP = 5
 """Historical five-passage per-document rerank pool cap."""
 
+SMALL_CORPUS_MAX_DOCUMENTS = 8
+"""Authorized current-document count at or below which the five-per-document
+rerank cap silences a long document instead of balancing many documents."""
+
 TRIVIAL_DEFAULT_QUERY_CLASSES = frozenset({"exact_code", "exact_acronym"})
 NAMED_SOURCE_CONFIDENCE_THRESHOLD = 0.80
 """Existing named-source confidence floor. Below this, names stay unused."""
@@ -44,6 +48,7 @@ def select_runtime_profile(
     version_id: UUID | None,
     representative_count: int,
     query_class: str | None,
+    authorized_document_count: int = 0,
 ) -> tuple[str, str]:
     """Choose the frozen Hybrid profile for one resolved scope.
 
@@ -52,23 +57,34 @@ def select_runtime_profile(
         version_id: Exact-one version when present.
         representative_count: Authorized representative count.
         query_class: Optional query class. Trivial exact stays on default.
+        authorized_document_count: Current documents the caller may read.
+            ``0`` means unknown and never triggers the small-corpus rule.
 
     Returns:
-        ``(profile_id, eligibility_reason)``.
+        ``(profile_id, eligibility_reason)``. Reasons include
+        ``small_corpus_long_document`` when an unscoped small corpus holds
+        a long document.
     """
 
-    long_eligible = (
+    scoped_long = (
         resolution is SourceResolution.EXACT_ONE
-        and representative_count > RERANK_PER_DOCUMENT_LEGACY_CAP
         and version_id is not None
+        and representative_count > RERANK_PER_DOCUMENT_LEGACY_CAP
     )
-    if not long_eligible:
+    small_corpus_long = (
+        resolution is not SourceResolution.EXACT_ONE
+        and 0 < authorized_document_count <= SMALL_CORPUS_MAX_DOCUMENTS
+        and representative_count > RERANK_PER_DOCUMENT_LEGACY_CAP
+    )
+    if not (scoped_long or small_corpus_long):
         return HYBRID_DEFAULT_PROFILE_ID, "default_profile_required"
     if not long_document_runtime_enabled():
         return HYBRID_DEFAULT_PROFILE_ID, "unfrozen_long_document_denied"
     if query_class in TRIVIAL_DEFAULT_QUERY_CLASSES:
         return HYBRID_DEFAULT_PROFILE_ID, "trivial_exact_default_profile"
-    return LONG_DOCUMENT_PROFILE_ID, "long_document_eligible"
+    if scoped_long:
+        return LONG_DOCUMENT_PROFILE_ID, "long_document_eligible"
+    return LONG_DOCUMENT_PROFILE_ID, "small_corpus_long_document"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +96,8 @@ class ResolvedRetrievalScope:
             current version matched. None otherwise.
         whole_document: True when the request is a whole-document summary.
         representative_count: Authorized representative passages for the
-            resolved version, else 0.
+            resolved version, or the largest authorized document's count
+            when the small-corpus rule applied, else 0.
         query_class: Optional evaluation class id.
         candidate_profile_id: Frozen default, or ``hybrid_long_document_v2``
             when exact-one, representative_count > 5, and the v2 pin exists.
@@ -90,6 +107,8 @@ class ResolvedRetrievalScope:
         selector_texts: Authorized titles used only as scope selectors.
             Empty when unscoped. Never returned to the client as an
             existence oracle.
+        authorized_document_count: Current documents the caller may read.
+            ``0`` when unknown or when an exact-one scope was resolved.
     """
 
     version_id: UUID | None
@@ -100,6 +119,7 @@ class ResolvedRetrievalScope:
     eligibility_reason: str
     resolution: SourceResolution
     selector_texts: tuple[str, ...] = ()
+    authorized_document_count: int = 0
 
 
 def strip_source_selectors(query: str, selectors: Sequence[str]) -> str:
@@ -180,8 +200,10 @@ def resolve_retrieval_scope(
     """Resolve requested source text to at most one authorized version.
 
     Zero matches stay unscoped. Multiple matches stay unscoped with
-    ``ambiguous``. Unauthorized IDs are indistinguishable from missing. The
-    long-document candidate remains runtime-denied until freeze.
+    ``ambiguous``. Unauthorized IDs are indistinguishable from missing.
+    An unscoped question on a small authorized corpus whose largest
+    document exceeds the legacy per-document cap uses
+    ``hybrid_long_document_v2`` without applying a version filter.
 
     Args:
         caller: Server-derived identity.
@@ -218,6 +240,7 @@ def resolve_retrieval_scope(
         elif len(unique_versions) > 1:
             resolution = SourceResolution.AMBIGUOUS
     counted = representative_count
+    document_count = 0
     if (
         connection is not None
         and version_id is not None
@@ -225,11 +248,15 @@ def resolve_retrieval_scope(
         and resolution is SourceResolution.EXACT_ONE
     ):
         counted = _count_representatives(connection, version_id)
+    if connection is not None and resolution is not SourceResolution.EXACT_ONE:
+        document_count, largest = _count_authorized_corpus(connection, caller)
+        counted = max(counted, largest)
     profile_id, reason = select_runtime_profile(
         resolution=resolution,
         version_id=version_id if resolution is SourceResolution.EXACT_ONE else None,
         representative_count=counted,
         query_class=query_class,
+        authorized_document_count=document_count,
     )
     return ResolvedRetrievalScope(
         version_id=version_id if resolution is SourceResolution.EXACT_ONE else None,
@@ -242,6 +269,7 @@ def resolve_retrieval_scope(
         selector_texts=selector_texts
         if resolution is SourceResolution.EXACT_ONE
         else (),
+        authorized_document_count=document_count,
     )
 
 
@@ -272,6 +300,63 @@ def _count_representatives(
         )
         row = cursor.fetchone()
     return int(row[0]) if row is not None else 0
+
+
+def _count_authorized_corpus(
+    connection: psycopg.Connection,
+    caller: CallerContext,
+) -> tuple[int, int]:
+    """Count authorized current documents and the largest representative set.
+
+    The second query runs only when the corpus is small enough for the
+    small-corpus rule, so large tenants pay one cheap count.
+
+    Args:
+        connection: Canonical Postgres ``app_api`` connection.
+        caller: Server-derived identity.
+
+    Returns:
+        ``(document_count, largest_representative_count)``. The second
+        value is ``0`` when the corpus is empty or larger than
+        ``SMALL_CORPUS_MAX_DOCUMENTS``.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT count(*)::int
+            FROM app.documents AS d
+            INNER JOIN app.document_versions AS dv
+              ON dv.id = d.current_version_id
+            WHERE d.deleted_at IS NULL
+              AND dv.deleted_at IS NULL
+              AND app.caller_can_read_document(%s, %s, d.id)
+            """,
+            (caller.rpc_user_id(), caller.rpc_role()),
+        )
+        row = cursor.fetchone()
+        documents = int(row[0]) if row is not None else 0
+        if documents == 0 or documents > SMALL_CORPUS_MAX_DOCUMENTS:
+            return documents, 0
+        cursor.execute(
+            """
+            SELECT COALESCE(max(per_version.n), 0)::int
+            FROM (
+              SELECT count(*) AS n
+              FROM app.document_chunks AS c
+              INNER JOIN app.documents AS d
+                ON d.current_version_id = c.version_id
+              WHERE d.deleted_at IS NULL
+                AND c.deleted_at IS NULL
+                AND c.is_search_representative
+                AND app.caller_can_read_document(%s, %s, d.id)
+              GROUP BY c.version_id
+            ) AS per_version
+            """,
+            (caller.rpc_user_id(), caller.rpc_role()),
+        )
+        largest = cursor.fetchone()
+    return documents, int(largest[0]) if largest is not None else 0
 
 
 def _search_authorized_versions(
