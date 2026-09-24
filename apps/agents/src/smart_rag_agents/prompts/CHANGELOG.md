@@ -2,7 +2,7 @@
 title: Prompt changelog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-24
 audience: engineering
 ---
 
@@ -22,6 +22,7 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | `answer_v1` | 2026-08-16 | One grounded answer from canonical passages and deterministic table values. |
 | `answer_v2` | 2026-09-15 | Paragraph-mapped company answers with exact 1–1000 character spans. Provider omits `answer_text`. Chat scores leaves and PDF toolbar pages, never printed `page_label`. |
 | `answer_v3` | 2026-09-16 | Surviving atomic-link claims only. Acronym expansions must be spelled in a supplied source. `answer_v2` stays immutable. |
+| `answer_v4` | 2026-09-24 | Ordered claims with `source_id` + `span` citations; application assigns link IDs, paragraphs, and ownership. First claim answers directly. `answer_v3` stays immutable. |
 | `verifier_v1` | 2026-08-16 | One batched check of at most six atomic links. No second call. |
 | `verifier_v2` | 2026-09-16 | Reject invented acronym expansions and fact literals missing from cited sources. One call, six-link cap unchanged. |
 | `optional_catalog_v1` | 2026-08-16 | Level 0 catalog capabilities and immutable safety rules. No core retrieve tools. |

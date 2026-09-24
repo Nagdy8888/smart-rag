@@ -79,16 +79,21 @@ contract failures the model used a chunk UUID as a link ID.
 
 1. Pin a new immutable `answer_v4.md` and a new strict output schema. The
    model returns an ordered list of at most `MAX_VERIFIER_LINKS` (6)
-   claims. Each claim has its text, a `new_paragraph` boolean, and one
-   or two citations. Each citation is `{chunk_id, span}`, and `chunk_id`
-   is a schema enum of the evidence IDs sent in that request. Table
-   citations use a `table_id` enum the same way. The model no longer
-   writes `link_id`, `paragraph_index`, or `atomic_link_id`.
-2. Application code assigns link IDs (UUIDv5 from run ID and claim
-   ordinal), paragraph indices (from claim order and `new_paragraph`),
-   and each citation's link. It then builds the existing internal answer
-   payload. `verifier_v2`, `render_verified_company_answer`, SSE events,
-   and the transcript contract keep their current shape.
+   claims. Each claim has its text, a `kind` (`fact` or
+   `inference_link`), and one or two citations of
+   `{source_id, span, source_ranges}`. The model no longer writes
+   `link_id`, `paragraph_index`, or `atomic_link_id`. The schema is the
+   same for every request: OpenAI processes each new strict schema once
+   before use, so a per-request ID enum would add that cost to every
+   answer call. Application code drops any `source_id` that was not
+   sent in the request (amended 2026-09-24, decision D2 in the plan).
+2. Application code assigns link IDs (`claim-1` to `claim-6`, scoped to
+   one answer payload and stored only in citation provenance), one
+   paragraph per claim (the release already renders one paragraph per
+   claim), `priority` from claim order, and each citation's link. It
+   then builds the existing internal answer payload. `verifier_v2`,
+   `render_verified_company_answer`, SSE events, and the transcript
+   contract keep their current shape.
 3. The deterministic check runs per claim. A claim whose citation fails
    is dropped on its own and recorded in `refused_links`. Failures
    include an unknown chunk, a span that is not an exact substring of
@@ -101,9 +106,9 @@ contract failures the model used a chunk UUID as a link ID.
    `MODEL_INPUT_MAX_CHARS`. The bytes of `answer_v1` to `answer_v3` are
    not edited.
 
-The OpenAI strict-schema behavior with enums must be checked against the
-pinned SDK and current documentation, and covered by a contract test,
-before the schema is used.
+The pinned SDK request shape is covered by
+tests/contract/test_answer_v4_schema.py, and a gated live call
+(ANSWER_SCHEMA_LIVE=1) proves the provider accepts the schema.
 
 ### Fix 2: Make the reranker run and fix the fallback order
 

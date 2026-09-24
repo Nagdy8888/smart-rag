@@ -2,7 +2,7 @@
 
 Loads approved chunk IDs through ``fetch_authorized_chunk_context``, builds
 ``HybridPassage`` evidence, then runs the production answer plus verifier
-path with ``answer_v3`` / ``verifier_v2`` and
+path with the pinned answer prompt / ``verifier_v2`` and
 ``render_verified_company_answer``. Never embeds sample gold in production
 modules. Prints counts only.
 """
@@ -53,6 +53,7 @@ from smart_rag_core.query_answer.assembly import (  # noqa: E402
     assemble_source_records,
     fit_source_records,
 )
+from smart_rag_core.query_answer.claims import parse_provider_answer  # noqa: E402
 from smart_rag_core.query_answer.generate import generate_answer  # noqa: E402
 from smart_rag_core.query_answer.models import (  # noqa: E402
     AnswerPayload,
@@ -371,7 +372,11 @@ def _live_answer_caller(
                 status="refused",
                 answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
             )
-        return AnswerPayload.model_validate(response.payload)
+        return parse_provider_answer(
+            response.payload,
+            chunk_ids=request.chunk_ids,
+            tables=(),
+        )
 
     return _call
 
@@ -458,7 +463,8 @@ def run_oracle_answer(
         None.
 
     External/Model Calls:
-        One ``answer_v3`` generation and at most one ``verifier_v2`` batch.
+        One pinned-answer-prompt generation and at most one ``verifier_v2``
+        batch.
 
     Budget/Deadline:
         Answer 25s, verifier 20s. No second generation.

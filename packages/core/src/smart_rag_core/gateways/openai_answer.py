@@ -9,7 +9,7 @@ from openai import APIStatusError, APITimeoutError, AuthenticationError
 
 from smart_rag_core.observability.langsmith_tracing import traced_openai_client
 from smart_rag_core.query_answer.schemas import (
-    answer_json_schema,
+    answer_claims_json_schema,
     eval_judge_json_schema,
     pdf_eval_judge_json_schema,
     verifier_json_schema,
@@ -98,9 +98,9 @@ def execute_openai_answer(
             text={
                 "format": {
                     "type": "json_schema",
-                    "name": "canonical_answer",
+                    "name": "canonical_answer_claims",
                     "strict": True,
-                    "schema": answer_json_schema(),
+                    "schema": answer_claims_json_schema(),
                 }
             },
             max_output_tokens=ANSWER_MAX_OUTPUT_TOKENS,

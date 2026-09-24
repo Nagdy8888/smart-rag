@@ -2,7 +2,7 @@
 title: Answer verification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-24
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 3
 ---
@@ -48,6 +48,52 @@ The composed conclusion is labeled `inference`. Wording is no stronger
 than the supported path. The conclusion need not appear verbatim in one
 passage. A chain whose every link is supported remains an inference.
 
+## answer_v4 claims contract
+
+`answer_v4` (Fixes 1 and 3 in
+[ADR-retrieved-answer-loss-repair.md](../adr/ADR-retrieved-answer-loss-repair.md))
+asks the model for an ordered list of at most six claims. Each claim
+has `text`, `kind` (`fact` or `inference_link`), and one or two
+citations of `{source_id, span, source_ranges}`. The model does not
+write link IDs, paragraph indices, citation ownership, or
+`answer_text`. The strict schema (`answer_claims_json_schema`) is the
+same for every request so the provider can reuse its processed form.
+`source_id` is a plain string that application code checks.
+
+`parse_provider_answer` in `smart_rag_core.query_answer.claims` maps
+the output with `claims_to_answer_payload`:
+
+- Claim *n* (1-based) gets link ID `claim-n`, its own paragraph, and
+  `priority` equal to its paragraph index, so the release keeps claim
+  order.
+- A citation whose `source_id` was not sent in the request is
+  dropped. Passage spans are clipped to 1,000 characters. Table
+  citations keep only ranges present on the table record, else all of
+  the record's ranges.
+- A claim is dropped on its own, and `claim-n` is added to
+  `refused_links`, when it is past the sixth, has blank or oversized
+  text, or keeps no citation. A provider `refused` status keeps no
+  claims. No kept claim means status `refused`.
+- A conclusion survives only when every listed claim was kept.
+
+Every paragraph holds exactly one link, so the paragraph contract,
+`verifier_v2`, and the claims-only release drop a failing claim
+without touching the others. Output that is not valid JSON, or a
+`claims` value of the wrong type, is still `answer_schema_invalid`.
+Payloads without a `claims` key parse as `AnswerPayload`; the offline
+mock gateway and recorded fixtures use that shape.
+
+```mermaid
+flowchart LR
+  providerNode["answer_v4 claims JSON"] --> parseNode["parse_provider_answer"]
+  parseNode --> mapNode["claims_to_answer_payload: claim-n, one paragraph each"]
+  mapNode --> filterNode["filter_invented_ids and binder span repair"]
+  filterNode --> contractNode["Paragraph contract drops failing claims only"]
+  contractNode --> verifierNode["verifier_v2, at most six links"]
+  verifierNode --> releaseNode["Claims-only release in claim order"]
+  mapNode -. "no claim kept" .-> refuseNode["Citation-free refusal"]
+```
+
 ## Layered verify
 
 1. Deterministic checks: current source/version/ACL, citation-span or
@@ -81,8 +127,8 @@ text is dropped. Company `answer_v2` passage citations require an exact
 1–1000 character span contained in canonical text. Empty spans are
 legacy whole-passage only when paragraph mappings are not required.
 
-Prompt versions: `answer_v3` (current), `answer_v2` and `answer_v1`
-(historical), `verifier_v2` (current), `verifier_v1` (historical),
+Prompt versions: `answer_v4` (current), `answer_v3`, `answer_v2`, and
+`answer_v1` (historical), `verifier_v2` (current), `verifier_v1` (historical),
 `web_critique_v1`, and `web_answer_v1` under
 `apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
 LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Before

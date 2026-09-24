@@ -7,6 +7,7 @@ from typing import Any, cast
 from pydantic import ValidationError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_answer.assembly import fit_source_records
+from smart_rag_core.query_answer.claims import parse_provider_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -53,7 +54,8 @@ def gateway_answer(
 
     Raises:
         AnswerError: If the gateway is unbound or the provider payload
-            cannot be parsed as ``AnswerPayload``.
+            matches neither the ``answer_v4`` claims shape nor
+            ``AnswerPayload``.
     """
 
     from smart_rag_core.gateways.model import AnswerModelRequest
@@ -101,10 +103,11 @@ def gateway_answer(
             timeout_seconds=request.remaining_deadline_seconds,
         ),
     )
-    try:
-        payload = AnswerPayload.model_validate(response.payload)
-    except ValidationError as exc:
-        raise AnswerError("answer_schema_invalid") from exc
+    payload = parse_provider_answer(
+        response.payload,
+        chunk_ids=request.chunk_ids,
+        tables=typed_tables,
+    )
     filtered = bind_company_atomic_links(
         filter_invented_ids(payload, fusion, typed_tables),
         fusion=fusion,

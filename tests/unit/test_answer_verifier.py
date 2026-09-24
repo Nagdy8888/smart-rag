@@ -64,10 +64,16 @@ from tests.support.query_runtime import RefusingHybridRetriever
 def test_answer_and_verifier_prompt_hashes() -> None:
     """Pinned hashes match LF-normalized prompt files."""
 
-    assert ANSWER_PROMPT_VERSION == "answer_v3"
+    assert ANSWER_PROMPT_VERSION == "answer_v4"
     assert VERIFIER_PROMPT_VERSION == "verifier_v2"
     assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v1"
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v3.md")
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v4.md")
+    assert verifier_prompt_digest("answer_v3.md") == (
+        "a72174c1c468ab0721f064aa4d53c0e11813d8cd8d072c4e5cbd593190edc7bc"
+    )
+    assert verifier_prompt_digest("answer_v1.md") == (
+        "696eb47095c2194e70b486b5756906f4e09b6c296a1952c410353c1fd60234f2"
+    )
     assert VERIFIER_PROMPT_SHA256 == verifier_prompt_digest("verifier_v2.md")
     assert verifier_prompt_digest("answer_v2.md") == (
         "20d55af652815a9829e477ed9d791d49386923da3c11d5dbdf1faa8081a37765"
@@ -700,7 +706,7 @@ def test_gateway_answer_binds_omitted_paragraphs_from_live_links() -> None:
                 request: Unused structured answer request.
 
             Returns:
-                Fixture payload matching live ``answer_v3`` omissions.
+                Fixture payload matching historical live ``answer_v3`` omissions.
             """
 
             del request
