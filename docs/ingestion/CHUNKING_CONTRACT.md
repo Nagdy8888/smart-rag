@@ -13,7 +13,7 @@ audience: engineering
 
 ## Hierarchy
 
-Typed parser elements become **document → section (parent) → passage** chunks. Parents aggregate ordered child passage references and are bounded to **1,500 tokens** for expansion context; they are not embedding targets.
+Typed parser elements become **document → section (parent) → passage** chunks. Parents aggregate ordered child passage references and are bounded to **1,500 tokens** for expansion context. A parent is stored as a search representative like a passage, so it is embedded, projected to BM25, and retrievable unless deduplication or the navigation rule below excludes it.
 
 ## Passage sizing
 
@@ -76,6 +76,68 @@ Chunk IDs are UUID5 values derived from document/version namespace, element IDs/
 - **Near (intra-version only):** 5-word-shingle Jaccard ≥ **0.92** when fuzzy policy meets **≥99% precision** and **≥85% recall** on fixtures; otherwise **exact-only** fallback (`dedup_v1`). Current fixture evaluation: precision **1.0**, recall **0.5** → **exact-only active**.
 - **Cross-document:** never hard-delete; authority/date may differ.
 
+## Navigation pages
+
+`apply_navigation_exclusion` (`ingestion/chunking/navigation.py`, policy
+`navigation_v1`) runs right after deduplication. It judges every chunk
+that is still a search representative, passage or parent, on its own
+`raw_text`. A flagged chunk stays stored with its locators and gets
+`is_search_representative = false`, `duplicate_of_chunk_id = NULL`, and
+provenance `search_exclusion_reason = "navigation_page"`. The existing
+representative filters keep it out of embedding, the BM25 projection,
+deterministic and title search terms, and the dense, BM25, and term
+channels. No migration: provenance is JSONB.
+
+```mermaid
+flowchart LR
+  buildNode["build_hierarchical_chunks"] --> dedupNode["apply_deduplication"]
+  dedupNode --> navNode["apply_navigation_exclusion"]
+  navNode -->|"representative"| searchNode["Embedding, BM25 projection, search terms"]
+  navNode -->|"navigation_page"| storedNode["Stored only, not searchable"]
+  dedupNode -->|"duplicate"| storedNode
+```
+
+**Meaning of the flag.** `is_search_representative = false` has two
+causes: `duplicate_of_chunk_id` set (exact duplicate of that chunk), or
+`duplicate_of_chunk_id` NULL with reason `navigation_page`. No reader
+dereferences `duplicate_of_chunk_id` except the repository insert
+order, which accepts NULL.
+
+**Rule (structure only; never a title, hash, page number, heading, or
+format).** Dot leaders become spaces and text splits on whitespace. A
+page reference is 1 to 4 digits, optionally a range joined by `-` or
+U+2010 to U+2014, or a lowercase roman numeral of two or more letters,
+with trailing `,;:.` ignored. A run of consecutive page references
+closes one entry. A chunk is navigation when it has at least 3 runs, at
+most 5.0 words per run, and at most 1.0 sentence break per 100 tokens.
+Entries are counted instead of lines because PDF reflow joins the lines
+of one block (median 3 lines of about 57 tokens per contents chunk).
+
+**Parents, children, guard.** Each chunk is judged on its own text, so
+an index parent is flagged even when one child is only a letter
+heading; a child is never excluded because its parent is. Parent
+context expansion does not filter on the flag, so a representative
+child of an excluded parent can still expand to index text. If every
+representative of a version would be flagged, nothing is flagged.
+
+| Calibration group (private PDF above) | Chunks | Flagged | Words per run (3+ runs) | Sentence breaks per 100 tokens |
+| --- | ---: | ---: | --- | --- |
+| Contents passages and parent | 13 | 13 | 1.67–3.80 | 0 |
+| Index passages and parents | 74 | 55 | 2.00–4.33 | 0 |
+| Glossary passages and parent | 7 | 0 | 274.5 (parent only) | 5.63–8.05 |
+| Prose passages and parents | 922 | 0 | 5.83–316 | 0–8.11 |
+
+**Limits.** Index fragments with fewer than 3 runs stay searchable (19
+of 74, each at most 13 tokens). Short-label number tables and code
+listings with per-line numbers can match. A lowercase word that is a
+valid roman numeral (`mix`, `cm`) counts as a page reference. LightRAG
+source loading (`jobs/graph_source_text.py`,
+`jobs/graph_mapping_persist.py`) reads undeleted chunks without this
+flag, so graph-eligible documents still send navigation chunks to graph
+extraction. `navigation_v1` is in the chunking config hash, not in the
+chunk ID; re-chunking a version under a new rule keeps IDs and the
+upsert rewrites the flag and provenance.
+
 ## Heading inventory (Phase 4 consumer)
 
 Phase 3 stores heading ancestry on each chunk (`section_path`). Phase 4 whole-document coverage uses the **authorized current heading inventory**: distinct `section_path` values on current, undeleted, ACL-visible chunks of exactly one document version. Do not create a second inventory table.
@@ -87,7 +149,7 @@ CSV/XLSX cells materialize to private **`table-artifacts`** Parquet (`table_parq
 ## Verification
 
 ```bash
-uv run pytest tests/unit/test_pdf_line_joins.py tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
+uv run pytest tests/unit/test_navigation_exclusion.py tests/unit/test_pdf_line_joins.py tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
 ```
 
 Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [docs index](../README.md)

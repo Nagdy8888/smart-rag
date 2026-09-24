@@ -19,7 +19,17 @@ class ChunkKind(StrEnum):
 
 
 class ChunkProvenance(BaseModel):
-    """Structured provenance for citations and reconstruction."""
+    """Structured provenance for citations and reconstruction.
+
+    ``search_exclusion_reason`` explains a chunk that is stored but is not a
+    search representative for a reason other than deduplication. It is
+    ``None`` for representatives and for duplicates, which carry
+    ``CanonicalChunk.duplicate_of_chunk_id`` instead. ``"navigation_page"``
+    marks a contents or index chunk excluded by
+    ``smart_rag_core.ingestion.chunking.navigation``. The value is stored in
+    the ``provenance`` JSONB column, so no migration is needed; rows written
+    before this field have no key and read as ``None``.
+    """
 
     element_ids: tuple[str, ...] = Field(default_factory=tuple)
     atomic_element_id: str | None = None
@@ -37,10 +47,19 @@ class ChunkProvenance(BaseModel):
     dedup_policy_version: str
     dedup_mode: str = "exact_and_near"
     normalized_content_hash: str
+    search_exclusion_reason: str | None = None
 
 
 class CanonicalChunk(BaseModel):
-    """One hierarchical passage or parent chunk before persistence."""
+    """One hierarchical passage or parent chunk before persistence.
+
+    ``is_search_representative`` is False for two reasons. An exact
+    duplicate sets ``duplicate_of_chunk_id`` to the kept chunk. A navigation
+    page leaves ``duplicate_of_chunk_id`` as ``None`` and sets
+    ``provenance.search_exclusion_reason`` to ``"navigation_page"``. A
+    non-representative stays stored with its locators but is not embedded,
+    projected to BM25, given search terms, or returned by retrieval.
+    """
 
     chunk_id: UUID
     chunk_index: int = Field(ge=0)

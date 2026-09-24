@@ -174,6 +174,7 @@ Primary references: [PyMuPDF docs](https://pymupdf.readthedocs.io/), [python-doc
 | Chunking policy version | text | `chunking_v1` | — | Packet 6 sign-off | worker | reject stale replay | Policy drift |
 | Tokenizer version | text | `cl100k_base_v1` | — | ADR `text-embedding-3-large` sizing | worker | reject stale replay | Embedding model change |
 | Dedup policy version | text | `dedup_v1` | — | Packet 6 sign-off | worker | exact-only fallback | Fuzzy gate miss |
+| Navigation policy version | text | `navigation_v1` | — | Answer-loss repair (Fix 4) | worker | stored, not searchable (`navigation_page`) | Threshold change or a prose false positive |
 | Passage target tokens | tokens | 200–400 | — | CHUNKING_CONTRACT | worker | split/merge | <90% ordinary prose in band |
 | Passage overlap | tokens | 50 | 40–60 | CHUNKING_CONTRACT | worker | metric fail | Overlap drift |
 | Passage hard cap | tokens | 600 | 600 | CHUNKING_CONTRACT | worker | atomic exception only | Silent split defect |

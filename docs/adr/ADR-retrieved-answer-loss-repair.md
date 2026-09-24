@@ -188,10 +188,14 @@ uncertain; this ADR does not promise one.
    loses the hyphen. The current ASCII rule already does this. Hyphens
    inside a line are untouched.
 2. Add a generic detector for table-of-contents and back-of-book-index
-   chunks. A chunk qualifies when most of its lines end in page references
-   (numbers, ranges, dot leaders) and it has little sentence text.
-   Thresholds are calibrated on fixtures, never on this book's title or
-   hash. Glossaries and prose must not match.
+   chunks. A chunk qualifies when its entries end in page references
+   (numbers, ranges, roman numerals, dot leaders): at least 3 runs of
+   page references, at most 5 words per run, and almost no sentence
+   breaks. Entries are counted instead of lines because PDF reflow joins
+   the lines of one block. Thresholds come from fixtures and structural
+   counts, never from the book's title, hash, page numbers, or headings.
+   Glossaries and prose must not match. Each representative passage or
+   parent is judged on its own text.
 3. Keep detected chunks stored in the version. Set
    `is_search_representative = false`, leave `duplicate_of_chunk_id`
    NULL, and add the provenance reason `navigation_page`. Existing filters
