@@ -60,7 +60,7 @@ about 500 ms.
 | L1 | `L0-b` | `L1-after` | 41.680 | 35.385 | 38.378 | `pre_first_stage_s` median | 1.931 | 1.236 | 0.072 | 0 |
 | L2 | `L1-after` | `L2-after` | 36.648 | 30.107 | 33.360 | parallel `server_total_s` median | 35.385 | 33.540 | 0.933 | 0 |
 | L3 | `L2-after` | `L3-after` | 34.907 s | 26.716 s | 33.399 s | `node_gap_total_s` median | 3.230 s | 3.462 s | 0.121 s | 0 |
-| L4 | `L3-after` | `L4-after` | pending | pending | pending | `event_spacing_median_s` median | pending | pending | pending | pending |
+| L4 | `L3-after` | `L4-after` | gate failed | - | - | `event_spacing_median_s` median | - | - | - | - |
 | L5 | `L4-after` | `L5-after` | pending | pending | pending | `rerank_timeout_after_send` count | pending | pending | pending | pending |
 | L6 | `L5-after` | `L6-after` | pending | pending | pending | `stage_timings_ms.retrieve_total_ms` median | pending | pending | pending | pending |
 | L7 | `L6-after` | `L7-after` | pending | pending | pending | answer completion tokens median | pending | pending | pending | pending |
@@ -74,3 +74,17 @@ Medians over the `sse.writer_summary` log lines of the `L3-after` runs
 | Lines found | `append_ms_p50` median | `lag_ms_max` median | `flush_ms_max` median |
 | ----------: | ---------------------: | ------------------: | --------------------: |
 | 12 | 297.3 | 4257.9 | 3167.2 |
+
+## L4 pooler probe
+
+```text
+sequential_ms_median=251.3
+pipelined_ms_median=187.3
+ratio=0.75
+PASS pipelined_rows
+FAIL scope_ends_at_commit
+PASS error_path
+FAIL pipelined_at_most_0_6_of_sequential
+```
+
+Gate failed; L4 code not applied.
