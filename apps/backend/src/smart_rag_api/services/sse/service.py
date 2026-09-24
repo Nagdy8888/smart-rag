@@ -11,7 +11,11 @@ from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.sse.catalog import HEARTBEAT_INTERVAL_SECONDS
 from smart_rag_core.sse.store import RunEventStore
 
-from smart_rag_api.services.sse.constants import NON_STARTABLE_STATUSES, POLL_SECONDS
+from smart_rag_api.services.sse.constants import (
+    ATTACH_IDLE_POLL_SECONDS,
+    NON_STARTABLE_STATUSES,
+    POLL_SECONDS,
+)
 from smart_rag_api.services.sse.executors import QueryRunExecutor
 from smart_rag_api.services.sse.registry import QueryRunRegistry
 from smart_rag_api.services.sse.run_access import RunAccessMixin
@@ -74,13 +78,14 @@ class SseStreamService(RunAccessMixin, RunOrchestrationMixin, SsePersistMixin):
             context: Fresh admit context used to start the graph.
 
         Yields:
-            SSE frames. Persistence happens before each yield.
+            SSE frames. Persistence happens before each yield. Store reads
+            run on worker threads; a live run wakes this loop on each append.
 
         Raises:
             QueryAdmissionError: Missing, foreign, or tombstoned run.
         """
 
-        self.assert_readable(caller, run_id=run_id)
+        await asyncio.to_thread(self.assert_readable, caller, run_id=run_id)
         cursor = after
         async for frame, sequence, terminal in self._replay(caller, run_id, cursor):
             cursor = sequence
@@ -88,7 +93,7 @@ class SseStreamService(RunAccessMixin, RunOrchestrationMixin, SsePersistMixin):
             if terminal:
                 return
 
-        record = self.assert_readable(caller, run_id=run_id)
+        record = await asyncio.to_thread(self.assert_readable, caller, run_id=run_id)
         live = self._registry.get(run_id)
         if live is None and record.status in NON_STARTABLE_STATUSES:
             async for frame, sequence, terminal in self._replay(caller, run_id, cursor):
@@ -100,9 +105,13 @@ class SseStreamService(RunAccessMixin, RunOrchestrationMixin, SsePersistMixin):
 
         if live is None and record.status == "pending":
             if context is None and not self._registry.has_input(run_id):
-                loaded = self._load_durable_start(caller, run_id)
+                loaded = await asyncio.to_thread(
+                    self._load_durable_start, caller, run_id
+                )
                 if loaded is None:
-                    self._emit_worker_unavailable(caller, run_id)
+                    await asyncio.to_thread(
+                        self._emit_worker_unavailable, caller, run_id
+                    )
                     async for frame, sequence, terminal in self._replay(
                         caller, run_id, cursor
                     ):
@@ -115,12 +124,14 @@ class SseStreamService(RunAccessMixin, RunOrchestrationMixin, SsePersistMixin):
                 self._registry.remember_input(run_id, message, runtime)
                 context = runtime
             live = self._registry.get_or_create(run_id)
-            self._start_once(caller, record, live, context)
+            await self._start_once(caller, record, live, context)
 
         if live is not None and not live.started and record.status == "pending":
-            self._start_once(caller, record, live, context)
+            await self._start_once(caller, record, live, context)
 
         while True:
+            handle = self._registry.get(run_id)
+            seen = handle.append_generation if handle is not None else 0
             emitted = False
             async for frame, sequence, terminal in self._replay(caller, run_id, cursor):
                 cursor = sequence
@@ -141,4 +152,6 @@ class SseStreamService(RunAccessMixin, RunOrchestrationMixin, SsePersistMixin):
                         return
                 if not emitted:
                     return
-            await asyncio.sleep(POLL_SECONDS)
+                await asyncio.sleep(POLL_SECONDS)
+                continue
+            await handle.wait_appended(seen, ATTACH_IDLE_POLL_SECONDS)

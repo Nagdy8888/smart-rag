@@ -8,6 +8,7 @@ the FastAPI-independent helpers.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 
 import psycopg
@@ -39,6 +40,7 @@ __all__ = [
     "build_query_graph_deps",
     "build_query_process_bindings",
     "open_run_app_api_connection",
+    "open_run_app_api_connection_async",
 ]
 
 
@@ -129,3 +131,24 @@ def build_query_graph_deps(
         store_get=store_get,
         store_put=store_put,
     )
+
+
+async def open_run_app_api_connection_async(supabase_dsn: str) -> psycopg.Connection:
+    """Open the run's ``app_api`` connection on a worker thread.
+
+    The connect (TLS plus pooler handshake, about 0.5 s) must not block the
+    SSE event loop. ``open_run_app_api_connection`` is looked up in this
+    module at call time, so tests that patch it here still apply.
+
+    Args:
+        supabase_dsn: Canonical Postgres URL.
+
+    Returns:
+        Autocommit-off connection with ``SET ROLE app_api``. Caller must
+        close it.
+
+    Raises:
+        QueryGraphRuntimeError: If the connection cannot be opened.
+    """
+
+    return await asyncio.to_thread(open_run_app_api_connection, supabase_dsn)

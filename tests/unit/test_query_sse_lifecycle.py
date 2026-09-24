@@ -7,6 +7,8 @@ import inspect
 import logging
 import threading
 import time
+from collections.abc import AsyncIterator
+from types import SimpleNamespace
 from typing import Any
 
 from smart_rag_api.services.sse_stream import (
@@ -552,3 +554,305 @@ def test_append_lock_failure_logs_sanitized_fields(
     assert "postgresql://" not in rendered
     assert "secret" not in rendered
     assert "example.invalid" not in rendered
+
+
+def test_live_run_wait_appended_timeout_and_notify() -> None:
+    """``wait_appended`` returns on timeout, on notify, and when already newer."""
+
+    from smart_rag_api.services.sse.registry import LiveQueryRun
+
+    async def _run() -> tuple[int, int, float, int]:
+        """Wait with no notify, then with a notify, then with a stale seen.
+
+        Returns:
+            Generation after timeout, after notify, seconds waited for the
+            notify, and generation for an already-newer ``seen``.
+        """
+
+        live = LiveQueryRun()
+        timed_out = await live.wait_appended(0, 0.05)
+        loop = asyncio.get_running_loop()
+        loop.call_later(0.05, live.notify_appended)
+        started = time.monotonic()
+        notified = await live.wait_appended(0, 2.0)
+        waited = time.monotonic() - started
+        immediate = await live.wait_appended(0, 5.0)
+        return timed_out, notified, waited, immediate
+
+    timed_out, notified, waited, immediate = asyncio.run(_run())
+    assert timed_out == 0
+    assert notified == 1
+    assert waited < 1.0
+    assert immediate == 1
+
+
+class _SlowListStore(MemoryRunEventStore):
+    """Memory store whose replay read blocks the calling thread."""
+
+    def __init__(self, hold_seconds: float) -> None:
+        """Configure the blocking read.
+
+        Args:
+            hold_seconds: Sleep per ``list_after`` call.
+        """
+
+        super().__init__()
+        self.hold_seconds = hold_seconds
+
+    def list_after(self, caller: Any, *, run_id: Any, after: int) -> Any:
+        """Block this thread, then read.
+
+        Args:
+            caller: Owner.
+            run_id: Run id.
+            after: Exclusive cursor.
+
+        Returns:
+            Events from the memory store.
+        """
+
+        time.sleep(self.hold_seconds)
+        return super().list_after(caller, run_id=run_id, after=after)
+
+
+def test_replay_list_after_runs_off_event_loop() -> None:
+    """A slow replay read cannot freeze the asyncio loop."""
+
+    store = _SlowListStore(0.2)
+    service = SseStreamService(
+        store=store,
+        registry=QueryRunRegistry(),
+        executor=FixtureQueryRunExecutor(),
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _probe() -> int:
+        """Tick every 10 ms while one replay read blocks its thread.
+
+        Returns:
+            Ticks counted during the replay.
+        """
+
+        ticks = 0
+
+        async def _ticker() -> None:
+            """Count loop turns until cancelled."""
+
+            nonlocal ticks
+            while True:
+                await asyncio.sleep(0.01)
+                ticks += 1
+
+        ticker = asyncio.create_task(_ticker())
+        async for _item in typed_attr(service, "_replay")(caller, runtime.run_id, 0):
+            pass
+        ticker.cancel()
+        return ticks
+
+    assert asyncio.run(_probe()) >= 8
+
+
+class _SpacedExecutor:
+    """Executor that yields status events with a fixed gap, then completes."""
+
+    def __init__(self, count: int, gap_seconds: float) -> None:
+        """Configure the spaced stream.
+
+        Args:
+            count: Status events before ``completed``.
+            gap_seconds: Sleep before each status event.
+        """
+
+        self.count = count
+        self.gap_seconds = gap_seconds
+        self.start_count = 0
+
+    async def execute(
+        self,
+        *,
+        context: Any,
+        message: str,
+        cancel_event: asyncio.Event,
+    ) -> AsyncIterator[tuple[str, dict[str, object]]]:
+        """Yield spaced status events, then ``completed``.
+
+        Args:
+            context: Unused authorized context.
+            message: Unused user text.
+            cancel_event: Unused cancel flag.
+
+        Yields:
+            Catalog drafts.
+        """
+
+        del context, message, cancel_event
+        self.start_count += 1
+        for index in range(self.count):
+            await asyncio.sleep(self.gap_seconds)
+            yield ("status", {"stage": f"stage_{index}", "status": "running"})
+        yield ("completed", {})
+
+
+def test_attach_wakes_on_append_not_idle_poll(monkeypatch: Any) -> None:
+    """Frames for a live run arrive on append, not after the idle poll."""
+
+    monkeypatch.setattr(
+        "smart_rag_api.services.sse.service.ATTACH_IDLE_POLL_SECONDS", 5.0
+    )
+    service = SseStreamService(
+        store=MemoryRunEventStore(),
+        registry=QueryRunRegistry(),
+        executor=_SpacedExecutor(count=4, gap_seconds=0.05),
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _drain() -> tuple[list[str], float]:
+        """Attach once and read every frame through the terminal.
+
+        Returns:
+            ``event:`` lines and elapsed seconds.
+        """
+
+        started = time.monotonic()
+        lines: list[str] = []
+        async for frame in service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        ):
+            lines.extend(
+                line for line in frame.splitlines() if line.startswith("event:")
+            )
+        return lines, time.monotonic() - started
+
+    lines, elapsed = asyncio.run(_drain())
+    assert lines[-1] == "event: completed"
+    assert lines.count("event: status") == 4
+    assert elapsed < 1.5
+
+
+def test_start_once_is_single_under_concurrent_attach() -> None:
+    """Two attaches racing on one pending run start one executor."""
+
+    store = MemoryRunEventStore()
+    executor = FixtureQueryRunExecutor(hold_seconds=0.1, emit_completed=True)
+    service = SseStreamService(
+        store=store,
+        registry=QueryRunRegistry(),
+        executor=executor,
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _attach() -> list[str]:
+        """Read one attach to its terminal.
+
+        Returns:
+            Frames from this attach.
+        """
+
+        return [
+            frame
+            async for frame in service.iter_frames(
+                caller, run_id=runtime.run_id, after=0, context=runtime
+            )
+        ]
+
+    async def _both() -> list[list[str]]:
+        """Run two attaches at once.
+
+        Returns:
+            Frames from each attach.
+        """
+
+        return list(await asyncio.gather(_attach(), _attach()))
+
+    first, second = asyncio.run(_both())
+    schema_rows = [
+        item
+        for item in store.list_after(caller, run_id=runtime.run_id, after=0)
+        if item.event_type == "schema"
+    ]
+    assert executor.start_count == 1
+    assert len(schema_rows) == 1
+    assert any("event: completed" in frame for frame in first)
+    assert any("event: completed" in frame for frame in second)
+
+
+def test_stream_commits_and_terminal_persist_run_off_event_loop(
+    monkeypatch: Any,
+) -> None:
+    """Run-connection open, commits, and post-terminal persist use threads."""
+
+    stream = RecordingAsyncStream((verified_chunk("THREAD"), trailing_chunk()))
+    executor = LangGraphQueryRunExecutor()
+    patch_recording_executor(monkeypatch, executor, RecordingCompiled(stream))
+    loop_threads: list[int] = []
+    open_threads: list[int] = []
+    commit_threads: list[int] = []
+    persist_threads: list[int] = []
+
+    def _open_connection(dsn: object) -> Any:
+        """Return a connection whose commit records its thread.
+
+        Args:
+            dsn: Unused DSN.
+
+        Returns:
+            Connection stand-in.
+        """
+
+        del dsn
+        open_threads.append(threading.get_ident())
+
+        def _commit() -> None:
+            """Record the committing thread."""
+
+            commit_threads.append(threading.get_ident())
+
+        def _close() -> None:
+            """Accept close."""
+
+        return SimpleNamespace(commit=_commit, close=_close)
+
+    def _persist(*args: object, **kwargs: object) -> None:
+        """Record the persisting thread.
+
+        Args:
+            *args: Unused persist arguments.
+            **kwargs: Unused persist options.
+        """
+
+        del args, kwargs
+        persist_threads.append(threading.get_ident())
+
+    monkeypatch.setattr(
+        "smart_rag_api.services.query_graph_runtime.open_run_app_api_connection",
+        _open_connection,
+    )
+    monkeypatch.setattr(executor, "_persist_assistant_answer", _persist)
+
+    async def _drain() -> None:
+        """Consume the patched executor and record the loop thread."""
+
+        loop_threads.append(threading.get_ident())
+        async for _event in executor.execute(
+            context=make_runtime(),
+            message="hello",
+            cancel_event=asyncio.Event(),
+        ):
+            pass
+
+    asyncio.run(_drain())
+    assert open_threads
+    assert commit_threads
+    assert persist_threads
+    assert loop_threads[0] not in open_threads
+    assert loop_threads[0] not in commit_threads
+    assert loop_threads[0] not in persist_threads

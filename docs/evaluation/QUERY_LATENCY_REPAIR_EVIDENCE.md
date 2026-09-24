@@ -57,7 +57,7 @@ about 500 ms.
 | Packet | Before tag | After tag | `wall_seconds` median | `server_total_s` median | `server_total_s` p90 | Targeted metric | Before | After | Noise band | `deadline_exhausted` |
 | ------ | ---------- | --------- | --------------------: | ----------------------: | -------------------: | --------------- | -----: | ----: | ---------: | -------------------: |
 | L0 | - | `L0-b` | 45.602 | 39.325 | 45.148 | noise band | - | - | 0.860 | 0 |
-| L1 | `L0-b` | `L1-after` | pending | pending | pending | `pre_first_stage_s` median | pending | pending | pending | pending |
+| L1 | `L0-b` | `L1-after` | 41.680 | 35.385 | 38.378 | `pre_first_stage_s` median | 1.931 | 1.236 | 0.072 | 0 |
 | L2 | `L1-after` | `L2-after` | pending | pending | pending | parallel `server_total_s` median | pending | pending | pending | pending |
 | L3 | `L2-after` | `L3-after` | pending | pending | pending | `node_gap_total_s` median | pending | pending | pending | pending |
 | L4 | `L3-after` | `L4-after` | pending | pending | pending | `event_spacing_median_s` median | pending | pending | pending | pending |

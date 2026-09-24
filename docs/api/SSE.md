@@ -226,6 +226,19 @@ They never include DSNs, JWTs, payload bodies, or exception text.
 This is the c31e50dc stall class. Disabling LangSmith tracing is not the
 fix. Authenticated live timing after this repair is still unverified.
 
+Since latency packet L1 (2026-09), every event-store read and write, the
+run-row lookups (`assert_readable`, `mark_running`, terminal checks), the
+run connection's per-chunk `commit()`, the run connection open, and the
+post-terminal summary and assistant persist run on worker threads through
+`asyncio.to_thread`, awaited in the same order as before. The attach loop
+no longer polls every 50 ms for a run this process executes: each append
+calls `LiveQueryRun.notify_appended()`, and the attach loop waits with
+`wait_appended(seen, ATTACH_IDLE_POLL_SECONDS)` (0.5 s upper bound). Runs
+without a live handle in this process keep the 50 ms `POLL_SECONDS` loop
+and still return when a round emits nothing. The terminal frame can reach
+the browser before the assistant `app.messages` row is written; the chat
+UI keeps the live answer until the refetched transcript matches it.
+
 ## Retention (packet 7)
 
 Completed idempotency keys default to seven days and completed events to

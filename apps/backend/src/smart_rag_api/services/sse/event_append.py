@@ -13,6 +13,8 @@ from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES
 from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore, sqlstate_of
 
+from smart_rag_api.services.sse.registry import QueryRunRegistry
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -20,6 +22,7 @@ class EventAppendMixin:
     """Mixin: persist one catalog event and log sanitized append failures."""
 
     _store: RunEventStore
+    _registry: QueryRunRegistry
 
     if TYPE_CHECKING:
 
@@ -76,12 +79,14 @@ class EventAppendMixin:
         event_type: str,
         payload: dict[str, object],
     ) -> PersistedRunEvent | None:
-        """Persist one event off the asyncio loop.
+        """Persist one event off the asyncio loop, then wake attach loops.
 
         Heartbeat and executor orchestration must use this helper so a
         synchronous run-row lock wait cannot freeze ``astream`` or SSE
-        polling. Callers still await each append before the next event so
-        sequence order and exactly-one terminal stay unchanged.
+        attach. Callers still await each append before the next event so
+        sequence order and exactly-one terminal stay unchanged. After the
+        write returns, attach loops waiting on this run are woken, also when
+        the append was replaced by a sanitized ``error`` or skipped.
 
         Args:
             caller: Owner.
@@ -93,9 +98,13 @@ class EventAppendMixin:
             Persisted row, or None when append is rejected after sanitizing.
         """
 
-        return await asyncio.to_thread(
+        persisted = await asyncio.to_thread(
             self._append, caller, run_id, event_type, payload
         )
+        live = self._registry.get(run_id)
+        if live is not None:
+            live.notify_appended()
+        return persisted
 
     def _append(
         self,

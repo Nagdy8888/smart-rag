@@ -9,7 +9,12 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
 
 class LiveQueryRun:
-    """In-process handle for one run's executor and heartbeat."""
+    """In-process handle for one run's executor, heartbeat, and wake-ups.
+
+    ``append_generation`` counts events this process has persisted for the
+    run. An attach loop reads it before a replay, then waits for it to
+    change, so a new event is streamed without polling.
+    """
 
     def __init__(self) -> None:
         """Create an idle handle."""
@@ -19,6 +24,44 @@ class LiveQueryRun:
         self.terminal = False
         self.executor_task: asyncio.Task[None] | None = None
         self.heartbeat_task: asyncio.Task[None] | None = None
+        self.append_generation = 0
+        self._append_event = asyncio.Event()
+
+    def notify_appended(self) -> None:
+        """Wake every attach loop that waits on this run.
+
+        Must be called on the event-loop thread because ``asyncio.Event`` is
+        not thread-safe. Code running in a worker thread must return to the
+        loop first (``await asyncio.to_thread(...)`` does that).
+
+        Side Effects:
+            Increments ``append_generation`` and releases current waiters.
+        """
+
+        self.append_generation += 1
+        released = self._append_event
+        self._append_event = asyncio.Event()
+        released.set()
+
+    async def wait_appended(self, seen: int, timeout: float) -> int:
+        """Wait until ``append_generation`` differs from ``seen``.
+
+        Args:
+            seen: Generation the caller read before its last replay.
+            timeout: Longest wait in seconds.
+
+        Returns:
+            The current generation. Equal to ``seen`` after a timeout.
+        """
+
+        if self.append_generation != seen:
+            return self.append_generation
+        waiter = self._append_event
+        try:
+            await asyncio.wait_for(waiter.wait(), timeout=timeout)
+        except TimeoutError:
+            pass
+        return self.append_generation
 
 
 class QueryRunRegistry:

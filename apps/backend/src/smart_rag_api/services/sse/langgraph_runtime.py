@@ -243,7 +243,7 @@ async def open_langgraph_astream(
 
     Side Effects:
         Binds run-local Web flags and ``QueryGraphDeps``, and opens one
-        ``app_api`` connection. The executor owns ``astream`` ``aclose``.
+        ``app_api`` connection on a worker thread; executor owns ``astream`` ``aclose``.
     """
     from smart_rag_agents.query.deps import QueryGraphContext, bind_query_run_deps
     from smart_rag_agents.query.graph import pending_query_state
@@ -251,12 +251,12 @@ async def open_langgraph_astream(
 
     from smart_rag_api.services.query_graph_runtime import (
         build_query_graph_deps,
-        open_run_app_api_connection,
+        open_run_app_api_connection_async,
     )
     from smart_rag_api.services.sse.stream_dispatch import production_astream_options
 
     bindings = process_bindings(settings)
-    connection = open_run_app_api_connection(bindings.supabase_dsn)
+    connection = await open_run_app_api_connection_async(bindings.supabase_dsn)
     store_binding = bind_memory_store(settings)
     if inspect.isawaitable(store_binding):
         store_get, store_put = await store_binding

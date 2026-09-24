@@ -39,6 +39,9 @@ class ReplayCancelMixin:
     ) -> AsyncIterator[tuple[str, int, bool]]:
         """Yield framed events after ``after``.
 
+        The store read runs on a worker thread so a slow database round trip
+        cannot block the event loop.
+
         Args:
             caller: Owner.
             run_id: Run id.
@@ -48,7 +51,10 @@ class ReplayCancelMixin:
             Frame text, new cursor, and whether the event is terminal.
         """
 
-        for event in self._store.list_after(caller, run_id=run_id, after=after):
+        events = await asyncio.to_thread(
+            self._store.list_after, caller, run_id=run_id, after=after
+        )
+        for event in events:
             frame = format_sse_event(
                 sequence=event.sequence,
                 event_type=event.event_type,

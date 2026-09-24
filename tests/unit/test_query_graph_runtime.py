@@ -219,7 +219,7 @@ def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
     assert "except QueryGraphRuntimeError:\n                connection = None" not in (
         executor_source
     )
-    assert "open_run_app_api_connection(bindings.supabase_dsn)" in runtime_source
+    assert "open_run_app_api_connection_async(bindings.supabase_dsn)" in runtime_source
     assert 'yield ("error", {"code": exc.reason})' in execute_source
 
 
