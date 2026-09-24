@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-24
 audience: engineering, ops
 ---
 
@@ -142,7 +142,7 @@ Primary references: [RFC 9309 robots](https://www.rfc-editor.org/rfc/rfc9309.htm
 | OCR languages | codes | eng+ara | eng+ara | Phase 1 multilingual gate | parser | `media_only`/diagnostic | Language coverage gap |
 | OCR min confidence | percent | 30 | 30 | Measured dev fixtures | parser | omit low-conf boxes | OCR recall review |
 | Parser config version | text | `parser_v1` | — | Packet 5 sign-off | parser | reject stale replay | Policy drift |
-| PDF parser version | text | `parser_v1_pdf_reflow_v3` | — | Ask evidence repair | PDF adapter | new version identity | Heading classification or line-join change |
+| PDF parser version | text | `parser_v1_pdf_reflow_v4` | — | Answer-loss repair (U+2010 and U+00AD line joins) | PDF adapter | new version identity | Heading classification or line-join change |
 | Cleaning policy version | text | `cleaning_v1` | — | Packet 5 sign-off | parser | reject stale replay | Cleaning rule change |
 | Parser network | policy | none | none | ADR parser isolation | infra | block job | Egress probe from parser |
 | Parser secrets | policy | none | none | ADR parser isolation | infra | block launch | Secret mount detected |

@@ -21,6 +21,13 @@ PDF_HEADING_MAX_WORDS = 12
 PDF_HEADING_MAX_CHARS = 80
 PDF_HEADING_SIZE_RATIO = 1.2
 PDF_HEADING_MIN_SIZE = 11.0
+LINE_END_HYPHENS = ("-", "\u2010", "\u00ad")
+"""Line-end characters removed when they split one word across two lines.
+
+ASCII hyphen-minus, U+2010 HYPHEN (the hyphen typeset books use), and
+U+00AD SOFT HYPHEN. U+2011 NON-BREAKING HYPHEN is not listed: a line never
+breaks after it, so a line-end U+2011 belongs to the text.
+"""
 
 
 class PdfTextBlock(NamedTuple):
@@ -69,10 +76,15 @@ def _union_pdf_bbox(
 def join_pdf_lines(pending: PdfTextBlock, block: PdfTextBlock) -> str:
     """Join two paragraph lines without a mid-word break or a mid-block newline.
 
-    A trailing hyphen after a letter is removed when the next line starts with
-    a lowercase letter. Lines from the same PyMuPDF block are separated by a
-    space. Lines from different blocks use ``PARAGRAPH_DELIMITER`` so citation
-    spans can still see paragraph boundaries.
+    A trailing hyphen from ``LINE_END_HYPHENS`` after a letter is removed
+    when the next line starts with a lowercase letter, so ``com`` + U+2010 +
+    ``plexity`` becomes ``complexity``. A real compound broken at its own
+    hyphen at a line end loses that hyphen; hyphens inside a line are never
+    touched. When the next line starts with anything else, the hyphen stays
+    and the normal join applies. Lines from the same PyMuPDF block are
+    separated by a space. Lines from different blocks use
+    ``PARAGRAPH_DELIMITER`` so citation spans can still see paragraph
+    boundaries.
 
     Args:
         pending: Paragraph accumulated so far.
@@ -86,7 +98,7 @@ def join_pdf_lines(pending: PdfTextBlock, block: PdfTextBlock) -> str:
     right = block.text
     if (
         len(left) >= 2
-        and left.endswith("-")
+        and left.endswith(LINE_END_HYPHENS)
         and left[-2].isalpha()
         and right[:1].islower()
     ):

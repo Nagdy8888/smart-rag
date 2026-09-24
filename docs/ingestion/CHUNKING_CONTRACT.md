@@ -2,7 +2,7 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-24
 owning_phase: 3
 audience: engineering
 ---
@@ -46,6 +46,20 @@ copied onto provenance locators as `page_label`. Chat company-PDF chips use
 the typed toolbar page (`pdf_page_number` = `page_index + 1`) and must not
 treat `page_label` as the displayed page.
 
+PDF line joins (`parser_v1_pdf_reflow_v4`, `join_pdf_lines` in
+`ingestion/parser/helpers.py`): lines of one PyMuPDF block join with a
+space, and lines of different blocks join with `PARAGRAPH_DELIMITER`
+(`\n\n`). When a line ends in a letter plus ASCII `-`, U+2010 HYPHEN,
+or U+00AD SOFT HYPHEN (`LINE_END_HYPHENS`) and the next line starts
+lowercase, the two join with no hyphen and no space. Before v4 only
+ASCII `-` joined, so typeset books stored letter + U+2010 + space +
+letter splits (719 of 1,016 chunks of the private PDF above). Limits:
+a real compound broken at its own hyphen at a line end loses the
+hyphen, and a suspended hyphen at a line end is joined to the next
+word. Hyphens inside a line are untouched. Any change to this rule
+changes `PDF_PARSER_VERSION`, the parser config hash, and every PDF
+chunk ID, so the stored document needs a re-ingest.
+
 ## Atomicity
 
 - **Tables:** split only between rows; repeat header row on each row-chunk.
@@ -73,7 +87,7 @@ CSV/XLSX cells materialize to private **`table-artifacts`** Parquet (`table_parq
 ## Verification
 
 ```bash
-uv run pytest tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
+uv run pytest tests/unit/test_pdf_line_joins.py tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
 ```
 
 Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [docs index](../README.md)
