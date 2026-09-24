@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Protocol, TypedDict
 from uuid import UUID
@@ -169,6 +169,13 @@ class HybridRunResult:
         term_ids: Authorized term IDs after recheck.
         source_resolution: Server-derived scope token. Empty when the
             retrieve path did not attach one.
+        stage_timings_ms: ID-free wall-clock milliseconds per retrieve
+            stage, keyed by ``HYBRID_STAGE_TIMING_KEYS``. Empty on cache
+            hits and fail-closed returns. ``rerank_call_ms`` exists only
+            when the rerank callback ran; a timed-out channel has no
+            ``channel_*_ms`` key. Treat as read-only.
+        rerank_invalid_subcode: ``RerankPayloadError.subcode`` when the
+            rerank payload failed validation, else empty.
     """
 
     ranked_ids: tuple[UUID, ...]
@@ -190,3 +197,5 @@ class HybridRunResult:
     bm25_ids: tuple[UUID, ...] = ()
     term_ids: tuple[UUID, ...] = ()
     source_resolution: str = ""
+    stage_timings_ms: dict[str, int] = field(default_factory=dict[str, int])
+    rerank_invalid_subcode: str = ""

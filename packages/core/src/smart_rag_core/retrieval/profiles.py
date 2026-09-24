@@ -54,6 +54,29 @@ EXACT_START_MIN_SLICE_SECONDS = HYBRID_DEADLINE_SECONDS
 envelope. Production Ask remaining is below this after profile/embed, so
 ANN starts first. P06-70 named ``deadline_budget`` after exact-from-start
 exhausted the 25s Ask envelope. The ceiling is not raised."""
+RERANK_INVALID_SUBCODES = frozenset(
+    {"json", "hash", "length", "duplicate", "unknown_id"}
+)
+"""ID-free ``RerankPayloadError.subcode`` values persisted in diagnostics."""
+HYBRID_STAGE_TIMING_KEYS = frozenset(
+    {
+        "scope_ms",
+        "embed_ms",
+        "channels_ms",
+        "channel_dense_ms",
+        "channel_bm25_ms",
+        "channel_term_ms",
+        "assemble_ms",
+        "temporal_load_ms",
+        "pool_preload_ms",
+        "rerank_gate_remaining_ms",
+        "rerank_call_ms",
+        "selection_ms",
+        "locator_reload_ms",
+        "retrieve_total_ms",
+    }
+)
+"""Allowed ``stage_timings_ms`` keys on Hybrid diagnostics (integer ms)."""
 CHANNEL_WEIGHT_DENSE = 1.0
 CHANNEL_WEIGHT_BM25 = 1.0
 CHANNEL_WEIGHT_TERM = 1.0

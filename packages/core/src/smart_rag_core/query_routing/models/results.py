@@ -14,6 +14,10 @@ from smart_rag_core.query_fusion.models import (
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.models.plan import BranchKind, CorrectionKind
+from smart_rag_core.retrieval.profiles import (
+    HYBRID_STAGE_TIMING_KEYS,
+    RERANK_INVALID_SUBCODES,
+)
 
 
 class TableEvidenceRecord(BaseModel):
@@ -70,6 +74,12 @@ class HybridBranchDiagnostics(BaseModel):
         evidence_ratio: Distinct-evidence component.
         support_confidence: Bounded support feature.
         effective_route: Executed branch family, never ``runs.route_family``.
+        stage_timings_ms: ID-free wall-clock milliseconds per retrieve
+            stage. Keys come from ``HYBRID_STAGE_TIMING_KEYS``; values are
+            non-negative integers. Empty for older checkpoints.
+        rerank_invalid_subcode: Rerank validation sub-code (``json``,
+            ``hash``, ``length``, ``duplicate``, ``unknown_id``) when
+            ``rerank_fallback`` is ``rerank_schema_invalid``, else empty.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -93,6 +103,8 @@ class HybridBranchDiagnostics(BaseModel):
     evidence_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     support_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     effective_route: str = Field(min_length=1, max_length=64)
+    stage_timings_ms: dict[str, int] = Field(default_factory=dict[str, int])
+    rerank_invalid_subcode: str = Field(default="", max_length=16)
 
     @field_validator(
         "dense_ids",
@@ -118,6 +130,49 @@ class HybridBranchDiagnostics(BaseModel):
 
         for item in value:
             UUID(item)
+        return value
+
+    @field_validator("stage_timings_ms")
+    @classmethod
+    def timings_are_known_non_negative(cls, value: dict[str, int]) -> dict[str, int]:
+        """Reject unknown stage names and negative durations.
+
+        Args:
+            value: Stage name to integer milliseconds.
+
+        Returns:
+            The same mapping when every key is allow-listed and every
+            value is at least zero.
+
+        Raises:
+            ValueError: ``stage_timing_key_invalid`` or
+                ``stage_timing_negative``.
+        """
+
+        for key, item in value.items():
+            if key not in HYBRID_STAGE_TIMING_KEYS:
+                raise ValueError("stage_timing_key_invalid")
+            if item < 0:
+                raise ValueError("stage_timing_negative")
+        return value
+
+    @field_validator("rerank_invalid_subcode")
+    @classmethod
+    def subcode_is_known(cls, value: str) -> str:
+        """Reject free-text rerank validation sub-codes.
+
+        Args:
+            value: Empty or one ``RERANK_INVALID_SUBCODES`` value.
+
+        Returns:
+            The same string.
+
+        Raises:
+            ValueError: ``rerank_subcode_invalid``.
+        """
+
+        if value and value not in RERANK_INVALID_SUBCODES:
+            raise ValueError("rerank_subcode_invalid")
         return value
 
 

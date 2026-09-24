@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-22
+last-reviewed: 2026-09-24
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -51,6 +51,38 @@ ANN starts first. The 25s Hybrid ceiling is not raised. The P06-70
 gate that required this admission is
 [p06-70-stage-isolation-2026-09-21.md](../development/phase-06/p06-70-stage-isolation-2026-09-21.md)
 (`deadline_budget`).
+
+## Stage timings and rerank sub-codes
+
+`HybridBranchDiagnostics` carries two ID-free fields.
+`stage_timings_ms` maps stage names to non-negative integer
+milliseconds. Allowed keys are `HYBRID_STAGE_TIMING_KEYS` in
+`retrieval/profiles.py`: `scope_ms`, `embed_ms`, `channels_ms`,
+`channel_dense_ms`, `channel_bm25_ms`, `channel_term_ms`,
+`assemble_ms`, `temporal_load_ms`, `pool_preload_ms`,
+`rerank_gate_remaining_ms`, `rerank_call_ms`, `selection_ms`,
+`locator_reload_ms`, and `retrieve_total_ms`. A channel that timed out
+has no `channel_*_ms` key. `rerank_call_ms` exists only when the
+rerank callback ran, so a `rerank_timeout` without it means the
+remaining-slice gate skipped the call. `rerank_gate_remaining_ms` is
+the remaining slice that the gate compared with
+`RERANK_RESERVED_SECONDS`; it is measured before pool preload. Cache
+hits and fail-closed returns carry only `scope_ms`.
+
+`rerank_invalid_subcode` is `json`, `hash`, `length`, `duplicate`, or
+`unknown_id` when `rerank_fallback` is `rerank_schema_invalid` and the
+payload failed application validation (`RerankPayloadError`). It is
+empty otherwise, including when the provider text was not JSON (the
+gateway fails before a payload exists). The diagnostics builder drops
+unknown keys, negative values, and unknown sub-codes instead of
+failing the branch.
+
+`scripts/eval_ask_stage_export.py` writes both fields per run
+(`unknown` for older checkpoints). Its per-run
+`bm25_degraded_explicit` is `False` when `fallback_reason` is `none`
+or empty, and runs with `none` do not lower the aggregate flag.
+Measured values:
+[HYBRID_STAGE_TIMINGS_2026-09.md](../evaluation/HYBRID_STAGE_TIMINGS_2026-09.md).
 
 ## Claim hygiene (Packet 9 metrics)
 

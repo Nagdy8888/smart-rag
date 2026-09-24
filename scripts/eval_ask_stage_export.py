@@ -16,6 +16,7 @@ from uuid import UUID
 
 import psycopg
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from smart_rag_core.retrieval.profiles import RERANK_INVALID_SUBCODES
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -119,7 +120,7 @@ def export_ask_stages(
             unknown_total += len(unknown)
             if record["rerank_accounting_ok"] is not True:
                 accounting_ok = False
-            if record["bm25_degraded_explicit"] is not True:
+            if not bm25_record_keeps_aggregate(record):
                 bm25_explicit = False
             runs[question_id] = {
                 "run_id": run_id or "unknown",
@@ -229,7 +230,8 @@ def stage_record(
 
     if diagnostics is None:
         return {name: "unknown" for name in REQUIRED_FIELDS}
-    fallback = str(diagnostics.get("fallback_reason") or "").strip() or "unknown"
+    raw_fallback = str(diagnostics.get("fallback_reason") or "").strip()
+    fallback = raw_fallback or "unknown"
     rerank_fallback = str(diagnostics.get("rerank_fallback") or "").strip() or "unknown"
     embedding_present = "embedding" in usage
     rerank_present = "rerank" in usage
@@ -240,16 +242,7 @@ def stage_record(
         accounting = "unknown"
     else:
         accounting = False
-    bm25_named = fallback.casefold().startswith("bm25")
-    masking = fallback in {"term_unavailable", "dense_unavailable"}
-    if fallback == "unknown":
-        bm25_explicit: bool | str = "unknown"
-    elif masking:
-        bm25_explicit = False
-    elif bm25_named or fallback:
-        bm25_explicit = True
-    else:
-        bm25_explicit = "unknown"
+    bm25_explicit = bm25_explicit_flag(raw_fallback)
     dense_ids = _id_list_or_unknown(diagnostics.get("dense_ids"))
     bm25_ids = _id_list_or_unknown(diagnostics.get("bm25_ids"))
     term_ids = _id_list_or_unknown(diagnostics.get("term_ids"))
@@ -280,7 +273,89 @@ def stage_record(
         "rerank_accounting_ok": accounting,
         "bm25_degraded_explicit": bm25_explicit,
         "retrieval_empty": retrieval_empty,
+        "stage_timings_ms": _timings_or_unknown(diagnostics.get("stage_timings_ms")),
+        "rerank_invalid_subcode": _subcode_or_unknown(
+            diagnostics.get("rerank_invalid_subcode")
+        ),
     }
+
+
+def bm25_explicit_flag(raw_fallback: str) -> bool | str:
+    """Classify whether one run's retrieve fallback names a BM25 outage.
+
+    Args:
+        raw_fallback: Stripped ``fallback_reason`` from diagnostics; may be
+            empty.
+
+    Returns:
+        ``False`` for no degradation (``none`` or empty) and for reasons
+        that can hide a BM25 outage (``term_unavailable``,
+        ``dense_unavailable``). ``"unknown"`` for the literal ``unknown``.
+        ``True`` for every other named reason.
+    """
+
+    if raw_fallback in {"", "none", "term_unavailable", "dense_unavailable"}:
+        return False
+    if raw_fallback == "unknown":
+        return "unknown"
+    return True
+
+
+def bm25_record_keeps_aggregate(record: Mapping[str, object]) -> bool:
+    """Return whether one run keeps the aggregate BM25-explicit flag true.
+
+    A run whose ``fallback_reason`` is ``none`` had no outage to name, so
+    its per-run ``False`` does not lower the promotion aggregate. Any
+    other run must carry ``bm25_degraded_explicit is True``.
+
+    Args:
+        record: One ``stage_record`` result.
+
+    Returns:
+        True when the aggregate may stay true for this run.
+    """
+
+    if record.get("fallback_reason") == "none":
+        return True
+    return record.get("bm25_degraded_explicit") is True
+
+
+def _timings_or_unknown(value: object) -> dict[str, int] | str:
+    """Return non-negative integer stage timings or ``unknown``.
+
+    Args:
+        value: JSON value of ``stage_timings_ms``.
+
+    Returns:
+        String-keyed integer milliseconds, or ``unknown`` when missing or
+        malformed.
+    """
+
+    if not isinstance(value, dict):
+        return "unknown"
+    timings: dict[str, int] = {}
+    for key, item in cast(dict[object, object], value).items():
+        if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+            return "unknown"
+        timings[str(key)] = item
+    return timings
+
+
+def _subcode_or_unknown(value: object) -> str:
+    """Return the rerank validation sub-code, empty, or ``unknown``.
+
+    Args:
+        value: JSON value of ``rerank_invalid_subcode``.
+
+    Returns:
+        The string when it is empty or allow-listed, else ``unknown``.
+    """
+
+    if not isinstance(value, str):
+        return "unknown"
+    if value and value not in RERANK_INVALID_SUBCODES:
+        return "unknown"
+    return value
 
 
 def _int_or_unknown(value: object) -> int | str:

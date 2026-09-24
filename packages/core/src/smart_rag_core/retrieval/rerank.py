@@ -21,6 +21,7 @@ from smart_rag_core.retrieval.profiles import (
     MMR_CANDIDATE_DEPTH,
     MMR_LAMBDA,
     RERANK_EXCERPT_CHARS,
+    RERANK_INVALID_SUBCODES,
     RERANK_MAX_PER_DOCUMENT,
     RERANK_POOL_SIZE,
     SECTION_QUOTA,
@@ -47,6 +48,39 @@ class RerankFallbackReason(StrEnum):
     UNKNOWN_USAGE = "rerank_unknown_usage"
     REFUSAL = "rerank_refusal"
     PROVIDER_ERROR = "rerank_provider_error"
+
+
+class RerankPayloadError(ValueError):
+    """Rerank payload failed application validation.
+
+    ``str(error)`` stays the specific message (for example
+    ``rerank_input_hash_mismatch``), so existing ``ValueError`` handlers
+    and ``match=`` tests keep working. ``subcode`` is the coarse, ID-free
+    class that diagnostics persist.
+
+    Attributes:
+        subcode: One of ``RERANK_INVALID_SUBCODES``: ``json`` (shape, type,
+            or bounds), ``hash`` (echoed digest differs), ``length`` (row
+            count differs), ``duplicate`` (repeated ID or rank), or
+            ``unknown_id`` (ID not supplied, or supplied set not covered).
+    """
+
+    def __init__(self, message: str, *, subcode: str) -> None:
+        """Build the error.
+
+        Args:
+            message: Specific validation message; becomes ``str(error)``.
+            subcode: Coarse sub-code from ``RERANK_INVALID_SUBCODES``.
+
+        Raises:
+            ValueError: ``rerank_subcode_invalid`` when ``subcode`` is not
+                allow-listed.
+        """
+
+        if subcode not in RERANK_INVALID_SUBCODES:
+            raise ValueError("rerank_subcode_invalid")
+        super().__init__(message)
+        self.subcode = subcode
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +137,8 @@ class RerankUsage:
         input_tokens: Prompt tokens, or 0 when unknown/mocked.
         output_tokens: Completion tokens, or 0 when unknown/mocked.
         model_calls: ``0`` or ``1``. Hidden retries are forbidden.
+        invalid_subcode: ``RerankPayloadError.subcode`` when the payload
+            failed application validation, else empty.
     """
 
     request_id: str
@@ -110,6 +146,7 @@ class RerankUsage:
     input_tokens: int
     output_tokens: int
     model_calls: int
+    invalid_subcode: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -649,7 +686,9 @@ def validate_rerank_payload(
         Rankings sorted by rank ascending.
 
     Raises:
-        ValueError: If status, IDs, ranks, or support violate the contract.
+        RerankPayloadError: If status, IDs, ranks, or support violate the
+            contract. ``str(error)`` is the specific reason and
+            ``subcode`` is its coarse class.
     """
 
     try:
@@ -658,29 +697,37 @@ def validate_rerank_payload(
         messages = " ".join(str(item.get("msg", "")) for item in error.errors())
         locations = [item.get("loc", ()) for item in error.errors()]
         if "rerank_support_out_of_bounds" in messages:
-            raise ValueError("rerank_support_out_of_bounds") from error
+            raise RerankPayloadError(
+                "rerank_support_out_of_bounds", subcode="json"
+            ) from error
         if "rerank_support_invalid" in messages:
-            raise ValueError("rerank_support_invalid") from error
+            raise RerankPayloadError(
+                "rerank_support_invalid", subcode="json"
+            ) from error
         if "rerank_rank_invalid" in messages:
-            raise ValueError("rerank_rank_invalid") from error
+            raise RerankPayloadError("rerank_rank_invalid", subcode="json") from error
         if any(loc and loc[-1] == "status" for loc in locations):
-            raise ValueError("rerank_incomplete") from error
-        raise ValueError("rerank_schema_invalid") from error
+            raise RerankPayloadError("rerank_incomplete", subcode="json") from error
+        raise RerankPayloadError("rerank_schema_invalid", subcode="json") from error
     if body.input_hash != input_hash:
-        raise ValueError("rerank_input_hash_mismatch")
+        raise RerankPayloadError("rerank_input_hash_mismatch", subcode="hash")
     if len(body.rankings) != len(candidate_ids):
-        raise ValueError("rerank_ranking_length")
+        raise RerankPayloadError("rerank_ranking_length", subcode="length")
     expected = {str(item) for item in candidate_ids}
     seen_ids: set[str] = set()
     seen_ranks: set[int] = set()
     parsed: list[RerankRanking] = []
     for row in body.rankings:
         if row.chunk_id not in expected:
-            raise ValueError("rerank_unknown_or_missing_id")
+            raise RerankPayloadError(
+                "rerank_unknown_or_missing_id", subcode="unknown_id"
+            )
         if row.chunk_id in seen_ids:
-            raise ValueError("rerank_duplicate_id")
-        if row.rank > len(candidate_ids) or row.rank in seen_ranks:
-            raise ValueError("rerank_rank_invalid")
+            raise RerankPayloadError("rerank_duplicate_id", subcode="duplicate")
+        if row.rank > len(candidate_ids):
+            raise RerankPayloadError("rerank_rank_invalid", subcode="json")
+        if row.rank in seen_ranks:
+            raise RerankPayloadError("rerank_rank_invalid", subcode="duplicate")
         seen_ids.add(row.chunk_id)
         seen_ranks.add(row.rank)
         parsed.append(
@@ -694,7 +741,7 @@ def validate_rerank_payload(
             )
         )
     if seen_ids != expected:
-        raise ValueError("rerank_id_set_mismatch")
+        raise RerankPayloadError("rerank_id_set_mismatch", subcode="unknown_id")
     parsed.sort(key=lambda item: item.rank)
     return tuple(parsed)
 

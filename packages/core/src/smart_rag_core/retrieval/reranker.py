@@ -10,6 +10,7 @@ from smart_rag_core.retrieval.profiles import RERANK_MODEL_ID
 from smart_rag_core.retrieval.rerank import (
     RerankFallbackReason,
     RerankPassage,
+    RerankPayloadError,
     RerankRanking,
     RerankUsage,
     rerank_input_hash,
@@ -41,6 +42,7 @@ def rerank_pool(
     Returns:
         Validated rankings, usage, and fallback reason. On failure the
         rankings tuple is empty so the caller keeps fused RRF order.
+        Schema-invalid usage carries ``invalid_subcode``.
 
     Side Effects:
         At most one ``generate_rerank`` call. Timeouts after provider success
@@ -87,7 +89,8 @@ def rerank_pool(
             candidate_ids=tuple(item.candidate.chunk_id for item in pool),
             input_hash=digest,
         )
-    except ValueError:
+    except ValueError as error:
+        subcode = error.subcode if isinstance(error, RerankPayloadError) else "json"
         return (
             (),
             RerankUsage(
@@ -96,6 +99,7 @@ def rerank_pool(
                 input_tokens=response.input_tokens,
                 output_tokens=response.output_tokens,
                 model_calls=response.model_calls,
+                invalid_subcode=subcode,
             ),
             RerankFallbackReason.SCHEMA_INVALID,
         )

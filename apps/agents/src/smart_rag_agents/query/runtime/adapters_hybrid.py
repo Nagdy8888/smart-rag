@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from uuid import UUID
@@ -186,9 +187,11 @@ class ProcessHybridRetriever:
             Embedding gateway call, per-channel Postgres (and optional
             ParadeDB) connections, and one shared context connection for
             preload, parent expansion, and locator reload.
+            Adds ``scope_ms`` (scope resolution plus frozen-profile load) to ``stage_timings_ms``.
         """
 
         typed_profile = profile if isinstance(profile, ExpectedProfile) else None
+        scope_started = time.perf_counter()
         scope = self._resolve_scope(caller, typed_profile, query=query)
         restrict_version_id = scope.version_id if scope is not None else None
         ranking_query = query
@@ -205,6 +208,7 @@ class ProcessHybridRetriever:
         if scope is not None:
             profile_id = scope.candidate_profile_id
         retrieval_profile = load_frozen_profile(profile_id)
+        scope_ms = int(max(0.0, time.perf_counter() - scope_started) * 1000.0)
         gateway = self._model_gateway
         prompt = self._rerank_prompt
         rerank_fn = None
@@ -265,7 +269,11 @@ class ProcessHybridRetriever:
             if scope is not None
             else SourceResolution.UNSCOPED.value
         )
-        return replace(result, source_resolution=resolution)
+        return replace(
+            result,
+            source_resolution=resolution,
+            stage_timings_ms={**result.stage_timings_ms, "scope_ms": scope_ms},
+        )
 
     def _resolve_version_id(
         self,
