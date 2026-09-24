@@ -51,6 +51,27 @@ def test_event_store_transaction_applies_lock_timeout(db_url: str) -> None:
         store.close()
 
 
+def test_event_store_role_is_transaction_scoped(db_url: str) -> None:
+    """``app_api`` ends with the store transaction on the reused session."""
+
+    store = PostgresRunEventStore(db_url)
+    try:
+        with typed_attr(store, "_transaction")() as connection:
+            inside_pid = connection.info.backend_pid
+        pool = typed_attr(store, "_pool")
+        reused = pool.acquire()
+        try:
+            assert reused.info.backend_pid == inside_pid
+            role = reused.execute("SELECT current_user").fetchone()
+            assert role is not None
+            assert str(role[0]) != "app_api"
+            reused.rollback()
+        finally:
+            pool.release(reused, reusable=True)
+    finally:
+        store.close()
+
+
 def test_uncommitted_usage_blocks_append_until_lock_timeout(db_url: str) -> None:
     """Uncommitted ``llm_usage`` makes heartbeat append fail in two seconds.
 

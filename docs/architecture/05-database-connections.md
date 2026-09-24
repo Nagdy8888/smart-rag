@@ -104,11 +104,17 @@ has no SQLSTATE. The delay is at most 100 ms and never exceeds remaining
 budget. Authentication failures (`28P01`) are not retried. Logs include
 only operation, attempt, and a fixed `transient_connect` reason.
 
-SSE `PostgresRunEventStore` reuses a session idle for less than 60
-seconds, then closes/discards it. Any operation error rolls back
-best-effort, discards the session, and re-raises. Read-only `list_after`
-may retry once before any row is returned. Append and terminal writes
-never auto-replay.
+SSE `PostgresRunEventStore` lends sessions from a
+`BoundedConnectionPool` (`smart_rag_core.settings.postgres_pool`): at most
+`EVENT_STORE_POOL_MAX_SIZE` = 4 per API process, counted inside the
+FastAPI request/RPC cap of 10 above. A session idle for 60 seconds or
+more is closed instead of reused. A caller that waits more than 2 seconds
+for a free session gets `event_store_busy`. Each transaction runs
+`SET LOCAL ROLE app_api; SET LOCAL lock_timeout TO '2s'`, so no pooled
+server session keeps `app_api` after commit. Any operation error rolls
+back best-effort, closes that session, and re-raises. Read-only
+`list_after` may retry once before any row is returned. Append and
+terminal writes never auto-replay.
 
 SSE event-store and LangGraph checkpointer already
 disable prepares (`prepare_threshold=None` / `0`). asyncpg LightRAG uses
@@ -118,7 +124,7 @@ disable prepares (`prepare_threshold=None` / `0`). asyncpg LightRAG uses
 flowchart LR
   api["FastAPI / query retrieve"] --> helper["connect_postgres\nprepare_threshold=None\nmax 2 attempts"]
   helper --> pooler["Supavisor txn 6543"]
-  sse["SSE event store\nidle less than 60s"] --> helper
+  sse["SSE event store pool\nmax 4, idle 60s, SET LOCAL ROLE"] --> helper
   checkpointer["LangGraph checkpointer"] --> session["Session/direct 5432"]
 ```
 
