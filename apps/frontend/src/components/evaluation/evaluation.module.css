@@ -43,9 +43,8 @@
   gap: calc(var(--space) * 3);
   padding: calc(var(--space) * 5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
 }
 
 .section {
@@ -86,7 +85,7 @@
   font: inherit;
   min-height: var(--row-height);
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   cursor: pointer;
@@ -94,7 +93,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+  transition: border-color var(--motion-fast), background-color var(--motion-fast);
 }
 
 .caseButtonCurrent {
@@ -139,7 +138,7 @@
   max-height: 12rem;
   overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 8px;
 }
 
@@ -162,7 +161,7 @@
   gap: 8px;
   align-items: start;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 8px;
 }
 
@@ -184,7 +183,7 @@
 
 .answerSurface {
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 12px;
   background: var(--color-surface-muted);
 }
@@ -201,6 +200,12 @@
   display: block;
   height: 100%;
   background: var(--color-accent);
+  transform-origin: left center;
+  animation: grow-x var(--duration-very-slow) var(--ease-smooth-out) var(--duration-micro) backwards;
+}
+
+.progressFill:dir(rtl) {
+  transform-origin: right center;
 }
 
 .editorHeader {
@@ -239,5 +244,42 @@
   .caseButton,
   .caseButtonCurrent {
     transition: none;
+  }
+}
+
+.examBoard .card {
+  padding: calc(var(--space) * 4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.card,
+.editor,
+.examBoard {
+  animation: enter-fade var(--duration-fast) var(--ease-in-out) backwards;
+}
+
+:global(details[open] > :not(summary)) {
+  animation: enter-rise-small var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes enter-rise-small {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+  }
+}
+
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
   }
 }

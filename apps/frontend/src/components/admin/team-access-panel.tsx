@@ -303,6 +303,7 @@ export function TeamAccessPanel() {
           ) : null}
           {members.length > 0 ? (
             <DataTable
+              variant="bare"
               caption="Workspace people"
               columns={memberColumns}
               rows={members}
