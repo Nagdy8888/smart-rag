@@ -133,7 +133,8 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-frontend-functional-overhaul.md](./adr/ADR-frontend-functional-overhaul.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, security, reviewers |
 | [adr/ADR-workspace-member-list.md](./adr/ADR-workspace-member-list.md) | engineering-lead | accepted | 2026-08-27 | frontend, eng, security, reviewers |
 | [adr/ADR-verified-answer-paced-reveal.md](./adr/ADR-verified-answer-paced-reveal.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security, reviewers |
-| [adr/ADR-ink-indigo-visual-refresh.md](./adr/ADR-ink-indigo-visual-refresh.md) | engineering-lead | accepted | 2026-08-25 | frontend, eng, reviewers |
+| [adr/ADR-ink-indigo-visual-refresh.md](./adr/ADR-ink-indigo-visual-refresh.md) | engineering-lead | superseded | 2026-08-25 | frontend, eng, reviewers |
+| [adr/ADR-quiet-tool-visual-refresh.md](./adr/ADR-quiet-tool-visual-refresh.md) | engineering-lead | accepted | 2026-09-25 | frontend, eng, reviewers |
 | [adr/ADR-general-chat-strict-split.md](./adr/ADR-general-chat-strict-split.md) | engineering-lead | accepted | 2026-09-10 | frontend, eng, security, reviewers |
 | [adr/ADR-local-pdf-evaluation-workspace.md](./adr/ADR-local-pdf-evaluation-workspace.md) | engineering-lead | superseded | 2026-09-13 | eng, reviewers, security, frontend |
 | [adr/ADR-hosted-webapp-evaluation-workspace.md](./adr/ADR-hosted-webapp-evaluation-workspace.md) | engineering-lead | accepted | 2026-09-13 | eng, reviewers, security, frontend |
