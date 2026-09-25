@@ -158,6 +158,24 @@ describe("AnswerSurface origin chrome", () => {
     expect(container.querySelector("img")).toBeNull();
   });
 
+  it("shows Starting as soon as send begins, before a run id", () => {
+    render(
+      <AnswerSurface
+        question="What is our refund policy?"
+        answer=""
+        citations={[]}
+        terminal={null}
+        starting
+        hrefForCitation={() => undefined}
+        onSelectCitation={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("What is our refund policy?")).toBeInTheDocument();
+    expect(screen.getByTestId("run-progress-timeline")).toBeInTheDocument();
+    expect(screen.getByText("Starting…")).toBeInTheDocument();
+    expect(screen.queryByText("Preparing query")).not.toBeInTheDocument();
+  });
+
   it("does not render assistant prose before verified tokens exist", () => {
     render(
       <AnswerSurface

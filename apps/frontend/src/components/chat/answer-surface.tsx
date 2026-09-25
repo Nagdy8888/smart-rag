@@ -78,7 +78,7 @@ export type AnswerSurfaceProps = {
   statusLine?: string | null;
   /** Reducer progress rows. Empty when no node has started. */
   progressItems?: readonly RunProgressItem[];
-  /** True after Send, before a run id exists. */
+  /** True from Send until admission returns a run id. Shows Starting… only. */
   starting?: boolean;
   /** True after verify_answer completed. */
   verificationCompleted?: boolean;
@@ -522,6 +522,7 @@ export const AnswerSurface = memo(function AnswerSurface({
           collapsed={verificationCompleted && answer.trim() !== "" && !revealing}
           chat={chat}
           revealing={revealing}
+          starting={starting}
         />
       ) : null}
       {showLiveAssistant ? (
