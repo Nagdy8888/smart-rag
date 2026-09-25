@@ -16,10 +16,24 @@
 
 .composerCard {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-composer);
-  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  padding: calc(var(--space) * 2) calc(var(--space) * 2) calc(var(--space) * 2)
+    calc(var(--space) * 3);
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.composerCard:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.composerField:focus,
+.composerField:focus-visible {
+  outline: none;
 }
 
 .composerField {
@@ -43,35 +57,33 @@
   line-height: 16px;
 }
 
+.composerHint kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
 .composerSend {
   position: relative;
   width: 36px;
   height: 36px;
   min-width: 36px;
   min-height: 36px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
 }
 
 .composerSend[aria-busy="true"] {
-  box-shadow: 0 0 0 4px var(--color-accent-muted);
-  animation: composer-send-pulse 1.15s ease-in-out infinite;
-}
-
-@keyframes composer-send-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px var(--color-accent-muted);
-  }
-  50% {
-    box-shadow: 0 0 0 7px var(--color-accent-soft);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .composerSend[aria-busy="true"] {
-    animation: none;
-    box-shadow: 0 0 0 4px var(--color-accent-muted);
-  }
+  cursor: progress;
+  opacity: 0.72;
 }
 
 .composerActions {
@@ -84,7 +96,9 @@
 .hint {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 1279px) {

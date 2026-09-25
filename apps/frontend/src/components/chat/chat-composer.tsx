@@ -127,6 +127,7 @@ export const ChatComposer = memo(function ChatComposer({
       <div className={styles.composerCard}>
         <Textarea
           label="Message"
+          hideLabel
           fullWidth
           rows={rows}
           maxLength={COMPOSER_MAX_CHARS}
@@ -144,7 +145,7 @@ export const ChatComposer = memo(function ChatComposer({
         />
         <div className={styles.composerFooter}>
           <p className={styles.composerHint}>
-            Enter to send · Shift+Enter for a new line
+            <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
           </p>
           {remaining < 1000 ? (
             <p className={styles.hint}>{`${String(remaining)} characters left`}</p>

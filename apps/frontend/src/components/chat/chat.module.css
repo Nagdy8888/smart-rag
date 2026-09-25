@@ -32,21 +32,25 @@
   margin: 0;
   color: var(--color-text-muted);
   max-width: 72ch;
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-height);
 }
 
 .historyNote {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-height);
 }
 
 .sourcesPane {
   display: none;
   min-width: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: calc(var(--space) * 4);
+  background: transparent;
+  border: 0;
+  border-inline-start: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 0 0 0 calc(var(--space) * 4);
 }
 
 .pipeline {
@@ -57,7 +61,8 @@
   margin: 0 0 calc(var(--space) * 3);
   padding: 0;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-height);
 }
 
 .pipelineStep[data-active="true"] {
@@ -68,7 +73,8 @@
 .pipelineCollapsed {
   margin: 0 0 calc(var(--space) * 3);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-height);
 }
 
 @media (max-width: 1279px) {

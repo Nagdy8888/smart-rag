@@ -98,7 +98,7 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
   return (
     <div className={styles.progressTimeline} data-testid="run-progress-timeline">
       <LiveRegion aria-label="Run progress" politeness="polite">
-        <p className={styles.statusLine} role="status">
+        <p key={summary} className={styles.statusLine} role="status">
           {summary}
         </p>
       </LiveRegion>
@@ -125,6 +125,7 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
                 key={item.id}
                 className={styles.progressItem}
                 role="listitem"
+                data-phase={item.phase}
                 aria-current={active ? "step" : undefined}
               >
                 {active ? <Spinner label={label} /> : null}

@@ -362,6 +362,7 @@ export function RunDetailsSheet({
       <Button
         type="button"
         variant="ghost"
+        size="compact"
         data-action-id="ask.run_details"
         onClick={onOpen}
       >

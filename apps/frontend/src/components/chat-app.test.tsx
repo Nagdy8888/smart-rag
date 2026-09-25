@@ -772,7 +772,7 @@ describe("ChatApp Ask workspace", () => {
     renderChat(<ChatApp />);
     expect(
       await screen.findByText(
-        "Ask a general question, or ask about your company documents for a cited answer.",
+        "Ask about your documents",
       ),
     ).toBeInTheDocument();
   });
