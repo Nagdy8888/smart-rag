@@ -36,10 +36,11 @@ The table below is the complete maintained map. Packet evidence under
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-27 | eng, security |
 | [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
-| [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-26 | frontend, reviewers |
+| [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-09-25 | frontend, reviewers |
+| [frontend/motion.md](./frontend/motion.md) | engineering-lead | draft | 2026-09-25 | frontend, reviewers |
 | [runbooks/managed-auth-totp-residue.md](./runbooks/managed-auth-totp-residue.md) | engineering-lead | accepted | 2026-08-24 | ops, security |
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-09-16 | eng, frontend, security |
-| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |
+| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-09-25 | eng, frontend |
 | [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-09-14 | eng, frontend, security |
 | [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-09-22 | eng, frontend |
 | [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
@@ -48,10 +49,10 @@ The table below is the complete maintained map. Packet evidence under
 | [frontend/A11Y_SECURITY_IMPLEMENTATION.md](./frontend/A11Y_SECURITY_IMPLEMENTATION.md) | engineering-lead | draft | 2026-09-15 | frontend, security |
 | [frontend/PHASE8_JOURNEY_MATRIX.md](./frontend/PHASE8_JOURNEY_MATRIX.md) | engineering-lead | draft | 2026-08-27 | eng, frontend, reviewers |
 | [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
-| [frontend/VISUAL_MAP.md](./frontend/VISUAL_MAP.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
-| [frontend/design-tokens-and-primitives.md](./frontend/design-tokens-and-primitives.md) | engineering-lead | draft | 2026-08-24 | frontend |
-| [frontend/workspace-screens.md](./frontend/workspace-screens.md) | engineering-lead | draft | 2026-09-15 | frontend |
-| [frontend/admin-and-auth-screens.md](./frontend/admin-and-auth-screens.md) | engineering-lead | draft | 2026-08-27 | frontend, security |
+| [frontend/VISUAL_MAP.md](./frontend/VISUAL_MAP.md) | engineering-lead | draft | 2026-09-25 | frontend, reviewers |
+| [frontend/design-tokens-and-primitives.md](./frontend/design-tokens-and-primitives.md) | engineering-lead | draft | 2026-09-25 | frontend |
+| [frontend/workspace-screens.md](./frontend/workspace-screens.md) | engineering-lead | draft | 2026-09-25 | frontend |
+| [frontend/admin-and-auth-screens.md](./frontend/admin-and-auth-screens.md) | engineering-lead | draft | 2026-09-25 | frontend, security |
 | [frontend/action-inventory.json](./frontend/action-inventory.json) | engineering-lead | draft | 2026-09-13 | frontend, reviewers |
 | [development/phase-07-stitch-specification-evidence.md](./development/phase-07-stitch-specification-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [development/phase-08-frontend-integration-evidence.md](./development/phase-08-frontend-integration-evidence.md) | engineering-lead | draft | 2026-08-25 | eng, reviewers |
@@ -133,7 +134,8 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-frontend-functional-overhaul.md](./adr/ADR-frontend-functional-overhaul.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, security, reviewers |
 | [adr/ADR-workspace-member-list.md](./adr/ADR-workspace-member-list.md) | engineering-lead | accepted | 2026-08-27 | frontend, eng, security, reviewers |
 | [adr/ADR-verified-answer-paced-reveal.md](./adr/ADR-verified-answer-paced-reveal.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security, reviewers |
-| [adr/ADR-ink-indigo-visual-refresh.md](./adr/ADR-ink-indigo-visual-refresh.md) | engineering-lead | accepted | 2026-08-25 | frontend, eng, reviewers |
+| [adr/ADR-ink-indigo-visual-refresh.md](./adr/ADR-ink-indigo-visual-refresh.md) | engineering-lead | superseded | 2026-08-25 | frontend, eng, reviewers |
+| [adr/ADR-quiet-tool-visual-refresh.md](./adr/ADR-quiet-tool-visual-refresh.md) | engineering-lead | accepted | 2026-09-25 | frontend, eng, reviewers |
 | [adr/ADR-general-chat-strict-split.md](./adr/ADR-general-chat-strict-split.md) | engineering-lead | accepted | 2026-09-10 | frontend, eng, security, reviewers |
 | [adr/ADR-local-pdf-evaluation-workspace.md](./adr/ADR-local-pdf-evaluation-workspace.md) | engineering-lead | superseded | 2026-09-13 | eng, reviewers, security, frontend |
 | [adr/ADR-hosted-webapp-evaluation-workspace.md](./adr/ADR-hosted-webapp-evaluation-workspace.md) | engineering-lead | accepted | 2026-09-13 | eng, reviewers, security, frontend |

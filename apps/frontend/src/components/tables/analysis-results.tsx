@@ -122,6 +122,7 @@ export function AnalysisResults({
             </Button>
           </div>
           <DataTable
+            variant="bare"
             caption="Table analyze rows"
             columns={listed.columns.map((id) => ({
               id,

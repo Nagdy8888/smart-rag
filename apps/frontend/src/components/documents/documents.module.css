@@ -56,9 +56,8 @@
 .tableWrap {
   overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
 }
 
 .table {
@@ -155,9 +154,8 @@
   gap: calc(var(--space) * 2);
   padding: calc(var(--space) * 3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
 }
 
 .mobilePills {
@@ -216,9 +214,13 @@
 }
 
 .tabs {
-  display: flex;
-  gap: calc(var(--space) * 2);
+  display: inline-flex;
+  align-self: flex-start;
+  gap: calc(var(--space) * 1);
+  padding: calc(var(--space) * 1);
   margin-bottom: calc(var(--space) * 3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
 }
 
 .section {
@@ -227,9 +229,8 @@
   gap: calc(var(--space) * 3);
   padding: calc(var(--space) * 5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
 }
 
 .section h2 {
@@ -355,9 +356,10 @@
 }
 
 .details {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: calc(var(--space) * 3);
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: calc(var(--space) * 3) 0 0;
 }
 
 .detailGrid {
@@ -421,5 +423,60 @@
   .toolbarCount {
     padding-top: 0;
     align-self: flex-start;
+  }
+}
+
+.section,
+.tableWrap {
+  animation: enter-fade var(--duration-fast) var(--ease-in-out) backwards;
+}
+
+.mobileCard {
+  animation: enter-rise var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+.mobileCard:nth-child(2) {
+  animation-delay: calc(var(--duration-stagger) * 1);
+}
+.mobileCard:nth-child(3) {
+  animation-delay: calc(var(--duration-stagger) * 2);
+}
+.mobileCard:nth-child(4) {
+  animation-delay: calc(var(--duration-stagger) * 3);
+}
+.mobileCard:nth-child(5) {
+  animation-delay: calc(var(--duration-stagger) * 4);
+}
+.mobileCard:nth-child(6) {
+  animation-delay: calc(var(--duration-stagger) * 5);
+}
+.mobileCard:nth-child(7) {
+  animation-delay: calc(var(--duration-stagger) * 6);
+}
+.mobileCard:nth-child(n + 8) {
+  animation-delay: calc(var(--duration-stagger) * 7);
+}
+
+.details[open] > :not(summary) {
+  animation: enter-rise-small var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-base));
+  }
+}
+
+@keyframes enter-rise-small {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
   }
 }

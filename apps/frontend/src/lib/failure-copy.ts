@@ -42,18 +42,17 @@ export function apiFailureBanner(failure: ApiFailure): string {
       if (failure.status === 403) {
         return FORBIDDEN_MUTATION_COPY;
       }
-      return `Session rejected (${displayText(failure.detail)}). Sign in again. UI state is not authorization.`;
+      return "Your session has ended. Sign in again.";
     case "budget":
-      return `Budget exhausted (${displayText(failure.detail)}).`;
+      return "Question answering is paused because the usage limit was reached.";
     case "rate": {
-      const retry =
-        failure.retryAfter !== null && failure.retryAfter !== ""
-          ? ` Retry-After ${displayText(failure.retryAfter)}.`
-          : "";
-      return `Request limited (${displayText(failure.detail)}).${retry}`;
+      if (failure.retryAfter !== null && /^\d+$/.test(failure.retryAfter)) {
+        return `Too many requests. Try again in ${failure.retryAfter} seconds.`;
+      }
+      return "Too many requests. Try again shortly.";
     }
     case "fail_closed":
-      return `Limiter fail-closed (${displayText(failure.detail)}). Approved reads may degrade; cost mutations are denied.`;
+      return "Usage checks are unavailable right now, so actions that add cost are paused. Reading existing answers still works.";
     case "unavailable":
       if (failure.detail === "web_search_disabled") {
         return WEB_SEARCH_DISABLED_COPY;

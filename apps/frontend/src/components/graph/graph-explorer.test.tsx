@@ -9,6 +9,7 @@ import { activateCanvasNode } from "./graph-canvas";
 import { GraphExplorer } from "./graph-explorer";
 import { SessionProvider } from "../../lib/auth/session-provider";
 import { ClassifiedApiError } from "../../lib/api";
+import { FORBIDDEN_MUTATION_COPY } from "../../lib/admin-copy";
 import {
   EMPTY_INSPECT_COPY,
   GRAPH_ENTITY_LIMIT_COPY,
@@ -296,7 +297,7 @@ describe("GraphExplorer", () => {
     );
     renderSurface(<GraphExplorer />);
     await searchSelectInspect();
-    expect(await screen.findByText(/Server denied this request/)).toBeInTheDocument();
+    expect(await screen.findByText(FORBIDDEN_MUTATION_COPY)).toBeInTheDocument();
     expect(screen.getByLabelText("Selected entities")).toHaveTextContent("acme");
   });
 

@@ -33,7 +33,7 @@ export const GRAPH_ENTITY_LIMIT_COPY = "You can inspect up to 12 entities.";
 
 /** Visible truthful inspect bounds. */
 export const GRAPH_INSPECT_BOUNDS_COPY =
-  "Inspect is capped at 12 entities, depth 3, and 200 nodes.";
+  "Shows up to 12 entities, 3 hops deep, and 200 nodes.";
 
 /**
  * Clamp inspect depth to 1–3. Default 3.

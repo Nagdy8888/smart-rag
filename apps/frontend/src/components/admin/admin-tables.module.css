@@ -7,13 +7,12 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: calc(var(--space) * 5);
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 3);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
 }
 
 .panel h2 {
@@ -44,7 +43,8 @@
   color: var(--color-text);
   cursor: pointer;
   padding: 0 calc(var(--space) * 2);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
+  transition: background-color var(--motion-fast), color var(--motion-fast);
 }
 
 .list button:hover {
@@ -71,7 +71,6 @@
   padding: calc(var(--space) * 4);
   min-height: var(--row-height);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 2);
@@ -95,18 +94,6 @@
   .panes {
     grid-template-columns: 1fr;
   }
-}
-
-.svgWrap {
-  overflow: auto;
-  min-height: 16rem;
-  max-height: 28rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(var(--color-border) 1px, transparent 1px) 0 0 / 24px 24px,
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px) 0 0 / 24px 24px,
-    var(--color-bg);
 }
 
 .formGrid {
@@ -290,5 +277,38 @@
   .usageRow,
   .teamGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+.panel,
+.metricCard {
+  animation: enter-fade var(--duration-fast) var(--ease-in-out) backwards;
+}
+
+.metricCard:nth-child(2) {
+  animation-delay: calc(var(--duration-stagger) * 1);
+}
+.metricCard:nth-child(3) {
+  animation-delay: calc(var(--duration-stagger) * 2);
+}
+.metricCard:nth-child(4) {
+  animation-delay: calc(var(--duration-stagger) * 3);
+}
+.metricCard:nth-child(5) {
+  animation-delay: calc(var(--duration-stagger) * 4);
+}
+.metricCard:nth-child(6) {
+  animation-delay: calc(var(--duration-stagger) * 5);
+}
+.metricCard:nth-child(7) {
+  animation-delay: calc(var(--duration-stagger) * 6);
+}
+.metricCard:nth-child(n + 8) {
+  animation-delay: calc(var(--duration-stagger) * 7);
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
   }
 }

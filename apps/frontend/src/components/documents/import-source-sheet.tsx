@@ -53,7 +53,8 @@ export function ImportSourceSheet({
         {showFileTab ? (
           <Button
             type="button"
-            variant={active === "file" ? "primary" : "secondary"}
+            variant={active === "file" ? "secondary" : "ghost"}
+            aria-pressed={active === "file"}
             onClick={() => onTabChange("file")}
           >
             Files
@@ -62,7 +63,8 @@ export function ImportSourceSheet({
         {showWebsiteTab ? (
           <Button
             type="button"
-            variant={active === "website" ? "primary" : "secondary"}
+            variant={active === "website" ? "secondary" : "ghost"}
+            aria-pressed={active === "website"}
             onClick={() => onTabChange("website")}
           >
             Website

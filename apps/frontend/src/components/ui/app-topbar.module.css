@@ -33,11 +33,11 @@
 }
 
 .topbarBrandName {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 15px;
   line-height: 20px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: var(--color-text);
   margin: 0;
 }
@@ -49,11 +49,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  line-height: 2rem;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.005em;
 }
 
 .readiness {
@@ -74,8 +74,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--color-accent-muted);
-  color: var(--color-accent);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
   font-size: 12px;
   font-weight: 600;
 }

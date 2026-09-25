@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-25
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -12,12 +12,12 @@ packet: P08-18
 Native Chat, Documents, Graph, and Tables mapped to FastAPI/SSE contracts.
 Stitch frames 04/05/06/07/09/10 are a **template, not a layout** (no extra
 frame routes). Their `screen.png` files are historical references only. Live
-composition is the Ink & Indigo console in
-[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md)
+composition is the quiet work-tool console in
+[ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md)
 and [workspace-screens.md](./workspace-screens.md). This packet does not
 port HTML.
 
-Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md) ·
+Related: [ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·

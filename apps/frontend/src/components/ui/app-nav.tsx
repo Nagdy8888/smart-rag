@@ -186,9 +186,9 @@ export function AccountMenu() {
 }
 
 export type ConsoleTopbarProps = {
-  /** Unused. Collapse lives on the ink rail. Kept for existing imports. */
+  /** Unused. Collapse lives on the nav rail. Kept for existing imports. */
   navExpanded?: boolean;
-  /** Unused. Collapse lives on the ink rail. */
+  /** Unused. Collapse lives on the nav rail. */
   onExpandNav?: () => void;
 };
 
@@ -248,7 +248,7 @@ export function ConsoleTopbar() {
         </Button>
         <div className={styles.topbarBrand}>
           <span className={styles.brandMark} aria-hidden="true">
-            <Icon name="spark" />
+            SR
           </span>
           <p className={styles.topbarBrandName}>Smart RAG</p>
         </div>

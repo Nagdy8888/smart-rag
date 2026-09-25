@@ -45,7 +45,7 @@ export const TEAM_OWNER_BOOTSTRAP_UNAVAILABLE = OWNER_BOOTSTRAP_UNAVAILABLE;
 
 /** Server denial when a hidden control is still invoked. */
 export const FORBIDDEN_MUTATION_COPY =
-  "Server denied this request (forbidden). UI hiding is convenience only.";
+  "You don’t have permission to do this.";
 
 /** Optimistic concurrency conflict on entity-rule approve/revoke. */
 export const STALE_ROW_VERSION_COPY =

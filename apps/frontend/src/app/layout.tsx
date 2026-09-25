@@ -6,8 +6,8 @@ import { AppProviders } from "../components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Smart RAG console",
-  description: "Smart RAG console (release candidate)",
+  title: "Smart RAG",
+  description: "Ask questions about your company documents and get cited answers.",
 };
 
 /**
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  * @param children - Auth or console layout content.
  * @returns English LTR html/body with providers. No AppShell here.
  * @remarks
- * Google Fonts and CDN typefaces are forbidden. Inter is self-hosted.
+ * Google Fonts and CDN typefaces are forbidden. IBM Plex is self-hosted.
  */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

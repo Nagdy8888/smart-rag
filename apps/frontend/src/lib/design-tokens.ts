@@ -1,95 +1,89 @@
 /**
  * Canonical design tokens for the production console.
  *
- * Values must match the Ink & Indigo refresh and `globals.css` `:root`.
- * CSS variables plus this module are the implementation source of truth.
+ * Values must match the quiet work-tool refresh (ADR-quiet-tool-visual-refresh)
+ * and `globals.css` `:root`. CSS variables plus this module are the
+ * implementation source of truth.
  *
  * @remarks
  * Do not load Google Fonts or Tailwind from a CDN. Motion honors
- * `prefers-reduced-motion`. `--gradient-brand` is reserved for the auth
- * brand panel, empty-state icon tile, and nav brand logo tile.
+ * `prefers-reduced-motion`.
  */
 
-/** Page canvas. Not lavender `#faf8ff`. */
-export const COLOR_BG = "#F6F7F9";
+/** Neutral page canvas. */
+export const COLOR_BG = "#F7F7F5";
 
 /** Card, drawer, topbar, nav, and input surface. */
 export const COLOR_SURFACE = "#FFFFFF";
 
 /** Secondary panels, table headers, code blocks. */
-export const COLOR_SURFACE_MUTED = "#F1F3F6";
+export const COLOR_SURFACE_MUTED = "#F2F2EF";
 
 /** Neutral hover fill. */
-export const COLOR_SURFACE_HOVER = "#EDEFF4";
+export const COLOR_SURFACE_HOVER = "#EDEDEA";
 
 /** Selected navigation or list row. */
-export const COLOR_SURFACE_SELECTED = "#EEF2FF";
+export const COLOR_SURFACE_SELECTED = "#E9EEF5";
 
 /** Primary body text. Never pure black. */
-export const COLOR_TEXT = "#101828";
+export const COLOR_TEXT = "#1D1D1B";
 
 /** Secondary body text. */
-export const COLOR_TEXT_SECONDARY = "#475467";
+export const COLOR_TEXT_SECONDARY = "#4A4A46";
 
 /** Metadata and helper text. */
-export const COLOR_TEXT_MUTED = "#667085";
+export const COLOR_TEXT_MUTED = "#6B6B66";
 
 /** Disabled text only. */
-export const COLOR_TEXT_DISABLED = "#98A2B3";
+export const COLOR_TEXT_DISABLED = "#A3A39E";
 
 /** Default borders. */
-export const COLOR_BORDER = "#E4E7EC";
+export const COLOR_BORDER = "#E3E3DF";
 
 /** Emphasized separators and input hover. */
-export const COLOR_BORDER_STRONG = "#CBD5E1";
+export const COLOR_BORDER_STRONG = "#CBCBC5";
 
-/** Primary action and active navigation. */
-export const COLOR_ACCENT = "#4F46E5";
+/** Primary action fill. */
+export const COLOR_PRIMARY = "#1D1D1B";
+
+/** Primary hover fill. */
+export const COLOR_PRIMARY_HOVER = "#2E2E2B";
+
+/** Primary pressed fill. */
+export const COLOR_PRIMARY_PRESSED = "#3A3A36";
+
+/** Text on primary fills. */
+export const COLOR_PRIMARY_FG = "#FFFFFF";
+
+/** Links, focus, and selection. */
+export const COLOR_ACCENT = "#3B5B8C";
 
 /** Primary hover. */
-export const COLOR_ACCENT_HOVER = "#4338CA";
+export const COLOR_ACCENT_HOVER = "#324E7A";
 
 /** Primary pressed. */
-export const COLOR_ACCENT_PRESSED = "#3730A3";
+export const COLOR_ACCENT_PRESSED = "#2A4167";
 
 /** Text on primary fills. */
 export const COLOR_ACCENT_FG = "#FFFFFF";
 
 /** Selected / muted accent fill. */
-export const COLOR_ACCENT_MUTED = "#EEF2FF";
+export const COLOR_ACCENT_MUTED = "#E9EEF5";
 
 /** Alias of muted accent for existing callers. */
-export const COLOR_ACCENT_SOFT = "#EEF2FF";
+export const COLOR_ACCENT_SOFT = "#E9EEF5";
 
 /** Selected outline. */
-export const COLOR_ACCENT_BORDER = "#C7D2FE";
-
-/** Dark ink navigation rail background. */
-export const COLOR_INK = "#0F1420";
-
-/** Nav hover/active surface. */
-export const COLOR_INK_RAISED = "#1A2132";
-
-/** Nav rail border. */
-export const COLOR_INK_BORDER = "#232B3E";
-
-/** Light text on the ink rail. */
-export const COLOR_INK_TEXT = "#E2E6EF";
-
-/** Muted text on the ink rail. */
-export const COLOR_INK_TEXT_MUTED = "#8E97AB";
-
-/** Brand moments only: auth panel, empty-state tile, nav logo tile. */
-export const GRADIENT_BRAND = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)";
+export const COLOR_ACCENT_BORDER = "#C3CEDF";
 
 /** Citations and provenance only. */
-export const COLOR_EVIDENCE = "#0E8584";
+export const COLOR_EVIDENCE = "#0A6F6E";
 
 /** Evidence hover. */
-export const COLOR_EVIDENCE_HOVER = "#0A6F6E";
+export const COLOR_EVIDENCE_HOVER = "#085958";
 
 /** Evidence muted fill. */
-export const COLOR_EVIDENCE_MUTED = "#ECFDFC";
+export const COLOR_EVIDENCE_MUTED = "#E8F4F3";
 
 /** Success text. */
 export const COLOR_SUCCESS = "#166534";
@@ -131,25 +125,25 @@ export const COLOR_INFO_BG = "#EFF6FF";
 export const COLOR_INFO_BORDER = "#BFDBFE";
 
 /** Keyboard focus ring. */
-export const COLOR_FOCUS = "#4F46E5";
+export const COLOR_FOCUS = "#3B5B8C";
 
 /** Modal overlay. No blur. */
-export const COLOR_OVERLAY = "rgb(15 23 42 / 0.42)";
+export const COLOR_OVERLAY = "rgb(29 29 27 / 0.4)";
 
 /** Control radius (buttons, inputs). */
-export const RADIUS_CONTROL = "10px";
+export const RADIUS_CONTROL = "6px";
 
-/** Card, panel, dialog radius. */
-export const RADIUS_CARD = "14px";
+/** Card and panel radius. */
+export const RADIUS_CARD = "8px";
 
 /** Control radius alias used by existing CSS. */
-export const RADIUS_SM = "10px";
+export const RADIUS_SM = "6px";
 
 /** Card radius alias used by existing CSS. */
-export const RADIUS_MD = "14px";
+export const RADIUS_MD = "8px";
 
-/** Overlay radius (same as cards). */
-export const RADIUS_LG = "14px";
+/** Overlay radius. */
+export const RADIUS_LG = "10px";
 
 /** Status pill radius. */
 export const RADIUS_PILL = "999px";
@@ -157,21 +151,15 @@ export const RADIUS_PILL = "999px";
 /** Spacing grid unit. */
 export const SPACE = "4px";
 
-/** Resting elevation. */
-export const SHADOW_1 = "0 1px 3px rgb(16 24 40 / 0.10)";
+/** Resting surfaces have a border and no shadow. */
+export const SHADOW_1 = "none";
 
 /** Dialog and drawer elevation. */
-export const SHADOW_2 = "0 12px 32px rgb(16 24 40 / 0.14)";
+export const SHADOW_2 = "0 8px 24px rgb(29 29 27 / 0.12)";
 
-/** Floating composer card elevation. */
-export const SHADOW_COMPOSER = "0 8px 24px rgb(16 24 40 / 0.12)";
-
-/** Self-hosted Inter plus system Arabic fallbacks. */
+/** Self-hosted IBM Plex Sans plus Arabic companion. */
 export const FONT_SANS =
-  '"Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif';
-
-/** Display headings. */
-export const FONT_DISPLAY = '"Inter Display", Inter, "Segoe UI", sans-serif';
+  '"IBM Plex Sans", "IBM Plex Sans Arabic", "Segoe UI", "Noto Naskh Arabic", sans-serif';
 
 /** Monospace stack for codes and IDs. */
 export const FONT_MONO =
@@ -208,10 +196,10 @@ export const CONTROL_HEIGHT_LG = "44px";
 export const ICON_BUTTON_SIZE = "36px";
 
 /** Page title size. */
-export const TEXT_PAGE_TITLE_SIZE = "24px";
+export const TEXT_PAGE_TITLE_SIZE = "20px";
 
 /** Page title line height. */
-export const TEXT_PAGE_TITLE_HEIGHT = "32px";
+export const TEXT_PAGE_TITLE_HEIGHT = "28px";
 
 /** Body size. */
 export const TEXT_BODY_SIZE = "14px";
@@ -220,16 +208,16 @@ export const TEXT_BODY_SIZE = "14px";
 export const TEXT_BODY_HEIGHT = "22px";
 
 /** Hero heading size. */
-export const TEXT_HERO_SIZE = "32px";
+export const TEXT_HERO_SIZE = "28px";
 
 /** Hero heading line height. */
-export const TEXT_HERO_HEIGHT = "40px";
+export const TEXT_HERO_HEIGHT = "36px";
 
 /** Section heading size. */
-export const TEXT_SECTION_SIZE = "18px";
+export const TEXT_SECTION_SIZE = "16px";
 
 /** Section heading line height. */
-export const TEXT_SECTION_HEIGHT = "26px";
+export const TEXT_SECTION_HEIGHT = "24px";
 
 /** Card title size. */
 export const TEXT_CARD_TITLE_SIZE = "15px";
@@ -249,14 +237,56 @@ export const TEXT_LABEL_SIZE = "13px";
 /** Label line height. */
 export const TEXT_LABEL_HEIGHT = "18px";
 
-/** Hover/focus transition. */
-export const MOTION_FAST = "150ms ease-out";
+/** Hover and focus transition. */
+export const MOTION_FAST = "150ms cubic-bezier(0.22, 1, 0.36, 1)";
 
-/** Drawer/dialog transition. */
-export const MOTION_DRAWER = "200ms ease-out";
+/** Drawer and dialog transition. */
+export const MOTION_DRAWER = "250ms cubic-bezier(0.22, 1, 0.36, 1)";
 
-/** Drawer/dialog transition alias for existing CSS. */
-export const MOTION_PANEL = "200ms ease-out";
+/** Drawer and dialog transition alias for existing CSS. */
+export const MOTION_PANEL = "250ms cubic-bezier(0.22, 1, 0.36, 1)";
+
+/** Per-item stagger offset. */
+export const DURATION_STAGGER = "40ms";
+
+/** Press feedback, tooltip delay, and the delay before a secondary line. */
+export const DURATION_MICRO = "80ms";
+
+/** Hover and focus transitions, backdrops, text swaps, and small rows. */
+export const DURATION_QUICK = "150ms";
+
+/** Dialogs, menus, tabs, bubbles, list rows, banners, and page fades. */
+export const DURATION_FAST = "250ms";
+
+/** Side sheets, the auth form entrance, and the evidence bar. */
+export const DURATION_SLOW = "400ms";
+
+/** Meters and progress bars filling. */
+export const DURATION_VERY_SLOW = "500ms";
+
+/** Curve for everything that opens, slides, grows, or moves. */
+export const EASE_SMOOTH_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/** Curve for fades, text swaps, and loops. */
+export const EASE_IN_OUT = "ease-in-out";
+
+/** Slight overshoot, only for citation markers and count changes. */
+export const EASE_BOUNCE = "cubic-bezier(0.34, 1.36, 0.64, 1)";
+
+/** Shortest translate distance. */
+export const DISTANCE_MICRO = "4px";
+
+/** Medium translate distance. */
+export const DISTANCE_SMALL = "6px";
+
+/** Default translate distance. */
+export const DISTANCE_BASE = "8px";
+
+/** Dialog entrance scale. */
+export const SCALE_LARGE = "0.96";
+
+/** Menu and popover entrance scale. */
+export const SCALE_MEDIUM = "0.97";
 
 /**
  * Frozen map of CSS custom properties to implementation values.
@@ -277,6 +307,10 @@ export const DESIGN_TOKENS = {
   "--color-text-disabled": COLOR_TEXT_DISABLED,
   "--color-border": COLOR_BORDER,
   "--color-border-strong": COLOR_BORDER_STRONG,
+  "--color-primary": COLOR_PRIMARY,
+  "--color-primary-hover": COLOR_PRIMARY_HOVER,
+  "--color-primary-pressed": COLOR_PRIMARY_PRESSED,
+  "--color-primary-fg": COLOR_PRIMARY_FG,
   "--color-accent": COLOR_ACCENT,
   "--color-accent-hover": COLOR_ACCENT_HOVER,
   "--color-accent-pressed": COLOR_ACCENT_PRESSED,
@@ -284,12 +318,6 @@ export const DESIGN_TOKENS = {
   "--color-accent-muted": COLOR_ACCENT_MUTED,
   "--color-accent-soft": COLOR_ACCENT_SOFT,
   "--color-accent-border": COLOR_ACCENT_BORDER,
-  "--color-ink": COLOR_INK,
-  "--color-ink-raised": COLOR_INK_RAISED,
-  "--color-ink-border": COLOR_INK_BORDER,
-  "--color-ink-text": COLOR_INK_TEXT,
-  "--color-ink-text-muted": COLOR_INK_TEXT_MUTED,
-  "--gradient-brand": GRADIENT_BRAND,
   "--color-evidence": COLOR_EVIDENCE,
   "--color-evidence-hover": COLOR_EVIDENCE_HOVER,
   "--color-evidence-muted": COLOR_EVIDENCE_MUTED,
@@ -317,9 +345,7 @@ export const DESIGN_TOKENS = {
   "--space": SPACE,
   "--shadow-1": SHADOW_1,
   "--shadow-2": SHADOW_2,
-  "--shadow-composer": SHADOW_COMPOSER,
   "--font-sans": FONT_SANS,
-  "--font-display": FONT_DISPLAY,
   "--font-mono": FONT_MONO,
   "--line-height-ar": LINE_HEIGHT_AR,
   "--line-height-en": LINE_HEIGHT_EN,
@@ -348,6 +374,20 @@ export const DESIGN_TOKENS = {
   "--motion-fast": MOTION_FAST,
   "--motion-drawer": MOTION_DRAWER,
   "--motion-panel": MOTION_PANEL,
+  "--duration-stagger": DURATION_STAGGER,
+  "--duration-micro": DURATION_MICRO,
+  "--duration-quick": DURATION_QUICK,
+  "--duration-fast": DURATION_FAST,
+  "--duration-slow": DURATION_SLOW,
+  "--duration-very-slow": DURATION_VERY_SLOW,
+  "--ease-smooth-out": EASE_SMOOTH_OUT,
+  "--ease-in-out": EASE_IN_OUT,
+  "--ease-bounce": EASE_BOUNCE,
+  "--distance-micro": DISTANCE_MICRO,
+  "--distance-small": DISTANCE_SMALL,
+  "--distance-base": DISTANCE_BASE,
+  "--scale-large": SCALE_LARGE,
+  "--scale-medium": SCALE_MEDIUM,
 } as const;
 
 /** CSS custom property names owned by the visual contract. */

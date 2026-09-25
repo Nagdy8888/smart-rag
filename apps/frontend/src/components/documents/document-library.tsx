@@ -74,7 +74,7 @@ export function DocumentLibrary() {
             onChange={(event) => lib.onFilter(event.target.value)}
           />
           <p className={styles.toolbarSummary}>
-            Filters apply to loaded documents only.
+            The filter only searches documents already loaded on this page.
           </p>
         </div>
         <p className={styles.toolbarCount}>

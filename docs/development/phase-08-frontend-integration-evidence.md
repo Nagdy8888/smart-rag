@@ -2345,6 +2345,8 @@ content, `limit` 1-100, `before` keyset, generic 404 for foreign/deleted.
 
 ## UI/UX overhaul P2
 
+Visuals in this section were superseded by [ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md) on 2026-09-25.
+
 Ink & Indigo tokens in `globals.css` / `design-tokens.ts`, self-hosted
 Inter Display SemiBold, restyled primitives, `EmptyState`, and
 [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md).

@@ -26,6 +26,8 @@ export type DataTableProps<T> = {
   rows: ReadonlyArray<T>;
   /** Row identity. */
   getRowId: (row: T) => string;
+  /** `bare` drops the outer border when the table already sits inside a bordered panel. */
+  variant?: "framed" | "bare";
 };
 
 /**
@@ -43,9 +45,13 @@ export function DataTable<T>({
   columns,
   rows,
   getRowId,
+  variant = "framed",
 }: DataTableProps<T>) {
+  const wrapClass = [styles.tableWrap, variant === "bare" ? styles.tableWrapBare : undefined]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={styles.tableWrap}>
+    <div className={wrapClass}>
       <table className={styles.table}>
         <caption>{caption}</caption>
         <thead>

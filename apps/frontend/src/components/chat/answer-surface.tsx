@@ -294,6 +294,7 @@ function AnswerParagraphs({
 
   return (
     <div
+      className={styles.answerBody}
       data-testid={
         showChips && visibleCitations.length > 0 ? "answer-citations" : undefined
       }
@@ -448,8 +449,8 @@ export const AnswerSurface = memo(function AnswerSurface({
       ) : null}
       {empty ? (
         <EmptyState
-          title="Ask a general question, or ask about your company documents for a cited answer."
-          body="General questions use the assistant. Company-document questions return citations you can inspect."
+          title="Ask about your documents"
+          body="Answers from company documents cite the passages they use. General questions are answered without citations."
         />
       ) : null}
       {messages.map((item) =>
@@ -494,7 +495,7 @@ export const AnswerSurface = memo(function AnswerSurface({
         ),
       )}
       {showLiveUser ? (
-        <p className={styles.userBubble} dir="auto">
+        <p className={`${styles.userBubble} ${styles.liveTurn}`} dir="auto">
           <UserText value={question} />
         </p>
       ) : null}
@@ -510,7 +511,7 @@ export const AnswerSurface = memo(function AnswerSurface({
         />
       ) : null}
       {showLiveAssistant ? (
-        <div>
+        <div className={styles.liveTurn}>
           {originLabel !== null ? (
             <p className={styles.answerHeader}>
               <Badge label={originLabel} data-testid="answer-origin" />
