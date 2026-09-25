@@ -298,4 +298,6 @@ $env:PYTHONPATH = ".private-eval"
 If `psycopg` is missing, the system Python was used instead of `.venv`.
 If a `UnicodeEncodeError` appears, `PYTHONIOENCODING` is not set.
 
+Repair outcome: [ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md).
+
 [docs index](../README.md)

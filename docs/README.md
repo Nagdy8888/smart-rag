@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-24
+last-reviewed: 2026-09-25
 audience: engineering, reviewers, client-approver
 ---
 
@@ -191,6 +191,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/FRESH_KNOWN_ANSWER_50_2026-09-23.md](./evaluation/FRESH_KNOWN_ANSWER_50_2026-09-23.md) | engineering-lead | draft | 2026-09-23 | eng, reviewers |
 | [evaluation/ANSWER_ONLY_50_2026-09-24.md](./evaluation/ANSWER_ONLY_50_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
+| [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
 | [evaluation/HYBRID_STAGE_TIMINGS_2026-09.md](./evaluation/HYBRID_STAGE_TIMINGS_2026-09.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
