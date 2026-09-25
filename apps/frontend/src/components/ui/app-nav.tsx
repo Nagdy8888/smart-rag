@@ -186,9 +186,9 @@ export function AccountMenu() {
 }
 
 export type ConsoleTopbarProps = {
-  /** Unused. Collapse lives on the ink rail. Kept for existing imports. */
+  /** Unused. Collapse lives on the nav rail. Kept for existing imports. */
   navExpanded?: boolean;
-  /** Unused. Collapse lives on the ink rail. */
+  /** Unused. Collapse lives on the nav rail. */
   onExpandNav?: () => void;
 };
 
