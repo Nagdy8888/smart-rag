@@ -32,23 +32,22 @@
   display: block;
   min-height: 0.75rem;
   border-radius: var(--radius-control);
-  background: linear-gradient(
-    90deg,
-    var(--color-surface-muted) 0%,
-    var(--color-surface-hover) 50%,
-    var(--color-surface-muted) 100%
-  );
-  background-size: 200% 100%;
-  animation: ui-shimmer 1.2s ease-in-out infinite;
+  background: var(--color-surface-hover);
+  animation: ui-skeleton-pulse calc(var(--duration-slow) * 3) var(--ease-in-out) infinite alternate;
 }
 
-@keyframes ui-shimmer {
-  0% {
-    background-position: 100% 0;
+@keyframes ui-skeleton-pulse {
+  from {
+    opacity: 1;
   }
+  to {
+    opacity: 0.55;
+  }
+}
 
-  100% {
-    background-position: -100% 0;
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
   }
 }
 
@@ -138,7 +137,7 @@
 
 .fixturePanel {
   border: 1px dashed var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: calc(var(--space) * 3);
   background: var(--color-surface);
   display: flex;

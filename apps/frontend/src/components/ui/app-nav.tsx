@@ -248,7 +248,7 @@ export function ConsoleTopbar() {
         </Button>
         <div className={styles.topbarBrand}>
           <span className={styles.brandMark} aria-hidden="true">
-            <Icon name="spark" />
+            SR
           </span>
           <p className={styles.topbarBrandName}>Smart RAG</p>
         </div>

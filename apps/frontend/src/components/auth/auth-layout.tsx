@@ -3,7 +3,6 @@
  */
 
 import type { ReactNode } from "react";
-import { Icon } from "../ui/icon";
 import styles from "./auth.module.css";
 
 export type AuthLayoutProps = {
@@ -29,7 +28,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       <div className={styles.split}>
         <aside className={styles.context} aria-label="Product">
           <span className={styles.mark} aria-hidden="true">
-            <Icon name="spark" />
+            SR
           </span>
           <p className={styles.product}>Smart RAG</p>
           <p className={styles.contextCopy}>
@@ -39,7 +38,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <div className={styles.formColumn}>
           <div className={styles.mobileBrand}>
             <span className={styles.mark} aria-hidden="true">
-              <Icon name="spark" />
+              SR
             </span>
             <p className={styles.product}>Smart RAG</p>
           </div>

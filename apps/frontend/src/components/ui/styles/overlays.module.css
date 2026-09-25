@@ -269,3 +269,85 @@
     width: 100%;
   }
 }
+
+/* Motion */
+.drawerBackdrop,
+.confirmBackdrop,
+.sheetBackdrop,
+.commandBackdrop {
+  animation: enter-fade var(--duration-quick) var(--ease-in-out) backwards;
+}
+
+.drawer,
+.confirmPanel,
+.commandPanel {
+  animation: enter-pop var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+.sheetPanelRight {
+  animation: enter-from-end var(--duration-slow) var(--ease-smooth-out) backwards;
+}
+
+.sheetPanelLeft {
+  animation: enter-from-start var(--duration-slow) var(--ease-smooth-out) backwards;
+}
+
+.sheetBody > * {
+  animation: enter-fade var(--duration-fast) var(--ease-in-out) backwards;
+}
+
+.sheetBody > :nth-child(2) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 1); }
+.sheetBody > :nth-child(3) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 2); }
+.sheetBody > :nth-child(4) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 3); }
+.sheetBody > :nth-child(5) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 4); }
+.sheetBody > :nth-child(6) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 5); }
+.sheetBody > :nth-child(7) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 6); }
+.sheetBody > :nth-child(n + 8) { animation-delay: calc(var(--duration-micro) + var(--duration-stagger) * 7); }
+
+.menuPanel,
+.popoverPanel {
+  transform-origin: top center;
+  animation: enter-drop var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+.tooltipPanel {
+  animation: enter-fade var(--duration-quick) var(--ease-in-out) var(--duration-micro) backwards;
+}
+
+.menuItem,
+.menuItemDanger,
+.commandList button {
+  transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+
+@keyframes enter-fade {
+  from { opacity: 0; }
+}
+
+@keyframes enter-pop {
+  from {
+    opacity: 0;
+    transform: scale(var(--scale-large));
+  }
+}
+
+@keyframes enter-drop {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--distance-micro) * -1)) scale(var(--scale-medium));
+  }
+}
+
+@keyframes enter-from-end {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes enter-from-start {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}

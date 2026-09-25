@@ -92,7 +92,7 @@ export function AppShell({ children }: AppShellProps) {
         >
           <div className={styles.brand}>
             <span className={styles.brandMark} aria-hidden="true">
-              <Icon name="spark" />
+              SR
             </span>
             <span className={styles.brandText}>
               <p className={styles.brandName}>Smart RAG</p>

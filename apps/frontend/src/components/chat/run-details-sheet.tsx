@@ -13,7 +13,6 @@ import { requestedSearchScopeLabel } from "../../lib/types";
 import {
   cacheStatusLabel,
   correctionReasonLabel,
-  routeIcon,
   routeLabel,
   routeSummary,
   runStatusLabel,
@@ -24,7 +23,6 @@ import {
 import { displayText } from "../../lib/safe-text";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
-import { Icon } from "../ui/icon";
 import { Sheet } from "../ui/sheet";
 import { StatusPill } from "../ui/status-pill";
 import { CodeText, UserText } from "../ui/user-text";
@@ -221,16 +219,12 @@ export function RunDetailsSheet({
         <p className={styles.lead}>How this answer was produced.</p>
       ) : (
         <EmptyState
-          icon="spark"
           title="No answer yet"
           body="Send a question to see how that answer was produced, including search mode and token usage."
         />
       )}
       {statusValue ? (
         <section className={styles.card} data-tone={statusTone} aria-label="Status">
-          <div className={styles.iconTile} aria-hidden="true">
-            <Icon name="spark" />
-          </div>
           <div>
             <p className={styles.kicker}>Status</p>
             <StatusPill status={statusValue} tone={statusTone} />
@@ -240,9 +234,6 @@ export function RunDetailsSheet({
       ) : null}
       {searchMode ? (
         <section className={styles.card} data-tone="search" aria-label="Search mode">
-          <div className={styles.iconTile} aria-hidden="true">
-            <Icon name={routeIcon(searchRoute)} />
-          </div>
           <div>
             <p className={styles.kicker}>Search mode</p>
             <h3 className={styles.title}>

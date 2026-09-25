@@ -1,8 +1,5 @@
 /**
- * Centered empty collection or transcript placeholder.
- *
- * Never fakes a successful result. The brand gradient tile is an approved
- * brand-moment exception from the no-gradient-on-controls rule.
+ * Left-aligned empty-state text with an optional muted icon. Never fakes a successful result.
  */
 
 import type { ReactNode } from "react";
@@ -14,33 +11,39 @@ export type EmptyStateProps = {
   title: string;
   /** One supporting body line. */
   body?: string;
-  /** Lucide icon in the brand tile. Default `spark`. */
+  /** Optional small muted Lucide icon shown before the title. */
   icon?: IconName;
   /** Optional primary action row. */
   action?: ReactNode;
-  /** Extra content such as prompt chips. */
+  /** Extra content such as prompt lists. */
   children?: ReactNode;
 };
 
 /**
- * Render a centered empty-state panel with a brand icon tile.
+ * Render a borderless, left-aligned empty state.
  *
  * @param props - Title, optional body, icon, action, and extra children.
  * @returns Non-alert placeholder. No fetch side effects.
+ * @remarks
+ * The container that holds it owns any border. Never nest it inside a card.
  */
 export function EmptyState({
   title,
   body,
-  icon = "spark",
+  icon,
   action,
   children,
 }: EmptyStateProps) {
   return (
     <div className={styles.emptyState}>
-      <div className={styles.emptyStateTile} aria-hidden="true">
-        <Icon name={icon} />
-      </div>
-      <h3 className={styles.emptyStateTitle}>{title}</h3>
+      <h3 className={styles.emptyStateTitle}>
+        {icon ? (
+          <span className={styles.emptyStateIcon} aria-hidden="true">
+            <Icon name={icon} />
+          </span>
+        ) : null}
+        {title}
+      </h3>
       {body ? <p className={styles.emptyStateBody}>{body}</p> : null}
       {action ? <div className={styles.emptyStateActions}>{action}</div> : null}
       {children}
