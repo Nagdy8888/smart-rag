@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-22
+last-reviewed: 2026-09-25
 audience: engineering, reviewers, client-approver
 ---
 
@@ -87,7 +87,7 @@ The table below is the complete maintained map. Packet evidence under
 | [graph/LIGHTRAG_CONTRACT.md](./graph/LIGHTRAG_CONTRACT.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [graph/ADAPTER_LIFECYCLE.md](./graph/ADAPTER_LIFECYCLE.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [graph/WORKSPACE_LIFECYCLE.md](./graph/WORKSPACE_LIFECYCLE.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
-| [graph/MAPPING.md](./graph/MAPPING.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
+| [graph/MAPPING.md](./graph/MAPPING.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [graph/GRAPH_MAPPING_CONTRACT.md](./graph/GRAPH_MAPPING_CONTRACT.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [graph/RETRIEVAL.md](./graph/RETRIEVAL.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/ENTITY_RULES.md](./graph/ENTITY_RULES.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
@@ -144,9 +144,11 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-live-rag-failure-remediation.md](./adr/ADR-live-rag-failure-remediation.md) | engineering-lead | accepted | 2026-09-16 | eng, reviewers, security, frontend |
 | [adr/ADR-hybrid-retrieval-accuracy.md](./adr/ADR-hybrid-retrieval-accuracy.md) | engineering-lead | accepted | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-honest-rag-accuracy.md](./adr/ADR-honest-rag-accuracy.md) | engineering-lead | accepted | 2026-09-21 | eng, reviewers, security |
-| [adr/ADR-ask-evidence-budget-repair.md](./adr/ADR-ask-evidence-budget-repair.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers |
+| [adr/ADR-ask-evidence-budget-repair.md](./adr/ADR-ask-evidence-budget-repair.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
+| [adr/ADR-sse-ordered-background-writer.md](./adr/ADR-sse-ordered-background-writer.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
+| [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-25 | eng, reviewers, security |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
-| [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-22 | eng, reviewers, security |
+| [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
 | [adr/ADR-llm-conversation-titles.md](./adr/ADR-llm-conversation-titles.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security |
@@ -158,13 +160,13 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-vision-captioning.md](./adr/ADR-vision-captioning.md) | product-owner | proposed | 2026-08-12 | client, eng |
 | [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
+| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [retrieval/BM25_PROJECTION_CONTRACT.md](./retrieval/BM25_PROJECTION_CONTRACT.md) | engineering-lead | draft | 2026-09-09 | eng |
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
-| [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-15 | eng |
-| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-22 | eng, ops |
+| [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-25 | eng |
+| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-24 | eng, ops |
 | [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-09-21 | eng |
 | [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-09-21 | eng, security |
 | [ingestion/PARSER_SANDBOX.md](./ingestion/PARSER_SANDBOX.md) | engineering-lead | draft | 2026-09-16 | eng, security, ops |
@@ -183,9 +185,16 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
 | [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers, client-approver |
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
+| [evaluation/QUERY_LATENCY_REPORT.md](./evaluation/QUERY_LATENCY_REPORT.md) | engineering-lead | active | 2026-09-24 | eng, reviewers |
+| [evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md](./evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
-| [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
+| [evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REPAIR_EVIDENCE_2026-09-22.md) | engineering-lead | draft | 2026-09-23 | eng, reviewers |
+| [evaluation/FRESH_KNOWN_ANSWER_50_2026-09-23.md](./evaluation/FRESH_KNOWN_ANSWER_50_2026-09-23.md) | engineering-lead | draft | 2026-09-23 | eng, reviewers |
+| [evaluation/ANSWER_ONLY_50_2026-09-24.md](./evaluation/ANSWER_ONLY_50_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
+| [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
+| [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
+| [evaluation/HYBRID_STAGE_TIMINGS_2026-09.md](./evaluation/HYBRID_STAGE_TIMINGS_2026-09.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |

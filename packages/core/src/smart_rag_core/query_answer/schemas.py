@@ -6,13 +6,16 @@ from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_ANSWER_PARAGRAPHS,
     MAX_CITATION_SPAN_CHARS,
+    MAX_CLAIM_CITATIONS,
     MAX_VERIFIER_LINKS,
 )
 
 
 def answer_json_schema() -> dict[str, object]:
-    """Return the strict answer structured-output schema.
+    """Return the historical ``answer_v3`` structured-output schema.
 
+    Live answer calls send :func:`answer_claims_json_schema`. This schema
+    stays so a rollback to ``answer_v3`` needs only the version pins.
     Provider output omits ``answer_text``. Application code releases
     surviving atomic-link claims after verification.
 
@@ -141,6 +144,72 @@ def answer_json_schema() -> dict[str, object]:
                 "enum": ["complete", "partial", "refused"],
             },
             "refused_links": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+
+
+def answer_claims_json_schema() -> dict[str, object]:
+    """Return the strict ``answer_v4`` claims structured-output schema.
+
+    The schema is the same for every request so the provider can reuse
+    its processed form. ``source_id`` is a plain string; application code
+    drops any citation whose ID was not sent in the request. Length caps
+    are enforced by application code, not by string keywords.
+
+    Returns:
+        OpenAI ``json_schema`` document. The model writes no link IDs,
+        paragraph indices, or ``answer_text``.
+    """
+
+    citation = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["source_id", "span", "source_ranges"],
+        "properties": {
+            "source_id": {"type": "string"},
+            "span": {"type": "string"},
+            "source_ranges": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+    claim = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["text", "kind", "citations"],
+        "properties": {
+            "text": {"type": "string"},
+            "kind": {"type": "string", "enum": ["fact", "inference_link"]},
+            "citations": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": MAX_CLAIM_CITATIONS,
+                "items": citation,
+            },
+        },
+    }
+    conclusion = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["text", "claim_numbers"],
+        "properties": {
+            "text": {"type": "string"},
+            "claim_numbers": {"type": "array", "items": {"type": "integer"}},
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["claims", "conclusion", "status"],
+        "properties": {
+            "claims": {
+                "type": "array",
+                "maxItems": MAX_VERIFIER_LINKS,
+                "items": claim,
+            },
+            "conclusion": {"anyOf": [{"type": "null"}, conclusion]},
+            "status": {
+                "type": "string",
+                "enum": ["complete", "partial", "refused"],
+            },
         },
     }
 

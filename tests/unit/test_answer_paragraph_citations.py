@@ -18,6 +18,7 @@ from smart_rag_core.query_answer.models import (
 )
 from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.schemas import (
+    answer_claims_json_schema,
     answer_json_schema,
     general_chat_json_schema,
 )
@@ -127,23 +128,38 @@ def test_answer_v2_remains_registered_and_hashed() -> None:
     assert "Do not author `answer_text`" in body
 
 
-def test_answer_v3_is_current_and_hashed() -> None:
-    """Pinned answer_v3 hash matches the immutable prompt file."""
+def test_answer_v3_remains_registered_and_hashed() -> None:
+    """Historical answer_v3 stays immutable, loadable, and schema-backed."""
 
     entry = load_prompt("answer_v3", environment="dev")
-    assert ANSWER_PROMPT_VERSION == "answer_v3"
-    assert entry.sha256 == ANSWER_PROMPT_SHA256
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v3.md")
+    assert entry.sha256 == verifier_prompt_digest("answer_v3.md")
     body = prompt_text("answer_v3")
     assert "Do not author `answer_text`" in body
-    assert "acronym" in body.lower()
     schema = answer_json_schema()
+    required = schema["required"]
+    assert isinstance(required, list)
+    assert "paragraphs" in required
+
+
+def test_answer_v4_is_current_and_hashed() -> None:
+    """Pinned answer_v4 hash matches the immutable prompt file."""
+
+    entry = load_prompt("answer_v4", environment="dev")
+    assert ANSWER_PROMPT_VERSION == "answer_v4"
+    assert entry.sha256 == ANSWER_PROMPT_SHA256
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v4.md")
+    body = prompt_text("answer_v4")
+    assert "Do not write `answer_text`" in body
+    assert "first claim answers the question directly" in body.lower()
+    assert "acronym" in body.lower()
+    schema = answer_claims_json_schema()
     properties = schema["properties"]
     required = schema["required"]
     assert isinstance(properties, dict)
     assert isinstance(required, list)
     assert "answer_text" not in properties
-    assert "paragraphs" in required
+    assert "paragraphs" not in properties
+    assert required == ["claims", "conclusion", "status"]
     general = general_chat_json_schema()
     general_properties = general["properties"]
     general_required = general["required"]

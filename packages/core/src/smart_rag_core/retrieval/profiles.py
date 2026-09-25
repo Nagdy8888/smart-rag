@@ -49,18 +49,46 @@ RETRIEVAL_SLICE_SECONDS = 10.0
 """Channel plus rerank slice. Independent of the 8000 ms SQL timeout."""
 RERANK_RESERVED_SECONDS = 3.0
 """Minimum remaining slice seconds required to start OpenAI rerank."""
+CHANNEL_PHASE_RESERVE_SECONDS = 1.5
+"""Post-channel work (assemble, temporal load, pool preload) kept free before the
+rerank reserve. p90 of A2 ``post_channel_ms`` rounded up to 0.5 s; approved in D5."""
+CHANNEL_MIN_SECONDS = 2.0
+"""Floor for the channel-phase deadline. Equals the Hybrid branch slice floor."""
 EXACT_START_MIN_SLICE_SECONDS = HYBRID_DEADLINE_SECONDS
 """Exact dense starts only when the retrieve slice is at least the Hybrid
 envelope. Production Ask remaining is below this after profile/embed, so
 ANN starts first. P06-70 named ``deadline_budget`` after exact-from-start
 exhausted the 25s Ask envelope. The ceiling is not raised."""
+RERANK_INVALID_SUBCODES = frozenset(
+    {"json", "hash", "length", "duplicate", "unknown_id"}
+)
+"""ID-free ``RerankPayloadError.subcode`` values persisted in diagnostics."""
+HYBRID_STAGE_TIMING_KEYS = frozenset(
+    {
+        "scope_ms",
+        "embed_ms",
+        "channels_ms",
+        "channel_dense_ms",
+        "channel_bm25_ms",
+        "channel_term_ms",
+        "assemble_ms",
+        "temporal_load_ms",
+        "pool_preload_ms",
+        "rerank_gate_remaining_ms",
+        "rerank_call_ms",
+        "selection_ms",
+        "locator_reload_ms",
+        "retrieve_total_ms",
+    }
+)
+"""Allowed ``stage_timings_ms`` keys on Hybrid diagnostics (integer ms)."""
 CHANNEL_WEIGHT_DENSE = 1.0
 CHANNEL_WEIGHT_BM25 = 1.0
 CHANNEL_WEIGHT_TERM = 1.0
 RERANK_POOL_SIZE = 20
 RERANK_MAX_PER_DOCUMENT = 5
 RERANK_EXCERPT_CHARS = 400
-RERANK_PROMPT_VERSION = "rerank_v1"
+RERANK_PROMPT_VERSION = "rerank_v2"
 RERANK_MAX_OUTPUT_TOKENS = 2_048
 FINAL_EVIDENCE_MAX = 12
 FINAL_TOKEN_BUDGET = 6_000

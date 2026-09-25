@@ -12,6 +12,7 @@ from smart_rag_core.retrieval.frozen_profile import (
     FROZEN_LONG_DOCUMENT_PROFILE_SHA256,
     FROZEN_PROFILE_PATH,
     LONG_DOCUMENT_PROFILE_ID,
+    LONG_DOCUMENT_V3_PROFILE_ID,
     PRIOR_LONG_DOCUMENT_PROFILE_ID,
     PRIOR_LONG_DOCUMENT_PROFILE_PATH,
     UnknownRetrievalProfileError,
@@ -73,8 +74,8 @@ def test_prior_long_document_v1_stays_unfrozen() -> None:
     assert LONG_DOCUMENT_PROFILE_ID in runtime_profile_ids()
 
 
-def test_exact_one_long_document_selects_v2() -> None:
-    """Exact-one authorized versions above the passage gate use v2."""
+def test_exact_one_long_document_selects_v3() -> None:
+    """Exact-one authorized versions above the passage gate use v3."""
 
     profile_id, reason = select_runtime_profile(
         resolution=SourceResolution.EXACT_ONE,
@@ -82,19 +83,19 @@ def test_exact_one_long_document_selects_v2() -> None:
         representative_count=40,
         query_class="factual_definition",
     )
-    assert profile_id == LONG_DOCUMENT_PROFILE_ID
+    assert profile_id == LONG_DOCUMENT_V3_PROFILE_ID
     assert reason == "long_document_eligible"
     key = hybrid_cache_key(
         principal_scope_hash="p",
         query_normalized="q",
-        retrieval_profile_id=LONG_DOCUMENT_PROFILE_ID,
+        retrieval_profile_id=LONG_DOCUMENT_V3_PROFILE_ID,
         visibility_generation=1,
     )
     assert len(key) == 64
 
 
-def test_small_corpus_long_document_selects_v2() -> None:
-    """Unscoped questions on a small corpus with a long document use v2."""
+def test_small_corpus_long_document_selects_v3() -> None:
+    """Unscoped questions on a small corpus with a long document use v3."""
 
     profile_id, reason = select_runtime_profile(
         resolution=SourceResolution.UNSCOPED,
@@ -103,7 +104,7 @@ def test_small_corpus_long_document_selects_v2() -> None:
         query_class="factual_definition",
         authorized_document_count=4,
     )
-    assert profile_id == LONG_DOCUMENT_PROFILE_ID
+    assert profile_id == LONG_DOCUMENT_V3_PROFILE_ID
     assert reason == "small_corpus_long_document"
 
 

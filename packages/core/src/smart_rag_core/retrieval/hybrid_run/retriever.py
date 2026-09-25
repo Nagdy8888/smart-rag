@@ -28,8 +28,10 @@ from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.hybrid import run_channels_parallel
 from smart_rag_core.retrieval.hybrid_run.assemble import (
     call_assemble_hybrid,
+    channel_phase_deadline_seconds,
     closed_result,
     compute_principal_scope_hash,
+    elapsed_ms,
     fail_closed_query,
     fused_first_evidence_ms,
     hybrid_assemble_kwargs,
@@ -38,6 +40,7 @@ from smart_rag_core.retrieval.hybrid_run.assemble import (
 )
 from smart_rag_core.retrieval.hybrid_run.budget import (
     counted_rerank,
+    timed_rerank,
 )
 from smart_rag_core.retrieval.hybrid_run.cache_lookup import HybridCacheLookupMixin
 from smart_rag_core.retrieval.hybrid_run.channels import (
@@ -83,6 +86,7 @@ from smart_rag_core.retrieval.profiles import (
     RetrievalFallbackReason,
 )
 from smart_rag_core.retrieval.rerank import (
+    CHANNEL_HEAD_PIN,
     RerankFallbackReason,
     channel_head_pins,
     rerank_preload_ids,
@@ -110,6 +114,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         that slice. The 25s
         ``HYBRID_DEADLINE_SECONDS`` value is the Phase 6 full-run budget
         and is not used here.
+        Channels wait only ``channel_phase_deadline_seconds(slice)`` so rerank keeps its reserve.
 
     Failure/fallback:
         Empty or over-long queries fail closed with ``retrieval_empty``.
@@ -213,6 +218,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             ``query_budget`` is bound, each gateway call consumes the
             run-local reservation or fails closed. Channel jobs may
             read ParadeDB and Supabase. No holdout access. No answer tokens.
+            Records ID-free per-stage wall times in ``stage_timings_ms``.
         """
 
         started = time.perf_counter()
@@ -246,6 +252,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 return cached
 
         texts = query_texts(query, profile)
+        embed_started = time.perf_counter()
         embed_response, embed_error = embed_query_texts(
             self._embedding_gateway, texts, budget=self.query_budget
         )
@@ -256,6 +263,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 embedding_call_count=1,
             )
         vectors = embed_response.vectors
+        timings: dict[str, int] = {"embed_ms": int(elapsed_ms(embed_started))}
         jobs: dict[str, ChannelJob] | None = (
             channel_jobs if channel_jobs is not None else self._channel_jobs
         )
@@ -269,10 +277,17 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 remaining_slice_seconds=slice_seconds,
             )
         channel_started = time.perf_counter()
+        channel_ms: dict[str, int] = {}
         completed, timed_out, exhausted = run_channels_parallel(
             jobs,
-            deadline_seconds=slice_seconds,
+            deadline_seconds=channel_phase_deadline_seconds(slice_seconds),
+            durations_ms=channel_ms,
         )
+        post_channel_started = time.perf_counter()
+        timings["channels_ms"] = int(elapsed_ms(channel_started))
+        for name in ("dense", "bm25", "term"):
+            if name in channel_ms:
+                timings[f"channel_{name}_ms"] = channel_ms[name]
         dense_lists, dense_reason = unpack_dense(completed.get("dense"))
         bm25_result = unpack_bm25(completed.get("bm25"))
         term_lists, term_reason = unpack_term(completed.get("term"))
@@ -343,9 +358,11 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         )
         subquestions = str_list_field(profile, "subquestions")[:3]
         subquestion_count = len(subquestions)
+        temporal_started = time.perf_counter()
         temporal_records = self._load_temporal_records(
             flatten_channel_candidates(dense_lists, bm25_result.candidates, term_lists)
         )
+        timings["temporal_load_ms"] = int(elapsed_ms(temporal_started))
         assemble_kwargs = hybrid_assemble_kwargs(
             dense_variants=dense_lists,
             bm25_variants=(
@@ -381,22 +398,30 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             fallback = RetrievalFallbackReason.RETRIEVAL_EMPTY
         fused_ids = tuple(item.chunk_id for item in assembled.fused)
         fused_at = time.perf_counter() if fused_ids else None
+        timings["assemble_ms"] = max(
+            0, int(elapsed_ms(post_channel_started)) - timings["temporal_load_ms"]
+        )
         context_cache: dict[UUID, ChunkContext] = {}
         loader = self._bound_loader(caller, context_cache)
         remaining = remaining_slice_seconds(
             slice_seconds=slice_seconds,
             slice_started=channel_started,
         )
+        timings["rerank_gate_remaining_ms"] = int(remaining * 1000)
+        preload_started = time.perf_counter()
         if self._retrieval_profile is not None:
             pool_size = self._retrieval_profile.rerank_pool_size
             max_per_document = self._retrieval_profile.rerank_max_per_document
+            dense_head = self._retrieval_profile.dense_head_pin
         else:
             pool_size = RERANK_POOL_SIZE
             max_per_document = RERANK_MAX_PER_DOCUMENT
+            dense_head = CHANNEL_HEAD_PIN
         pinned_ids = channel_head_pins(
             dense_ids=dense_ids,
             bm25_ids=bm25_ids,
             fused_ids=fused_ids,
+            dense_head=dense_head,
         )
         preload_ids = rerank_preload_ids(
             assembled.fused,
@@ -405,20 +430,29 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             pinned_ids=pinned_ids,
         )
         contexts = loader(preload_ids) if preload_ids else ()
-        rerank_fn: RerankFn = counted_rerank(
-            self._rerank or identity_rerank,
-            self.query_budget,
-            count_gateway=self._rerank is not None,
+        timings["pool_preload_ms"] = int(elapsed_ms(preload_started))
+        rerank_call_ms: list[int] = []
+        rerank_fn: RerankFn = timed_rerank(
+            counted_rerank(
+                self._rerank or identity_rerank,
+                self.query_budget,
+                count_gateway=self._rerank is not None,
+            ),
+            rerank_call_ms,
         )
         rerank_calls = 0
         evidence: tuple[EvidenceUnit, ...] = ()
         selected_ids: tuple[UUID, ...] = ()
         rerank_order: tuple[UUID, ...] = fused_ids
         rerank_fallback = ""
+        rerank_invalid_subcode = ""
+        rerank_ranked_count = 0
+        rerank_appended_count = 0
         rerank_top_support: float | None = None
         selection_profile = self._retrieval_profile
         coverage = assembled.coverage
         if assembled.fused:
+            selection_started = time.perf_counter()
             selection = select_hybrid_context(
                 query=query,
                 profile=resolved_profile,
@@ -430,13 +464,22 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 remaining_deadline_seconds=remaining,
                 retrieval_profile=selection_profile,
                 pinned_ids=pinned_ids,
+                dense_ids=dense_ids,
             )
+            timings["selection_ms"] = int(elapsed_ms(selection_started))
+            if rerank_call_ms:
+                timings["rerank_call_ms"] = rerank_call_ms[0]
             if selection.usage is not None:
                 rerank_calls = selection.usage.model_calls
+                rerank_invalid_subcode = selection.usage.invalid_subcode
             selected_ids = tuple(item.candidate.chunk_id for item in selection.passages)
             rerank_order = selection.rerank_order
             rerank_fallback = selection.fallback_reason.value
+            rerank_ranked_count = selection.rerank_ranked_count
+            rerank_appended_count = selection.rerank_appended_count
+            locator_started = time.perf_counter()
             locator_rows = loader(selected_ids) if selected_ids else ()
+            timings["locator_reload_ms"] = int(elapsed_ms(locator_started))
             evidence = evidence_units(selection.passages, locator_rows)
             unique_docs = {item.candidate.document_id for item in selection.passages}
             unique_versions = {item.candidate.version_id for item in selection.passages}
@@ -524,4 +567,11 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             dense_ids=dense_ids,
             bm25_ids=bm25_ids,
             term_ids=term_ids,
+            stage_timings_ms={
+                **timings,
+                "retrieve_total_ms": int(elapsed_ms(started)),
+            },
+            rerank_invalid_subcode=rerank_invalid_subcode,
+            rerank_ranked_count=rerank_ranked_count,
+            rerank_appended_count=rerank_appended_count,
         )

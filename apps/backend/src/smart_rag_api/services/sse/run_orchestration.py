@@ -4,23 +4,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES
 from smart_rag_core.sse.sanitize import sanitize_error_payload
 from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore
 
-from smart_rag_api.services.sse.chunks import (
-    coerce_stream_token_count,
-    token_counts_from_update,
-)
+from smart_rag_api.services.sse.chunks import token_counts_from_update
+from smart_rag_api.services.sse.event_writer import executor_draft_writer
 from smart_rag_api.services.sse.executors import QueryRunExecutor
 from smart_rag_api.services.sse.registry import LiveQueryRun, QueryRunRegistry
 from smart_rag_api.services.sse.run_heartbeat import RunHeartbeatMixin
+from smart_rag_api.services.sse.run_summary import build_termination_payload
 
 LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
 
             ...
 
-    def _start_once(
+    async def _start_once(
         self,
         caller: CallerContext,
         record: QueryRunRecord,
@@ -75,7 +75,12 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
     ) -> None:
         """Start the executor at most once in this process.
 
-        Durable heartbeats are owned only by ``_run_heartbeat``.
+        ``live.started`` is set before the first ``await`` so two attaches
+        racing on the same run cannot both start it. Store and durable-input
+        calls run on worker threads. When a cancel arrives during those
+        calls, the executor is not started (the cancel request already
+        persisted ``cancelled``). Durable heartbeats are owned only by
+        ``_run_heartbeat``.
 
         Args:
             caller: Owner.
@@ -87,9 +92,12 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
         if live.started:
             return
         live.started = True
-        self._ensure_schema(caller, record.run_id)
+        await asyncio.to_thread(self._ensure_schema, caller, record.run_id)
+        live.notify_appended()
         try:
-            self._store.mark_running(caller, run_id=record.run_id)
+            await asyncio.to_thread(
+                self._store.mark_running, caller, run_id=record.run_id
+            )
         except QueryAdmissionError:
             LOGGER.info(
                 "query run not marked running",
@@ -101,13 +109,19 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
         message = self._registry.take_input(record.run_id)
         runtime = context or self._registry.take_context(record.run_id)
         if (not message or runtime is None) and self._postgres_url:
-            loaded = self._load_durable_start(caller, record.run_id)
+            loaded = await asyncio.to_thread(
+                self._load_durable_start, caller, record.run_id
+            )
             if loaded is not None:
                 loaded_message, loaded_runtime = loaded
                 if not message:
                     message = loaded_message
                 if runtime is None:
                     runtime = loaded_runtime
+        if live.cancel_event.is_set():
+            live.terminal = True
+            live.notify_appended()
+            return
         live.executor_task = asyncio.create_task(
             self._run_executor(caller, record, live, message, runtime)
         )
@@ -125,9 +139,13 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
     ) -> None:
         """Run the executor once and persist its drafts.
 
-        Each catalog append is awaited on a worker thread so a run-row
-        lock wait cannot freeze this event loop. Sequence order is the
-        executor yield order.
+        Drafts go through one ``RunEventWriter`` that persists them in
+        yield order while the graph keeps running. The executor waits for
+        it after each terminal draft, at the end of the stream, and on the
+        cancel and error paths, so a terminal is durable before
+        post-terminal work. Queued non-terminal drafts are skipped after a
+        cancel request. Store calls run on worker threads, and attach loops
+        are woken on each append and when the executor ends.
 
         Args:
             caller: Owner.
@@ -140,7 +158,9 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
 
         runtime = context or self._registry.take_context(record.run_id)
         if (runtime is None or not message) and self._postgres_url:
-            loaded = self._load_durable_start(caller, record.run_id)
+            loaded = await asyncio.to_thread(
+                self._load_durable_start, caller, record.run_id
+            )
             if loaded is not None:
                 loaded_message, loaded_runtime = loaded
                 if not message:
@@ -148,10 +168,19 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                 if runtime is None:
                     runtime = loaded_runtime
         if runtime is None:
-            self._emit_worker_unavailable(caller, record.run_id)
+            await asyncio.to_thread(
+                self._emit_worker_unavailable, caller, record.run_id
+            )
             live.terminal = True
+            live.notify_appended()
             self._cancel_tasks(live)
             return
+        writer = executor_draft_writer(
+            self._append_async,
+            caller=caller,
+            run_id=record.run_id,
+            cancel_event=live.cancel_event,
+        )
         try:
             from smart_rag_core.observability.query_run_trace import (
                 invoke_traced_query_run_sse,
@@ -182,7 +211,9 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                     message=message,
                     cancel_event=live.cancel_event,
                 ):
-                    await self._append_async(caller, record.run_id, event_type, payload)
+                    await writer.submit(event_type, payload)
+                    if event_type in TERMINAL_SSE_EVENT_TYPES:
+                        await writer.flush()
                     if event_type == "token_delta":
                         delta = payload.get("delta")
                         if isinstance(delta, str) and delta:
@@ -195,7 +226,11 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                             prompt_tokens = event_prompt
                         if event_completion is not None:
                             completion_tokens = event_completion
-                if not self._has_terminal(caller, record.run_id):
+                await writer.flush()
+                await writer.close()
+                if not await asyncio.to_thread(
+                    self._has_terminal, caller, record.run_id
+                ):
                     if live.cancel_event.is_set():
                         await self._append_async(caller, record.run_id, "cancelled", {})
                     else:
@@ -205,60 +240,13 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                             "error",
                             {"code": "run_failed"},
                         )
-                summary = getattr(self._executor, "termination_summary", None)
-                payload: dict[str, object]
-                if isinstance(summary, dict):
-                    typed_summary = cast(dict[object, object], summary)
-                    payload = {str(key): value for key, value in typed_summary.items()}
-                else:
-                    payload = {
-                        "termination_reason": (
-                            "cancelled" if live.cancel_event.is_set() else "unknown"
-                        ),
-                        "terminal_event_type": None,
-                        "stream_exhausted": False,
-                    }
-                if assistant_parts:
-                    payload["assistant_message"] = "".join(assistant_parts)
-                if prompt_tokens is None:
-                    prompt_tokens = coerce_stream_token_count(
-                        payload.get("input_tokens")
-                    )
-                if prompt_tokens is None:
-                    prompt_tokens = coerce_stream_token_count(
-                        payload.get("prompt_tokens")
-                    )
-                if completion_tokens is None:
-                    completion_tokens = coerce_stream_token_count(
-                        payload.get("output_tokens")
-                    )
-                if completion_tokens is None:
-                    completion_tokens = coerce_stream_token_count(
-                        payload.get("completion_tokens")
-                    )
-                if prompt_tokens is not None:
-                    payload["input_tokens"] = prompt_tokens
-                if completion_tokens is not None:
-                    payload["output_tokens"] = completion_tokens
-                input_count = coerce_stream_token_count(payload.get("input_tokens"))
-                output_count = coerce_stream_token_count(payload.get("output_tokens"))
-                if input_count is not None or output_count is not None:
-                    from smart_rag_core.observability.langsmith_tracing import (
-                        estimate_traced_chat_cost_usd,
-                    )
-
-                    input_total = 0 if input_count is None else input_count
-                    output_total = 0 if output_count is None else output_count
-                    payload["input_tokens"] = input_total
-                    payload["output_tokens"] = output_total
-                    payload["total_tokens"] = input_total + output_total
-                    payload["estimated_cost_usd"] = float(
-                        estimate_traced_chat_cost_usd(
-                            input_tokens=input_total,
-                            output_tokens=output_total,
-                        )
-                    )
-                return payload
+                return build_termination_payload(
+                    getattr(self._executor, "termination_summary", None),
+                    cancelled=live.cancel_event.is_set(),
+                    assistant_parts=assistant_parts,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
 
             if settings is None:
                 await _consume()
@@ -273,7 +261,8 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                     effective_route=runtime.route_family.value,
                 )
         except asyncio.CancelledError:
-            if not self._has_terminal(caller, record.run_id):
+            await writer.close()
+            if not await asyncio.to_thread(self._has_terminal, caller, record.run_id):
                 await self._append_async(caller, record.run_id, "cancelled", {})
             raise
         except Exception as exc:
@@ -284,7 +273,8 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                     "error_type": type(exc).__name__,
                 },
             )
-            if not self._has_terminal(caller, record.run_id):
+            await writer.close()
+            if not await asyncio.to_thread(self._has_terminal, caller, record.run_id):
                 await self._append_async(
                     caller,
                     record.run_id,
@@ -292,7 +282,9 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
                     sanitize_error_payload(exc),
                 )
         finally:
+            writer.abort()
             live.terminal = True
+            live.notify_appended()
             heartbeat = live.heartbeat_task
             if heartbeat is not None and not heartbeat.done():
                 heartbeat.cancel()

@@ -203,15 +203,35 @@ sequenceDiagram
 
 Heartbeat and executor appends run in `asyncio.to_thread` so a synchronous
 Postgres wait cannot freeze the SSE event loop or LangGraph `astream`.
-Sequence order is unchanged: each append is awaited before the next event.
 Exactly one terminal remains required.
 
-`PostgresRunEventStore` keeps autocommit off. Each transaction runs one
-parameter-free statement, `SET ROLE app_api; SET LOCAL lock_timeout TO '2s'`,
-so both settings share one round trip. That matches the intended `app_api`
-GUC. Hosted login-role sessions do not always inherit role timeouts after
-`SET ROLE`, so the store must set the limit itself. `app.append_run_event`
-stays a separate parameterized statement.
+Since latency packet L3, the executor does not wait for each append. It
+hands drafts to a per-run `RunEventWriter`
+(`smart_rag_api.services.sse.event_writer`): one background task persists
+them in yield order, so sequence order is still the executor yield order.
+The queue holds at most `EVENT_WRITER_MAX_PENDING` = 32 drafts; a full
+queue makes the executor wait. After a terminal draft the executor waits
+until the writer has persisted it, so `commit_successful_terminal` and
+reservation settlement still run after a durable terminal. After a cancel
+request, queued non-terminal drafts are skipped because `cancelled` is
+already persisted. An unexpected append exception stops the writer; the
+executor then persists one sanitized `error` terminal if none exists.
+Heartbeats keep their own direct append path. Frames still come only from
+persisted rows, so `app.run_events.created_at` is persist time and can lag
+the graph by up to the queue length. See
+[ADR-sse-ordered-background-writer.md](../adr/ADR-sse-ordered-background-writer.md).
+
+`PostgresRunEventStore` keeps autocommit off and lends sessions from a
+pool of at most 4 per API process (see
+[05-database-connections.md](../architecture/05-database-connections.md)).
+Each transaction runs one parameter-free statement,
+`SET LOCAL ROLE app_api; SET LOCAL lock_timeout TO '2s'`, so both settings
+share one round trip and both end at commit. Hosted login-role sessions
+do not always inherit role timeouts after `SET ROLE`, so the store must
+set the limit itself. `app.append_run_event` stays a separate
+parameterized statement. A caller that waits more than 2 seconds for a
+free session gets `event_store_busy`, which the append path logs and
+handles like `lock_timeout`.
 
 `app.append_run_event` takes `SELECT … FROM app.runs FOR UPDATE`. An
 uncommitted `llm_usage` insert on the graph `app_api` connection holds
@@ -225,6 +245,19 @@ They never include DSNs, JWTs, payload bodies, or exception text.
 
 This is the c31e50dc stall class. Disabling LangSmith tracing is not the
 fix. Authenticated live timing after this repair is still unverified.
+
+Since latency packet L1 (2026-09), every event-store read and write, the
+run-row lookups (`assert_readable`, `mark_running`, terminal checks), the
+run connection's per-chunk `commit()`, the run connection open, and the
+post-terminal summary and assistant persist run on worker threads through
+`asyncio.to_thread`, awaited in the same order as before. The attach loop
+no longer polls every 50 ms for a run this process executes: each append
+calls `LiveQueryRun.notify_appended()`, and the attach loop waits with
+`wait_appended(seen, ATTACH_IDLE_POLL_SECONDS)` (0.5 s upper bound). Runs
+without a live handle in this process keep the 50 ms `POLL_SECONDS` loop
+and still return when a round emits nothing. The terminal frame can reach
+the browser before the assistant `app.messages` row is written; the chat
+UI keeps the live answer until the refetched transcript matches it.
 
 ## Retention (packet 7)
 

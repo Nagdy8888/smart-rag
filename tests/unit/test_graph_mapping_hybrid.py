@@ -43,7 +43,7 @@ _RERANK_PROMPT = (
     / "src"
     / "smart_rag_agents"
     / "prompts"
-    / "rerank_v1.md"
+    / "rerank_v2.md"
 )
 
 

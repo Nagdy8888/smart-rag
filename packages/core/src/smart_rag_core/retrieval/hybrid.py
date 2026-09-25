@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections import defaultdict
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -256,33 +257,62 @@ def run_channels_parallel(
     jobs: dict[str, Callable[[], object]],
     *,
     deadline_seconds: float = HYBRID_DEADLINE_SECONDS,
+    durations_ms: dict[str, int] | None = None,
 ) -> tuple[dict[str, object], tuple[str, ...], bool]:
     """Run channel callables in parallel and record timeouts separately.
 
     Args:
         jobs: Mapping of channel name to zero-argument callables.
         deadline_seconds: Remaining Hybrid deadline share.
+        durations_ms: Optional sink. Receives the in-thread wall time in
+            integer milliseconds of every job that finished before the
+            deadline. Timed-out jobs get no entry.
 
     Returns:
         Completed results, timed-out names, and whether the deadline exhausted.
 
     Side Effects:
         Executes the callables in worker threads. Does not start answer
-        generation.
+        generation. Writes ``durations_ms`` when given.
     """
 
     if deadline_seconds <= 0:
         return {}, tuple(jobs), True
     executor = ThreadPoolExecutor(max_workers=max(1, len(jobs)))
     try:
-        futures = {executor.submit(job): name for name, job in jobs.items()}
+        futures = {
+            executor.submit(_timed_call, job): name for name, job in jobs.items()
+        }
         done, pending = wait(futures, timeout=deadline_seconds)
         timed_out = tuple(futures[item] for item in pending)
         for item in pending:
             item.cancel()
         completed: dict[str, object] = {}
         for item in done:
-            completed[futures[item]] = item.result()
+            value, elapsed = item.result()
+            completed[futures[item]] = value
+            if durations_ms is not None:
+                durations_ms[futures[item]] = elapsed
         return completed, timed_out, bool(timed_out)
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
+
+
+def _timed_call(job: Callable[[], object]) -> tuple[object, int]:
+    """Run one channel job and measure it inside its worker thread.
+
+    Args:
+        job: Zero-argument channel callable.
+
+    Returns:
+        The job result and its non-negative wall time in integer
+        milliseconds.
+
+    Raises:
+        Exception: Whatever ``job`` raises, unchanged. ``item.result()``
+            re-raises it in the caller exactly as before.
+    """
+
+    started = time.perf_counter()
+    value = job()
+    return value, int(max(0.0, time.perf_counter() - started) * 1000.0)

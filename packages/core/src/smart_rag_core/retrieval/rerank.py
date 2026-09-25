@@ -21,6 +21,7 @@ from smart_rag_core.retrieval.profiles import (
     MMR_CANDIDATE_DEPTH,
     MMR_LAMBDA,
     RERANK_EXCERPT_CHARS,
+    RERANK_INVALID_SUBCODES,
     RERANK_MAX_PER_DOCUMENT,
     RERANK_POOL_SIZE,
     SECTION_QUOTA,
@@ -47,6 +48,39 @@ class RerankFallbackReason(StrEnum):
     UNKNOWN_USAGE = "rerank_unknown_usage"
     REFUSAL = "rerank_refusal"
     PROVIDER_ERROR = "rerank_provider_error"
+
+
+class RerankPayloadError(ValueError):
+    """Rerank payload failed application validation.
+
+    ``str(error)`` stays the specific message (for example
+    ``rerank_input_hash_mismatch``), so existing ``ValueError`` handlers
+    and ``match=`` tests keep working. ``subcode`` is the coarse, ID-free
+    class that diagnostics persist.
+
+    Attributes:
+        subcode: One of ``RERANK_INVALID_SUBCODES``: ``json`` (shape, type,
+            or bounds), ``hash`` (echoed digest differs), ``length`` (row
+            count differs), ``duplicate`` (repeated ID or rank), or
+            ``unknown_id`` (ID not supplied, or supplied set not covered).
+    """
+
+    def __init__(self, message: str, *, subcode: str) -> None:
+        """Build the error.
+
+        Args:
+            message: Specific validation message; becomes ``str(error)``.
+            subcode: Coarse sub-code from ``RERANK_INVALID_SUBCODES``.
+
+        Raises:
+            ValueError: ``rerank_subcode_invalid`` when ``subcode`` is not
+                allow-listed.
+        """
+
+        if subcode not in RERANK_INVALID_SUBCODES:
+            raise ValueError("rerank_subcode_invalid")
+        super().__init__(message)
+        self.subcode = subcode
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,12 +119,15 @@ class RerankRanking:
         rank: 1-based order.
         support: Bounded ranking feature in ``[0, 1]``.
         supported_subquestion_indices: Optional 0-based subquestion indices.
+        appended: True when the model did not rank this candidate and the
+            server appended it in pool order (``rerank_v2`` partial output).
     """
 
     chunk_id: UUID
     rank: int
     support: float
     supported_subquestion_indices: tuple[int, ...] = ()
+    appended: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +140,8 @@ class RerankUsage:
         input_tokens: Prompt tokens, or 0 when unknown/mocked.
         output_tokens: Completion tokens, or 0 when unknown/mocked.
         model_calls: ``0`` or ``1``. Hidden retries are forbidden.
+        invalid_subcode: ``RerankPayloadError.subcode`` when the payload
+            failed application validation, else empty.
     """
 
     request_id: str
@@ -110,6 +149,7 @@ class RerankUsage:
     input_tokens: int
     output_tokens: int
     model_calls: int
+    invalid_subcode: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +168,9 @@ class ContextSelection:
             rerank. None on identity/skip/failure.
         supported_subquestion_indices: Validated 0-based subquestion indices
             from a completed rerank payload. Empty on fallback.
+        rerank_ranked_count: Candidates the model ranked. 0 on fallback.
+        rerank_appended_count: Candidates appended by the server after a
+            partial ranking. 0 on fallback or a full ranking.
     """
 
     passages: tuple[RerankPassage, ...]
@@ -139,6 +182,8 @@ class ContextSelection:
     skipped_counterfactual: bool
     rerank_top_support: float | None = None
     supported_subquestion_indices: tuple[int, ...] = ()
+    rerank_ranked_count: int = 0
+    rerank_appended_count: int = 0
 
 
 def rerank_input_hash(
@@ -235,29 +280,34 @@ def channel_head_pins(
     bm25_ids: Sequence[UUID],
     fused_ids: Sequence[UUID],
     head: int = CHANNEL_HEAD_PIN,
+    dense_head: int | None = None,
 ) -> tuple[UUID, ...]:
     """Return the channel-head IDs that must enter the rerank pool.
 
     RRF with ``rrf_k=60`` ranks any chunk returned by two channels above a
-    chunk returned by one channel at rank 1. Pinning the first ``head``
-    authorized IDs of each channel keeps single-channel top hits visible to
-    the reranker without changing fusion weights.
+    chunk returned by one channel at rank 1. Pinning the first authorized
+    IDs of each channel keeps single-channel top hits visible to the
+    reranker without changing fusion weights.
 
     Args:
         dense_ids: Dense IDs in channel-rank order.
         bm25_ids: BM25 IDs in channel-rank order.
         fused_ids: Authorized fused IDs. Pins outside this set are dropped,
             so pins can never add an ID the ACL recheck removed.
-        head: Per-channel pin count.
+        head: BM25 pin count, and the dense pin count when ``dense_head``
+            is ``None``.
+        dense_head: Dense pin count from the frozen profile
+            (``dense_head_pin``). ``None`` uses ``head``.
 
     Returns:
         Distinct pins, dense first then BM25, each within ``fused_ids``.
     """
 
     authorized = set(fused_ids)
+    dense_limit = head if dense_head is None else dense_head
     pins: list[UUID] = []
-    for channel in (dense_ids, bm25_ids):
-        for chunk_id in tuple(channel)[: max(0, head)]:
+    for channel, limit in ((dense_ids, dense_limit), (bm25_ids, head)):
+        for chunk_id in tuple(channel)[: max(0, limit)]:
             if chunk_id in authorized and chunk_id not in pins:
                 pins.append(chunk_id)
     return tuple(pins)
@@ -649,7 +699,9 @@ def validate_rerank_payload(
         Rankings sorted by rank ascending.
 
     Raises:
-        ValueError: If status, IDs, ranks, or support violate the contract.
+        RerankPayloadError: If status, IDs, ranks, or support violate the
+            contract. ``str(error)`` is the specific reason and
+            ``subcode`` is its coarse class.
     """
 
     try:
@@ -658,29 +710,37 @@ def validate_rerank_payload(
         messages = " ".join(str(item.get("msg", "")) for item in error.errors())
         locations = [item.get("loc", ()) for item in error.errors()]
         if "rerank_support_out_of_bounds" in messages:
-            raise ValueError("rerank_support_out_of_bounds") from error
+            raise RerankPayloadError(
+                "rerank_support_out_of_bounds", subcode="json"
+            ) from error
         if "rerank_support_invalid" in messages:
-            raise ValueError("rerank_support_invalid") from error
+            raise RerankPayloadError(
+                "rerank_support_invalid", subcode="json"
+            ) from error
         if "rerank_rank_invalid" in messages:
-            raise ValueError("rerank_rank_invalid") from error
+            raise RerankPayloadError("rerank_rank_invalid", subcode="json") from error
         if any(loc and loc[-1] == "status" for loc in locations):
-            raise ValueError("rerank_incomplete") from error
-        raise ValueError("rerank_schema_invalid") from error
+            raise RerankPayloadError("rerank_incomplete", subcode="json") from error
+        raise RerankPayloadError("rerank_schema_invalid", subcode="json") from error
     if body.input_hash != input_hash:
-        raise ValueError("rerank_input_hash_mismatch")
+        raise RerankPayloadError("rerank_input_hash_mismatch", subcode="hash")
     if len(body.rankings) != len(candidate_ids):
-        raise ValueError("rerank_ranking_length")
+        raise RerankPayloadError("rerank_ranking_length", subcode="length")
     expected = {str(item) for item in candidate_ids}
     seen_ids: set[str] = set()
     seen_ranks: set[int] = set()
     parsed: list[RerankRanking] = []
     for row in body.rankings:
         if row.chunk_id not in expected:
-            raise ValueError("rerank_unknown_or_missing_id")
+            raise RerankPayloadError(
+                "rerank_unknown_or_missing_id", subcode="unknown_id"
+            )
         if row.chunk_id in seen_ids:
-            raise ValueError("rerank_duplicate_id")
-        if row.rank > len(candidate_ids) or row.rank in seen_ranks:
-            raise ValueError("rerank_rank_invalid")
+            raise RerankPayloadError("rerank_duplicate_id", subcode="duplicate")
+        if row.rank > len(candidate_ids):
+            raise RerankPayloadError("rerank_rank_invalid", subcode="json")
+        if row.rank in seen_ranks:
+            raise RerankPayloadError("rerank_rank_invalid", subcode="duplicate")
         seen_ids.add(row.chunk_id)
         seen_ranks.add(row.rank)
         parsed.append(
@@ -694,7 +754,7 @@ def validate_rerank_payload(
             )
         )
     if seen_ids != expected:
-        raise ValueError("rerank_id_set_mismatch")
+        raise RerankPayloadError("rerank_id_set_mismatch", subcode="unknown_id")
     parsed.sort(key=lambda item: item.rank)
     return tuple(parsed)
 

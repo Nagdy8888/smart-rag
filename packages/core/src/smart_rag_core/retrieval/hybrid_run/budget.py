@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from decimal import Decimal
 from typing import Any, cast
@@ -233,3 +234,43 @@ def counted_rerank(
         )
 
     return _wrapped
+
+
+def timed_rerank(inner: RerankFn, sink: list[int]) -> RerankFn:
+    """Wrap a rerank callback and record its wall time.
+
+    Args:
+        inner: Rerank callback, usually the ``counted_rerank`` wrapper.
+        sink: List that receives one non-negative integer millisecond
+            value per invocation, including invocations that raise.
+
+    Returns:
+        Callback with the same contract as ``inner``.
+
+    Side Effects:
+        Appends to ``sink``. Adds no model call, retry, or budget debit.
+    """
+
+    def _timed(
+        query: str,
+        pool: tuple[RerankPassage, ...],
+        remaining_deadline_seconds: float,
+    ) -> tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason]:
+        """Invoke ``inner`` once and record its duration.
+
+        Args:
+            query: Original user query.
+            pool: Authorized rerank pool.
+            remaining_deadline_seconds: Remaining Hybrid deadline share.
+
+        Returns:
+            The unchanged ``inner`` triple.
+        """
+
+        started = time.perf_counter()
+        try:
+            return inner(query, pool, remaining_deadline_seconds)
+        finally:
+            sink.append(int(max(0.0, time.perf_counter() - started) * 1000.0))
+
+    return _timed

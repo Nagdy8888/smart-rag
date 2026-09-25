@@ -81,7 +81,7 @@ def test_postgres_event_store_reuses_and_closes_session(monkeypatch: Any) -> Non
 
     assert calls.count("CONNECT postgresql://hosted PREPARE None") == 1
     assert calls.count(EVENT_STORE_SESSION_SQL) == 2
-    assert "SET ROLE app_api" in EVENT_STORE_SESSION_SQL
+    assert "SET LOCAL ROLE app_api" in EVENT_STORE_SESSION_SQL
     assert EVENT_STORE_LOCK_TIMEOUT_SQL in EVENT_STORE_SESSION_SQL
     assert calls.index(EVENT_STORE_SESSION_SQL) < calls.index("COMMIT")
     assert calls.count("COMMIT") == 2
@@ -330,7 +330,7 @@ def test_postgres_event_store_discards_on_error_without_append_replay(
     assert connect_count["n"] == 1
     assert "ROLLBACK" in calls
     assert "CLOSE" in calls
-    assert typed_attr(store, "_connection") is None
+    assert typed_attr(store, "_pool").idle_count() == 0
 
 
 def test_postgres_event_store_list_after_retries_before_rows(
@@ -426,3 +426,154 @@ def test_postgres_event_store_list_after_retries_before_rows(
     events = store.list_after(caller, run_id=uuid4(), after=0)
     assert events == ()
     assert list_attempts["n"] == 2
+
+
+def test_postgres_event_store_parallel_transactions_do_not_serialize(
+    monkeypatch: Any,
+) -> None:
+    """Two threads get two pooled sessions and run their RPCs at once."""
+
+    import threading
+    import time
+    from uuid import uuid4
+
+    from smart_rag_core.security.identity import CallerContext, UserRole
+
+    connects = {"n": 0}
+    counter_lock = threading.Lock()
+
+    def _rows() -> list[object]:
+        """Return no replay rows.
+
+        Returns:
+            Empty list.
+        """
+
+        return []
+
+    def _connect(url: str, **kwargs: object) -> object:
+        """Return a new fake connection whose replay RPC takes 0.2 s.
+
+        Args:
+            url: DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Fake connection.
+        """
+
+        del url, kwargs
+        with counter_lock:
+            connects["n"] += 1
+        connection = SimpleNamespace(closed=False)
+
+        def _execute(statement: str, *_args: object) -> Any:
+            """Sleep during the replay RPC.
+
+            Args:
+                statement: SQL statement.
+                *_args: Bound parameters.
+
+            Returns:
+                Cursor stand-in.
+            """
+
+            if "list_run_events_after" in statement:
+                time.sleep(0.2)
+            return SimpleNamespace(fetchall=_rows)
+
+        connection.execute = _execute
+        connection.commit = lambda: None
+        connection.rollback = lambda: None
+        connection.close = lambda: setattr(connection, "closed", True)
+        return connection
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    store = PostgresRunEventStore("postgresql://hosted")
+    caller = CallerContext(
+        user_id=str(uuid4()),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+    )
+
+    def _read() -> None:
+        """Replay one run."""
+
+        store.list_after(caller, run_id=uuid4(), after=0)
+
+    started = time.monotonic()
+    threads = [threading.Thread(target=_read) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    elapsed = time.monotonic() - started
+    store.close()
+    assert connects["n"] == 2
+    assert elapsed < 0.35
+
+
+def test_postgres_event_store_busy_pool_maps_to_admission_error(
+    monkeypatch: Any,
+) -> None:
+    """A full pool fails in the wait bound with ``event_store_busy``."""
+
+    from uuid import uuid4
+
+    from smart_rag_core.security.identity import CallerContext, UserRole
+
+    monkeypatch.setattr(sse_store_mod, "EVENT_STORE_POOL_MAX_SIZE", 1)
+    monkeypatch.setattr(sse_store_mod, "EVENT_STORE_POOL_WAIT_SECONDS", 0.05)
+    connection = SimpleNamespace(closed=False)
+
+    def _execute(statement: str, *_args: object) -> Any:
+        """Accept any statement.
+
+        Args:
+            statement: SQL statement.
+            *_args: Bound parameters.
+
+        Returns:
+            Cursor stand-in.
+        """
+
+        del statement
+        return SimpleNamespace(fetchall=list, fetchone=lambda: None)
+
+    connection.execute = _execute
+    connection.commit = lambda: None
+    connection.rollback = lambda: None
+    connection.close = lambda: setattr(connection, "closed", True)
+
+    def _connect(url: str, **kwargs: object) -> object:
+        """Return the single fake connection.
+
+        Args:
+            url: DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Fake connection.
+        """
+
+        del url, kwargs
+        return connection
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    store = PostgresRunEventStore("postgresql://hosted")
+    caller = CallerContext(
+        user_id=str(uuid4()),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+    )
+    with typed_attr(store, "_transaction")():
+        with pytest.raises(QueryAdmissionError) as busy:
+            store.list_after(caller, run_id=uuid4(), after=0)
+    store.close()
+    assert busy.value.reason == "event_store_busy"

@@ -185,7 +185,9 @@ class LangGraphExecuteMixin(
         except Exception:
             self._set_termination(reason="error", terminal_event_type="error")
             if mapper is not None and mapper.verified_text:
-                self._persist_assistant_answer(context, mapper, settings)
+                await asyncio.to_thread(
+                    self._persist_assistant_answer, context, mapper, settings
+                )
             raise
         finally:
             self._record_stream_usage(

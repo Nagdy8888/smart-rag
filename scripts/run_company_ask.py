@@ -183,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
                 "run_id": str(streamed.get("run_id") or ""),
                 "origin": str(streamed.get("origin") or ""),
                 "stages": _json_mapping(streamed.get("stages")),
+                "timing": _json_mapping(streamed.get("timing")),
             }
             done = len(answers)
             if args.progress is not None:
@@ -448,11 +449,16 @@ def _ask_one(
         question: User question.
 
     Returns:
-        Streamed answer, stages, limitation, and terminal.
+        Streamed answer, stages, limitation, and terminal. A streamed run
+        also has ``timing`` with ``post_seconds``, ``first_frame_seconds``,
+        ``sse_seconds``, and ``wall_seconds`` (3 decimals). Timing never
+        changes the retry or sleep behavior.
     """
 
     idempotency = str(uuid4())
+    ask_started = time.monotonic()
     for _attempt in range(4):
+        post_started = time.monotonic()
         admit = client.post(
             f"{base_url}/conversations/{conversation_id}/messages",
             headers=_auth_headers(token, paid=True, idempotency=idempotency),
@@ -477,11 +483,18 @@ def _ask_one(
                 "run_id": "",
                 "stages": {},
             }
+        post_seconds = round(time.monotonic() - post_started, 3)
         admit_body = _json_mapping(admit.json())
         run_id = str(admit_body.get("run_id") or "")
         streamed = _read_sse(client, base_url, token, run_id)
         streamed["http_status"] = admit.status_code
         streamed["run_id"] = run_id
+        streamed["timing"] = {
+            "post_seconds": post_seconds,
+            "first_frame_seconds": streamed.pop("first_frame_seconds", None),
+            "sse_seconds": streamed.pop("sse_seconds", None),
+            "wall_seconds": round(time.monotonic() - ask_started, 3),
+        }
         return streamed
     return {
         "http_status": 429,
@@ -509,7 +522,9 @@ def _read_sse(
         run_id: Admitted run.
 
     Returns:
-        Answer text, terminal, limitation, origin, and stage fields.
+        Answer text, terminal, limitation, origin, and stage fields, plus
+        ``first_frame_seconds`` (stream open to the first ``event:`` line,
+        or None) and ``sse_seconds`` (stream open to return).
     """
 
     started = time.monotonic()
@@ -522,6 +537,7 @@ def _read_sse(
     citation_count = 0
     path_steps: list[str] = []
     open_stage = ""
+    first_frame_seconds: float | None = None
     with client.stream(
         "GET",
         f"{base_url}/runs/{run_id}/events?after=0",
@@ -577,6 +593,8 @@ def _read_sse(
                 continue
             if raw.startswith("event:"):
                 event_name = raw[6:].strip()
+                if first_frame_seconds is None:
+                    first_frame_seconds = round(time.monotonic() - started, 3)
             elif raw.startswith("data:"):
                 data_lines.append(raw[5:].lstrip())
     if open_stage:
@@ -588,6 +606,8 @@ def _read_sse(
         "origin": origin,
         "citation_count": citation_count,
         "path": ">".join(path_steps) if path_steps else "-",
+        "first_frame_seconds": first_frame_seconds,
+        "sse_seconds": round(time.monotonic() - started, 3),
         "stages": {
             "coverage_score": coverage_score,
             "correction_outcome": correction,

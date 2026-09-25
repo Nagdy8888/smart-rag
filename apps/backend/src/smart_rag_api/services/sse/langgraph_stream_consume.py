@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
@@ -182,7 +183,9 @@ async def iter_mapped_langgraph_updates(
         Commits the run-scoped ``app_api`` connection before mapping each
         stream part and once more after natural exhaustion so the final
         graph node (``verify_answer``) can persist citations and counted
-        usage before the executor closes the connection.
+        usage before the executor closes the connection. Commits and the
+        post-terminal persist run on a worker thread and are awaited in
+        order, so they never block the event loop.
     """
 
     from smart_rag_api.services.query_sse_mapping import assert_catalog_event
@@ -193,7 +196,7 @@ async def iter_mapped_langgraph_updates(
     last_prompt_tokens: int | None = None
     last_completion_tokens: int | None = None
     async for raw_chunk in stream_iter:
-        connection.commit()
+        await asyncio.to_thread(connection.commit)
         if cancel_event.is_set():
             set_termination(
                 reason="cancelled",
@@ -238,7 +241,8 @@ async def iter_mapped_langgraph_updates(
                     and not successful_terminal_committed
                 ):
                     successful_terminal_committed = True
-                    commit_successful_terminal(
+                    await asyncio.to_thread(
+                        commit_successful_terminal,
                         context,
                         mapper,
                         settings,
@@ -262,7 +266,8 @@ async def iter_mapped_langgraph_updates(
                 and not successful_terminal_committed
             ):
                 successful_terminal_committed = True
-                commit_successful_terminal(
+                await asyncio.to_thread(
+                    commit_successful_terminal,
                     context,
                     mapper,
                     settings,
@@ -270,7 +275,7 @@ async def iter_mapped_langgraph_updates(
                     terminal_status=last_status,
                 )
     if stream_exhausted and not cancel_event.is_set():
-        connection.commit()
+        await asyncio.to_thread(connection.commit)
     yield MappedStreamResult(
         stream_exhausted=stream_exhausted,
         last_remaining_calls=last_remaining_calls,

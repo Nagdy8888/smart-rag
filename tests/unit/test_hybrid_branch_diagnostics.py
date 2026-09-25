@@ -222,7 +222,7 @@ def test_stage_record_measures_accounting_and_bm25_explicit() -> None:
     }
     ok = stage_record(diagnostics, {"embedding", "rerank"})
     assert ok["rerank_accounting_ok"] is True
-    assert ok["bm25_degraded_explicit"] is True
+    assert ok["bm25_degraded_explicit"] is False
     assert ok["retrieval_empty"] is False
     assert ok["rerank_pool_ids"] == [chunk]
     masked = stage_record(

@@ -51,7 +51,7 @@ from smart_rag_core.query_profile.versions import (
     PROFILE_PROMPT_VERSION,
 )
 from smart_rag_core.query_routing.knowledge_scope import mock_profile_knowledge_scope
-from smart_rag_core.retrieval.rerank import rerank_input_hash
+from smart_rag_core.retrieval.rerank_labels import rerank_labels
 from smart_rag_core.retrieval.rerank_versions import (
     RERANK_PROMPT_SHA256,
     RERANK_PROMPT_VERSION,
@@ -184,26 +184,16 @@ class MockModelAdapter:
             raise ValueError(
                 f"Model input exceeds configured {self._max_input_chars}-character bound"
             )
-        digest = rerank_input_hash(
-            query=request.query,
-            candidate_ids=tuple(request.candidate_ids),
-            excerpts=tuple(request.excerpts),
-            prompt_sha256=request.prompt_sha256,
-        )
-        rankings: list[dict[str, object]] = [
-            {
-                "chunk_id": chunk_id,
-                "rank": index,
-                "support": 1.0 if index == 1 else 0.5,
-            }
-            for index, chunk_id in enumerate(request.candidate_ids, start=1)
-        ]
+        labels = rerank_labels(len(request.candidate_ids))
         return RerankModelResponse(
             mode="mock",
             payload={
                 "status": "complete",
-                "input_hash": digest,
-                "rankings": rankings,
+                "ranking": list(labels),
+                "support": {
+                    label: 1.0 if index == 0 else 0.5
+                    for index, label in enumerate(labels)
+                },
             },
             request_id=f"mock-rerank-{self._fixture_id}",
             input_tokens=0,

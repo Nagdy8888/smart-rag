@@ -58,7 +58,7 @@ flowchart TD
 | `manifest_holdout` | `7c70b4267efbd9df46247c099333ef7e82ed4ccc6df906727d8997e7bcacada2` |
 | `manifest_qualification` | `716ea031255217a82fa8ce2a1d7f89dbf17e841a99e7b1f4dc4de3a51d42cc14` |
 | `query_profile_prompt` | `cdbd53097306afda12de8be4be247ce45d525a1f889bbfd47f48c223ab20ccbd` |
-| `rerank_prompt` | `4767049107cfe6e8591c84d3b1d202393dfd2564383e6c5bfa0bd5fece8f1925` |
+| `rerank_prompt` | `995a87d869b3330aac0b5e2d64b764a32cc8542c7d85d9182118945ce9560cab` |
 | `schema` | `996fb7553dcffa1805020444b2c4e22eebf05d6a9909882468a2cc7b80d151c9` |
 
 ## Pins
@@ -79,7 +79,7 @@ flowchart TD
 | `pyarrow` | `19.0.1` |
 | `query_profile_prompt_version` | `query_profile_v1` |
 | `rerank_model` | `gpt-4o-mini` |
-| `rerank_prompt_version` | `rerank_v1` |
+| `rerank_prompt_version` | `rerank_v2` |
 | `rrf_k` | `60` |
 | `term_cap` | `30` |
 

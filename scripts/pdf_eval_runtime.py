@@ -48,6 +48,7 @@ from smart_rag_core.gateways.openai_answer import (
     execute_openai_pdf_eval_judge,
 )
 from smart_rag_core.query_answer.assembly import assemble_source_records
+from smart_rag_core.query_answer.claims import parse_provider_answer
 from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.versions import (
@@ -163,7 +164,7 @@ def load_profile_for_eval(profile_id: str) -> object:
 
 
 def bind_live_rerank(settings: SharedSettings) -> Callable[..., object]:
-    """Bind production ``rerank_pool`` with the pinned ``rerank_v1`` prompt.
+    """Bind production ``rerank_pool`` with the pinned ``rerank_v2`` prompt.
 
     Args:
         settings: Process settings with a live OpenAI key.
@@ -301,7 +302,11 @@ def generate_live_answer(
             status="refused",
             answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
         )
-    payload = AnswerPayload.model_validate(response.payload)
+    payload = parse_provider_answer(
+        response.payload,
+        chunk_ids=request.chunk_ids,
+        tables=(),
+    )
     filtered = filter_invented_ids(payload, fusion, ())
     return filtered.model_copy(
         update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}

@@ -22,6 +22,8 @@ CANDIDATE_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_PROFILE_ID}.json"
 PRIOR_LONG_DOCUMENT_PROFILE_PATH = (
     PROFILE_DIR / f"{PRIOR_LONG_DOCUMENT_PROFILE_ID}.json"
 )
+LONG_DOCUMENT_V3_PROFILE_ID = "hybrid_long_document_v3"
+LONG_DOCUMENT_V3_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_V3_PROFILE_ID}.json"
 COVERAGE_SCORE_BASELINE = 0.65
 FROZEN_HYBRID_PROFILE_SHA256 = (
     "37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0"
@@ -30,6 +32,10 @@ FROZEN_LONG_DOCUMENT_PROFILE_SHA256 = (
     "1b356c0de0972ee42758f1ef9f0a7a47b283ec779f97fbe9af8f04e490dffd7a"
 )
 """Pinned after P06-62 development ablations. Not the unfrozen v1 digest."""
+FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256 = (
+    "9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8"
+)
+"""Pinned in answer-loss repair A4. Rollback is ``hybrid_long_document_v2``."""
 
 
 class UnknownRetrievalProfileError(ValueError):
@@ -62,6 +68,11 @@ class FrozenHybridProfile(BaseModel):
         coverage_thresholds: Per-class coverage_score refuse thresholds.
         dense_mode_when_version_scoped: ``exact`` for a resolved version on
             the long-document candidate; default profile stays ``ann``.
+        dense_head_pin: Dense channel-head IDs pinned into the rerank pool.
+            Default 5 equals ``CHANNEL_HEAD_PIN``; the BM25 pin stays 5.
+        fallback_order: Pool order when rerank does not complete. ``rrf``
+            keeps fused order; ``dense_first`` puts dense hits first in
+            dense-rank order, then the rest in fused order.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -87,6 +98,8 @@ class FrozenHybridProfile(BaseModel):
     mmr_candidate_depth: int = Field(default=20, ge=1)
     excerpt_strategy: Literal["prefix", "query_aware"] = "prefix"
     dense_mode_when_version_scoped: Literal["ann", "exact"] = "ann"
+    dense_head_pin: int = Field(default=5, ge=0, le=20)
+    fallback_order: Literal["rrf", "dense_first"] = "rrf"
 
 
 def canonical_profile_digest(payload: dict[str, Any]) -> str:
@@ -117,12 +130,15 @@ def runtime_profile_ids() -> frozenset[str]:
     """Return profile ids that retrieve may cache and execute.
 
     Returns:
-        Default plus the pinned long-document id when enabled.
+        Default, plus the pinned long-document ids when enabled: v2 (the
+        rollback) and v3 (the routed profile).
     """
 
     ids = {HYBRID_DEFAULT_PROFILE_ID}
     if long_document_runtime_enabled():
         ids.add(LONG_DOCUMENT_PROFILE_ID)
+    if FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256:
+        ids.add(LONG_DOCUMENT_V3_PROFILE_ID)
     return frozenset(ids)
 
 
@@ -134,7 +150,8 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
             always allow-listed. ``hybrid_long_document_v2`` is executable
             after P06-62 pins its digest. ``hybrid_long_document_v1``
             stays unfrozen. ``hybrid_packet5_v1`` is documented rollback,
-            not a second live default.
+            not a second live default. ``hybrid_long_document_v3`` is
+            executable after answer-loss repair A4 pins its digest.
 
     Returns:
         Validated frozen profile.
@@ -158,21 +175,47 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
             raise FrozenProfileMutationError("profile_id mismatch")
         return profile
     if profile_id == LONG_DOCUMENT_PROFILE_ID:
-        pin = FROZEN_LONG_DOCUMENT_PROFILE_SHA256
-        if not pin:
-            raise UnknownRetrievalProfileError(profile_id)
-        raw = json.loads(CANDIDATE_PROFILE_PATH.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
-            raise FrozenProfileMutationError("frozen profile is not an object")
-        payload = cast(dict[str, Any], raw)
-        digest = canonical_profile_digest(payload)
-        if digest != pin:
-            raise FrozenProfileMutationError("frozen profile hash mismatch")
-        profile = FrozenHybridProfile.model_validate(payload)
-        if profile.profile_id != LONG_DOCUMENT_PROFILE_ID:
-            raise FrozenProfileMutationError("profile_id mismatch")
-        return profile
+        return _load_pinned_profile(
+            profile_id, CANDIDATE_PROFILE_PATH, FROZEN_LONG_DOCUMENT_PROFILE_SHA256
+        )
+    if profile_id == LONG_DOCUMENT_V3_PROFILE_ID:
+        return _load_pinned_profile(
+            profile_id,
+            LONG_DOCUMENT_V3_PROFILE_PATH,
+            FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256,
+        )
     raise UnknownRetrievalProfileError(profile_id)
+
+
+def _load_pinned_profile(profile_id: str, path: Path, pin: str) -> FrozenHybridProfile:
+    """Load one pinned long-document profile or fail closed.
+
+    Args:
+        profile_id: Requested id. Must equal the file's ``profile_id``.
+        path: Frozen JSON artifact.
+        pin: Expected canonical digest. Empty means not executable.
+
+    Returns:
+        Validated frozen profile.
+
+    Raises:
+        UnknownRetrievalProfileError: Empty pin.
+        FrozenProfileMutationError: Not an object, hash mismatch, or id mismatch.
+        FileNotFoundError: Artifact is missing.
+    """
+
+    if not pin:
+        raise UnknownRetrievalProfileError(profile_id)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise FrozenProfileMutationError("frozen profile is not an object")
+    payload = cast(dict[str, Any], raw)
+    if canonical_profile_digest(payload) != pin:
+        raise FrozenProfileMutationError("frozen profile hash mismatch")
+    profile = FrozenHybridProfile.model_validate(payload)
+    if profile.profile_id != profile_id:
+        raise FrozenProfileMutationError("profile_id mismatch")
+    return profile
 
 
 def load_evaluation_profile(profile_id: str) -> FrozenHybridProfile:

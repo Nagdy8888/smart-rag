@@ -8,7 +8,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from threading import Lock, RLock
+from threading import Lock
 from typing import NoReturn, Protocol
 from uuid import UUID
 
@@ -18,10 +18,8 @@ from psycopg.types.json import Json
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext
-from smart_rag_core.settings.postgres_connect import (
-    connect_postgres,
-    is_transient_connect_failure,
-)
+from smart_rag_core.settings.postgres_connect import is_transient_connect_failure
+from smart_rag_core.settings.postgres_pool import BoundedConnectionPool, PoolBusyError
 from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES
 from smart_rag_core.sse.sanitize import as_json_object, validate_sse_payload
 
@@ -29,11 +27,18 @@ LOGGER = logging.getLogger(__name__)
 _REASON_PREFIX = "query_admission:"
 EVENT_STORE_LOCK_TIMEOUT = "2s"
 EVENT_STORE_LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout TO '2s'"
-EVENT_STORE_SESSION_SQL = f"SET ROLE app_api; {EVENT_STORE_LOCK_TIMEOUT_SQL}"
+EVENT_STORE_SESSION_SQL = f"SET LOCAL ROLE app_api; {EVENT_STORE_LOCK_TIMEOUT_SQL}"
 """One parameter-free round trip that selects the API role and bounds lock
-waits for the transaction. Psycopg 3 sends parameter-free multi-statement
-strings with the simple query protocol."""
+waits for this transaction only. ``SET LOCAL`` ends at commit, so a pooled
+server session never keeps ``app_api``. Psycopg 3 sends parameter-free
+multi-statement strings with the simple query protocol."""
 EVENT_STORE_IDLE_SECONDS = 60.0
+EVENT_STORE_POOL_MAX_SIZE = 4
+"""Most concurrent event-store transactions per API process. Counted inside
+the FastAPI request/RPC transaction-pooler cap (10) in
+``docs/architecture/05-database-connections.md``."""
+EVENT_STORE_POOL_WAIT_SECONDS = 2.0
+"""Longest wait for a pooled event-store session. Matches ``lock_timeout``."""
 
 
 def sqlstate_of(exc: BaseException) -> str | None:
@@ -435,95 +440,74 @@ class PostgresRunEventStore:
         *,
         monotonic_clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        """Store the app_api DSN.
+        """Store the app_api DSN and configure the session pool.
 
         Args:
             postgres_url: Postgres URL. No connection is opened here.
             monotonic_clock: Injected clock for idle-reuse tests.
         """
 
-        self._postgres_url = postgres_url
-        self._connection: psycopg.Connection | None = None
-        self._connection_lock = RLock()
-        self._last_used = 0.0
-        self._monotonic_clock = monotonic_clock
-
-    def _discard_connection(self) -> None:
-        """Close and drop the reusable session. Caller holds the lock."""
-
-        connection = self._connection
-        self._connection = None
-        self._last_used = 0.0
-        if connection is None:
-            return
-        try:
-            connection.close()
-        except Exception:
-            return
-
-    def _session(self) -> psycopg.Connection:
-        """Return a connection idle for less than 60 seconds.
-
-        Returns:
-            Open connection with prepares disabled.
-        """
-
-        connection = self._connection
-        if connection is not None and not connection.closed:
-            idle = self._monotonic_clock() - self._last_used
-            if idle < EVENT_STORE_IDLE_SECONDS:
-                return connection
-            self._discard_connection()
-        connection = connect_postgres(self._postgres_url)
-        self._connection = connection
-        self._last_used = self._monotonic_clock()
-        return connection
+        self._pool = BoundedConnectionPool(
+            postgres_url,
+            max_size=EVENT_STORE_POOL_MAX_SIZE,
+            wait_seconds=EVENT_STORE_POOL_WAIT_SECONDS,
+            idle_seconds=EVENT_STORE_IDLE_SECONDS,
+            name="sse-event-store",
+            monotonic_clock=monotonic_clock,
+        )
 
     @contextmanager
     def _transaction(self) -> Generator[psycopg.Connection, None, None]:
-        """Yield one serialized transaction on a reusable database session.
+        """Yield one transaction on a pooled database session.
 
-        Reusing the API session avoids a TLS and hosted-pooler handshake for
-        every SSE frame. Automatic prepared statements remain disabled because
-        the configured Supabase transaction pooler can switch server sessions.
-        A session idle for 60 seconds or more is closed before the next yield.
-        The lock prevents concurrent executor, heartbeat, and replay operations
-        from sharing a Psycopg transaction. Each transaction runs one
-        parameter-free statement that does ``SET ROLE app_api`` and sets
-        ``lock_timeout`` to two seconds so a run-row lock wait fails closed
-        instead of sitting until the login role's 120-second statement
-        timeout. Autocommit stays off. Any operation error rolls back
-        best-effort, discards the session, and re-raises. Append/terminal
-        callers must not replay the write.
+        Up to ``EVENT_STORE_POOL_MAX_SIZE`` transactions run at once, so a
+        replay never waits for another run's append. Reusing pooled sessions
+        avoids a TLS and hosted-pooler handshake for every SSE frame; a
+        session idle for 60 seconds or more is closed instead of reused.
+        Automatic prepared statements stay disabled because the Supabase
+        transaction pooler can switch server sessions. Each transaction
+        first runs one parameter-free statement that does
+        ``SET LOCAL ROLE app_api`` and sets ``lock_timeout`` to two seconds,
+        so the role and the limit end with the transaction and a run-row
+        lock wait fails closed instead of sitting until the login role's
+        120-second statement timeout. Autocommit stays off. Any operation
+        error rolls back best-effort, closes that session, and re-raises.
+        Append/terminal callers must not replay the write.
 
         Yields:
             Open connection with ``app_api`` selected for this transaction.
 
         Raises:
+            QueryAdmissionError: ``event_store_busy`` when no pooled session
+                frees up within ``EVENT_STORE_POOL_WAIT_SECONDS``.
             psycopg.Error: Connection, role, RPC, commit, or rollback failure.
         """
 
-        with self._connection_lock:
-            connection = self._session()
+        try:
+            connection = self._pool.acquire()
+        except PoolBusyError as exc:
+            raise QueryAdmissionError("event_store_busy") from exc
+        reusable = False
+        try:
+            connection.execute(EVENT_STORE_SESSION_SQL)
+            yield connection
+            connection.commit()
+            reusable = True
+        except BaseException:
             try:
-                connection.execute(EVENT_STORE_SESSION_SQL)
-                yield connection
-                connection.commit()
-                self._last_used = self._monotonic_clock()
-            except BaseException:
-                try:
-                    connection.rollback()
-                except Exception:
-                    LOGGER.info(
-                        "event store rollback failed",
-                        extra={
-                            "operation": "event_store_rollback",
-                            "attempt": 1,
-                            "reason": "rollback_failed",
-                        },
-                    )
-                self._discard_connection()
-                raise
+                connection.rollback()
+            except Exception:
+                LOGGER.info(
+                    "event store rollback failed",
+                    extra={
+                        "operation": "event_store_rollback",
+                        "attempt": 1,
+                        "reason": "rollback_failed",
+                    },
+                )
+            raise
+        finally:
+            self._pool.release(connection, reusable=reusable)
 
     def probe(self) -> None:
         """Open a discarded-if-stale session and prove ``SELECT 1``.
@@ -536,15 +520,15 @@ class PostgresRunEventStore:
             connection.execute("SELECT 1")
 
     def close(self) -> None:
-        """Close the reusable database session.
+        """Close pooled database sessions.
 
         Side Effects:
-            Waits for an active store transaction, then closes its connection.
-            Calling this method more than once is safe.
+            Closes idle sessions now; a session lent to an active
+            transaction is closed when that transaction ends. Calling this
+            method more than once is safe.
         """
 
-        with self._connection_lock:
-            self._discard_connection()
+        self._pool.close()
 
     def register_run(
         self,

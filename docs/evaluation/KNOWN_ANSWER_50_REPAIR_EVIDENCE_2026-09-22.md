@@ -2,7 +2,7 @@
 title: Known-answer 50 repair evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-22
+last-reviewed: 2026-09-23
 audience: engineering, reviewers
 ---
 
@@ -14,6 +14,9 @@ Root causes:
 [KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md](./KNOWN_ANSWER_50_ROOT_CAUSES_2026-09-22.md).
 Scoring rules:
 [DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md).
+A later 50-question set, written from other pages of the same PDF, is
+[FRESH_KNOWN_ANSWER_50_2026-09-23.md](./FRESH_KNOWN_ANSWER_50_2026-09-23.md).
+That run is not a rescore of the questions in this file.
 
 This is one fresh 50-question run against the rebuilt Compose `api`
 image. It does not tune profiles, prompts, or gold. No answer text, gold

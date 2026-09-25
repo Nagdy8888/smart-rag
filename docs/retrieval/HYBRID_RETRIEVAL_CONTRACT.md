@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-22
+last-reviewed: 2026-09-24
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -34,8 +34,8 @@ round-robins variants so one variant cannot consume the survivor cap.
 
 ## Long-document runtime profile (P06-62)
 
-`hybrid_long_document_v2` is the measured immutable long-document
-profile. Runtime retrieve loads it after an exact-one authorized
+`hybrid_long_document_v3` is the runtime long-document profile (answer-loss
+repair A4). Runtime retrieve loads it after an exact-one authorized
 version scope with more than five representatives, and also when the
 question stays unscoped or ambiguous, the caller can read 1 to 8 current
 documents, and the largest of those documents has more than five
@@ -51,6 +51,64 @@ ANN starts first. The 25s Hybrid ceiling is not raised. The P06-70
 gate that required this admission is
 [p06-70-stage-isolation-2026-09-21.md](../development/phase-06/p06-70-stage-isolation-2026-09-21.md)
 (`deadline_budget`).
+
+`hybrid_long_document_v3` copies `hybrid_long_document_v2` and adds two
+fields. `dense_head_pin` 12 pins the first 12 authorized dense IDs into
+the rerank pool; the BM25 pin stays `CHANNEL_HEAD_PIN` (5), and pins still
+cannot add an ID outside the fused list. `fallback_order` `dense_first`
+applies only when rerank does not complete (the reserve gate skipped it,
+or the call returned a fallback reason other than `none`): pool members
+found by dense search come first in dense-rank order, then the rest in
+fused order. A partial `rerank_v2` ranking counts as completed; only its
+appended tail uses that order. MMR, quotas, parent expansion, the 12-unit
+cap, and the 6000-token budget are unchanged. Both fields default to the
+old behavior (`5`, `rrf`), so `hybrid_default_v1` and
+`hybrid_long_document_v2` bytes and digests are unchanged. Canonical
+SHA-256 `9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8`
+(`FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256`). Rollback: route to
+`hybrid_long_document_v2`, which stays pinned and loadable. For v3 this
+replaces the rule "falls back to deterministic RRF", approved in
+[ADR-retrieved-answer-loss-repair.md](../adr/ADR-retrieved-answer-loss-repair.md).
+
+Channel-phase window (answer-loss repair A5): channels wait only
+`min(slice, max(CHANNEL_MIN_SECONDS, slice - RERANK_RESERVED_SECONDS - CHANNEL_PHASE_RESERVE_SECONDS))`
+with `CHANNEL_MIN_SECONDS` 2.0 and `CHANNEL_PHASE_RESERVE_SECONDS` 1.5
+(p90 of measured post-channel work, approved as decision D5). A channel still
+running then is a channel timeout, as before. The slice, the 25 s Hybrid
+deadline, and the 50 s run deadline are unchanged. Cutting a channel early can
+cost recall; see [HYBRID_STAGE_TIMINGS_2026-09.md](../evaluation/HYBRID_STAGE_TIMINGS_2026-09.md).
+
+## Stage timings and rerank sub-codes
+
+`HybridBranchDiagnostics` carries two ID-free fields.
+`stage_timings_ms` maps stage names to non-negative integer
+milliseconds. Allowed keys are `HYBRID_STAGE_TIMING_KEYS` in
+`retrieval/profiles.py`: `scope_ms`, `embed_ms`, `channels_ms`,
+`channel_dense_ms`, `channel_bm25_ms`, `channel_term_ms`,
+`assemble_ms`, `temporal_load_ms`, `pool_preload_ms`,
+`rerank_gate_remaining_ms`, `rerank_call_ms`, `selection_ms`,
+`locator_reload_ms`, and `retrieve_total_ms`. A channel that timed out
+has no `channel_*_ms` key. `rerank_call_ms` exists only when the
+rerank callback ran, so a `rerank_timeout` without it means the
+remaining-slice gate skipped the call. `rerank_gate_remaining_ms` is
+the remaining slice that the gate compared with
+`RERANK_RESERVED_SECONDS`; it is measured before pool preload. Cache
+hits and fail-closed returns carry only `scope_ms`.
+
+`rerank_invalid_subcode` is `json`, `hash`, `length`, `duplicate`, or
+`unknown_id` when `rerank_fallback` is `rerank_schema_invalid` and the
+payload failed application validation (`RerankPayloadError`). It is
+empty otherwise, including when the provider text was not JSON (the
+gateway fails before a payload exists). The diagnostics builder drops
+unknown keys, negative values, and unknown sub-codes instead of
+failing the branch.
+
+`scripts/eval_ask_stage_export.py` writes both fields per run
+(`unknown` for older checkpoints). Its per-run
+`bm25_degraded_explicit` is `False` when `fallback_reason` is `none`
+or empty, and runs with `none` do not lower the aggregate flag.
+Measured values:
+[HYBRID_STAGE_TIMINGS_2026-09.md](../evaluation/HYBRID_STAGE_TIMINGS_2026-09.md).
 
 ## Claim hygiene (Packet 9 metrics)
 
@@ -222,9 +280,9 @@ flowchart TD
   fused["Authorized fused IDs"] --> pool["Top-20 pool: profile cap per document, plus channel-head pins"]
   pool --> skip{"Trivial exact and two channels?"}
   skip -->|yes| mmrSkip["MMR plus quotas. No model call"]
-  skip -->|no| oneCall["One Responses json_schema call. max_retries=0. No tools"]
-  oneCall --> valid{"Set-equality and ranks valid?"}
-  valid -->|no| rrf["Keep fused RRF order. Typed fallback"]
+  skip -->|no| oneCall["One Responses json_schema call with c01-c20 labels. max_retries=0. No tools"]
+  oneCall --> valid{"Valid shape and at least one known label?"}
+  valid -->|no| rrf["Fused RRF order, or dense-first on v3. Typed fallback"]
   valid -->|yes| mmr["MMR plus document/section quotas"]
   mmrSkip --> parents["Recheck parents. Adjacent from authorized pool"]
   rrf --> parents
@@ -234,13 +292,30 @@ flowchart TD
 
 Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md).
 
+`rerank_v2` (answer-loss repair A3) sends each pool candidate as a
+label `c01` to `c20` in pool order plus its canonical excerpt. Chunk
+UUIDs and the input hash never reach the model; the adapter still
+computes the hash and traces it. The strict schema is
+`{status, ranking, support}`: `ranking` is an array of label enum
+values (1 to pool-size items) and `support` maps every label to
+`[0, 1]`. The schema depends only on the pool size. The server maps
+labels back to IDs, keeps the first occurrence of each label, ignores
+unknown labels, and appends unranked candidates in fallback order (fused, or dense-first under `hybrid_long_document_v3`) with
+support 0. A partial ranking still counts as a completed rerank
+(`rerank_fallback` `none`); diagnostics record `rerank_partial`,
+`rerank_ranked_count`, and `rerank_appended_count`. A payload that
+fails the shape check (`json`), an empty ranking (`length`), or a
+ranking with no known label (`unknown_id`) is `rerank_schema_invalid`
+with that sub-code. Provider text that is not JSON stays
+`rerank_schema_invalid` with an empty sub-code. One call, no retry.
+
 The frozen `hybrid_default_v1` numbers in the table below are unchanged.
 At runtime the pool is fused order under that profile's per-document cap,
 plus up to five dense heads and five BM25 heads that are already in the
 authorized fused list (`CHANNEL_HEAD_PIN`). Pins bypass the per-document
 cap, count toward the pool size, and keep fused order. A small authorized
-corpus selects `hybrid_long_document_v2` instead, whose own frozen cap is
-20 and whose document quota is 12. See
+corpus selects `hybrid_long_document_v3` instead, whose own frozen cap is
+20, whose document quota is 12, and whose dense pin is 12. See
 [ADR-small-corpus-long-document-and-channel-pins.md](../adr/ADR-small-corpus-long-document-and-channel-pins.md).
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
@@ -248,7 +323,7 @@ corpus selects `hybrid_long_document_v2` instead, whose own frozen cap is
 | Rerank pool | IDs | Plan | 2–20 | **20** | `hybrid_default_v1` | `build_rerank_pool` | retrieval | 20 | Packet 6 |
 | Max passages per document in pool | IDs | Plan | 1–5 | **5** | unit quota test | Duplicates cannot crowd the pool | retrieval | 5 | Packet 6 |
 | Rerank model | model id | OpenAI Responses structured output | allow-listed | **`gpt-4o-mini`** | `openai==2.26.0` | Mock identity in CI; live unverified | retrieval | `gpt-4o-mini` | Packet 6 live bake-off |
-| Rerank prompt | version | Packet 5 | `rerank_v1` | **`rerank_v1`** | SHA-256 `4767049107cfe6e8591c84d3b1d202393dfd2564383e6c5bfa0bd5fece8f1925` | Changelog | retrieval | `rerank_v1` | Prompt edit |
+| Rerank prompt | version | Answer-loss repair A3 | `rerank_v1`, `rerank_v2` | **`rerank_v2`** | SHA-256 `995a87d869b3330aac0b5e2d64b764a32cc8542c7d85d9182118945ce9560cab`; `rerank_v1` stays pinned as `RERANK_V1_PROMPT_SHA256` | Changelog | retrieval | `rerank_v1` | Prompt edit |
 | SDK retries | count | Plan one-operation | 0 | **0** | OpenAI client `max_retries=0` | Timeout/429 fall back to RRF | retrieval | 0 | SDK bump |
 | Excerpt bound | chars / passage | Input bound | 1–400 | **400** | `RERANK_EXCERPT_CHARS` | Canonical `raw_text` only | retrieval | 400 | Token miss |
 | MMR lambda | mix | Plan | (0, 1] | **0.7** provisional | Jaccard on `arabic_norm_v1` | Unit diversity test | retrieval | 0.7 | Packet 6 |

@@ -18,7 +18,10 @@ from smart_rag_core.retrieval.hybrid_run.types import (
     VariantLists,
 )
 from smart_rag_core.retrieval.profiles import (
+    CHANNEL_MIN_SECONDS,
+    CHANNEL_PHASE_RESERVE_SECONDS,
     MAX_NORMALIZED_QUERY_CHARS,
+    RERANK_RESERVED_SECONDS,
     RetrievalFallbackReason,
 )
 from smart_rag_core.retrieval.temporal import TemporalDocument, TemporalIntent
@@ -261,3 +264,24 @@ def fused_first_evidence_ms(*, started: float, fused_at: float | None) -> float:
     if fused_at is None:
         return elapsed_ms(started)
     return max(0.0, (fused_at - started) * 1000.0)
+
+
+def channel_phase_deadline_seconds(slice_seconds: float) -> float:
+    """Return how long channels may run inside one retrieve slice.
+
+    The channel phase ends early enough that post-channel work
+    (``CHANNEL_PHASE_RESERVE_SECONDS``) plus the rerank reserve
+    (``RERANK_RESERVED_SECONDS``) still fit in the slice. The result is at
+    least ``CHANNEL_MIN_SECONDS`` and never more than the slice itself.
+
+    Args:
+        slice_seconds: Retrieve slice in seconds (already clamped by the
+            Hybrid branch).
+
+    Returns:
+        Channel wait in seconds. A channel still running then is reported as
+        timed out by ``run_channels_parallel``.
+    """
+
+    reserved = RERANK_RESERVED_SECONDS + CHANNEL_PHASE_RESERVE_SECONDS
+    return min(slice_seconds, max(CHANNEL_MIN_SECONDS, slice_seconds - reserved))

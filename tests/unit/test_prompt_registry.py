@@ -37,6 +37,7 @@ def test_summary_v1_is_versioned_and_hashed() -> None:
             "eval_pdf_judge_v1",
             "answer_v2",
             "answer_v3",
+            "answer_v4",
             "web_critique_v1",
             "web_answer_v1",
         }

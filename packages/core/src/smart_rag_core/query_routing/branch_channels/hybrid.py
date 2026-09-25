@@ -27,7 +27,12 @@ from smart_rag_core.query_routing.protocols import HybridRetrieveLike
 from smart_rag_core.retrieval.cache_store import RetrievalCacheMode
 from smart_rag_core.retrieval.context import ContextFn
 from smart_rag_core.retrieval.context_loader import ChunkContext
-from smart_rag_core.retrieval.profiles import RETRIEVAL_SLICE_SECONDS
+from smart_rag_core.retrieval.profiles import (
+    HYBRID_STAGE_TIMING_KEYS,
+    RERANK_INVALID_SUBCODES,
+    RERANK_POOL_SIZE,
+    RETRIEVAL_SLICE_SECONDS,
+)
 from smart_rag_core.security.identity import CallerContext
 
 
@@ -233,6 +238,15 @@ def hybrid_diagnostics_from_outcome(
         evidence_ratio=getattr(coverage, "evidence_ratio", None),
         support_confidence=getattr(coverage, "support_confidence", None),
         effective_route=effective_route,
+        stage_timings_ms=_stage_timings(getattr(outcome, "stage_timings_ms", None)),
+        rerank_invalid_subcode=_invalid_subcode(
+            getattr(outcome, "rerank_invalid_subcode", "")
+        ),
+        rerank_partial=_bounded_count(getattr(outcome, "rerank_appended_count", 0)) > 0,
+        rerank_ranked_count=_bounded_count(getattr(outcome, "rerank_ranked_count", 0)),
+        rerank_appended_count=_bounded_count(
+            getattr(outcome, "rerank_appended_count", 0)
+        ),
     )
 
 
@@ -262,6 +276,62 @@ def _uuid_ids(values: object, cap: int) -> tuple[str, ...]:
             continue
         kept.append(text)
     return tuple(kept)
+
+
+def _stage_timings(value: object) -> dict[str, int]:
+    """Keep allow-listed, non-negative integer stage timings.
+
+    Args:
+        value: ``stage_timings_ms`` from the retrieve outcome, or anything.
+
+    Returns:
+        A new dict with only known keys and non-negative ``int`` values.
+        Booleans, floats, strings, and unknown keys are dropped, so a bad
+        value never fails the branch.
+    """
+
+    if not isinstance(value, dict):
+        return {}
+    kept: dict[str, int] = {}
+    for key, item in cast(dict[object, object], value).items():
+        if not isinstance(key, str) or key not in HYBRID_STAGE_TIMING_KEYS:
+            continue
+        if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+            continue
+        kept[key] = item
+    return kept
+
+
+def _invalid_subcode(value: object) -> str:
+    """Return an allow-listed rerank validation sub-code or empty.
+
+    Args:
+        value: ``rerank_invalid_subcode`` from the retrieve outcome.
+
+    Returns:
+        The value when it is in ``RERANK_INVALID_SUBCODES``, else ``""``.
+    """
+
+    if isinstance(value, str) and value in RERANK_INVALID_SUBCODES:
+        return value
+    return ""
+
+
+def _bounded_count(value: object) -> int:
+    """Return a rerank count in ``[0, RERANK_POOL_SIZE]``, else 0.
+
+    Args:
+        value: Count from the retrieve outcome, or anything.
+
+    Returns:
+        The integer when it is a non-boolean int in range, else ``0``.
+    """
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    if value < 0 or value > RERANK_POOL_SIZE:
+        return 0
+    return value
 
 
 def chunk_loader(
