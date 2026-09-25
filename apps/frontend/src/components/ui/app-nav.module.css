@@ -1,13 +1,13 @@
 /**
- * Ink rail navigation, brand, and collapsed/expanded width.
+ * Tinted nav rail, brand, and collapsed/expanded width.
  */
 
 .nav {
   display: none;
   box-sizing: border-box;
-  background: var(--color-ink);
-  border-inline-end: 1px solid var(--color-ink-border);
-  color: var(--color-ink-text);
+  background: var(--color-surface-muted);
+  border-inline-end: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   padding: calc(var(--space) * 4);
 }
 
@@ -25,14 +25,14 @@
   min-width: 32px;
   min-height: 32px;
   padding: 0;
-  color: var(--color-ink-text);
+  color: var(--color-text-secondary);
   background: transparent;
-  border: 1px solid var(--color-ink-border);
+  border: 1px solid var(--color-border);
 }
 
 .navToggle:hover {
-  background: var(--color-ink-raised);
-  color: #fff;
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .brand {
@@ -49,11 +49,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: var(--gradient-brand);
-  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   flex: 0 0 auto;
 }
 
@@ -64,12 +67,12 @@
 }
 
 .brandName {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 15px;
   line-height: 20px;
-  letter-spacing: -0.02em;
-  color: #fff;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -99,10 +102,11 @@
   margin: 0 0 calc(var(--space) * 1);
   padding-inline: calc(var(--space) * 3);
   color: var(--color-text-muted);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text-muted);
 }
 
 .navList {
@@ -124,7 +128,7 @@
 
 .navRow a,
 .profileLink {
-  color: var(--color-ink-text-muted);
+  color: var(--color-text-secondary);
   text-decoration: none;
   min-height: 40px;
   height: 40px;
@@ -134,7 +138,7 @@
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   font-weight: 500;
   transition:
@@ -144,25 +148,19 @@
 
 .navRow a:hover,
 .profileLink:hover {
-  background: var(--color-ink-raised);
-  color: var(--color-ink-text);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .navRow a[aria-current="page"] {
   font-weight: 600;
-  color: #fff;
-  background: var(--color-ink-raised);
-  box-shadow: none;
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border);
 }
 
-.navRow a[aria-current="page"]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--color-accent);
+.navRow a[aria-current="page"] svg {
+  color: var(--color-accent);
 }
 
 .userBlock {
@@ -199,7 +197,7 @@
     max-height: 100vh;
     max-height: 100dvh;
     overflow: auto;
-    transition: none;
+    transition: width var(--duration-fast) var(--ease-smooth-out), flex-basis var(--duration-fast) var(--ease-smooth-out);
   }
 
   .navToggle,
@@ -268,4 +266,12 @@
   .navIsCollapsed .navToggle {
     align-self: center;
   }
+}
+
+.navRow a svg {
+  transition: color var(--motion-fast);
+}
+
+.navToggle {
+  transition: background-color var(--motion-fast), color var(--motion-fast);
 }

@@ -1,7 +1,8 @@
 ---
 title: ADR — Ink & Indigo visual refresh supersedes Precision Workspace theme values
 adr_id: ADR-ink-indigo-visual-refresh
-status: accepted
+status: superseded
+superseded_by: ADR-quiet-tool-visual-refresh
 owner: engineering-lead
 last-reviewed: 2026-08-25
 approver: "user (Cursor chat; no legal name provided)"
@@ -13,7 +14,7 @@ audience: frontend, reviewers
 
 ## Status
 
-`accepted` — 2026-08-25. The user approved a bolder visual redesign after
+`superseded` by [ADR-quiet-tool-visual-refresh](./ADR-quiet-tool-visual-refresh.md) on 2026-09-25. The user approved a bolder visual redesign after
 auditing the live console: keep Next.js 16 + React 19, keep the existing
 Auth/API/SSE contracts, and replace the light all-white Precision Workspace
 hex values with an ink navigation rail and deeper indigo accent.

@@ -8,7 +8,7 @@ describe("public auth paths", () => {
     expect(isPublicAuthPath("/mfa/challenge")).toBe(false);
     expect(isPublicAuthPath("/mfa/enroll")).toBe(false);
     expect(isPublicAuthPath("/unavailable/GAP-07-07")).toBe(false);
-    expect(isPublicAuthPath("/fonts/inter-latin-400-normal.woff2")).toBe(true);
+    expect(isPublicAuthPath("/fonts/ibm-plex-sans-latin-400-normal.woff2")).toBe(true);
     expect(isPublicAuthPath("/")).toBe(false);
     expect(isPublicAuthPath("/invitations/accept")).toBe(false);
   });

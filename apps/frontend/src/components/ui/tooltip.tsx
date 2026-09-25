@@ -16,7 +16,7 @@ export type TooltipProps = {
   children: ReactNode;
   /**
    * `end` uses a viewport-fixed panel to the right of the trigger so
-   * collapsed ink-rail labels are not clipped by `overflow: auto`.
+   * collapsed nav-rail labels are not clipped by `overflow: auto`.
    */
   placement?: TooltipPlacement;
 };

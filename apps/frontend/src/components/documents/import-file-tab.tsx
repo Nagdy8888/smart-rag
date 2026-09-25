@@ -138,8 +138,7 @@ export function ImportFileTab({
         I attest this source is allowed under the current processing policy.
       </label>
       <p className={styles.muted}>
-        Uploads use your signed-in session. A reservation is never treated as
-        ready for search.
+        Files become searchable after processing finishes.
       </p>
       <Button
         type="button"

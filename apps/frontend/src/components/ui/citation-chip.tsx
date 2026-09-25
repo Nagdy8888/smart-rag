@@ -60,7 +60,9 @@ export function CitationChip({
       {source !== undefined && source !== "" ? (
         <>
           {" "}
-          <UserText value={source} />
+          <span className={styles.chipLabel}>
+            <UserText value={source} />
+          </span>
         </>
       ) : null}
       {unavailable && (label === undefined || label === "")

@@ -12,10 +12,11 @@
 .workspace {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
+  gap: calc(var(--space) * 6);
   flex: 1;
   min-height: 0;
   align-items: stretch;
+  transition: grid-template-columns var(--duration-fast) var(--ease-smooth-out);
 }
 
 .rail {
@@ -28,10 +29,11 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: calc(var(--space) * 3);
+  background: transparent;
+  border: 0;
+  border-inline-end: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 0 calc(var(--space) * 4) 0 0;
 }
 
 .railHeader {
@@ -62,16 +64,17 @@
 }
 
 .railIsCollapsed {
-  padding: calc(var(--space) * 2);
+  padding: 0 calc(var(--space) * 2) 0 0;
   align-items: center;
   justify-content: flex-start;
 }
 
 .railTitle {
   margin: 0;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-height);
   font-weight: 600;
+  color: var(--color-text-secondary);
 }
 
 .railCollapse {
@@ -88,7 +91,7 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 16px;
 }
 
@@ -107,6 +110,29 @@
      top of each other. Rows keep their content height; the list scrolls. */
   flex-shrink: 0;
   height: auto;
+  animation: enter-rise-small var(--duration-fast) var(--ease-smooth-out) backwards;
+}
+
+.railList > li:nth-child(2) {
+  animation-delay: calc(var(--duration-stagger) * 1);
+}
+.railList > li:nth-child(3) {
+  animation-delay: calc(var(--duration-stagger) * 2);
+}
+.railList > li:nth-child(4) {
+  animation-delay: calc(var(--duration-stagger) * 3);
+}
+.railList > li:nth-child(5) {
+  animation-delay: calc(var(--duration-stagger) * 4);
+}
+.railList > li:nth-child(6) {
+  animation-delay: calc(var(--duration-stagger) * 5);
+}
+.railList > li:nth-child(7) {
+  animation-delay: calc(var(--duration-stagger) * 6);
+}
+.railList > li:nth-child(n + 8) {
+  animation-delay: calc(var(--duration-stagger) * 7);
 }
 
 .conversationRow {
@@ -136,6 +162,11 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition: background-color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.conversationButton:hover {
+  background: var(--color-surface-hover);
 }
 
 .conversationCopy {
@@ -151,6 +182,7 @@
   color: var(--color-text-muted);
   font-size: 12px;
   line-height: 16px;
+  font-variant-numeric: tabular-nums;
 }
 
 .conversationTitle {
@@ -172,11 +204,12 @@
 .conversationRow:hover .conversationDelete,
 .conversationRow:focus-within .conversationDelete {
   display: inline-flex;
+  animation: enter-fade var(--duration-quick) var(--ease-in-out) backwards;
 }
 
 .conversationRow[data-selected="true"] .conversationButton {
   background: var(--color-surface-selected);
-  border-color: var(--color-accent-border);
+  border-color: transparent;
 }
 
 .workspaceSessionsExpanded {
@@ -198,5 +231,21 @@
   .workspace > .rail {
     display: flex;
     max-height: 28vh;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 0 calc(var(--space) * 3);
+  }
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes enter-rise-small {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
   }
 }

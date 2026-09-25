@@ -1,8 +1,8 @@
 # Design tokens and primitives
 
-Canonical live values are the Ink & Indigo refresh in
-[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md)
-(user-approved 2026-08-25). That ADR supersedes the Precision Workspace
+Canonical live values are the quiet work-tool refresh in
+[ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md)
+(accepted 2026-09-25). That ADR supersedes Ink & Indigo and the Precision Workspace
 hex table in
 [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md).
 `:root` in `apps/frontend/src/app/globals.css` and
@@ -27,31 +27,30 @@ Primitives live under `apps/frontend/src/components/ui/` (`Button` /
 
 Set or retain these exact CSS variables:
 
-- `--color-bg: #F6F7F9` — application canvas.
-- `--color-surface: #FFFFFF` — cards, drawers, topbar, inputs.
-- `--color-surface-muted: #F1F3F6` — secondary panels, table headers, code blocks.
-- `--color-surface-hover: #EDEFF4` — neutral hover.
-- `--color-surface-selected: #EEF2FF` — selected list item.
-- `--color-text: #101828` — primary text.
-- `--color-text-secondary: #475467` — secondary body text.
-- `--color-text-muted: #667085` — metadata and helper text.
-- `--color-text-disabled: #98A2B3` — disabled text only.
-- `--color-border: #E4E7EC` — normal borders.
-- `--color-border-strong: #CBD5E1` — emphasized separators and input hover.
-- `--color-accent: #4F46E5` — primary action.
-- `--color-accent-hover: #4338CA` — primary hover.
-- `--color-accent-pressed: #3730A3` — primary pressed.
-- `--color-accent-fg: #FFFFFF` — text on primary action.
-- `--color-accent-muted: #EEF2FF` — active/selected background.
-- `--color-accent-border: #C7D2FE` — selected outline.
-- `--color-ink: #0F1420` — navigation rail background.
-- `--color-ink-raised: #1A2132` — nav hover/active.
-- `--color-ink-border: #232B3E`.
-- `--color-ink-text: #E2E6EF`.
-- `--color-ink-text-muted: #8E97AB`.
-- `--color-evidence: #0E8584` — citations and evidence accents.
-- `--color-evidence-hover: #0A6F6E`.
-- `--color-evidence-muted: #ECFDFC`.
+- `--color-bg: #F7F7F5` — application canvas.
+- `--color-surface: #FFFFFF` — content column, top bar, inputs.
+- `--color-surface-muted: #F2F2EF` — nav rail, secondary panels.
+- `--color-surface-hover: #EDEDEA` — neutral hover.
+- `--color-surface-selected: #E9EEF5` — selected list item.
+- `--color-text: #1D1D1B` — primary text.
+- `--color-text-secondary: #4A4A46` — secondary body text.
+- `--color-text-muted: #6B6B66` — metadata and helper text.
+- `--color-text-disabled: #A3A39E` — disabled text only.
+- `--color-border: #E3E3DF` — normal borders.
+- `--color-border-strong: #CBCBC5` — emphasized separators and input hover.
+- `--color-primary: #1D1D1B` — ink primary button.
+- `--color-primary-hover: #2E2E2B`.
+- `--color-primary-pressed: #3A3A36`.
+- `--color-primary-fg: #FFFFFF` — text on the ink button.
+- `--color-accent: #3B5B8C` — slate-blue accent, not the primary button.
+- `--color-accent-hover: #324E7A`.
+- `--color-accent-pressed: #2A4167`.
+- `--color-accent-fg: #FFFFFF`.
+- `--color-accent-muted: #E9EEF5`.
+- `--color-accent-border: #C3CEDF`.
+- `--color-evidence: #0A6F6E` — citations only.
+- `--color-evidence-hover: #085958`.
+- `--color-evidence-muted: #E8F4F3`.
 - `--color-success: #166534`.
 - `--color-success-bg: #F0FDF4`.
 - `--color-success-border: #BBF7D0`.
@@ -65,12 +64,12 @@ Set or retain these exact CSS variables:
 - `--color-info: #1D4ED8`.
 - `--color-info-bg: #EFF6FF`.
 - `--color-info-border: #BFDBFE`.
-- `--color-focus: #4F46E5`.
-- `--color-overlay: rgb(15 23 42 / 0.42)` — modal/sheet overlay, with no blur.
+- `--color-focus: #3B5B8C`.
+- `--color-overlay: rgb(29 29 27 / 0.4)` — modal/sheet overlay, with no blur.
 
 Rules:
 
-- `--gradient-brand` may appear only on the auth brand panel, empty-state icon tile, and nav logo tile. No other gradients. Skeleton shimmer is the one loading exception.
+- No gradients. The skeleton is a solid `--color-surface-hover` pulse.
 - No glass, transparency-based cards, or `backdrop-filter`.
 - No pure black text.
 - White text is used only on accent/danger fills that pass WCAG AA.
@@ -81,17 +80,16 @@ Rules:
 
 Font families:
 
-- Body: locally hosted `Inter`, weights 400, 500, and 600 only.
-- Headings: locally hosted `Inter Display` weight 600, then Inter.
-- Fallback: `"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif`.
+- Body and headings: locally hosted IBM Plex Sans and IBM Plex Sans Arabic, weights 400, 500, and 600.
+- Fallback: `"Segoe UI", "Noto Naskh Arabic", sans-serif`.
 - Monospace: `ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace`.
 - Do not download fonts at runtime.
 
 Type scale (size/line-height, weight, letter-spacing):
 
-- Hero: 32/40, 600, `-0.02em`.
-- Page title: 24/32, 600, `-0.02em` (Inter Display).
-- Auth title: 28/36, 600 (Inter Display).
+- Hero: 28/36, 600, `-0.01em`.
+- Page title: 20/28, 600, `-0.01em` (IBM Plex Sans).
+- Auth title: 24/32, 600 (IBM Plex Sans).
 - Section: 18/26, 600.
 - Card title: 15/22, 600.
 - Body: 14/22, 400.
@@ -140,8 +138,7 @@ Geometry:
 
 Radius:
 
-- Buttons, inputs, selects, search, compact controls: 10px (`--radius-control`).
-- Cards, panels, banners, menus: 14px (`--radius-card`).
+- Citation markers: 4px. Controls: 6px (`--radius-control`). Panels and cards: 8px (`--radius-md`). Overlays: 10px (`--radius-lg`). Pills: 999px.
 - Dialogs and drawers: 14px.
 - Composer card: 16px.
 - Avatar: 50% circle.
@@ -153,7 +150,7 @@ Borders/elevation:
 - Standard border: `1px solid var(--color-border)`.
 - Strong/hover border: `1px solid var(--color-border-strong)`.
 - Selected border: `1px solid var(--color-accent-border)`.
-- `--shadow-1: 0 1px 3px rgb(16 24 40 / 0.10)` for raised cards and menus.
+- `--shadow-1: none`. Resting surfaces use a border and no shadow. Overlays use `--shadow-2`.
 - `--shadow-2: 0 12px 32px rgb(16 24 40 / 0.14)` for dialogs and drawers.
 - `--shadow-composer: 0 8px 24px rgb(16 24 40 / 0.12)` for the Ask composer.
 - Never stack multiple shadows or use glow effects.
@@ -238,6 +235,7 @@ An ordinary rounded rectangle, never a decorative shape.
 - Normal minimum height 104px.
 - Chat composer minimum 52px and maximum 180px, auto-resizing; after max height it scrolls internally.
 - Character counter appears only after 80% of the server limit.
+- `hideLabel` keeps the accessible name and hides the visible label. The Ask composer uses it.
 
 #### `Checkbox`
 
@@ -250,8 +248,8 @@ An ordinary rounded rectangle, never a decorative shape.
 
 - Use for Admin sections and list/canvas switching only.
 - Horizontal tab list with 40px tab height.
-- Active tab has accent text and a 2px bottom border; inactive tabs have secondary text.
-- No pill-style segmented tabs for page-level navigation.
+- Active tab has ink text and a 2px underline that grows from the center. Inactive tabs have secondary text.
+- Documents import and Save-to-quiz use a segmented control, not underline tabs.
 - Arrow keys move focus; Home/End supported.
 - URL-addressable page tabs update the query string.
 
@@ -311,6 +309,7 @@ An ordinary rounded rectangle, never a decorative shape.
 - Status is a pill; timestamps are secondary text; actions are one overflow IconButton.
 - Sortable header is a real button with direction icon and accessible state.
 - On mobile, retain a semantic scroll region or render cards with the same field labels; do not hide critical fields without a detail path.
+- `variant="bare"` drops the outer frame when the table already sits inside a panel. The default remains framed.
 
 #### `Pagination`
 
@@ -322,11 +321,9 @@ An ordinary rounded rectangle, never a decorative shape.
 
 #### `EmptyState`
 
-- Centered within a minimum 240px region.
-- 40px muted icon in a 56px accent-muted square with 12px radius.
-- Title 16px/24px weight 600; body 14px, max width 420px.
-- At most one primary and one secondary action, both real.
-- Do not include illustrations or stock images.
+- Left-aligned and borderless. Never place it inside a card.
+- The icon is optional and is never a sparkle.
+- Title and body stay short. At most one primary and one secondary action, both real.
 
 #### `ErrorState`
 

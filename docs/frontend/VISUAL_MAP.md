@@ -2,7 +2,7 @@
 title: Stitch visual composition map
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-09-25
 audience: frontend, reviewers
 ---
 
@@ -12,8 +12,8 @@ Historical route-to-screenshot map for the Stitch export. On 2026-08-24
 the user rejected those screenshots as the live composition target. They
 remain local historical references only (gitignored
 `docs/stitch_smart_rag_enterprise_console/`; not a CI docs target). Do
-not import that folder. Current composition is the light Precision
-Workspace in [STITCH_BRIEF.md](./STITCH_BRIEF.md) and
+not import that folder. Current composition is the quiet work-tool console in
+[ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md) and
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
 
 Related: [ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md) ·

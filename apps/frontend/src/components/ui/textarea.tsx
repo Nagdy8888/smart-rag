@@ -4,12 +4,15 @@
 
 import type { ReactNode, TextareaHTMLAttributes } from "react";
 import styles from "./styles/controls.module.css";
+import uiStyles from "./ui.module.css";
 
 export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   /** Visible English label. */
   label: ReactNode;
   /** Optional error text. */
   error?: string;
+  /** Keep the label for screen readers but hide it visually. The accessible name is unchanged. */
+  hideLabel?: boolean;
   /** Drop the 520px field cap so the control can fill its parent. */
   fullWidth?: boolean;
 };
@@ -27,6 +30,7 @@ export function Textarea({
   id,
   className,
   fullWidth = false,
+  hideLabel = false,
   ...rest
 }: TextareaProps) {
   const inputId =
@@ -40,7 +44,7 @@ export function Textarea({
     .join(" ");
   return (
     <label className={fieldClass} htmlFor={inputId}>
-      {label}
+      {hideLabel ? <span className={uiStyles.srOnly}>{label}</span> : label}
       <textarea
         id={inputId}
         className={combined}

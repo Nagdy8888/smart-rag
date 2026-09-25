@@ -100,7 +100,7 @@ test("login geometry, overflow, and mapped Sign in at required viewports", async
       };
     });
     expect(box.height).toBe(40);
-    expect(box.radius).toBe("10px");
+    expect(box.radius).toBe("6px");
     const email = page.getByLabel("Email");
     const inputHeight = await email.evaluate((element) =>
       Math.round(element.getBoundingClientRect().height),

@@ -190,7 +190,7 @@ describe("AnswerSurface origin chrome", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByText(
-        "Ask a general question, or ask about your company documents for a cited answer.",
+        "Ask about your documents",
       ),
     ).not.toBeInTheDocument();
   });
@@ -210,7 +210,7 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.getByText("Loading conversation…")).toBeInTheDocument();
     expect(
       screen.queryByText(
-        "Ask a general question, or ask about your company documents for a cited answer.",
+        "Ask about your documents",
       ),
     ).not.toBeInTheDocument();
   });
@@ -329,7 +329,7 @@ describe("AnswerSurface origin chrome", () => {
     );
     expect(
       screen.getByText(
-        "Ask a general question, or ask about your company documents for a cited answer.",
+        "Ask about your documents",
       ),
     ).toBeInTheDocument();
   });

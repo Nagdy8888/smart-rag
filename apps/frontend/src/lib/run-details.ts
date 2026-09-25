@@ -215,6 +215,8 @@ export function runStatusSummary(
 /**
  * Return the icon for a known search mode.
  *
+ * Unknown routes use the search icon.
+ *
  * @param route - Server `route_family`.
  * @returns Typed icon name.
  */
@@ -228,7 +230,7 @@ export function routeIcon(route: string | null | undefined): IconName {
   if (route === "hybrid" || route === "combined" || route === "composite" || route === "web_research") {
     return "search";
   }
-  return "spark";
+  return "search";
 }
 
 export type SearchModeChatSlice = {

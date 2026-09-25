@@ -1,7 +1,7 @@
 # Workspace screens
 
-Live composition follows the Ink & Indigo refresh in
-[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md),
+Live composition follows the quiet work-tool refresh in
+[ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md),
 [`globals.css`](../../apps/frontend/src/app/globals.css), and
 [`design-tokens.ts`](../../apps/frontend/src/lib/design-tokens.ts). The
 Phase 8 visual-contract packet remains the interaction source; hex values,
@@ -16,16 +16,16 @@ where they disagree.
 
 - Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`. Width does not animate. The shell height is `100vh` then `100dvh` so Edge on Windows still fills the viewport.
 - At `>=1024px` a 32px ghost “Collapse navigation” / “Expand navigation” icon control sits at the **rail bottom**. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle. A later `1280px` rule must not force the expanded width; collapsed classes win at every desktop width.
-- Nav rail uses `--color-ink` with `--color-ink-border` on the trailing edge. Topbar stays white with a bottom border.
-- Main area uses canvas background and owns vertical scrolling.
+- Nav rail uses `--color-surface-muted` with a 1px `--color-border` on the trailing edge. Topbar and the content column stay white.
+- Main owns vertical scrolling.
 - Skip link is visually hidden until focused, then appears at top-left as a Primary-style link.
 - No footer is needed.
 
 #### Brand block
 
 - Height 56px, 16px horizontal padding.
-- 32px logo tile with `--gradient-brand` and a white spark icon.
-- “Smart RAG” Inter Display 15px, `--color-ink-text`. No subtitle.
+- 28px ink monogram `SR`. No spark icon and no gradient.
+- “Smart RAG” IBM Plex Sans 15px. No subtitle.
 - Collapsed nav shows mark only with tooltip.
 
 #### `AppNav`

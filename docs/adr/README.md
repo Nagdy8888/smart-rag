@@ -32,7 +32,8 @@ audience: engineering
 | Stitch-first production UX | accepted | 8 UX | [ADR-stitch-first-ux.md](./ADR-stitch-first-ux.md) |
 | Frontend functional overhaul | accepted | 8 remediation | [ADR-frontend-functional-overhaul.md](./ADR-frontend-functional-overhaul.md) |
 | Verified-answer paced reveal and custom progress | accepted | 6/8 amendment | [ADR-verified-answer-paced-reveal.md](./ADR-verified-answer-paced-reveal.md) |
-| Ink & Indigo visual refresh | accepted | 8 UX | [ADR-ink-indigo-visual-refresh.md](./ADR-ink-indigo-visual-refresh.md) |
+| Ink & Indigo visual refresh | superseded | 8 UX | [ADR-ink-indigo-visual-refresh.md](./ADR-ink-indigo-visual-refresh.md) |
+| Quiet work-tool visual refresh | accepted | 8 UX | [ADR-quiet-tool-visual-refresh.md](./ADR-quiet-tool-visual-refresh.md) |
 | General-chat strict split | accepted | 6/8 amendment | [ADR-general-chat-strict-split.md](./ADR-general-chat-strict-split.md) |
 | Local PDF evaluation workspace | superseded | 6 overlay | [ADR-local-pdf-evaluation-workspace.md](./ADR-local-pdf-evaluation-workspace.md) |
 | Hosted webapp evaluation workspace | accepted | 6 overlay | [ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md) |

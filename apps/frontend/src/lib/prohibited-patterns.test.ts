@@ -75,7 +75,7 @@ describe("prohibited production patterns", () => {
     path.join(frontendRoot, "postcss.config.mjs"),
   ];
 
-  it("rejects CDN, innerHTML, dead hashes, blur, fonts, avatars, and random auth", () => {
+  it("rejects CDN, innerHTML, dead hashes, blur, gradients, sparkle icons, fonts, avatars, motion misuse, and random auth", () => {
     const hits: string[] = [];
     for (const file of files) {
       const text = readFileSync(file, "utf8");
@@ -96,10 +96,40 @@ describe("prohibited production patterns", () => {
         [/i\.pravatar\.cc/, "pravatar"],
         [/Math\.random\s*\(/, "Math.random live diagnostics/auth"],
         [/stitch_smart_rag_enterprise_console/, "gitignored Stitch import"],
+        [/linear-gradient\(/, "gradient"],
+        [/radial-gradient\(/, "gradient"],
+        [/\bSparkles\b/, "Sparkles icon"],
+        [/name="spark"/, "spark icon"],
+        [/UI state is not authorization/, "developer copy in UI"],
+        [/InterDisplay|Inter Display/, "retired display font"],
+        [/transition:\s*all\b/, "transition: all"],
+        [/will-change/, "will-change"],
+        [/animation:[^;]*\b(?:both|forwards)\s*;/, "animation fill both/forwards"],
+        [/animation-fill-mode:\s*(?:both|forwards)/, "animation fill both/forwards"],
       ];
       for (const [pattern, label] of needles) {
         if (pattern.test(text)) {
           hits.push(`${rel}: ${label}`);
+        }
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it("keeps CSS motion on the token scale", () => {
+    const hits: string[] = [];
+    for (const file of files) {
+      if (!file.endsWith(".css") || file.endsWith("globals.css")) {
+        continue;
+      }
+      const text = readFileSync(file, "utf8");
+      const rel = path.relative(frontendRoot, file).replaceAll("\\", "/");
+      for (const line of text.split("\n")) {
+        if (
+          /^\s*(?:animation|transition)[\w-]*\s*:/.test(line) &&
+          /\b\d+(?:\.\d+)?m?s\b/.test(line)
+        ) {
+          hits.push(`${rel}: ${line.trim()}`);
         }
       }
     }

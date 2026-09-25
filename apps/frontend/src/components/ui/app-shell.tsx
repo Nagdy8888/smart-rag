@@ -31,7 +31,7 @@ export type AppShellProps = {
 };
 
 /**
- * Render the ink-rail console chrome.
+ * Render the console chrome: tinted nav rail, white top bar, white content column.
  *
  * @param props - Shell children.
  * @returns Landmark structure with English LTR chrome.
@@ -39,7 +39,7 @@ export type AppShellProps = {
  * Security: omitting nav items does not imply HTTP 403.
  * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true. The desktop expand state is
  * stored in localStorage after hydration via `useLayoutPreference`.
- * Below 1024px the ink rail is CSS-hidden and marked `inert` so
+ * Below 1024px the nav rail is CSS-hidden and marked `inert` so
  * Playwright and assistive tech use the topbar Menu sheet instead.
  */
 export function AppShell({ children }: AppShellProps) {
@@ -92,7 +92,7 @@ export function AppShell({ children }: AppShellProps) {
         >
           <div className={styles.brand}>
             <span className={styles.brandMark} aria-hidden="true">
-              <Icon name="spark" />
+              SR
             </span>
             <span className={styles.brandText}>
               <p className={styles.brandName}>Smart RAG</p>

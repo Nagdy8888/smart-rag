@@ -192,10 +192,11 @@ export function ChatStage(props: ChatStageProps) {
             <Button
               type="button"
               variant="ghost"
+              size="compact"
               data-action-id="ask.sources"
               onClick={onSourcesOpen}
             >
-              Sources ({String(headerCount)})
+              Sources (<span key={headerCount} className={chatStyles.countPop}>{String(headerCount)}</span>)
             </Button>
           ) : null}
           <RunDetailsSheet
@@ -277,17 +278,21 @@ export function ChatStage(props: ChatStageProps) {
         ) : null}
         {showEmptyPrompts ? (
           <div className={chatStyles.emptyPrompts}>
-            {PROMPT_CHIPS.map((chip) => (
-              <Button
-                key={chip}
-                type="button"
-                variant="secondary"
-                data-action-id="ask.prompt_fill"
-                onClick={() => onFillComposer(chip)}
-              >
-                {chip}
-              </Button>
-            ))}
+            <p className={chatStyles.emptyPromptsLabel}>Try one of these</p>
+            <ul className={chatStyles.emptyPromptList}>
+              {PROMPT_CHIPS.map((chip) => (
+                <li key={chip}>
+                  <button
+                    type="button"
+                    className={chatStyles.emptyPrompt}
+                    data-action-id="ask.prompt_fill"
+                    onClick={() => onFillComposer(chip)}
+                  >
+                    {chip}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
         {feedbackRunId !== null ||

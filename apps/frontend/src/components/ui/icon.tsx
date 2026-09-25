@@ -30,7 +30,6 @@ import {
   Search,
   Send,
   Share2,
-  Sparkles,
   Table2,
   Trash2,
   Upload,
@@ -61,7 +60,6 @@ export type IconName =
   | "close"
   | "upload"
   | "plus"
-  | "spark"
   | "bell"
   | "help"
   | "google"
@@ -101,7 +99,6 @@ const LUCIDE_BY_NAME: Record<Exclude<IconName, "google">, LucideIcon> = {
   close: X,
   upload: Upload,
   plus: Plus,
-  spark: Sparkles,
   bell: Bell,
   help: CircleHelp,
   chevron: ChevronDown,

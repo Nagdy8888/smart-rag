@@ -190,7 +190,7 @@ export function TablesApp() {
 
   return (
     <div className={styles.page}>
-      <PageHeader description="Run bounded calculations on structured data with exact cell provenance." />
+      <PageHeader description="Filter, group, and compare values from tables in your documents." />
       {listError ? (
         <StatusBanner kind="error" role="alert">
           {listError}
@@ -343,6 +343,6 @@ function tablesEmptyCopy(visibleCount: number): { title: string; body?: string }
   }
   return {
     title: "Pick a table to analyze",
-    body: "Deterministic calculations with exact cell provenance.",
+    body: "Pick a table to analyze. Every result links back to the cells it came from.",
   };
 }
