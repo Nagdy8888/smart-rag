@@ -2,14 +2,14 @@
 title: Admin and auth screen specification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-25
 audience: frontend, security
 packet: P08-19
 ---
 
 # Admin and auth screens
 
-P08-19 ships these routes on `/login` family pages, `/admin` tabs, and `/account`. Visual values follow [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md).
+P08-19 ships these routes on `/login` family pages, `/admin` tabs, and `/account`. Visual values follow [ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md).
 
 ## Screen specifications
 
@@ -17,9 +17,9 @@ P08-19 ships these routes on `/login` family pages, `/admin` tabs, and `/account
 
 #### `AuthLayout`
 
-- Two columns at `>=1024px` (45% brand / 55% form). Single centered column below.
-- Brand panel: `--gradient-brand`, white content, 48px padding, 40px white logo tile, “Smart RAG” hero scale, one line exactly “Grounded answers from your company's knowledge.”
-- Form column: `--color-bg`, card max-width 420px, `--radius-card`, `--shadow-1`, 32px padding, title 28/36 Inter Display.
+- Header, centered borderless form, and footer. No gradient split.
+- Header: 28px ink monogram `SR` and “Smart RAG”.
+- Form column: max-width 380px, no card border or shadow, title 24/32 IBM Plex Sans. Footer: “Answers cite the company documents they come from.”
 - Skip link is visually hidden until keyboard-focused.
 - Successful sign-in calls `router.replace("/")` and `router.refresh()`. Sign-in button uses `pending` / `pendingLabel="Signing in…"`.
 

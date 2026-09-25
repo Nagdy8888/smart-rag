@@ -6,7 +6,7 @@ It does not invent from text the caller cannot see. It does not quietly switch c
 
 ![Sign in](docs/assets/readme/login.png)
 
-Sign in on hosted Supabase Auth. The ink-and-indigo console is the rest of the product.
+Sign in on hosted Supabase Auth. The rest of the product is the console: neutral surfaces, with citations as the one colored element.
 
 ![Ask](docs/assets/readme/ask.png)
 

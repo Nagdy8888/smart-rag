@@ -30,6 +30,7 @@ The product is a tool for reading company documents. Citations are the core prom
 4. No gradients anywhere.
 5. Motion uses CSS only, on the transitions.dev duration scale (40ms to 500ms), with reduced-motion collapsing durations and delays. Historical messages never replay an entrance.
 6. User-visible copy drops developer notes such as "UI state is not authorization." The BM25 degradation message stays.
+7. Motion is CSS only, documented in [docs/frontend/motion.md](../frontend/motion.md): token durations from 40ms to 500ms, entrance keyframes, and reduced motion that zeros delays.
 
 ## Superseded contract rules
 
