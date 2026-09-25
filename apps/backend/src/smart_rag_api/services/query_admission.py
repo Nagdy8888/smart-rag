@@ -46,7 +46,6 @@ def query_admission_bucket_key(user_id: str) -> str:
     Returns:
         Bucket key including the user id. Valkey is not authoritative.
     """
-
     return f"{QUERY_ADMISSION_BUCKET_PREFIX}:{user_id}"
 
 
@@ -63,6 +62,7 @@ def admit_query_run_for_caller(
     postgres_rate_limit_url: SecretStr | None = None,
     valkey_limits_url: SecretStr | None = None,
     valkey_client: ValkeyClient | None = None,
+    connection: psycopg.Connection | None = None,
 ) -> QueryAdmissionResult:
     """Apply FastAPI rate limits, then admit through the durable RPC.
 
@@ -85,6 +85,10 @@ def admit_query_run_for_caller(
             Never authorizes spend.
         valkey_client: Optional limits client. Timeouts fall back to Postgres
             then fail closed.
+        connection: Caller-owned session. When set, this function commits
+            the admit transaction on it with ``SET LOCAL ROLE app_api`` and
+            does not close it. The caller rolls back if this function raises.
+            When omitted, a new connection is opened and closed here.
 
     Returns:
         Authorized runtime context from the durable admit RPC.
@@ -97,7 +101,6 @@ def admit_query_run_for_caller(
         Consumes one Postgres rate-limit attempt. On success, inserts or
         reconnects one query run and reservation.
     """
-
     limiter_url = postgres_rate_limit_url or SecretStr(postgres_url)
     try:
         check_auth_rate_limit(
@@ -121,8 +124,22 @@ def admit_query_run_for_caller(
         requested_search_scope=requested_search_scope,
     )
     try:
-        with connect_postgres(postgres_url) as connection:
-            connection.execute("SET ROLE app_api")
+        if connection is None:
+            with connect_postgres(postgres_url) as owned:
+                owned.execute("SET ROLE app_api")
+                result = admit_query_run(
+                    owned,
+                    caller=caller,
+                    conversation_id=conversation_id,
+                    idempotency_key=idempotency_key,
+                    payload_hash=payload_hash,
+                    route_family=route_family,
+                    requested_search_scope=requested_search_scope,
+                    token_issued_at=token_issued_at,
+                )
+                owned.commit()
+        else:
+            connection.execute("SET LOCAL ROLE app_api")
             result = admit_query_run(
                 connection,
                 caller=caller,

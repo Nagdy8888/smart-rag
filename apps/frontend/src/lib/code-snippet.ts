@@ -7,7 +7,7 @@
 const DEF_PATTERN = /\b(?:async\s+)?def\s+\w+\s*\(/;
 const CLASS_PATTERN = /\bclass\s+\w+/;
 const HEADER_PATTERN =
-  /^((?:async\s+)?(?:def|class)\s+\w+\s*\(.*\)(?:\s*(?:->|→)\s*[^:]+)?)\s*:\s*([\s\S]*)$/;
+  /^((?:async\s+)?(?:def|class)\s+\w+\s*\([^)]*\)[^:]*):\s*([\s\S]*)$/;
 
 /**
  * Return whether a verified paragraph contains a function or class to show as code.

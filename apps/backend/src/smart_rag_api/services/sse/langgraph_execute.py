@@ -55,7 +55,6 @@ class LangGraphExecuteMixin(
             ExternalFlowBlockedError: When tracing would export real company
                 content without a verified subprocessor matrix.
         """
-
         from smart_rag_core.observability.governance_gate import (
             assert_langsmith_export_permitted,
         )
@@ -100,13 +99,19 @@ class LangGraphExecuteMixin(
         mapper: QuerySseMapper | None = None
 
         def _close_connection() -> None:
-            """Close the app_api connection exactly once."""
+            """Return the app_api connection to the pool exactly once.
 
+            Stand-ins that were not lent by the pool are closed.
+            """
             nonlocal connection_closed
             if connection is None or connection_closed:
                 return
             connection_closed = True
-            connection.close()
+            from smart_rag_api.services.query_graph_runtime import (
+                release_run_app_api_connection,
+            )
+
+            release_run_app_api_connection(connection)
 
         try:
             connection, stream_iter, _deps = await open_langgraph_astream(
@@ -215,7 +220,6 @@ def deadline_partial_events(
     Returns:
         ``deadline`` then ``partial`` with ``reason=deadline_exhausted``.
     """
-
     return [
         ("deadline", {"route_family": context.route_family.value}),
         ("partial", {"reason": DEADLINE_EXHAUSTED_DETAIL}),

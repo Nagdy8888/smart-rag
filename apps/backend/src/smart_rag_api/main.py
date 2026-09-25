@@ -53,7 +53,6 @@ def _bind_valkey_client(
     Returns:
         Client or None when the URL is unset.
     """
-
     from smart_rag_core.runtime.valkey import SocketValkeyClient
 
     if url is None:
@@ -62,6 +61,49 @@ def _bind_valkey_client(
     if not secret:
         return None
     return SocketValkeyClient(secret, timeout_seconds=timeout_seconds)
+
+
+def _warm_app_api_pools(postgres_url: str) -> None:
+    """Open one admission session and one run session, then return them idle.
+
+    A failure is logged by type only. The first Ask still connects on demand.
+
+    Args:
+        postgres_url: Transaction-pooler URL. Never logged.
+
+    Side Effects:
+        Leaves at most one idle connection in each app_api pool.
+    """
+    from smart_rag_api.services.api_postgres_pool import admission_session
+    from smart_rag_api.services.query_graph_runtime import (
+        open_run_app_api_connection,
+        release_run_app_api_connection,
+    )
+
+    try:
+        with admission_session(postgres_url) as connection:
+            connection.execute("SELECT 1")
+            connection.rollback()
+    except Exception as exc:
+        LOGGER.warning(
+            "admission pool warmup failed",
+            extra={
+                "event": "backend.query_runtime.admission_pool_warmup_failed",
+                "error_type": type(exc).__name__,
+            },
+        )
+    try:
+        run_connection = open_run_app_api_connection(postgres_url)
+    except Exception as exc:
+        LOGGER.warning(
+            "run pool warmup failed",
+            extra={
+                "event": "backend.query_runtime.run_pool_warmup_failed",
+                "error_type": type(exc).__name__,
+            },
+        )
+        return
+    release_run_app_api_connection(run_connection)
 
 
 @asynccontextmanager
@@ -98,7 +140,6 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         retrieval adapters are imported here so constructing ``create_app``
         cannot form a retrieval import cycle.
     """
-
     from smart_rag_core.gateways import block_openai_network, create_model_gateway
     from smart_rag_core.observability.langsmith_tracing import flush_langsmith_traces
     from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
@@ -165,12 +206,19 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
 
                     Side Effects:
                         Caches Hybrid, memory store, checkpointer, and the
-                        compiled graph on ``warmed_executor``. Failures are
-                        logged by type only so DSN text cannot leak.
+                        compiled graph on ``warmed_executor``. Opens one idle
+                        admission connection and one idle run connection so
+                        the first Ask skips those pooler handshakes. Failures
+                        are logged by type only so DSN text cannot leak.
                     """
-
                     try:
                         await warmed_executor.warmup(settings)
+                        dsn = settings.supabase_db_url
+                        if dsn is not None:
+                            await asyncio.to_thread(
+                                _warm_app_api_pools,
+                                dsn.get_secret_value(),
+                            )
                         application.state.query_runtime_warmed = True
                         LOGGER.info(
                             "query runtime warmed",
@@ -223,6 +271,9 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         if callable(close_run_event_store):
             close_run_event_store()
             application.state.run_event_store = None
+        from smart_rag_api.services.api_postgres_pool import close_api_postgres_pools
+
+        close_api_postgres_pools()
         offload_executor.shutdown(wait=True, cancel_futures=True)
         application.state.offload_executor = None
         if adapter is not None:
@@ -248,7 +299,6 @@ async def add_correlation_context(
         Binds request-local logging context. It logs no URL, query, body,
         authorization header, or source content.
     """
-
     request_id = normalized_request_id(request.headers.get("X-Request-ID"))
     with correlation_context(request_id=request_id):
         LOGGER.info(
@@ -276,7 +326,6 @@ def _openapi_docs_enabled(settings: BackendSettings) -> bool:
     Returns:
         True only for ``local`` and ``test``.
     """
-
     return settings.app_env in {Environment.LOCAL, Environment.TEST}
 
 
@@ -297,7 +346,6 @@ def create_app() -> FastAPI:
     Side Effects:
         Reads process environment through ``load_backend_settings``.
     """
-
     settings = load_backend_settings()
     docs_enabled = _openapi_docs_enabled(settings)
     application = FastAPI(
@@ -370,7 +418,6 @@ def live() -> dict[str, str]:
     Returns:
         A mapping with ``status=live``.
     """
-
     return {"status": "live"}
 
 
@@ -384,7 +431,6 @@ def ready() -> dict[str, object]:
         Readiness mapping with ``status=unconfigured`` and ``query_ready=false``
         in the public shape (no named dependencies).
     """
-
     payload = build_readiness(
         None,
         valkey_limits=None,
@@ -409,7 +455,6 @@ def run() -> None:
         SettingsValidationError: If backend settings are invalid.
         ModuleNotFoundError: If uvicorn is not installed in the environment.
     """
-
     import uvicorn
 
     settings: BackendSettings = load_backend_settings()

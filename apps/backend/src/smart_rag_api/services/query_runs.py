@@ -28,6 +28,10 @@ from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.security.untrusted import isolate_untrusted_text
 from smart_rag_core.settings.postgres_connect import connect_postgres
 
+from smart_rag_api.services.api_postgres_pool import (
+    APP_API_TRANSACTION_ROLE_SQL,
+    admission_session,
+)
 from smart_rag_api.services.query_admission import admit_query_run_for_caller
 
 STREAM_PATH_TEMPLATE = "/runs/{run_id}/events"
@@ -44,7 +48,6 @@ def escape_run_citation(item: RunCitationRecord) -> RunCitationRecord:
         Excerpt stays on the dedicated field and is never copied into
         ``provenance``.
     """
-
     provenance = {
         str(key): isolate_untrusted_text(value) if isinstance(value, str) else value
         for key, value in item.provenance.items()
@@ -76,7 +79,6 @@ def _safe_https_url(url: str | None) -> str | None:
         The URL, or ``None`` when the scheme is not HTTPS or the locator
         includes userinfo or a fragment.
     """
-
     if url is None or url == "":
         return None
     parsed = urlsplit(url)
@@ -108,7 +110,6 @@ class QueryRunService:
             web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot. Default false.
             web_search_configured: True when a non-empty Exa key is present.
         """
-
         self._postgres_url = postgres_url
         self._valkey_client = valkey_client
         self._web_search_enabled = web_search_enabled
@@ -138,8 +139,12 @@ class QueryRunService:
         Raises:
             QueryAdmissionError: Rate, ownership, budget, idempotency, or
                 disabled/unconfigured Web.
-        """
 
+        Side Effects:
+            Admit and the user-message insert share one pooled ``app_api``
+            session, in two transactions. A failed insert marks the run
+            failed on that same session when it is still usable.
+        """
         if requested_search_scope is RequestedSearchScope.WEB:
             if not self._web_search_enabled:
                 raise QueryAdmissionError("web_search_disabled")
@@ -148,20 +153,21 @@ class QueryRunService:
             route_family = Phase6RouteFamily.WEB_RESEARCH
         else:
             route_family = Phase6RouteFamily.COMPOSITE
-        result = admit_query_run_for_caller(
-            self._postgres_url,
-            caller=caller,
-            conversation_id=conversation_id,
-            idempotency_key=idempotency_key,
-            message=message,
-            route_family=route_family,
-            requested_search_scope=requested_search_scope,
-            postgres_rate_limit_url=SecretStr(self._postgres_url),
-            valkey_client=self._valkey_client,
-        )
-        try:
-            with connect_postgres(self._postgres_url) as connection:
-                connection.execute("SET ROLE app_api")
+        with admission_session(self._postgres_url) as connection:
+            result = admit_query_run_for_caller(
+                self._postgres_url,
+                caller=caller,
+                conversation_id=conversation_id,
+                idempotency_key=idempotency_key,
+                message=message,
+                route_family=route_family,
+                requested_search_scope=requested_search_scope,
+                postgres_rate_limit_url=SecretStr(self._postgres_url),
+                valkey_client=self._valkey_client,
+                connection=connection,
+            )
+            try:
+                connection.execute(APP_API_TRANSACTION_ROLE_SQL)
                 append_query_message(
                     connection,
                     caller=caller,
@@ -171,22 +177,87 @@ class QueryRunService:
                     content=message,
                 )
                 connection.commit()
-        except (psycopg.Error, QueryAdmissionError) as exc:
-            with connect_postgres(self._postgres_url) as connection:
-                connection.execute("SET ROLE app_api")
-                try:
-                    fail_query_run(
-                        connection,
-                        caller=caller,
-                        run_id=result.context.run_id,
-                    )
-                    connection.commit()
-                except QueryAdmissionError:
-                    connection.rollback()
-            del exc
-            raise QueryAdmissionError("message_persist_failed") from None
+            except (psycopg.Error, QueryAdmissionError):
+                self._fail_unpersisted_message(
+                    connection,
+                    caller=caller,
+                    run_id=result.context.run_id,
+                )
+                raise QueryAdmissionError("message_persist_failed") from None
         stream_path = STREAM_PATH_TEMPLATE.format(run_id=result.context.run_id)
         return result.context, stream_path
+
+    def _fail_unpersisted_message(
+        self,
+        connection: psycopg.Connection,
+        *,
+        caller: CallerContext,
+        run_id: UUID,
+    ) -> None:
+        """Mark an admitted run failed after the user message insert fails.
+
+        The admit transaction is already committed. This rolls back the
+        failed insert and records the failure on the same session. If that
+        session is unusable, it opens one new connection, matching the
+        previous fail path.
+
+        Args:
+            connection: Session that just failed the message insert.
+            caller: Authenticated caller.
+            run_id: Run created by the committed admit.
+
+        Side Effects:
+            Commits ``fail_query_run`` when the database accepts it.
+            Swallows a ``QueryAdmissionError`` from that RPC. A failure to
+            open the fallback connection propagates.
+        """
+        try:
+            connection.rollback()
+            connection.execute(APP_API_TRANSACTION_ROLE_SQL)
+            fail_query_run(
+                connection,
+                caller=caller,
+                run_id=run_id,
+            )
+            connection.commit()
+        except QueryAdmissionError:
+            try:
+                connection.rollback()
+            except psycopg.Error:
+                return
+            return
+        except psycopg.Error:
+            self._fail_unpersisted_message_on_new_connection(caller, run_id=run_id)
+
+    def _fail_unpersisted_message_on_new_connection(
+        self,
+        caller: CallerContext,
+        *,
+        run_id: UUID,
+    ) -> None:
+        """Record message-persist failure on a fresh connection.
+
+        Args:
+            caller: Authenticated caller.
+            run_id: Run created by the committed admit.
+
+        Raises:
+            psycopg.Error: The fallback connection cannot be opened.
+
+        Side Effects:
+            Opens and closes one Postgres connection.
+        """
+        with connect_postgres(self._postgres_url) as fresh:
+            fresh.execute("SET ROLE app_api")
+            try:
+                fail_query_run(
+                    fresh,
+                    caller=caller,
+                    run_id=run_id,
+                )
+                fresh.commit()
+            except QueryAdmissionError:
+                fresh.rollback()
 
     def get(self, caller: CallerContext, *, run_id: UUID) -> QueryRunRecord:
         """Fetch one owned run.
@@ -201,7 +272,6 @@ class QueryRunService:
         Raises:
             QueryAdmissionError: ``not_found`` for missing or foreign runs.
         """
-
         with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             return get_query_run(connection, caller=caller, run_id=run_id)
@@ -219,7 +289,6 @@ class QueryRunService:
         Raises:
             QueryAdmissionError: Ownership or state failures.
         """
-
         with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             record = cancel_query_run(connection, caller=caller, run_id=run_id)
@@ -242,7 +311,6 @@ class QueryRunService:
         Raises:
             QueryAdmissionError: ``not_found`` for missing or foreign runs.
         """
-
         with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             records = list_run_citations(connection, caller=caller, run_id=run_id)
@@ -271,7 +339,6 @@ class QueryRunService:
         Raises:
             QueryAdmissionError: ``not_found`` for missing or foreign rows.
         """
-
         with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             detail = get_run_citation_detail(

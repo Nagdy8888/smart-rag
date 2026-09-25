@@ -20,7 +20,6 @@ from smart_rag_agents.query.live_runtime import (
     QueryGraphRuntimeError,
     _context_loader,
     bind_table_executor,
-    open_run_app_api_connection,
 )
 from smart_rag_agents.query.live_runtime import (
     build_query_graph_deps as _build_query_graph_deps,
@@ -29,6 +28,11 @@ from smart_rag_agents.query.live_runtime import (
     build_query_process_bindings as _build_query_process_bindings,
 )
 from smart_rag_core.settings import SharedSettings
+
+from smart_rag_api.services.api_postgres_pool import (
+    checkout_run_connection,
+    release_run_connection,
+)
 
 __all__ = [
     "DsnBm25Retriever",
@@ -51,7 +55,6 @@ def _lifespan_app_state() -> object | None:
         ``app.state`` or None. Import is deferred to avoid a cycle with
         ``main`` which imports the SSE registry at module load.
     """
-
     try:
         from smart_rag_api.main import app as api_app
     except ImportError:
@@ -86,7 +89,6 @@ def build_query_process_bindings(
     Raises:
         QueryGraphRuntimeError: When Hybrid or the gateway cannot be built.
     """
-
     return _build_query_process_bindings(
         settings=settings,
         app_state=app_state if app_state is not None else _lifespan_app_state(),
@@ -123,7 +125,6 @@ def build_query_graph_deps(
     Raises:
         QueryGraphRuntimeError: If required adapters are missing.
     """
-
     return _build_query_graph_deps(
         bindings=bindings,
         connection=connection,
@@ -133,22 +134,74 @@ def build_query_graph_deps(
     )
 
 
-async def open_run_app_api_connection_async(supabase_dsn: str) -> psycopg.Connection:
-    """Open the run's ``app_api`` connection on a worker thread.
+def open_run_app_api_connection(supabase_dsn: str) -> psycopg.Connection:
+    """Lend one warm ``app_api`` connection for counted model calls on this run.
 
-    The connect (TLS plus pooler handshake, about 0.5 s) must not block the
-    SSE event loop. ``open_run_app_api_connection`` is looked up in this
-    module at call time, so tests that patch it here still apply.
+    The first checkout in a process opens a connection. Later runs reuse it
+    after :func:`release_run_app_api_connection` returns it idle, so they
+    skip the pooler handshake. A busy pool opens a direct connection instead
+    of waiting.
 
     Args:
         supabase_dsn: Canonical Postgres URL.
 
     Returns:
         Autocommit-off connection with ``SET ROLE app_api``. Caller must
-        close it.
+        release it with :func:`release_run_app_api_connection`.
+
+    Raises:
+        QueryGraphRuntimeError: If the connection cannot be opened.
+
+    Side Effects:
+        May open a Postgres session with automatic prepares disabled.
+    """
+    connection: psycopg.Connection | None = None
+    try:
+        connection = checkout_run_connection(supabase_dsn)
+        connection.execute("SET ROLE app_api")
+    except (psycopg.Error, OSError) as exc:
+        if connection is not None:
+            release_run_app_api_connection(connection, reusable=False)
+        raise QueryGraphRuntimeError("app_api_connection_unbound") from exc
+    return connection
+
+
+def release_run_app_api_connection(
+    connection: object,
+    *,
+    reusable: bool | None = None,
+) -> None:
+    """Return a run connection to the pool, or close a stand-in.
+
+    Args:
+        connection: Connection from :func:`open_run_app_api_connection`, or
+            a test stand-in that only implements ``close``.
+        reusable: When omitted, reuse only an idle open connection.
+            ``False`` closes it. Stand-ins that this module did not lend
+            are always closed.
+
+    Side Effects:
+        May leave ``connection`` idle for the next run, or close it.
+    """
+    release_run_connection(connection, reusable=reusable)
+
+
+async def open_run_app_api_connection_async(supabase_dsn: str) -> psycopg.Connection:
+    """Open the run's ``app_api`` connection on a worker thread.
+
+    The connect (TLS plus pooler handshake, about 0.5 s) must not block the
+    SSE event loop. A warm pooled connection returns without that handshake.
+    ``open_run_app_api_connection`` is looked up in this module at call time,
+    so tests that patch it here still apply.
+
+    Args:
+        supabase_dsn: Canonical Postgres URL.
+
+    Returns:
+        Autocommit-off connection with ``SET ROLE app_api``. Caller must
+        release it with :func:`release_run_app_api_connection`.
 
     Raises:
         QueryGraphRuntimeError: If the connection cannot be opened.
     """
-
     return await asyncio.to_thread(open_run_app_api_connection, supabase_dsn)

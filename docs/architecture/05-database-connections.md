@@ -2,7 +2,7 @@
 title: Database connections and pool budgets
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-25
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -116,6 +116,17 @@ back best-effort, closes that session, and re-raises. Read-only
 `list_after` may retry once before any row is returned. Append and
 terminal writes never auto-replay.
 
+Ask admission uses two more pools in
+`smart_rag_api.services.api_postgres_pool`, also inside that cap of 10:
+admission max 2, and the per-run `app_api` connection max 4
+(4 + 2 + 4 = 10). Admit and the user-message insert share one admission
+session as two transactions (`SET LOCAL ROLE app_api` each), so a question
+does not open a second pooler handshake for the insert. The run pool is
+filled once at API startup and reused after each run releases it. A
+checkout that finds every slot lent opens one direct connection and closes
+it, which is the ephemeral connect this path used before pooling. Idle
+sessions older than 60 seconds are closed.
+
 SSE event-store and LangGraph checkpointer already
 disable prepares (`prepare_threshold=None` / `0`). asyncpg LightRAG uses
 `statement_cache_size=0`. Do not add named prepares on pooler DSNs.
@@ -125,10 +136,11 @@ flowchart LR
   api["FastAPI / query retrieve"] --> helper["connect_postgres\nprepare_threshold=None\nmax 2 attempts"]
   helper --> pooler["Supavisor txn 6543"]
   sse["SSE event store pool\nmax 4, idle 60s, SET LOCAL ROLE"] --> helper
+  admit["Ask admit pool max 2\nand run pool max 4"] --> helper
   checkpointer["LangGraph checkpointer"] --> session["Session/direct 5432"]
 ```
 
-Verification: `uv run pytest tests/unit/test_postgres_dsn.py tests/unit/test_hybrid_run.py tests/unit/test_general_chat_generate.py tests/unit/test_query_sse_event_store.py tests/unit/test_readiness.py -q`
+Verification: `uv run pytest tests/unit/test_postgres_dsn.py tests/unit/test_hybrid_run.py tests/unit/test_general_chat_generate.py tests/unit/test_query_sse_event_store.py tests/unit/test_api_postgres_pool.py tests/unit/test_readiness.py -q`
 
 ## Role timeouts / work_mem / application_name
 

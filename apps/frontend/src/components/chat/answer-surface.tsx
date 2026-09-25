@@ -522,7 +522,6 @@ export const AnswerSurface = memo(function AnswerSurface({
           collapsed={verificationCompleted && answer.trim() !== "" && !revealing}
           chat={chat}
           revealing={revealing}
-          starting={starting}
         />
       ) : null}
       {showLiveAssistant ? (

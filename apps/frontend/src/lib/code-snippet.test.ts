@@ -20,6 +20,19 @@ describe("code snippets", () => {
     expect(isCodeSnippet("The refund period is 30 days.")).toBe(false);
   });
 
+  it("splits a signature that uses a non-ascii arrow", () => {
+    const mixed =
+      "defined by @tool def multiply(x: float, y: float) \u2794 float: \"\"\"Multiply 'x' times 'y'.\"\"\" return x * y";
+    expect(formatCodeSnippet(mixed)).toBe(
+      [
+        "@tool",
+        "def multiply(x: float, y: float) \u2794 float:",
+        '    """Multiply \'x\' times \'y\'."""',
+        "    return x * y",
+      ].join("\n"),
+    );
+  });
+
   it("puts a curly-quote docstring on its own line", () => {
     const mixed =
       "The multiply tool is defined by the function @tool def multiply(x: float, y: float) → float: \u201c\u201c\u201cMultiply 'x' times 'y'.\u201d\u201d\u201d return x * y.";
