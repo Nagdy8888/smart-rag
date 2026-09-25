@@ -43,14 +43,14 @@ describe("design token source of truth", () => {
   const css = readFileSync(cssPath, "utf8");
   const root = parseRootTokens(css);
 
-  it("matches the Phase 8 visual-contract palette in CSS and TS", () => {
+  it("matches the quiet work-tool palette in CSS and TS", () => {
     for (const [name, value] of Object.entries(DESIGN_TOKENS)) {
       expect(root[name], name).toBe(value);
     }
-    expect(COLOR_BG).toBe("#F6F7F9");
-    expect(COLOR_ACCENT).toBe("#4F46E5");
-    expect(RADIUS_SM).toBe("10px");
-    expect(RADIUS_MD).toBe("14px");
+    expect(COLOR_BG).toBe("#F7F7F5");
+    expect(COLOR_ACCENT).toBe("#3B5B8C");
+    expect(RADIUS_SM).toBe("6px");
+    expect(RADIUS_MD).toBe("8px");
     expect(CONTROL_HEIGHT).toBe("40px");
   });
 
@@ -60,7 +60,9 @@ describe("design token source of truth", () => {
     expect(assigned).not.toContain("#faf8ff");
     expect(root["--color-bg"]).not.toBe("#0F766E");
     expect(root["--color-accent"]).not.toBe("#0F766E");
-    expect(root["--radius-md"]).not.toBe("8px");
+    expect(root["--gradient-brand"]).toBeUndefined();
+    expect(root["--color-ink"]).toBeUndefined();
+    expect(css).not.toMatch(/linear-gradient\(/);
     expect(css).not.toMatch(/backdrop-filter/i);
     expect(css).not.toMatch(/\bblur\(/);
     expect(css).not.toContain("cdn.tailwindcss.com");

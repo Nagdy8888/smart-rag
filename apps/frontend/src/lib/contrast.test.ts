@@ -6,6 +6,11 @@ import {
   COLOR_BG,
   COLOR_DANGER,
   COLOR_SURFACE,
+  COLOR_PRIMARY,
+  COLOR_PRIMARY_FG,
+  COLOR_SURFACE_MUTED,
+  COLOR_EVIDENCE,
+  COLOR_EVIDENCE_MUTED,
   COLOR_TEXT,
   COLOR_TEXT_MUTED,
   COLOR_WARNING,
@@ -19,6 +24,13 @@ describe("WCAG AA token contrast", () => {
       ["muted on surface", COLOR_TEXT_MUTED, COLOR_SURFACE],
       ["accent foreground", COLOR_ACCENT_FG, COLOR_ACCENT],
       ["danger on surface", COLOR_DANGER, COLOR_SURFACE],
+      ["primary foreground", COLOR_PRIMARY_FG, COLOR_PRIMARY],
+      ["accent on surface", COLOR_ACCENT, COLOR_SURFACE],
+      ["accent on canvas", COLOR_ACCENT, COLOR_BG],
+      ["muted on canvas", COLOR_TEXT_MUTED, COLOR_BG],
+      ["muted on muted surface", COLOR_TEXT_MUTED, COLOR_SURFACE_MUTED],
+      ["evidence marker text", COLOR_EVIDENCE, COLOR_EVIDENCE_MUTED],
+      ["evidence on surface", COLOR_EVIDENCE, COLOR_SURFACE],
     ];
     for (const [label, fg, bg] of pairs) {
       expect(contrastRatio(fg, bg), label).toBeGreaterThanOrEqual(
