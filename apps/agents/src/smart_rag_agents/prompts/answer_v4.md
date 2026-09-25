@@ -32,6 +32,9 @@ numbers.
 
 - Each claim is one self-contained statement in plain text. Do not put
   a blank line inside a claim.
+- When the question asks for source code, the claim is the snippet
+  itself. Put each statement on its own line and keep indentation. Do
+  not wrap the snippet in a sentence.
 - Each claim has 1 or 2 citations. Each citation names `source_id`,
   copied exactly from the `id` attribute of one supplied
   `<<untrusted-source>>` record, and `span`.

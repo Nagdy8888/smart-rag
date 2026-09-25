@@ -27,6 +27,8 @@ export type RunProgressTimelineProps = {
   chat?: ChatViewState | null;
   /** True while verified text is still being presented. */
   revealing?: boolean;
+  /** True after Send, before a run id exists. No invented stage rows. */
+  starting?: boolean;
 };
 
 /**
@@ -72,6 +74,9 @@ export function progressSummary(props: RunProgressTimelineProps): string {
   if (props.verificationCompleted && !props.answerAvailable) {
     return "Verified — preparing display";
   }
+  if (props.starting && props.items.length === 0 && props.terminal === null) {
+    return "Starting…";
+  }
   if (props.chat) {
     return runStatusLine(props.chat) ?? progressLabel(props.items.at(-1)?.key ?? "prepare_query");
   }
@@ -95,10 +100,12 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
   const open = userOpen ?? !props.collapsed;
   const summary = progressSummary(props);
   const showList = open && props.items.length > 0;
+  const showStarting = props.starting === true && props.items.length === 0 && props.terminal === null;
   return (
     <div className={styles.progressTimeline} data-testid="run-progress-timeline">
       <LiveRegion aria-label="Run progress" politeness="polite">
-        <p key={summary} className={styles.statusLine} role="status">
+        <p className={styles.statusLine} role="status">
+          {showStarting ? <Spinner label="Starting" /> : null}
           {summary}
         </p>
       </LiveRegion>
@@ -125,7 +132,6 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
                 key={item.id}
                 className={styles.progressItem}
                 role="listitem"
-                data-phase={item.phase}
                 aria-current={active ? "step" : undefined}
               >
                 {active ? <Spinner label={label} /> : null}

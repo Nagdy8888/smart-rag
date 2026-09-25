@@ -14,6 +14,7 @@ import { shouldShowCitations } from "./answer-origin";
 import type { ApiFailure } from "./api";
 import {
   applyProgressFrame,
+  beginAgentGraph,
   emptyRunProgress,
   type RunProgressState,
 } from "./run-progress";
@@ -116,6 +117,20 @@ export function createChatViewState(idempotencyKey: string): ChatViewState {
     chatPromptTokens: 0,
     chatCompletionTokens: 0,
     chatCostUsd: 0,
+  };
+}
+
+/**
+ * Open the agent graph on a fresh run before admission returns.
+ *
+ * @param state - View after `startNextChatRun`.
+ * @returns Same view with `enforce_admission` already started.
+ */
+export function openLiveAgentGraph(state: ChatViewState): ChatViewState {
+  return {
+    ...state,
+    stage: "enforce_admission",
+    progress: beginAgentGraph(state.progress),
   };
 }
 

@@ -16,6 +16,7 @@ from smart_rag_core.models.env_pins import ANSWER_MODEL_ID
 from smart_rag_core.query_answer.claims import (
     AnswerClaimsPayload,
     claims_to_answer_payload,
+    normalize_claim_text,
     parse_provider_answer,
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
@@ -167,6 +168,24 @@ def test_each_claim_becomes_one_paragraph_with_one_link() -> None:
     ] == [("claim-1", 0, first), ("claim-2", 1, second)]
     assert payload.answer_text == ""
     assert payload.status == "complete"
+
+
+def test_code_claim_keeps_line_breaks_and_prose_stays_one_line() -> None:
+    """Source-code claims keep statement lines. Prose stays one sentence."""
+
+    fusion = _fusion()
+    first, _second = _ids(fusion)
+    snippet = "@tool\ndef multiply(x: float, y: float) -> float:\n    return x * y"
+    payload = claims_to_answer_payload(
+        _claims(_claim(f"{snippet}\n\n", (first, FIRST_TEXT))),
+        chunk_ids=(first,),
+        tables=(),
+    )
+    assert payload.paragraphs[0].text == snippet
+    assert "\n\n" not in payload.paragraphs[0].text
+    assert normalize_claim_text("  The   refund   is  30 days.  ") == (
+        "The refund is 30 days."
+    )
     assert payload.refused_links == ()
     checked, failures = deterministic_check_answer(
         payload, fusion=fusion, tables=(), require_paragraphs=True

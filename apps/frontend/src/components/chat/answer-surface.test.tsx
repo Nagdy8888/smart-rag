@@ -145,6 +145,19 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.queryByTestId("answer-token-usage")).not.toBeInTheDocument();
   });
 
+  it("renders a code answer as a snippet and keeps markup inert", () => {
+    const { container } = renderSurface({
+      answerOrigin: "company_documents",
+      answer:
+        '@tool def multiply(x: float, y: float) -> float: """Multiply.""" return x * y <img src=x onerror=alert(1)>',
+    });
+    const snippet = screen.getByTestId("answer-code-snippet");
+    expect(snippet.tagName).toBe("PRE");
+    expect(snippet.textContent).toContain("def multiply");
+    expect(snippet.textContent).toContain("\n");
+    expect(container.querySelector("img")).toBeNull();
+  });
+
   it("does not render assistant prose before verified tokens exist", () => {
     render(
       <AnswerSurface

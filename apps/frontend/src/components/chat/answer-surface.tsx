@@ -28,6 +28,7 @@ import {
   routeLabel,
 } from "../../lib/run-details";
 import { formatRelativeTime } from "../../lib/relative-time";
+import { formatCodeSnippet, isCodeSnippet } from "../../lib/code-snippet";
 import { displayText } from "../../lib/safe-text";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -77,6 +78,8 @@ export type AnswerSurfaceProps = {
   statusLine?: string | null;
   /** Reducer progress rows. Empty when no node has started. */
   progressItems?: readonly RunProgressItem[];
+  /** True after Send, before a run id exists. */
+  starting?: boolean;
   /** True after verify_answer completed. */
   verificationCompleted?: boolean;
   /** Live chat view for truthful summary copy. */
@@ -313,9 +316,17 @@ function AnswerParagraphs({
             data-paragraph-index={String(index)}
             key={`p-${String(index)}`}
           >
-            <p className={styles.answerProse} dir="auto">
-              <UserText value={slice.text} />
-            </p>
+            {slice.complete && isCodeSnippet(slice.text) ? (
+              <pre className={styles.codeSnippet} data-testid="answer-code-snippet">
+                <code dir="ltr">
+                  <UserText value={formatCodeSnippet(slice.text)} />
+                </code>
+              </pre>
+            ) : (
+              <p className={styles.answerProse} dir="auto">
+                <UserText value={slice.text} />
+              </p>
+            )}
             <ParagraphCitations
               citations={mapped}
               hrefForCitation={hrefForCitation}
@@ -367,6 +378,7 @@ export const AnswerSurface = memo(function AnswerSurface({
   effectiveRoute = null,
   statusLine = null,
   progressItems = [],
+  starting = false,
   verificationCompleted = false,
   chat = null,
   revealing = false,
@@ -401,6 +413,7 @@ export const AnswerSurface = memo(function AnswerSurface({
   const showLiveUser =
     question !== "" && !transcriptTextMatches(lastHistUser?.content, question);
   const showProgress =
+    starting ||
     progressItems.length > 0 ||
     statusLine !== null ||
     (chat !== null && chat.terminal === null && chat.runId !== null);
@@ -502,6 +515,7 @@ export const AnswerSurface = memo(function AnswerSurface({
       {showProgress ? (
         <RunProgressTimeline
           items={progressItems}
+          starting={starting}
           terminal={terminal}
           verificationCompleted={verificationCompleted}
           answerAvailable={answer.trim() !== ""}

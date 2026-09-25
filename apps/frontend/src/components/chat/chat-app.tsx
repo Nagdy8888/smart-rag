@@ -107,6 +107,7 @@ export function ChatApp() {
     conversationId: selection.conversationId,
     visibleText: reveal.visibleText,
     loadingEarlier,
+    followKey: run.lastUserMessage,
   });
   const actions = useConversationActions({
     auth: queries.auth,

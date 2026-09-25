@@ -122,6 +122,23 @@ describe("RunProgressTimeline", () => {
     expect(screen.getByRole("list")).toBeInTheDocument();
   });
 
+  it("shows Starting before any stage row exists", () => {
+    render(
+      <RunProgressTimeline
+        items={[]}
+        terminal={null}
+        verificationCompleted={false}
+        answerAvailable={false}
+        collapsed={false}
+        starting
+      />,
+    );
+    expect(screen.getByText("Starting…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Starting" })).toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.queryByText("Preparing query")).not.toBeInTheDocument();
+  });
+
   it("marks the active started row as the current step", () => {
     render(
       <RunProgressTimeline
@@ -150,6 +167,13 @@ describe("progressSummary", () => {
       collapsed: false,
     };
     expect(progressSummary(base)).toBe("Generating…");
+    expect(
+      progressSummary({
+        ...base,
+        items: [],
+        starting: true,
+      }),
+    ).toBe("Starting…");
     expect(
       progressSummary({
         ...base,

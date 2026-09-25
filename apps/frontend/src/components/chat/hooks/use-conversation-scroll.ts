@@ -20,6 +20,8 @@ export type UseConversationScrollInput = {
   conversationId: string | null;
   visibleText: string;
   loadingEarlier: boolean;
+  /** Changes when a new live question is submitted. Scrolls if still pinned. */
+  followKey?: string;
 };
 
 export type UseConversationScrollResult = {
@@ -44,19 +46,20 @@ export function isPinnedToBottom(element: HTMLElement): boolean {
 }
 
 /**
- * Follow visible answer growth only while the user remains near the bottom.
+ * Follow visible answer growth and a new live question only while the user
+ * remains near the bottom.
  *
  * Never scrolls `window`, `#main`, or the session rail. `useLayoutEffect` is
  * used only to restore the prepended-history anchor in the same frame as the
  * DOM mutation so the viewport does not jump.
  *
- * @param input - Conversation id, visible text, and pagination busy flag.
+ * @param input - Conversation id, visible text, live-question key, and pagination flag.
  * @returns Container ref, pin state, and prepend helpers.
  */
 export function useConversationScroll(
   input: UseConversationScrollInput,
 ): UseConversationScrollResult {
-  const { conversationId, visibleText, loadingEarlier } = input;
+  const { conversationId, visibleText, loadingEarlier, followKey = "" } = input;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(true);
@@ -116,7 +119,7 @@ export function useConversationScroll(
       return;
     }
     element.scrollTop = element.scrollHeight;
-  }, [visibleText]);
+  }, [visibleText, followKey]);
 
   useLayoutEffect(() => {
     // Restore the pre-prepend scroll anchor in the same frame as the inserted

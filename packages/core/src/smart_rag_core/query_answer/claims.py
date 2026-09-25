@@ -8,6 +8,7 @@ only its own claim instead of the whole answer.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
@@ -32,6 +33,37 @@ from smart_rag_core.query_answer.versions import (
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 
 CLAIM_LINK_PREFIX = "claim-"
+_CODE_CLAIM = re.compile(
+    r"(?m)(?:^|\s)(?:@\w+|def\s+\w+\s*\(|class\s+\w+|import\s+\w+|from\s+\w+)"
+)
+
+
+def normalize_claim_text(text: str) -> str:
+    """Collapse claim whitespace while keeping source-code line breaks.
+
+    Prose becomes one sentence. A multiline code claim keeps each
+    non-empty line, including leading indentation, and drops blank lines
+    so the paragraph delimiter never appears inside the claim.
+
+    Args:
+        text: Provider claim body.
+
+    Returns:
+        Normalized claim text, or empty when the body is blank.
+    """
+
+    flattened = " ".join(text.split())
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    if "\n" not in normalized or _CODE_CLAIM.search(normalized) is None:
+        return flattened
+    cleaned: list[str] = []
+    for line in normalized.split("\n"):
+        body = " ".join(line.split())
+        if not body:
+            continue
+        indent = line[: len(line) - len(line.lstrip(" \t"))].replace("\t", "    ")
+        cleaned.append(f"{indent}{body}")
+    return "\n".join(cleaned)
 
 
 class ClaimCitation(BaseModel):
@@ -194,7 +226,7 @@ def claims_to_answer_payload(
     link_by_number: dict[int, str] = {}
     for number, claim in enumerate(claims.claims, start=1):
         link_id = f"{CLAIM_LINK_PREFIX}{number}"
-        text = " ".join(claim.text.split())
+        text = normalize_claim_text(claim.text)
         mapped = None
         if (
             claims.status != "refused"

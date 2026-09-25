@@ -33,6 +33,41 @@ export type RunProgressState = {
 
 const VERIFY_STAGE = "verify_answer";
 
+/** First production stage. Opened locally when Send is accepted. */
+export const LIVE_GRAPH_START_STAGE = "enforce_admission";
+
+/**
+ * Open the agent graph on the first production stage.
+ *
+ * `lastSequence` stays unchanged so the first persisted SSE frame still
+ * applies. A later `enforce_admission` start does not add a second row.
+ *
+ * @param progress - Current timeline. Usually empty for a new run.
+ * @returns Progress with `enforce_admission` started, or the same object
+ *   when that stage is already open.
+ */
+export function beginAgentGraph(progress: RunProgressState): RunProgressState {
+  const open = latestOpenIndex(progress.items, "node", LIVE_GRAPH_START_STAGE);
+  if (open >= 0) {
+    return progress;
+  }
+  return {
+    ...progress,
+    items: [
+      ...progress.items,
+      {
+        id: `node:${LIVE_GRAPH_START_STAGE}:0`,
+        kind: "node",
+        key: LIVE_GRAPH_START_STAGE,
+        phase: "started",
+        outcome: null,
+        firstSequence: 0,
+        lastSequence: 0,
+      },
+    ],
+  };
+}
+
 /**
  * Return an empty progress timeline.
  *

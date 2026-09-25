@@ -65,17 +65,21 @@ describe("useConversationScroll", () => {
   it("scrolls on reveal growth only while pinned and jump re-pins", () => {
     const metrics = { scrollHeight: 400, clientHeight: 200, scrollTop: 152 };
     const { result, rerender } = renderHook(
-      (props: { text: string; conversationId: string | null }) =>
+      (props: { text: string; conversationId: string | null; followKey: string }) =>
         useConversationScroll({
           conversationId: props.conversationId,
           visibleText: props.text,
           loadingEarlier: false,
+          followKey: props.followKey,
         }),
-      { initialProps: { text: "Hi", conversationId: "c1" } },
+      { initialProps: { text: "Hi", conversationId: "c1", followKey: "" } },
     );
     attachScroller(result.current.containerRef, metrics);
-    rerender({ text: "Hi there", conversationId: "c1" });
+    rerender({ text: "Hi there", conversationId: "c1", followKey: "" });
     expect(metrics.scrollTop).toBe(400);
+    metrics.scrollHeight = 520;
+    rerender({ text: "Hi there", conversationId: "c1", followKey: "question" });
+    expect(metrics.scrollTop).toBe(520);
     metrics.scrollTop = 0;
     act(() => {
       result.current.containerRef.current?.dispatchEvent(
@@ -84,7 +88,7 @@ describe("useConversationScroll", () => {
     });
     expect(result.current.pinned).toBe(false);
     metrics.scrollHeight = 800;
-    rerender({ text: "Hi there verified more", conversationId: "c1" });
+    rerender({ text: "Hi there verified more", conversationId: "c1", followKey: "question" });
     expect(metrics.scrollTop).toBe(0);
     act(() => {
       result.current.jumpToLatest();

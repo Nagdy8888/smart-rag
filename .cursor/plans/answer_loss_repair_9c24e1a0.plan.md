@@ -4,49 +4,49 @@ overview: One combined plan on one branch (fix/answer-loss-repair). Raise the an
 todos:
   - id: a0-branch-unseen-set
     content: "A0: cut fix/answer-loss-repair from main, redact the two eval docs (D4), commit both plans and the docs, open the draft PR, write and seal the unseen 50-question set, baseline run."
-    status: in_progress
+    status: completed
   - id: a1-answer-v4
     content: "A1: answer_v4 prompt + fixed claims schema (D2); claims.py maps claims to one paragraph and one link each (claim-n); per-claim drops; gated live schema test; 13-question live subset."
-    status: pending
+    status: completed
   - id: a2-timings-subcodes
     content: "A2: ID-only Hybrid sub-stage timings (stage_timings_ms, owned here per D3) and rerank validation sub-codes; 10-question measurement run that feeds D5."
-    status: pending
+    status: completed
   - id: l0-latency-report
     content: "L0 (latency, trimmed): client wall time in run_company_ask.py, eval_latency_report.py, eval_citation_page_score.py, probe_latency_image.py, docs; skips its own Hybrid timer edits (A2 owns them); two latency-12 baseline runs."
-    status: pending
+    status: completed
   - id: l1-sse-loop-unblock
     content: "L1 (latency): move synchronous event-store and run-connection calls off the event loop; wake attach on append instead of 50 ms polling."
-    status: pending
+    status: completed
   - id: l2-event-store-pool
     content: "L2 (latency): small psycopg_pool pool for the event store with SET LOCAL ROLE."
-    status: pending
+    status: completed
   - id: l3-ordered-writer
     content: "L3 (latency): per-run ordered background event writer; terminal events flush and are awaited. ADR."
-    status: pending
+    status: completed
   - id: l4-pipelined-append
     content: "L4 (latency, conditional on L3's report): one round trip per append with psycopg pipeline mode."
-    status: pending
+    status: completed
   - id: a3-rerank-v2
     content: "A3: rerank_v2 with c01-c20 labels, no hash echo, partial rankings kept (replaces latency L5)."
-    status: pending
+    status: completed
   - id: a4-long-document-v3
     content: "A4: frozen profile hybrid_long_document_v3 with dense_head_pin 12 and fallback_order dense_first; scoped and small-corpus routes use v3; v1/v2 bytes unchanged."
-    status: pending
+    status: completed
   - id: a5-rerank-window
     content: "A5: protect the rerank window; reserve computed from A2 by the rule approved in D5."
-    status: pending
+    status: completed
   - id: a6-hyphen-reflow
     content: "A6: join U+2010 and U+00AD line-end hyphens; PDF_PARSER_VERSION parser_v1_pdf_reflow_v4."
-    status: pending
+    status: completed
   - id: a7-navigation-pages
     content: "A7: generic table-of-contents / index detector; is_search_representative=false with provenance reason navigation_page; no migration."
-    status: pending
+    status: completed
   - id: a8-reingest
     content: "A8 (D6 approved): soft-delete the current book document and upload the same PDF as a new document; rebuild parser image and restart the worker; add --version-id/--answers to the private diagnostics."
-    status: pending
+    status: completed
   - id: a9-rerun-acceptance
     content: "A9: full reruns (diagnosed set, unseen set, negative question) on the rebuilt image, latency report (report only), evidence doc, acceptance table."
-    status: pending
+    status: completed
   - id: a10-ship
     content: "A10: PR out of draft, green checks, merge, delete the branch, rebuild local images from main."
     status: pending

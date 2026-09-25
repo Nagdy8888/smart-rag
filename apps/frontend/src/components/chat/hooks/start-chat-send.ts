@@ -18,9 +18,11 @@ import {
 import {
   addChatTokens,
   applyAdmission,
+  openLiveAgentGraph,
   startNextChatRun,
   type ChatViewState,
 } from "../../../lib/chat-view";
+import { emptyRunProgress } from "../../../lib/run-progress";
 import { conversationTitleFromPrompt } from "../../../lib/conversation-title";
 import { composerDraftIsSendable } from "../../../lib/composer";
 import { newIdempotencyKey } from "../../../lib/idempotency";
@@ -178,6 +180,15 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
       deps.settleCompletedTurn(settled);
     }
     deps.setLastUserMessage(text.trim());
+    const chatAtSend = deps.chatRef.current;
+    let prepared = chatAtSend;
+    if (prepared.runId === null || prepared.terminal !== null) {
+      const nextKey = deps.idempotencyRef.current ?? newIdempotencyKey();
+      deps.idempotencyRef.current = nextKey;
+      prepared = openLiveAgentGraph(startNextChatRun(prepared, nextKey));
+      deps.setChat(prepared);
+      deps.setFailure(null);
+    }
     let streamHandedOff = false;
     let activeConversationId = deps.conversationId;
     if (activeConversationId === null) {
@@ -188,6 +199,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
         );
         activeConversationId = created.conversation_id;
         if (activeConversationId === "" || activeConversationId === "undefined") {
+          deps.setChat(chatAtSend);
           deps.setFailure({ kind: "server", status: 500 });
           deps.setLastUserMessage("");
           deps.sendLockRef.current = false;
@@ -198,6 +210,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
         deps.onConversationId(created.conversation_id);
         void deps.queryClient.invalidateQueries({ queryKey: deps.keys.conversations });
       } catch (error) {
+        deps.setChat(chatAtSend);
         deps.setFailure(
           isClassifiedApiError(error)
             ? error.failure
@@ -210,6 +223,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
       }
     }
     if (activeConversationId === null) {
+      deps.setChat(chatAtSend);
       deps.setLastUserMessage("");
       deps.sendLockRef.current = false;
       deps.setSending(false);
@@ -222,14 +236,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
     deps.abortRef.current?.abort();
     const controller = new AbortController();
     deps.abortRef.current = controller;
-    let current = deps.chatRef.current;
-    if (current.runId === null || current.terminal !== null) {
-      const nextKey = deps.idempotencyRef.current ?? newIdempotencyKey();
-      deps.idempotencyRef.current = nextKey;
-      current = startNextChatRun(current, nextKey);
-      deps.setChat(current);
-      deps.setFailure(null);
-    }
+    let current = prepared;
     const searchScope = deps.bindSearchScope(current.idempotencyKey, capturedScope);
     try {
       const started = await startOrResumeMessageStream(
@@ -251,6 +258,11 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
         return false;
       }
       if (started.failure) {
+        deps.setChat({
+          ...current,
+          stage: null,
+          progress: emptyRunProgress(),
+        });
         deps.setFailure(started.failure);
         deps.setLastUserMessage("");
         return false;

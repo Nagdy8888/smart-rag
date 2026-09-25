@@ -39,14 +39,17 @@ export function progressLabel(key: string): string {
  * Return the idle-hidden status line for an in-flight run.
  *
  * @param chat - Current view.
- * @returns Exactly one of Preparing…, Retrieving…, Searching…, Reading…,
- *   Generating…, Verifying…, or null when idle.
+ * @returns Exactly one of Admission, Preparing…, Retrieving…, Searching…,
+ *   Reading…, Generating…, Verifying…, or null when idle.
  */
 export function runStatusLine(chat: ChatViewState): string | null {
   if (chat.terminal !== null || chat.runId === null) {
     return null;
   }
   const raw = (chat.stage ?? "").toLowerCase();
+  if (raw.includes("admission")) {
+    return "Admission";
+  }
   if (raw.includes("web_search") || raw.includes("web_scope")) {
     return "Searching…";
   }

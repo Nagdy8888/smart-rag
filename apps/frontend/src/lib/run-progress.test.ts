@@ -1,7 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { applyProgressFrame, emptyRunProgress } from "./run-progress";
+import { applyProgressFrame, beginAgentGraph, emptyRunProgress } from "./run-progress";
 
 describe("run progress reducer", () => {
+  it("opens the agent graph before the first server frame and keeps one row", () => {
+    const opened = beginAgentGraph(emptyRunProgress());
+    expect(opened.lastSequence).toBe(0);
+    expect(opened.items).toEqual([
+      expect.objectContaining({
+        key: "enforce_admission",
+        phase: "started",
+        firstSequence: 0,
+      }),
+    ]);
+    const started = applyProgressFrame(
+      opened,
+      "status",
+      { stage: "enforce_admission", status: "running", phase: "started" },
+      1,
+      false,
+    );
+    expect(started.items).toHaveLength(1);
+    const closed = applyProgressFrame(
+      started,
+      "status",
+      { stage: "enforce_admission", status: "admitted", phase: "completed" },
+      2,
+      false,
+    );
+    expect(closed.items[0]).toMatchObject({
+      key: "enforce_admission",
+      phase: "completed",
+      outcome: "admitted",
+    });
+  });
+
   it("opens then closes a node row", () => {
     let progress = emptyRunProgress();
     progress = applyProgressFrame(

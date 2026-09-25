@@ -192,11 +192,10 @@ export function ChatStage(props: ChatStageProps) {
             <Button
               type="button"
               variant="ghost"
-              size="compact"
               data-action-id="ask.sources"
               onClick={onSourcesOpen}
             >
-              Sources (<span key={headerCount} className={chatStyles.countPop}>{String(headerCount)}</span>)
+              Sources ({String(headerCount)})
             </Button>
           ) : null}
           <RunDetailsSheet
@@ -234,6 +233,7 @@ export function ChatStage(props: ChatStageProps) {
           answerOrigin={chat.answerOrigin}
           effectiveRoute={chat.diagnostics.effectiveRoute ?? chat.routeFamily}
           progressItems={chat.progress.items}
+          starting={run.sending && chat.runId === null}
           verificationCompleted={chat.progress.verificationCompleted}
           chat={chat}
           hrefForCitation={hrefForCitation}
@@ -278,21 +278,17 @@ export function ChatStage(props: ChatStageProps) {
         ) : null}
         {showEmptyPrompts ? (
           <div className={chatStyles.emptyPrompts}>
-            <p className={chatStyles.emptyPromptsLabel}>Try one of these</p>
-            <ul className={chatStyles.emptyPromptList}>
-              {PROMPT_CHIPS.map((chip) => (
-                <li key={chip}>
-                  <button
-                    type="button"
-                    className={chatStyles.emptyPrompt}
-                    data-action-id="ask.prompt_fill"
-                    onClick={() => onFillComposer(chip)}
-                  >
-                    {chip}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {PROMPT_CHIPS.map((chip) => (
+              <Button
+                key={chip}
+                type="button"
+                variant="secondary"
+                data-action-id="ask.prompt_fill"
+                onClick={() => onFillComposer(chip)}
+              >
+                {chip}
+              </Button>
+            ))}
           </div>
         ) : null}
         {feedbackRunId !== null ||
