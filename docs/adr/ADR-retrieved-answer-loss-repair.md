@@ -204,8 +204,12 @@ uncertain; this ADR does not promise one.
    it only marks duplicates. Readers that assume a duplicate target must
    handle NULL. The user chose this over a new column, which would need a
    migration.
-4. Re-ingest the book as a new version through the normal pipeline. Keep
-   the previous version for rollback.
+4. Re-ingest the book through the normal pipeline. The upload API always
+   creates a new document and refuses bytes that match a visible one,
+   and no RPC restores a deleted document, so the book is soft-deleted
+   with `app.delete_visible_document` and uploaded again as a new
+   document. The old rows stay soft-deleted but cannot be made current
+   through the application.
 
 ### Not changed
 
@@ -268,6 +272,9 @@ Approved by the user on 2026-09-24:
   approval after the step 1 measurements.
 - **Fix 4:** the meaning of `is_search_representative`, the parser
   version bump, and a re-ingest of the book.
+- **Fix 4 re-ingest path (2026-09-25):** soft-delete the book document
+  and upload the same PDF as a new document, with a new chunk and
+  document ID.
 - The acceptance targets above.
 
 ## Alternatives considered
@@ -319,8 +326,10 @@ out of git.
 - **Fixes 1 and 3:** pin `answer_v3` again; `answer_v4` stays unused.
 - **Fix 2:** route to `hybrid_long_document_v2`, pin `rerank_v1`, and
   revert the channel window.
-- **Fix 4:** make the previous book version current again. The parser
-  revert affects only new ingests.
+- **Fix 4:** revert the A6 and A7 commits, rebuild the parser image,
+  restart the worker, soft-delete the re-ingested document, and upload
+  the PDF again. Restoring the old soft-deleted rows by SQL is not
+  approved. Both reverts affect only new ingests.
 
 ## Verification
 

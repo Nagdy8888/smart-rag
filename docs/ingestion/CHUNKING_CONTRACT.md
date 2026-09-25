@@ -2,7 +2,7 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-24
+last-reviewed: 2026-09-25
 owning_phase: 3
 audience: engineering
 ---
@@ -137,6 +137,32 @@ flag, so graph-eligible documents still send navigation chunks to graph
 extraction. `navigation_v1` is in the chunking config hash, not in the
 chunk ID; re-chunking a version under a new rule keeps IDs and the
 upsert rewrites the flag and provenance.
+
+## Stored book after the answer-loss re-ingest (2026-09-25)
+
+Counts only (private report `a8_version_report.py`). Document `95e6c763`
+was soft-deleted and the same PDF was uploaded as document
+`b56d5774`, version `d7e3206a` (`parser_v1_pdf_reflow_v4`,
+`navigation_v1`, `graph_ineligible`).
+
+| Measure | Before (`e119bf87`) | After (`d7e3206a`) |
+| --- | ---: | ---: |
+| Chunks (passages / parents) | 1,016 (742 / 274) | 1,005 (731 / 274) |
+| Search representatives | 1,015 | 936 |
+| Exact duplicates | 1 | 1 |
+| Navigation exclusions (parents) | 0 (0) | 68 (20) |
+| Chunks with a letter, U+2010, space, letter split | 719 | 7 |
+| Split occurrences | 2,732 | 8 |
+| Glossary chunks searchable (pp. 337-340) | 7 / 7 | 7 / 7 |
+| Representatives without an embedding | 0 | 0 |
+| Completed embedding ledger inputs | 1,015 | 936 |
+
+On the 11-question subset (a01-a10, a38), the fact chunk reached
+dense, BM25, fused, rerank-pool, and selected evidence in 11, 4, 9,
+9, and 9 questions, against 11, 5, 9, 9, and 8 before. The
+generated answer held the fact in 8 questions and the released answer
+in 7, against 8 and 2 before. Outcomes: `strict_phrase` 6,
+`verifier_refusal_after_fusion` 4, `wrong_phrasing` 1.
 
 ## Heading inventory (Phase 4 consumer)
 

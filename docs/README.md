@@ -144,7 +144,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-honest-rag-accuracy.md](./adr/ADR-honest-rag-accuracy.md) | engineering-lead | accepted | 2026-09-21 | eng, reviewers, security |
 | [adr/ADR-ask-evidence-budget-repair.md](./adr/ADR-ask-evidence-budget-repair.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
 | [adr/ADR-sse-ordered-background-writer.md](./adr/ADR-sse-ordered-background-writer.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
-| [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
+| [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-25 | eng, reviewers, security |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
@@ -163,7 +163,7 @@ The table below is the complete maintained map. Packet evidence under
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
-| [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-24 | eng |
+| [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-25 | eng |
 | [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-24 | eng, ops |
 | [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-09-21 | eng |
 | [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-09-21 | eng, security |
