@@ -35,7 +35,7 @@ describe("evaluatePaidHandshake", () => {
     expect(decision.allowPaidPost).toBe(false);
     expect(decision.kind).toBe("below_min");
     expect(handshakeBelowMinCopy()).toBe(
-      "This client is below min_client_version. Update before asking a question.",
+      "This page is out of date. Reload to get the latest version.",
     );
     expect(
       mayStartPaidPost(decision, { runId: null, terminal: null }),

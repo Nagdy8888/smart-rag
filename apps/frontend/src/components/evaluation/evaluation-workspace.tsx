@@ -171,7 +171,7 @@ export function EvaluationWorkspace({ auth, status }: EvaluationWorkspaceProps) 
     return (
       <ErrorState
         title="You don’t have access."
-        message="This area is limited to owners and admins. The server denied the request."
+        message="Only owners and admins can open this page."
       />
     );
   }

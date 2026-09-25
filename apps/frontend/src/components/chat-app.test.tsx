@@ -26,7 +26,7 @@ import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { CHAT_RUN_POINTER_KEY } from "../lib/chat-pointer";
 import { MIXED_SCOPE_CLARIFICATION } from "../lib/answer-origin";
-import { handshakeBelowMinCopy } from "../lib/handshake";
+import { handshakeBelowMinCopy, QUERY_NOT_READY_COPY } from "../lib/handshake";
 import { WEB_SEARCH_DISABLED_COPY } from "../lib/failure-copy";
 import { limitationCopy } from "../lib/limitations";
 
@@ -405,7 +405,7 @@ describe("ChatApp MFA removal and revoked session", () => {
     renderChat(<ChatApp />);
     expect(
       await screen.findByText(
-        "Session rejected (unauthorized). Sign in again. UI state is not authorization.",
+        "Your session has ended. Sign in again.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
@@ -747,7 +747,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(
       await screen.findByText(
-        "Session rejected (unauthorized). Sign in again. UI state is not authorization.",
+        "Your session has ended. Sign in again.",
       ),
     ).toBeInTheDocument();
     expect(messagePosts).toEqual([]);
@@ -761,7 +761,7 @@ describe("ChatApp query_ready gate", () => {
     renderChat(<ChatApp />);
     expect(await screen.findByRole("button", { name: "Send" })).toBeDisabled();
     await waitFor(() => {
-      expect(screen.getByText(/query_ready/i)).toBeInTheDocument();
+      expect(screen.getByText(QUERY_NOT_READY_COPY)).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
   });

@@ -26,12 +26,12 @@ export type HandshakeDecision = {
  * @returns Exact brief sentence. Never includes stack traces.
  */
 export function handshakeBelowMinCopy(): string {
-  return "This client is below min_client_version. Update before asking a question.";
+  return "This page is out of date. Reload to get the latest version.";
 }
 
 /** Copy when core `query_ready` is false. Optional BM25/graph degradation is not this. */
 export const QUERY_NOT_READY_COPY =
-  "Ask is unavailable until query_ready is true.";
+  "Search isn’t ready yet. Try again in a moment.";
 
 /**
  * Compare published SSE schema labels. Numeric strings use integer order;
@@ -163,12 +163,12 @@ export function paidSendBlockReason(
       return handshakeBelowMinCopy();
     }
     if (decision.kind === "loading") {
-      return "Checking API compatibility.";
+      return "Connecting…";
     }
-    return "API handshake is unavailable.";
+    return "Can’t reach the server. Check your connection and try again.";
   }
   if (ready === undefined) {
-    return "Checking query readiness.";
+    return "Checking that search is ready…";
   }
   if (ready === null || ready.query_ready !== true) {
     return QUERY_NOT_READY_COPY;

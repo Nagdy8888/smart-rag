@@ -263,7 +263,7 @@ describe("TablesApp", () => {
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
-    expect(await screen.findByText(/Request limited/)).toBeInTheDocument();
+    expect(await screen.findByText(/Too many requests/)).toBeInTheDocument();
 
     analyzeTable.mockRejectedValueOnce(new Error("boom"));
     fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
@@ -307,7 +307,7 @@ describe("TablesApp", () => {
     expect((await screen.findAllByText(EMPTY_MANIFESTS_COPY)).length).toBeGreaterThan(0);
     expect(screen.queryByText("Pick a table to analyze")).toBeNull();
     expect(
-      screen.getByText("Run bounded calculations on structured data with exact cell provenance."),
+      screen.getByText("Filter, group, and compare values from tables in your documents."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
     expect(screen.getByRole("button", { name: "Analyze" })).toBeDisabled();

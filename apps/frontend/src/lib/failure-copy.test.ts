@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyApiError } from "./api";
+import { FORBIDDEN_MUTATION_COPY } from "./admin-copy";
 import {
   apiFailureBanner,
   chatRunFailureBanner,
@@ -35,12 +36,12 @@ describe("approved HTTP failure copy", () => {
   it("maps 402, 403, 404, 409, 422, 426, 429, and 503 to safe banners", () => {
     expect(
       apiFailureBanner(classifyApiError(402, { detail: "budget_exhausted" })!),
-    ).toContain("Budget exhausted");
+    ).toContain("usage limit was reached");
     expect(
       apiFailureBanner(
         classifyApiError(403, { detail: "forbidden" })!,
       ),
-    ).toContain("forbidden");
+    ).toBe(FORBIDDEN_MUTATION_COPY);
     expect(apiFailureBanner(classifyApiError(404, {})!)).toContain("deleted");
     expect(
       apiFailureBanner(classifyApiError(409, { detail: "conflict" })!),
@@ -55,7 +56,7 @@ describe("approved HTTP failure copy", () => {
           sse_schema_version: "1",
         })!,
       ),
-    ).toContain("min_client_version");
+    ).toBe("This page is out of date. Reload to get the latest version.");
     expect(
       apiFailureBanner(
         classifyApiError(
@@ -64,12 +65,12 @@ describe("approved HTTP failure copy", () => {
           { "Retry-After": "12" },
         )!,
       ),
-    ).toContain("Retry-After 12");
+    ).toContain("Try again in 12 seconds");
     expect(
       apiFailureBanner(
         classifyApiError(503, { detail: "limiter_unavailable" })!,
       ),
-    ).toContain("fail-closed");
+    ).toContain("actions that add cost are paused");
     expect(
       apiFailureBanner(
         classifyApiError(503, { detail: "web_search_disabled" })!,

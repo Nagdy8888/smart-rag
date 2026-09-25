@@ -11,7 +11,7 @@ export const CALLBACK_FAILED = "Sign-in could not be completed";
 
 /** 401 `session_revoked`. */
 export const SESSION_REVOKED_BANNER =
-  "Session rejected (session_revoked). Sign in again. UI state is not authorization.";
+  "You were signed out. Sign in again.";
 
 /** GAP-07-08 honest copy. No bootstrap wizard. */
 export const OWNER_BOOTSTRAP_UNAVAILABLE =
