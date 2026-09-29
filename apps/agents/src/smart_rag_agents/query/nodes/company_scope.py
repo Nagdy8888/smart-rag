@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import cast
 
+from smart_rag_core.query_fusion.exceptions import FusionError as CombinedFusionError
 from smart_rag_core.query_routing.branches import execute_branches
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.serde import plan_from_state, preparation_from_state
+from smart_rag_core.retrieval.fusion import FusionError as HybridFusionError
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes.shared import (
@@ -48,7 +50,9 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     Failure/fallback route:
         Graph unavailability degrades Combined to Hybrid. Historical
         graph paths fail closed. Hybrid/table never fall back to graph
-        prose.
+        prose. Hybrid RRF ``FusionError`` and unexpected retrieve
+        ``ValueError`` / ``RuntimeError`` become ``insufficient_evidence``
+        instead of crashing the SSE stream.
 
     Args:
         state: State after planning.
@@ -95,6 +99,23 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 "detail": exc.reason,
                 "keyword_extract_count": 0,
                 "catalog_llm_call_count": 0,
+            },
+        )
+    except (HybridFusionError, CombinedFusionError, ValueError, RuntimeError) as exc:
+        reason = getattr(exc, "reason", None) or str(exc) or "company_scope_failed"
+        return cast(
+            QueryGraphState,
+            {
+                **state,
+                "status": "insufficient_evidence",
+                "detail": str(reason)[:128],
+                "branch_results": [],
+                "keyword_extract_count": 0,
+                "catalog_llm_call_count": 0,
+                "remaining_model_calls": query_budget.remaining_model_calls,
+                **accumulated_tokens(
+                    state, query_budget.prompt_tokens, query_budget.completion_tokens
+                ),
             },
         )
     extract_total = sum(item.keyword_extract_count for item in results)

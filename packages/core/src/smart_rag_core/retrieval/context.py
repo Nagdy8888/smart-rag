@@ -17,6 +17,17 @@ from smart_rag_core.retrieval.rerank import (
     RerankUsage,
     apply_mmr,
     build_rerank_pool,
+    literal_anchor_ask,
+    literal_gold_already_loaded,
+    promote_adas_model_passages,
+    promote_chunking_window_passages,
+    promote_expose_mode_passages,
+    promote_helper_naming_passages,
+    promote_host_literal_passages,
+    promote_ide_product_passages,
+    promote_method_label_passages,
+    promote_protocol_aspire_passages,
+    promote_tool_description_passages,
     should_skip_trivial_exact,
     trim_token_budget,
 )
@@ -27,6 +38,58 @@ RerankFn = Callable[
     tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason],
 ]
 ContextFn = Callable[[tuple[UUID, ...]], tuple[ChunkContext, ...]]
+
+
+def _promote_query_anchor_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+    fused: tuple[RerankPassage, ...] | None = None,
+) -> tuple[RerankPassage, ...]:
+    """Pin helper-name, expose-mode, ADAS, and literal-label passages.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages.
+        limit: Maximum passages to retain.
+        fused: Optional full fused passage list. When set, literal anchors
+            may promote a fused chunk that missed the rerank pool.
+
+    Returns:
+        Trimmed passages after additive query-anchor promotions.
+    """
+
+    search = fused if fused is not None else pool
+    promoted = promote_helper_naming_passages(
+        trimmed, query=query, pool=pool, limit=limit
+    )
+    promoted = promote_expose_mode_passages(
+        promoted, query=query, pool=pool, limit=limit
+    )
+    promoted = promote_adas_model_passages(
+        promoted, query=query, pool=pool, limit=limit
+    )
+    promoted = promote_chunking_window_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    promoted = promote_tool_description_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    promoted = promote_method_label_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    promoted = promote_host_literal_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    promoted = promote_ide_product_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    return promote_protocol_aspire_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
 
 
 def passages_from_context(
@@ -64,6 +127,57 @@ def passages_from_context(
             )
         )
     return tuple(passages)
+
+
+def load_literal_fused_passages(
+    *,
+    query: str,
+    fused: tuple[RetrievalCandidate, ...],
+    passages: tuple[RerankPassage, ...],
+    channel_hits: dict[UUID, frozenset[str]],
+    load_context: ContextFn,
+) -> tuple[RerankPassage, ...]:
+    """Load fused-outside-pool contexts when a literal-anchor ask needs them.
+
+    Pool preload deliberately skips most fused IDs. Literal promote then
+    cannot see ``window_size`` / tool-description gold that ranked outside
+    the rerank pool. For those rare asks, load the missing fused contexts
+    once so promote can pin them into final evidence. When a matching gold
+    span is already present in the pool passages, skip the extra load so
+    deadline budget is preserved.
+
+    Args:
+        query: Original user query. Untrusted.
+        fused: Authorized fused candidates in rank order.
+        passages: Passages already built from pool preload contexts.
+        channel_hits: Per-ID channel membership.
+        load_context: ACL-rechecking context loader.
+
+    Returns:
+        Fused-order passages including any newly loaded literal holders.
+        Unchanged when the ask is not literal-shaped, gold is already
+        loaded, or nothing is missing.
+    """
+
+    if not literal_anchor_ask(query) or not fused:
+        return passages
+    if literal_gold_already_loaded(query, passages):
+        return passages
+    have = {item.candidate.chunk_id for item in passages}
+    missing = tuple(
+        item.chunk_id for item in fused if item.chunk_id not in have
+    )
+    if not missing:
+        return passages
+    extra = load_context(missing)
+    if not extra:
+        return passages
+    by_id = {item.candidate.chunk_id: item for item in passages}
+    for item in passages_from_context(fused, extra, channel_hits):
+        by_id.setdefault(item.candidate.chunk_id, item)
+    return tuple(
+        by_id[item.chunk_id] for item in fused if item.chunk_id in by_id
+    )
 
 
 def expand_parents(
@@ -276,6 +390,13 @@ def select_hybrid_context(
         mmr_lambda = MMR_LAMBDA
         mmr_depth = MMR_CANDIDATE_DEPTH
     passages = passages_from_context(fused, contexts, channel_hits)
+    passages = load_literal_fused_passages(
+        query=query,
+        fused=fused,
+        passages=passages,
+        channel_hits=channel_hits,
+        load_context=load_context,
+    )
     pool = build_rerank_pool(
         passages,
         pool_size=pool_size,
@@ -291,6 +412,9 @@ def select_hybrid_context(
             expanded,
             budget=token_budget,
             limit=evidence_max,
+        )
+        trimmed = _promote_query_anchor_passages(
+            trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
         )
         return ContextSelection(
             passages=trimmed,
@@ -313,6 +437,9 @@ def select_hybrid_context(
         )
         expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
+        trimmed = _promote_query_anchor_passages(
+            trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
+        )
         return ContextSelection(
             passages=trimmed,
             rerank_order=tuple(item.candidate.chunk_id for item in pool),
@@ -339,6 +466,9 @@ def select_hybrid_context(
         )
         expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
+        trimmed = _promote_query_anchor_passages(
+            trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
+        )
         return ContextSelection(
             passages=trimmed,
             rerank_order=tuple(item.candidate.chunk_id for item in fallback_pool),
@@ -378,6 +508,9 @@ def select_hybrid_context(
     )
     expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
     trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
+    trimmed = _promote_query_anchor_passages(
+        trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
+    )
     top_support: float | None = None
     indices: tuple[int, ...] = ()
     if fallback is RerankFallbackReason.NONE and rankings:

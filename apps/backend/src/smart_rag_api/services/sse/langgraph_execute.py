@@ -187,12 +187,21 @@ class LangGraphExecuteMixin(
                 stream_exhausted=stream_exhausted,
             )
             raise
-        except Exception:
+        except Exception as exc:
+            LOGGER.info(
+                "query sse stream failed",
+                extra={
+                    "event": "query.sse.executor_failed",
+                    "run_id": str(context.run_id),
+                    "error_type": type(exc).__name__,
+                },
+            )
             self._set_termination(reason="error", terminal_event_type="error")
             if mapper is not None and mapper.verified_text:
                 await asyncio.to_thread(
                     self._persist_assistant_answer, context, mapper, settings
                 )
+            yield ("error", {"code": "run_failed"})
             raise
         finally:
             self._record_stream_usage(

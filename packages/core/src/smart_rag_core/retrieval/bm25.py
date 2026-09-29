@@ -3,10 +3,15 @@
 ``Bm25Retriever`` receives opaque server-derived scope and allow-listed
 filters. Every ID is batch-rechecked in Supabase before it can leave this
 adapter. BM25 snippets are never selected or returned.
+
+Multi-token asks try conjunction (``&&&``) before disjunction (``|||``).
+Flat equal scores are discarded so UUID ordering cannot poison Hybrid
+fusion with query-independent heads.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 import psycopg
@@ -34,6 +39,7 @@ from smart_rag_core.retrieval.profiles import (
 from smart_rag_core.retrieval.recheck import recheck_retrieval_candidates
 from smart_rag_core.retrieval.types import Bm25RetrievalResult, RetrievalCandidate
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
 _FIELD_TIER = {
     Bm25Field.TITLE: 0,
@@ -41,6 +47,84 @@ _FIELD_TIER = {
     Bm25Field.ALIAS: 1,
     Bm25Field.BODY: 2,
 }
+_SCORE_EQUALITY_DIGITS = 6
+
+
+def bm25_query_token_count(query_text: str) -> int:
+    """Return the whitespace token count after Arabic normalization.
+
+    Args:
+        query_text: Raw user or variant query.
+
+    Returns:
+        Non-negative token count. Empty or whitespace-only text is ``0``.
+    """
+
+    normalized = normalize_arabic_v1(query_text).strip()
+    if not normalized:
+        return 0
+    return len(normalized.split())
+
+
+def prefer_bm25_conjunction(query_text: str) -> bool:
+    """Return whether multi-token queries should try conjunction first.
+
+    Disjunction (``|||``) on long English asks matches nearly every chunk
+    with flat scores; ``chunk_id`` then dominates the sort and unrelated
+    questions share the same BM25 head. Conjunction recovers distinctive
+    multi-token phrases before falling back to disjunction.
+
+    Args:
+        query_text: Raw user or variant query.
+
+    Returns:
+        True when the normalized query has two or more tokens.
+    """
+
+    return bm25_query_token_count(query_text) >= 2
+
+
+def bm25_scores_discriminate(scores: Sequence[float]) -> bool:
+    """Return whether BM25 scores separate the top survivors.
+
+    When every survivor shares one rounded score, ordering collapses to
+    ``chunk_id`` and pollutes Hybrid fusion with query-independent heads.
+
+    Args:
+        scores: Channel scores for authorized survivors in rank order.
+
+    Returns:
+        True when there are fewer than two scores, or at least two distinct
+        values after rounding to six decimals.
+    """
+
+    if len(scores) < 2:
+        return True
+    distinct = {round(float(item), _SCORE_EQUALITY_DIGITS) for item in scores}
+    return len(distinct) >= 2
+
+
+def resolve_bm25_operators(
+    query_text: str,
+    *,
+    requested: Bm25Operator,
+) -> tuple[Bm25Operator, ...]:
+    """Return operators to try, conjunction first for multi-token asks.
+
+    Args:
+        query_text: Raw query used for token counting.
+        requested: Caller-selected operator. Non-disjunction requests are
+            returned alone (no conjunction probe).
+
+    Returns:
+        Ordered operators. Never empty.
+    """
+
+    if requested is not Bm25Operator.MATCH_DISJUNCTION:
+        return (requested,)
+    if prefer_bm25_conjunction(query_text):
+        return (Bm25Operator.MATCH_CONJUNCTION, Bm25Operator.MATCH_DISJUNCTION)
+    return (Bm25Operator.MATCH_DISJUNCTION,)
 
 
 class Bm25Retriever:
@@ -70,8 +154,8 @@ class Bm25Retriever:
     ) -> Bm25RetrievalResult:
         """Scan BM25 IDs and recheck them on canonical Supabase.
 
-        One bounded top-N query per allow-listed field is issued. Relevance
-        keyset pagination is not used because it is not qualified for this pin.
+        Multi-token asks try conjunction before disjunction. Flat-score
+        survivor lists are dropped so UUID-ordered noise cannot enter fusion.
 
         Args:
             supabase: Canonical Postgres connection for the recheck RPC.
@@ -109,6 +193,55 @@ class Bm25Retriever:
                 candidates=(),
                 fallback_reason=RetrievalFallbackReason.BM25_UNAVAILABLE,
             )
+
+        last_empty = Bm25RetrievalResult(
+            scanned_ids=(),
+            candidates=(),
+            fallback_reason=RetrievalFallbackReason.NONE,
+        )
+        for active in resolve_bm25_operators(query_text, requested=operator):
+            result = self._retrieve_with_operator(
+                supabase=supabase,
+                caller=caller,
+                query_text=query_text,
+                operator=active,
+                language=language,
+                acl_scope_id=acl_scope_id,
+                fields=fields,
+            )
+            if result.fallback_reason is not RetrievalFallbackReason.NONE:
+                return result
+            if result.candidates:
+                return result
+            last_empty = result
+        return last_empty
+
+    def _retrieve_with_operator(
+        self,
+        *,
+        supabase: psycopg.Connection,
+        caller: CallerContext,
+        query_text: str,
+        operator: Bm25Operator,
+        language: str | None,
+        acl_scope_id: str | None,
+        fields: tuple[Bm25Field, ...],
+    ) -> Bm25RetrievalResult:
+        """Run one operator pass for :meth:`retrieve`.
+
+        Args:
+            supabase: Canonical recheck connection.
+            caller: Server-derived identity.
+            query_text: Raw query.
+            operator: Operator for this pass.
+            language: Optional language filter.
+            acl_scope_id: Optional ACL scope prefilter.
+            fields: Field priority.
+
+        Returns:
+            Survivors for this operator, or empty candidates when scores
+            do not discriminate.
+        """
 
         per_field_limit = BM25_SCAN_ID_CAP // max(len(fields), 1)
         scored: list[tuple[int, float, UUID]] = []
@@ -162,6 +295,20 @@ class Bm25Retriever:
             scores_by_id=scores,
         )
         capped = survivors[:BM25_AUTHORIZED_SURVIVOR_CAP]
+        if not bm25_scores_discriminate(
+            tuple(item.channel_score for item in capped)
+        ):
+            return Bm25RetrievalResult(
+                scanned_ids=scanned_ids,
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.NONE,
+                variant_count=1,
+                variant_ranks=(0,),
+                rechecked_count=len(ordered_ids),
+                survivor_count=0,
+                index_schema_version=BM25_INDEX_SCHEMA_VERSION,
+                normalizer_version=NORMALIZATION_VERSION,
+            )
         return Bm25RetrievalResult(
             scanned_ids=scanned_ids,
             candidates=capped,
@@ -188,6 +335,10 @@ class Bm25Retriever:
         fields: tuple[Bm25Field, ...] = BM25_FIELD_PRIORITY,
     ) -> Bm25RetrievalResult:
         """Scan original plus at most three variants in one top-300 statement.
+
+        Multi-token primary asks try conjunction before disjunction. Flat
+        survivor scores are discarded so UUID-ordered noise cannot enter
+        Hybrid fusion.
 
         Args:
             supabase: Canonical Postgres for the recheck RPC.
@@ -238,7 +389,7 @@ class Bm25Retriever:
 
         unique_texts: list[str] = []
         seen_text: set[str] = set()
-        for text in texts[:4]:
+        for text in texts[:3]:
             normalized = text.strip()
             if not normalized or normalized in seen_text:
                 continue
@@ -250,6 +401,60 @@ class Bm25Retriever:
                 candidates=(),
                 fallback_reason=RetrievalFallbackReason.NONE,
             )
+
+        primary = unique_texts[0]
+        last_empty = Bm25RetrievalResult(
+            scanned_ids=(),
+            candidates=(),
+            fallback_reason=RetrievalFallbackReason.NONE,
+            variant_count=len(unique_texts),
+        )
+        for active in resolve_bm25_operators(primary, requested=operator):
+            result = self._retrieve_variants_with_operator(
+                supabase=supabase,
+                caller=caller,
+                unique_texts=tuple(unique_texts),
+                operator=active,
+                language=language,
+                acl_scope_id=acl_scope_id,
+                version_id=version_id,
+                fields=fields,
+            )
+            if result.fallback_reason is not RetrievalFallbackReason.NONE:
+                return result
+            if result.candidates:
+                return result
+            last_empty = result
+        return last_empty
+
+    def _retrieve_variants_with_operator(
+        self,
+        *,
+        supabase: psycopg.Connection,
+        caller: CallerContext,
+        unique_texts: tuple[str, ...],
+        operator: Bm25Operator,
+        language: str | None,
+        acl_scope_id: str | None,
+        version_id: UUID | None,
+        fields: tuple[Bm25Field, ...],
+    ) -> Bm25RetrievalResult:
+        """Run one operator pass for :meth:`retrieve_variants`.
+
+        Args:
+            supabase: Canonical recheck connection.
+            caller: Server-derived identity.
+            unique_texts: Deduplicated original plus variants.
+            operator: Operator for every branch in this pass.
+            language: Optional language filter.
+            acl_scope_id: Optional ACL scope prefilter.
+            version_id: Optional version scope.
+            fields: Field priority.
+
+        Returns:
+            Survivors for this operator, or empty candidates when scores
+            do not discriminate.
+        """
 
         branches: list[sql.Composed] = []
         params: list[object] = []
@@ -390,6 +595,20 @@ class Bm25Retriever:
                     continue
                 seen_final.add(item.chunk_id)
                 combined.append(item)
+        if not bm25_scores_discriminate(
+            tuple(item.channel_score for item in combined)
+        ):
+            return Bm25RetrievalResult(
+                scanned_ids=tuple(scanned),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.NONE,
+                variant_count=len(unique_texts),
+                variant_ranks=tuple(0 for _ in capped_lists),
+                rechecked_count=len(scanned),
+                survivor_count=0,
+                index_schema_version=BM25_INDEX_SCHEMA_VERSION,
+                normalizer_version=NORMALIZATION_VERSION,
+            )
         return Bm25RetrievalResult(
             scanned_ids=tuple(scanned),
             candidates=tuple(combined),

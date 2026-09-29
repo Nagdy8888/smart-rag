@@ -712,6 +712,46 @@ def test_channel_head_pins_bypass_document_cap_and_keep_fused_order() -> None:
     assert ids == sorted(ids, key=position.__getitem__)
 
 
+def test_dense_pins_reserved_in_pin_order_not_fused_order() -> None:
+    """Dense heads keep pool slots even when fused rank places them late.
+
+    With ``dense_head_pin`` near ``rerank_pool_size``, filling pins from fused
+    order let early BM25 pins crowd out dense rank 15. Pin-list order
+    (dense first) reserves those heads before BM25 fill.
+    """
+
+    dense_late = tuple(_candidate() for _ in range(20))
+    bm25_early = tuple(_candidate() for _ in range(5))
+    filler = tuple(_candidate() for _ in range(30))
+    fused = bm25_early + filler + dense_late
+    pins = tuple(item.chunk_id for item in dense_late) + tuple(
+        item.chunk_id for item in bm25_early
+    )
+    preloaded = rerank_preload_ids(
+        fused,
+        pool_size=20,
+        max_per_document=RERANK_MAX_PER_DOCUMENT,
+        pinned_ids=pins,
+    )
+    assert len(preloaded) == 20
+    assert set(preloaded) == {item.chunk_id for item in dense_late}
+    passages = tuple(
+        RerankPassage(
+            candidate=item,
+            raw_text=f"passage {item.chunk_id}",
+            section_path=(),
+            parent_chunk_id=None,
+            token_count=2,
+            channels=frozenset({"dense"}),
+            excerpt=f"passage {item.chunk_id}",
+        )
+        for item in fused
+    )
+    pool = build_rerank_pool(passages, pool_size=20, pinned_ids=pins)
+    pool_ids = {item.candidate.chunk_id for item in pool}
+    assert pool_ids == {item.chunk_id for item in dense_late}
+
+
 def test_pool_without_pins_is_unchanged() -> None:
     """An empty pin set reproduces the legacy pool exactly."""
 
@@ -755,3 +795,195 @@ def test_channel_head_pins_only_return_authorized_ids() -> None:
     )
     assert pins == (b, c, x)
     assert channel_head_pins(dense_ids=(a,), bm25_ids=(), fused_ids=()) == ()
+
+
+def test_promote_helper_naming_prepends_prose_passage() -> None:
+    """Helper-name asks pull naming prose into final evidence when missing."""
+
+    from smart_rag_core.retrieval.rerank import promote_helper_naming_passages
+
+    prose = _passage(
+        text="A helper function (update_memory) reads the trial logs."
+    )
+    definition = _passage(
+        text="def update_memory(path: str):\n    pass\n"
+    )
+    query = "What helper function name does the Reflexion loop use?"
+    promoted = promote_helper_naming_passages(
+        (definition,),
+        query=query,
+        pool=(definition, prose),
+        limit=12,
+    )
+    assert promoted[0].candidate.chunk_id == prose.candidate.chunk_id
+    assert len(promoted) == 2
+
+
+def test_promote_tool_description_from_fused_outside_pool() -> None:
+    """Tool-description promote pins gold that is outside the trimmed set."""
+
+    from smart_rag_core.retrieval.rerank import promote_tool_description_passages
+
+    distractor = _passage(text="Zapier webhook notes without a Wolfram blurb.")
+    gold = _passage(
+        text=(
+            'tool_descriptions = {"query_wolfram_alpha": '
+            '"Use Wolfram Alpha to compute mathematical expressions."}'
+        )
+    )
+    query = "what is the description string for query_wolfram_alpha?"
+    promoted = promote_tool_description_passages(
+        (distractor,),
+        query=query,
+        pool=(distractor, gold),
+        limit=12,
+    )
+    assert promoted[0].candidate.chunk_id == gold.candidate.chunk_id
+
+
+def test_promote_chunking_window_from_fused_outside_pool() -> None:
+    """Chunking promote pins window_size/overlap gold outside the pool trim."""
+
+    from smart_rag_core.retrieval.rerank import promote_chunking_window_passages
+
+    distractor = _passage(text="Managing Context Windows\nShort-Term Memory")
+    gold = _passage(
+        text=(
+            "memory = Memory(chunking_strategy={'mode':'sliding_window',\n"
+            " 'window_size': 128, 'overlap': 16})"
+        )
+    )
+    query = (
+        "In the Memory chunking_strategy example, what window_size "
+        "and overlap values are used?"
+    )
+    promoted = promote_chunking_window_passages(
+        (distractor,),
+        query=query,
+        pool=(distractor, gold),
+        limit=12,
+    )
+    assert promoted[0].candidate.chunk_id == gold.candidate.chunk_id
+
+
+def test_promote_tool_description_prefers_query_overlap() -> None:
+    """When two passages hold Wolfram gold, prefer higher query overlap."""
+
+    from smart_rag_core.retrieval.rerank import promote_tool_description_passages
+
+    weak = _passage(
+        text=(
+            'tool_descriptions = {"query_wolfram_alpha": '
+            '"Use Wolfram Alpha to compute mathematical expressions."}'
+        )
+    )
+    strong = _passage(
+        text=(
+            "Semantic tool retrieval example.\n"
+            'tool_descriptions = {"query_wolfram_alpha": '
+            '"Use Wolfram Alpha to compute mathematical expressions."}'
+        )
+    )
+    query = (
+        "In the semantic tool retrieval example, what is the description "
+        "string for query_wolfram_alpha?"
+    )
+    promoted = promote_tool_description_passages(
+        (weak,),
+        query=query,
+        pool=(weak, strong),
+        limit=12,
+    )
+    assert promoted[0].candidate.chunk_id == strong.candidate.chunk_id
+
+
+def test_load_literal_fused_passages_loads_missing_gold() -> None:
+    """Literal asks load fused contexts that missed the pool preload."""
+
+    from smart_rag_core.retrieval.context import load_literal_fused_passages
+
+    doc = uuid4()
+    pool_id = uuid4()
+    gold_id = uuid4()
+    version = uuid4()
+    pool_cand = RetrievalCandidate(
+        chunk_id=pool_id,
+        document_id=doc,
+        version_id=version,
+        channel_rank=1,
+        channel_score=1.0,
+    )
+    gold_cand = RetrievalCandidate(
+        chunk_id=gold_id,
+        document_id=doc,
+        version_id=version,
+        channel_rank=2,
+        channel_score=0.5,
+    )
+    pool_passage = RerankPassage(
+        candidate=pool_cand,
+        raw_text="Managing Context Windows",
+        token_count=3,
+        channels=frozenset({"dense"}),
+    )
+    gold_text = (
+        "memory = Memory(chunking_strategy={'mode':'sliding_window', "
+        "'window_size': 128, 'overlap': 16})"
+    )
+
+    def _load(ids: tuple[UUID, ...]) -> tuple[ChunkContext, ...]:
+        """Return gold context when requested.
+
+        Args:
+            ids: Chunk ids to load.
+
+        Returns:
+            Matching context rows.
+        """
+
+        rows: list[ChunkContext] = []
+        for chunk_id in ids:
+            if chunk_id != gold_id:
+                continue
+            rows.append(
+                ChunkContext(
+                    chunk_id=gold_id,
+                    document_id=doc,
+                    version_id=version,
+                    parent_chunk_id=None,
+                    chunk_index=284,
+                    page_number=142,
+                    section_path=(),
+                    token_count=20,
+                    raw_text=gold_text,
+                    is_search_representative=True,
+                )
+            )
+        return tuple(rows)
+
+    loaded = load_literal_fused_passages(
+        query=(
+            "In the Memory chunking_strategy example, what window_size "
+            "and overlap values are used?"
+        ),
+        fused=(pool_cand, gold_cand),
+        passages=(pool_passage,),
+        channel_hits={
+            pool_id: frozenset({"dense"}),
+            gold_id: frozenset({"dense"}),
+        },
+        load_context=_load,
+    )
+    assert any(item.candidate.chunk_id == gold_id for item in loaded)
+    from smart_rag_core.retrieval.rerank import promote_chunking_window_passages
+
+    promoted = promote_chunking_window_passages(
+        (pool_passage,),
+        query=(
+            "In the Memory chunking_strategy example, what window_size "
+            "and overlap values are used?"
+        ),
+        pool=loaded,
+        limit=12,
+    )
+    assert promoted[0].candidate.chunk_id == gold_id

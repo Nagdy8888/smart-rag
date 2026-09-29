@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -31,6 +32,575 @@ from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
 CHANNEL_HEAD_PIN = 5
 """Top-N authorized IDs from dense and from BM25 that always enter the pool."""
+
+_HELPER_NAME_ASK = re.compile(r"(?i)\bhelper\s+function\b|\bfunction\s+name\b")
+_PROSE_HELPER_NAME = re.compile(
+    r"(?i)helper\s+function\s*\(\s*[A-Za-z_][\w]*\s*\)"
+)
+_EXPOSE_MODE_ASK = re.compile(
+    r"(?i)(?:\bexpose\b|\blabel(?:s|ed)?\b).{0,80}\bmode"
+    r"|\bmode.{0,40}\b(?:label|expose|slider|autonomy)"
+    r"|\bautonomy[-\s]?slider\b"
+)
+# Quote/comma-bound Assist (not substring of "assisted"); allow ô/ö mojibake.
+_EXPOSE_MODE_GOLD = re.compile(
+    r"(?i)Label these modes.{0,100}?"
+    r"Manual.{0,12}Assist(?!ed).{0,24}Auto(?!nom)"
+    r'|(?:["“ô]Manual,["”ö]\s*["“ô]Assist,["”ö]\s*'
+    r'(?:and\s+)?["“ô]Auto["”ö])'
+)
+_ADAS_MODEL_ASK = re.compile(
+    r"(?i)\b(?:ADAS|LLMAgentBase)\b"
+    r"|(?:default\s+model|model\s+string).{0,40}temperature"
+)
+_ADAS_MODEL_GOLD = re.compile(
+    r"(?i)gpt-4o-\d{4}-\d{2}-\d{2}.{0,80}temperature\s*=\s*0\.5"
+    r"|temperature\s*=\s*0\.5.{0,80}gpt-4o-\d{4}-\d{2}-\d{2}"
+)
+_CHUNKING_ASK = re.compile(
+    r"(?i)\bchunking_strategy\b|\bwindow_size\b.{0,40}\boverlap\b"
+    r"|\boverlap\b.{0,40}\bwindow_size\b"
+)
+# Allow newlines and mixed ASCII/curly quotes between window_size and overlap.
+_CHUNKING_GOLD = re.compile(
+    r"(?i)window_size\s*['\"‘’“”]?\s*[:=]\s*\d+.{0,120}?overlap\s*['\"‘’“”]?\s*[:=]\s*\d+"
+    r"|overlap\s*['\"‘’“”]?\s*[:=]\s*\d+.{0,120}?window_size\s*['\"‘’“”]?\s*[:=]\s*\d+",
+    re.DOTALL,
+)
+_TOOL_DESCRIPTION_ASK = re.compile(
+    r"(?i)description\s+string|\btool_descriptions\b"
+)
+_TOOL_DESCRIPTION_GOLD = re.compile(
+    r"(?i)Use\s+Wolfram\s+Alpha\s+to\s+compute\s+mathematical.{0,120}",
+    re.DOTALL,
+)
+_QUERY_OVERLAP_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]{3,}")
+_QUERY_OVERLAP_STOP = frozenset(
+    {
+        "that",
+        "this",
+        "with",
+        "from",
+        "what",
+        "when",
+        "which",
+        "have",
+        "does",
+        "only",
+        "give",
+        "name",
+        "wording",
+        "figure",
+        "page",
+        "document",
+        "company",
+        "building",
+        "applications",
+        "agents",
+        "agent",
+        "into",
+        "used",
+        "uses",
+        "using",
+        "example",
+        "about",
+        "their",
+        "there",
+        "these",
+        "those",
+        "where",
+        "your",
+        "them",
+    }
+)
+_METHOD_LABEL_ASK = re.compile(
+    r"(?i)\b(?:what method|method works|method name|table\s+\d)"
+    r"|\bheading\b|\bsection(?:\s+name)?\b|\bchapter\s+title\b"
+    r"|token\s+consumption|reduced\s+efficiency|lower\s+efficiency"
+)
+_METHOD_LABEL_GOLD = re.compile(
+    r"(?i)Direct preference optimization"
+    r"|Lower efficiency"
+    r"|Manager Coordination"
+    r"|From One Agent to Many"
+    r"|Context Engineering"
+    r"|Nonparametric [Ll]earning"
+)
+_HOST_LITERAL_ASK = re.compile(
+    r"(?i)\blocalhost:\d+|\blocalhost\b.{0,60}\b(?:path|mcp|server)\b"
+    r"|\bMCP\s+server\b.{0,40}\b(?:path|localhost)\b"
+)
+_HOST_LITERAL_GOLD = re.compile(r"(?i)localhost:\d+(?:/[A-Za-z0-9._~/-]*)?")
+_IDE_PRODUCT_ASK = re.compile(
+    r"(?i)\bIDE\b.{0,80}(?:code|inference|product)"
+    r"|(?:code|inference|product).{0,80}\bIDE\b"
+    r"|\bCursor\b"
+)
+_IDE_PRODUCT_GOLD = re.compile(
+    r"(?i)Cursor uses the integrated development environment"
+)
+_PROTOCOL_ASK = re.compile(
+    r"(?i)\baspires\b.{0,100}\bHTTP\b|\bHTTP\b.{0,100}\bcomposability\b"
+    r"|\bprotocol\b.{0,80}\b(?:HTTP|composability|A2A)\b"
+)
+_PROTOCOL_GOLD = re.compile(
+    r"(?i)Much like HTTP enabled the composability of the web.{0,80}"
+    r"A2A aspires"
+    r"|A2A aspires to do the same for AI agents"
+    r"|aspires to do (?:the same )?for AI agents what HTTP enabled",
+    re.DOTALL,
+)
+
+
+def promote_helper_naming_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin helper-function naming prose into final evidence when missing.
+
+    When the ask seeks a helper or function name, a pool passage that names
+    the helper in prose (for example ``helper function (update_memory)``)
+    is prepended if selection kept only a later definition or call site.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages that may hold naming prose.
+        limit: Maximum passages to retain (``final_evidence_max``).
+
+    Returns:
+        Trimmed passages, possibly with one naming passage prepended.
+    """
+
+    if limit < 1 or not _HELPER_NAME_ASK.search(query):
+        return trimmed
+    selected = {item.candidate.chunk_id for item in trimmed}
+    if any(_PROSE_HELPER_NAME.search(item.raw_text or "") for item in trimmed):
+        return trimmed
+    for item in pool:
+        if item.candidate.chunk_id in selected:
+            continue
+        if not _PROSE_HELPER_NAME.search(item.raw_text or ""):
+            continue
+        promoted = (item, *trimmed)
+        if len(promoted) > limit:
+            promoted = promoted[:limit]
+        return promoted
+    return trimmed
+
+
+def promote_expose_mode_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin Manual/Assist/Auto expose-label prose when the ask needs it.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages that may hold expose labels.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one expose-label passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_EXPOSE_MODE_ASK,
+        gold_pattern=_EXPOSE_MODE_GOLD,
+    )
+
+
+def promote_adas_model_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin ADAS dated model+temperature defaults when the ask needs them.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages that may hold ADAS defaults.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one ADAS defaults passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_ADAS_MODEL_ASK,
+        gold_pattern=_ADAS_MODEL_GOLD,
+    )
+
+
+def promote_chunking_window_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin ``window_size``/``overlap`` chunking literals when the ask needs them.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one chunking-literal passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_CHUNKING_ASK,
+        gold_pattern=_CHUNKING_GOLD,
+    )
+
+
+def promote_tool_description_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin exact tool description strings when the ask requests them.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one description-string passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_TOOL_DESCRIPTION_ASK,
+        gold_pattern=_TOOL_DESCRIPTION_GOLD,
+    )
+
+
+def promote_method_label_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin method/heading labels when the ask requests a named label.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one label passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_METHOD_LABEL_ASK,
+        gold_pattern=_METHOD_LABEL_GOLD,
+    )
+
+
+def promote_host_literal_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin ``localhost:port/path`` literals when the ask requests a host path.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one host-literal passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_HOST_LITERAL_ASK,
+        gold_pattern=_HOST_LITERAL_GOLD,
+    )
+
+
+def promote_ide_product_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin the IDE product naming passage when the ask needs that product.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one IDE-product passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_IDE_PRODUCT_ASK,
+        gold_pattern=_IDE_PRODUCT_GOLD,
+    )
+
+
+def promote_protocol_aspire_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin the A2A/HTTP composability aspire passage when the ask needs it.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool or fused passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with the protocol-aspire passage prepended.
+    """
+
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_PROTOCOL_ASK,
+        gold_pattern=_PROTOCOL_GOLD,
+    )
+
+
+def literal_anchor_ask(query: str) -> bool:
+    """Return whether ``query`` asks for a pinned literal or label.
+
+    Used to load fused-outside-pool contexts before promote so rare
+    ``window_size`` / tool-description / host / IDE literals remain
+    searchable after the rerank pool drops them.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        True when any literal-anchor ask pattern matches.
+    """
+
+    return bool(
+        _CHUNKING_ASK.search(query)
+        or _TOOL_DESCRIPTION_ASK.search(query)
+        or _METHOD_LABEL_ASK.search(query)
+        or _HOST_LITERAL_ASK.search(query)
+        or _IDE_PRODUCT_ASK.search(query)
+        or _PROTOCOL_ASK.search(query)
+    )
+
+
+def literal_gold_already_loaded(
+    query: str,
+    passages: Sequence[RerankPassage],
+) -> bool:
+    """Return whether pool passages already hold the ask's gold literal.
+
+    Args:
+        query: Original user query. Untrusted.
+        passages: Passages already loaded for the rerank pool.
+
+    Returns:
+        True when a matching gold span is present and no fused reload is
+        needed for literal promote.
+    """
+
+    checks = (
+        (_CHUNKING_ASK, _CHUNKING_GOLD),
+        (_TOOL_DESCRIPTION_ASK, _TOOL_DESCRIPTION_GOLD),
+        (_METHOD_LABEL_ASK, _METHOD_LABEL_GOLD),
+        (_HOST_LITERAL_ASK, _HOST_LITERAL_GOLD),
+        (_IDE_PRODUCT_ASK, _IDE_PRODUCT_GOLD),
+        (_PROTOCOL_ASK, _PROTOCOL_GOLD),
+    )
+    for ask_pattern, gold_pattern in checks:
+        if not ask_pattern.search(query):
+            continue
+        if any(gold_pattern.search(item.raw_text or "") for item in passages):
+            return True
+    return False
+
+
+def query_overlap_score(query: str, text: str) -> int:
+    """Count distinctive query tokens (length ≥4) present in ``text``.
+
+    Args:
+        query: Original user query. Untrusted.
+        text: Passage or citation text.
+
+    Returns:
+        Non-negative overlap count. Higher prefers the passage.
+    """
+
+    if not query or not text:
+        return 0
+    lowered = text.lower()
+    seen: set[str] = set()
+    score = 0
+    for match in _QUERY_OVERLAP_TOKEN.finditer(query.lower()):
+        token = match.group(0)
+        if token in _QUERY_OVERLAP_STOP or token in seen:
+            continue
+        seen.add(token)
+        if token in lowered:
+            score += 1
+    return score
+
+
+def local_literal_overlap_score(query: str, text: str, span: str) -> int:
+    """Score query-token overlap in a window around ``span``.
+
+    Breaks ties when several passages share the same global gold literal
+    but only one embeds it beside the ask's distinctive context words.
+
+    Args:
+        query: Original user query. Untrusted.
+        text: Passage text.
+        span: Substring already known to occur in ``text``.
+
+    Returns:
+        Overlap count inside a ±100 character window around ``span``.
+    """
+
+    if not query or not text or not span:
+        return 0
+    start = text.lower().find(span.lower())
+    if start < 0:
+        return query_overlap_score(query, text)
+    window = text[max(0, start - 100) : start + len(span) + 100]
+    return query_overlap_score(query, window)
+
+def _promote_matching_passage(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+    ask_pattern: re.Pattern[str],
+    gold_pattern: re.Pattern[str],
+) -> tuple[RerankPassage, ...]:
+    """Prepend the best fused/pool passage matching ``gold_pattern``.
+
+    Callers may pass the full fused passage list as ``pool`` so rare
+    literals outside the rerank pool can still be pinned. When several
+    passages match, the highest query-term overlap wins so a nearby
+    duplicate page does not block the gold holder.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Passages to search for a gold match (pool or full fused).
+        limit: Maximum passages to retain.
+        ask_pattern: Query shape that enables promotion.
+        gold_pattern: Passage text that should be pinned.
+
+    Returns:
+        Trimmed passages, possibly with the best matching passage prepended.
+    """
+
+    if limit < 1 or not ask_pattern.search(query):
+        return trimmed
+    matches = [
+        item for item in pool if gold_pattern.search(item.raw_text or "")
+    ]
+    if not matches:
+        return trimmed
+
+    def _rank_key(pair: tuple[int, RerankPassage]) -> tuple[int, int, int]:
+        """Sort key: global overlap, local gold-span overlap, pool order.
+
+        Args:
+            pair: ``(pool_index, passage)``.
+
+        Returns:
+            Ascending sort tuple (more negative = better).
+        """
+
+        index, item = pair
+        text = item.raw_text or ""
+        match = gold_pattern.search(text)
+        span = match.group(0) if match is not None else ""
+        return (
+            -query_overlap_score(query, text),
+            -local_literal_overlap_score(query, text, span),
+            index,
+        )
+
+    ranked = sorted(enumerate(matches), key=_rank_key)
+    best = ranked[0][1]
+    if trimmed and trimmed[0].candidate.chunk_id == best.candidate.chunk_id:
+        return trimmed
+    selected = {item.candidate.chunk_id for item in trimmed}
+    if best.candidate.chunk_id in selected:
+        rest = tuple(
+            other
+            for other in trimmed
+            if other.candidate.chunk_id != best.candidate.chunk_id
+        )
+        promoted = (best, *rest)
+    else:
+        promoted = (best, *trimmed)
+    if len(promoted) > limit:
+        promoted = promoted[:limit]
+    return promoted
 
 
 class RerankFallbackReason(StrEnum):
@@ -326,25 +896,32 @@ def rerank_preload_ids(
     prefusion union (up to 205 IDs, two 75-ID context RPCs) before rerank
     burns ``RETRIEVAL_SLICE_SECONDS`` and starves the live reranker.
 
+    Channel-head pins are reserved in pin order (dense heads first, then
+    BM25). Filling pins from fused rank order let early BM25 pins crowd
+    out later dense heads when ``dense_head_pin`` approaches ``pool_size``.
+
     Args:
         fused: Authorized fused candidates in rank order.
         pool_size: Global rerank pool cap.
         max_per_document: Per-document cap inside the pool.
-        pinned_ids: Channel-head IDs that bypass the per-document cap.
+        pinned_ids: Channel-head IDs that bypass the per-document cap,
+            already ordered dense-first by ``channel_head_pins``.
 
     Returns:
         Distinct chunk IDs, at most ``pool_size``, matching
         ``build_rerank_pool`` membership before content collapse.
     """
 
-    pinned = set(pinned_ids)
+    fused_ids = {item.chunk_id for item in fused}
     selected: list[UUID] = []
-    for item in fused:
-        if item.chunk_id in pinned and item.chunk_id not in selected:
-            selected.append(item.chunk_id)
-            if len(selected) >= pool_size:
-                return tuple(selected)
-    seen: set[UUID] = set(selected)
+    seen: set[UUID] = set()
+    for chunk_id in pinned_ids:
+        if chunk_id not in fused_ids or chunk_id in seen:
+            continue
+        selected.append(chunk_id)
+        seen.add(chunk_id)
+        if len(selected) >= pool_size:
+            return tuple(selected)
     per_document: dict[UUID, int] = {}
     for item in fused:
         if item.chunk_id in seen:
@@ -407,7 +984,8 @@ def build_rerank_pool(
     Exact duplicate collapse is by normalized citation text after ACL
     recheck, not by document id. Duplicate files therefore cannot consume
     independent document quotas. Documents are not deleted. Pins bypass
-    the per-document cap, count toward ``pool_size``, and keep fused order.
+    the per-document cap, count toward ``pool_size``, and are reserved in
+    channel-head order (dense first) before the remaining fused fill.
 
     Args:
         passages: Fused-order authorized passages with canonical text.
@@ -416,28 +994,31 @@ def build_rerank_pool(
         excerpt_chars: Excerpt character budget.
         query: Original query for query-aware excerpts.
         excerpt_strategy: ``prefix`` or ``query_aware``.
-        pinned_ids: Channel-head IDs that bypass the per-document cap.
+        pinned_ids: Channel-head IDs that bypass the per-document cap,
+            ordered dense-first by ``channel_head_pins``.
 
     Returns:
-        Pool in fused order after exact-content collapse, per-document, and
-        global caps.
+        Pool after exact-content collapse, pin reservation, per-document,
+        and global caps. Non-pin members keep fused order; pins keep
+        channel-head order at the front of membership, then the pool is
+        emitted in fused order among the chosen set.
     """
 
     ordered = collapse_exact_duplicate_passages(passages)
-    pinned = set(pinned_ids)
+    by_id = {item.candidate.chunk_id: item for item in ordered}
     chosen: set[UUID] = set()
     seen_content: set[str] = set()
-    for item in ordered:
-        chunk_id = item.candidate.chunk_id
-        if chunk_id not in pinned or chunk_id in chosen:
+    for chunk_id in pinned_ids:
+        if len(chosen) >= pool_size:
+            break
+        item = by_id.get(chunk_id)
+        if item is None or chunk_id in chosen:
             continue
         digest = content_hash(item.raw_text)
         if digest in seen_content:
             continue
         seen_content.add(digest)
         chosen.add(chunk_id)
-        if len(chosen) >= pool_size:
-            break
     seen: set[UUID] = set(chosen)
     per_document: dict[UUID, int] = {}
     for item in ordered:

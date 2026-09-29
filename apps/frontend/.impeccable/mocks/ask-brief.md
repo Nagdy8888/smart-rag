@@ -18,4 +18,8 @@ FIRST VIEWPORT: Smart RAG and Ask, Documents, Tables, Graph, Admin sit in the fi
 
 FORM: The Field, seed 43c71ab8, composition The plate.
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+
+## Build path note
+
+The comp-led hero gate remains open (~61%, needs ≥72%). Live Ask ships The Field in the product surface while that pixel gate stays deferred: ink field chrome, bone plate, segmented source, plate typography, and electric citation chips.

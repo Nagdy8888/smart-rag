@@ -19,6 +19,7 @@ from smart_rag_core.query_answer.citations import (
     leading_sentence,
     maybe_persist_verified_citations,
     persist_answer_citations,
+    repair_leaf_citations,
 )
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_fusion.models import PassageOrigin, ScoredPassage
@@ -346,6 +347,199 @@ def test_verify_insufficient_when_every_citation_skipped(
     )
     assert verified["status"] == "insufficient_evidence"
     assert verified["detail"] == "citation_leaf_unresolved"
+
+
+def test_repair_leaf_citations_uses_claim_local_unique_span() -> None:
+    """A short ambiguous span retargets onto the unique claim-holding passage."""
+
+    from smart_rag_core.query_answer.models import AnswerParagraph, AtomicLink
+    from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+
+    parent = verifier_passage(
+        1,
+        text=(
+            "> 0.25 signals major drift.\n\n"
+            "prioritize retraining if PSI > 0.25 persists over 48 hours."
+        ),
+        rank=1,
+    )
+    leaf = verifier_passage(
+        2,
+        text="prioritize retraining if PSI > 0.25 persists over 48 hours.",
+        rank=2,
+    )
+    fusion = verifier_fusion(parent, leaf)
+    parent_id = str(fusion.evidence[0].chunk_id)
+    leaf_id = str(fusion.evidence[1].chunk_id)
+    claim = "prioritize retraining if PSI > 0.25 persists over 48 hours."
+    answer = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("claim-1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=parent_id,
+                span="> 0.25",
+                paragraph_index=0,
+                atomic_link_id="claim-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="claim-1",
+                claim=claim,
+                chunk_ids=(parent_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    skipped = (
+        SkippedCitation(
+            chunk_id=parent_id,
+            paragraph_index=0,
+            span="> 0.25",
+            reason="leaf_ambiguous",
+        ),
+    )
+    repaired = repair_leaf_citations(answer, fusion, skipped)
+    assert repaired.citations[0].chunk_id == leaf_id
+    assert "PSI > 0.25" in repaired.citations[0].span
+    assert "48 hours" in repaired.citations[0].span
+
+
+def test_verify_partial_after_leaf_citation_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Zero-persist leaf skips recover when claim-local repair then persists."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.verify import verify_answer_node
+    from smart_rag_agents.query.state import pending_query_state
+    from smart_rag_core.query_answer.models import AnswerParagraph, AtomicLink
+    from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+    from smart_rag_core.security.identity import UserRole
+
+    parent = verifier_passage(
+        1,
+        text=(
+            "SHA-256 and SHA-1 appear in several layers.\n\n"
+            "Computing a SHA-256 hash of incoming data upon receipt is "
+            "recommended for maintaining data integrity in MAESTRO layer 2, "
+            "Data operations."
+        ),
+        rank=1,
+    )
+    leaf = verifier_passage(
+        2,
+        text=(
+            "Computing a SHA-256 hash of incoming data upon receipt is "
+            "recommended for maintaining data integrity in MAESTRO layer 2, "
+            "Data operations."
+        ),
+        rank=2,
+    )
+    fusion = verifier_fusion(parent, leaf)
+    parent_id = str(fusion.evidence[0].chunk_id)
+    leaf_id = str(fusion.evidence[1].chunk_id)
+    claim = (
+        "Computing a SHA-256 hash of incoming data upon receipt is "
+        "recommended for maintaining data integrity in MAESTRO layer 2, "
+        "Data operations."
+    )
+    runtime = MagicMock()
+    runtime.user_id = uuid4()
+    runtime.role = UserRole.MEMBER
+    runtime.authorization_version = 1
+    runtime.session_id = None
+    runtime.run_id = uuid4()
+    calls: list[AnswerPayload] = []
+
+    def _persist(
+        _connection: object,
+        *,
+        caller: object,
+        run_id: object,
+        fusion: object,
+        answer: AnswerPayload,
+    ) -> CitationPersistResult:
+        """Skip every citation on the first call; accept a repaired claim span.
+
+        Args:
+            _connection: Unused mock connection.
+            caller: Unused caller.
+            run_id: Unused run id.
+            fusion: Unused fusion.
+            answer: Answer being persisted.
+
+        Returns:
+            Persist result for this attempt.
+        """
+
+        del caller, run_id, fusion
+        calls.append(answer)
+        if len(calls) == 1:
+            skipped = tuple(
+                SkippedCitation(
+                    chunk_id=str(item.chunk_id or ""),
+                    paragraph_index=item.paragraph_index,
+                    span=(item.span or "").strip(),
+                    reason="leaf_ambiguous",
+                )
+                for item in answer.citations
+            )
+            return CitationPersistResult(ids=(), skipped=skipped)
+        assert answer.citations
+        assert any(
+            "SHA-256" in (item.span or "") and len(item.span or "") >= 12
+            for item in answer.citations
+        )
+        return CitationPersistResult(ids=(uuid4(),), skipped=())
+
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.runtime_from_state",
+        lambda _state: runtime,
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.render_verified_company_answer",
+        lambda answer, **_kwargs: answer,
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.summarize_run_usage",
+        MagicMock(side_effect=QueryAdmissionError("database_rejected")),
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.maybe_persist_verified_citations",
+        _persist,
+    )
+    state = pending_query_state(user_query="What hashing example does MAESTRO recommend?")
+    state["status"] = "answered"
+    state["remaining_model_calls"] = 8
+    state["fusion"] = fusion.model_dump(mode="json")
+    state["answer"] = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=parent_id,
+                span="SHA-256",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(link_id="l1", claim=claim, chunk_ids=(parent_id,)),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    ).model_dump(mode="json")
+    verified = verify_answer_node(state, QueryGraphDeps(connection=MagicMock()))
+    assert verified["status"] == "verified_partial"
+    assert verified["detail"] == "citation_leaf_unresolved"
+    assert len(calls) == 2
 
 
 def test_live_persist_does_not_backfill_fusion_citations() -> None:

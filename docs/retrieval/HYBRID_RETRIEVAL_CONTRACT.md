@@ -53,7 +53,7 @@ gate that required this admission is
 (`deadline_budget`).
 
 `hybrid_long_document_v3` copies `hybrid_long_document_v2` and adds two
-fields. `dense_head_pin` 12 pins the first 12 authorized dense IDs into
+fields. `dense_head_pin` 20 pins the first 20 authorized dense IDs into
 the rerank pool; the BM25 pin stays `CHANNEL_HEAD_PIN` (5), and pins still
 cannot add an ID outside the fused list. `fallback_order` `dense_first`
 applies only when rerank does not complete (the reserve gate skipped it,
@@ -64,7 +64,7 @@ appended tail uses that order. MMR, quotas, parent expansion, the 12-unit
 cap, and the 6000-token budget are unchanged. Both fields default to the
 old behavior (`5`, `rrf`), so `hybrid_default_v1` and
 `hybrid_long_document_v2` bytes and digests are unchanged. Canonical
-SHA-256 `9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8`
+SHA-256 `54bf7e76f5eb9e77bbc853296c29c57470f937feb5a5da5be1f4d95f02fea254`
 (`FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256`). Rollback: route to
 `hybrid_long_document_v2`, which stays pinned and loadable. For v3 this
 replaces the rule "falls back to deterministic RRF", approved in

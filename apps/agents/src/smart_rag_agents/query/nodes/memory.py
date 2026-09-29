@@ -74,14 +74,19 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
             "memory_records": [],
         }
     dumped = [item.model_dump(mode="json") for item in records]
+    detail = "memory loaded as untrusted delimited records"
     if deps.store_get is not None:
-        namespace = memory_store_namespace(
-            company_id=None,
-            user_id=str(context.user_id),
-            conversation_id=str(context.conversation_id),
-        )
-        stored = deps.store_get(namespace, "summary")
-        summary_text = stored.get("summary") if stored else None
+        try:
+            namespace = memory_store_namespace(
+                company_id=None,
+                user_id=str(context.user_id),
+                conversation_id=str(context.conversation_id),
+            )
+            stored = deps.store_get(namespace, "summary")
+        except Exception:
+            stored = None
+            detail = FALLBACK_MEMORY_UNAVAILABLE
+        summary_text = stored.get("summary") if isinstance(stored, dict) else None
         if isinstance(summary_text, str) and summary_text:
             summary_record = delimit_memory_record(
                 message_id=str(
@@ -96,5 +101,5 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
         **state,
         "status": "memory_loaded",
         "memory_records": dumped,
-        "detail": "memory loaded as untrusted delimited records",
+        "detail": detail,
     }

@@ -23,7 +23,7 @@
   "mmr_candidate_depth": 20,
   "excerpt_strategy": "query_aware",
   "dense_mode_when_version_scoped": "exact",
-  "dense_head_pin": 12,
+  "dense_head_pin": 20,
   "fallback_order": "dense_first",
   "coverage_thresholds": {
     "exact_code": 0.65,

@@ -80,6 +80,7 @@ def render_verified_company_answer(
     *,
     fusion: FusionResult,
     tables: tuple[TableEvidenceRecord, ...],
+    user_query: str | None = None,
 ) -> AnswerPayload:
     """Replace free-form company prose with surviving atomic-link claims.
 
@@ -91,6 +92,8 @@ def render_verified_company_answer(
         payload: Answer after deterministic checks and the verifier batch.
         fusion: Fitted canonical evidence for this run.
         tables: Deterministic table snapshots.
+        user_query: Original user text for multi-holder citation rebind.
+            Untrusted.
 
     Returns:
         Payload whose prose is unique surviving claims, plus a composed
@@ -98,7 +101,9 @@ def render_verified_company_answer(
         refusal when no supported material link remains.
     """
 
-    working = bind_company_atomic_links(payload, fusion=fusion)
+    working = bind_company_atomic_links(
+        payload, fusion=fusion, user_query=user_query
+    )
     guarded = drop_ungrounded_literals(working, fusion=fusion, tables=tables)
     surviving = tuple(
         sorted(guarded.atomic_links, key=lambda item: (item.priority, item.link_id))

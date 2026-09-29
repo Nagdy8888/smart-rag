@@ -139,9 +139,10 @@ tests/contract/test_answer_v4_schema.py, and a gated live call
    and digest pin. The `hybrid_default_v1` and `hybrid_long_document_v2`
    bytes stay unchanged. It adds two fields whose defaults keep current
    behavior:
-   - `dense_head_pin` (default 5, v3 value 12). The first 12 dense IDs
-     are pinned into the pool, and pins still cannot add an ID outside
-     `fused_ids`.
+   - `dense_head_pin` (default 5, current v3 value 20). The first 20 dense
+     IDs are pinned into the pool, and pins still cannot add an ID outside
+     `fused_ids`. The original answer-loss repair shipped pin 12; hard50
+     refusal repair raised it to 20 so dense ranks 13–20 reach the pool.
    - `fallback_order` (`rrf` or `dense_first`, v3 value `dense_first`).
      When rerank does not complete, pool members that dense search found
      are ordered by dense rank, followed by the rest in fused order.

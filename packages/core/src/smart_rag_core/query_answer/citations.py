@@ -13,7 +13,8 @@ import psycopg
 
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
-from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
+from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload, AtomicLink
+from smart_rag_core.query_answer.versions import MAX_CITATION_SPAN_CHARS
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.web_research.models import WebSourceRecord
@@ -31,7 +32,11 @@ resolution rather than the run, the caller, or the transaction."""
 MIN_RETRY_SPAN_CHARS = 24
 """Shortest leading sentence worth retrying as a narrower span."""
 
+MIN_CLAIM_LOCAL_SPAN_CHARS = 12
+"""Shortest claim excerpt worth using as a unique leaf span."""
+
 _SENTENCE_END = re.compile(r"[.!?\u061f\u3002]\s|\n")
+_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +153,190 @@ def drop_skipped_citations(
     if len(kept) == len(answer.citations):
         return answer
     return answer.model_copy(update={"citations": kept})
+
+
+def repair_leaf_citations(
+    answer: AnswerPayload,
+    fusion: FusionResult,
+    skipped: Sequence[SkippedCitation],
+) -> AnswerPayload:
+    """Rebuild skipped citations onto claim-local unique fusion spans.
+
+    Parent passages and bare probes such as ``> 0.25`` or ``SHA-256`` often
+    match several search-representative children and fail leaf persist. When
+    the atomic claim (or a multi-token excerpt of it) sits inside exactly one
+    fused passage, that passage and excerpt become the citation target so a
+    second persist can succeed.
+
+    Args:
+        answer: Verified answer that still holds claim prose.
+        fusion: Fitted canonical evidence for this run.
+        skipped: Leaf-unresolved citations from the first persist attempt.
+
+    Returns:
+        Answer with repaired passage citations when a unique holder exists.
+        Unchanged when nothing can be retargeted.
+    """
+
+    if not skipped or not fusion.evidence or not answer.atomic_links:
+        return answer
+    skip_keys = {
+        (item.chunk_id, item.paragraph_index, (item.span or "").strip())
+        for item in skipped
+    }
+    links_by_id = {item.link_id: item for item in answer.atomic_links}
+    links_by_paragraph: dict[int, AtomicLink] = {}
+    for paragraph in answer.paragraphs:
+        for link_id in paragraph.link_ids:
+            link = links_by_id.get(link_id)
+            if link is not None:
+                links_by_paragraph[paragraph.paragraph_index] = link
+                break
+    repaired: list[AnswerCitation] = []
+    link_updates: dict[str, str] = {}
+    changed = False
+    for citation in answer.citations:
+        key = (
+            str(citation.chunk_id or ""),
+            citation.paragraph_index,
+            (citation.span or "").strip(),
+        )
+        if key not in skip_keys:
+            repaired.append(citation)
+            continue
+        link = None
+        if citation.atomic_link_id:
+            link = links_by_id.get(citation.atomic_link_id)
+        if link is None and citation.paragraph_index is not None:
+            link = links_by_paragraph.get(citation.paragraph_index)
+        target = _unique_claim_holder(link, fusion) if link is not None else None
+        if target is None:
+            repaired.append(citation)
+            continue
+        chunk_id, span = target
+        repaired.append(
+            citation.model_copy(
+                update={
+                    "chunk_id": chunk_id,
+                    "span": span[:MAX_CITATION_SPAN_CHARS],
+                }
+            )
+        )
+        if link is not None and chunk_id not in link.chunk_ids:
+            link_updates[link.link_id] = chunk_id
+        changed = True
+    if not changed:
+        return answer
+    links = answer.atomic_links
+    if link_updates:
+        links = tuple(
+            item.model_copy(
+                update={"chunk_ids": (link_updates[item.link_id], *item.chunk_ids)}
+            )
+            if item.link_id in link_updates
+            else item
+            for item in answer.atomic_links
+        )
+    return answer.model_copy(
+        update={"citations": tuple(repaired), "atomic_links": links}
+    )
+
+
+def _unique_claim_holder(
+    link: AtomicLink,
+    fusion: FusionResult,
+) -> tuple[str, str] | None:
+    """Return the unique fusion passage and claim-local span for one link.
+
+    Args:
+        link: Surviving atomic claim that still needs a leaf citation.
+        fusion: Fitted canonical evidence.
+
+    Returns:
+        ``(chunk_id, span)`` when exactly one passage uniquely holds a
+        claim-local excerpt. ``None`` when zero or several qualify.
+    """
+
+    claim = (link.claim or "").strip()
+    if not claim:
+        return None
+    for span in _claim_span_candidates(claim):
+        holders = [
+            item
+            for item in fusion.evidence
+            if item.citation_text and span in item.citation_text
+        ]
+        if len(holders) != 1:
+            continue
+        holder = holders[0]
+        return (str(holder.chunk_id), span)
+    # Prefer the shortest passage that fully contains the claim when several
+    # fused parents nest the same text — leaf persist needs one target.
+    full_holders = [
+        item
+        for item in fusion.evidence
+        if item.citation_text and claim in item.citation_text
+    ]
+    if not full_holders:
+        return None
+    full_holders.sort(key=lambda item: (len(item.citation_text), str(item.chunk_id)))
+    shortest = full_holders[0]
+    if len(full_holders) > 1 and len(full_holders[1].citation_text) == len(
+        shortest.citation_text
+    ):
+        return None
+    excerpt = claim[:MAX_CITATION_SPAN_CHARS].rstrip()
+    if len(excerpt) < MIN_CLAIM_LOCAL_SPAN_CHARS or excerpt not in shortest.citation_text:
+        return None
+    return (str(shortest.chunk_id), excerpt)
+
+
+def _claim_span_candidates(claim: str) -> tuple[str, ...]:
+    """Build longest-first claim excerpts suitable as unique leaf spans.
+
+    Args:
+        claim: Atomic claim text released into the answer.
+
+    Returns:
+        Distinct substrings of ``claim``, longest first, excluding bare
+        probes shorter than ``MIN_CLAIM_LOCAL_SPAN_CHARS``.
+    """
+
+    stripped = claim.strip()
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _add(value: str) -> None:
+        """Record one candidate when it is long enough and new.
+
+        Args:
+            value: Candidate substring.
+        """
+
+        text = value.strip()
+        if len(text) > MAX_CITATION_SPAN_CHARS:
+            text = text[:MAX_CITATION_SPAN_CHARS].rstrip()
+        if len(text) < MIN_CLAIM_LOCAL_SPAN_CHARS or text in seen:
+            return
+        seen.add(text)
+        ordered.append(text)
+
+    _add(stripped)
+    for match in _SENTENCE_END.finditer(stripped):
+        _add(stripped[: match.start() + 1])
+    tokens = [item.group(0) for item in _TOKEN.finditer(stripped)]
+    if len(tokens) >= 2:
+        for width in range(min(len(tokens), 8), 1, -1):
+            for start in range(0, len(tokens) - width + 1):
+                left = stripped.lower().find(tokens[start].lower())
+                right_token = tokens[start + width - 1]
+                right = stripped.lower().find(
+                    right_token.lower(), left if left >= 0 else 0
+                )
+                if left >= 0 and right >= left:
+                    _add(stripped[left : right + len(right_token)])
+    ordered.sort(key=len, reverse=True)
+    return tuple(ordered)
 
 
 def _passage_locator_fields(scored: ScoredPassage | None) -> dict[str, object]:

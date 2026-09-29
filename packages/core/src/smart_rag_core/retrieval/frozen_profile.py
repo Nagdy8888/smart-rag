@@ -33,7 +33,7 @@ FROZEN_LONG_DOCUMENT_PROFILE_SHA256 = (
 )
 """Pinned after P06-62 development ablations. Not the unfrozen v1 digest."""
 FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256 = (
-    "9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8"
+    "54bf7e76f5eb9e77bbc853296c29c57470f937feb5a5da5be1f4d95f02fea254"
 )
 """Pinned in answer-loss repair A4. Rollback is ``hybrid_long_document_v2``."""
 

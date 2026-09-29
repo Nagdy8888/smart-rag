@@ -145,6 +145,9 @@ def assemble_hybrid(
     """
 
     load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
+    dense_variants = tuple(dense_variants)[:3]
+    bm25_variants = tuple(bm25_variants)[:3]
+    term_variants = tuple(term_variants)[:3]
     dense_capped = tuple(
         cap_channel(variant, RetrievalChannel.DENSE) for variant in dense_variants
     )

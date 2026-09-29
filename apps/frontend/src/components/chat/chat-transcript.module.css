@@ -36,38 +36,38 @@
 .answer {
   flex: 0 1 auto;
   width: 100%;
-  max-width: 760px;
+  max-width: 44rem;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space) * 6);
+  gap: calc(var(--space) * 5);
 }
 
 .userBubble {
   margin: 0;
   margin-inline-start: 0;
-  max-width: 68ch;
+  max-width: 40rem;
   min-width: 0;
   padding: 0;
   background: transparent;
   border-radius: 0;
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .answerProse {
   margin: 0;
-  max-width: 68ch;
+  max-width: 40rem;
   min-width: 0;
   font-family: var(--font-sans);
-  font-size: 18px;
-  line-height: 28px;
+  font-size: 20px;
+  line-height: 1.45;
   color: var(--color-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -281,8 +281,8 @@
   align-items: stretch;
   gap: 0;
   min-width: 0;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
+  border: 2px solid var(--color-border-strong);
+  border-radius: 10px;
   overflow: hidden;
   background: var(--color-plate, var(--color-surface));
 }
@@ -290,13 +290,14 @@
 .scopeSegment {
   appearance: none;
   margin: 0;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 calc(var(--space) * 4);
   border: 0;
-  border-inline-end: 1px solid var(--color-border-strong);
+  border-inline-end: 2px solid var(--color-border-strong);
   border-radius: 0;
   background: transparent;
   color: var(--color-text);
+  -webkit-text-fill-color: var(--color-text);
   font: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -320,6 +321,7 @@
 .scopeSegment[aria-checked="true"] {
   background: var(--color-primary);
   color: var(--color-primary-fg);
+  -webkit-text-fill-color: var(--color-primary-fg);
 }
 
 .scopeSegment:disabled {
@@ -372,11 +374,11 @@
   flex-shrink: 0;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: calc(var(--space) * 2);
+  gap: calc(var(--space) * 3);
   align-items: center;
-  padding-bottom: calc(var(--space) * 3);
-  margin-bottom: calc(var(--space) * 4);
-  border-bottom: 1px solid var(--color-border);
+  padding-bottom: calc(var(--space) * 4);
+  margin-bottom: calc(var(--space) * 2);
+  border-bottom: 0;
 }
 
 .emptyPrompts {
@@ -415,7 +417,7 @@
 }
 
 .emptyPrompt:hover {
-  color: var(--color-accent);
+  color: var(--color-text);
   transform: translateX(var(--distance-micro));
 }
 
@@ -446,22 +448,22 @@
   }
 
   .userBubble {
-    font-size: 22px;
+    font-size: 24px;
   }
 
   .answerProse {
-    font-size: 16px;
-    line-height: 26px;
+    font-size: 17px;
+    line-height: 1.5;
   }
 }
 
 @media (max-width: 479px) {
   .userBubble {
-    font-size: 20px;
+    font-size: 22px;
   }
 
   .scopeSegment {
-    min-height: 36px;
+    min-height: 40px;
     padding: 0 calc(var(--space) * 3);
     font-size: 13px;
   }

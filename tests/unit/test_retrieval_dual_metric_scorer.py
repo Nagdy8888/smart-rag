@@ -111,6 +111,47 @@ def test_empty_retrieval_requires_zero_channel_hits() -> None:
     assert score.outcome is DualOutcome.EMPTY_RETRIEVAL
 
 
+def test_curly_apostrophe_matches_ascii_canonical() -> None:
+    """Curly apostrophes in answers still match ASCII gold phrases."""
+
+    score = score_company_answer(
+        answer_text="users smoothly adjust an agent\u2019s autonomy setting",
+        facts=(
+            RequiredFact(
+                fact_id="autonomy",
+                canonical_phrases=("an agent's autonomy",),
+            ),
+        ),
+        stages=RetrievalStageAttribution(fused_count=2, dense_hit=True),
+    )
+    assert score.strict_pass is True
+    assert score.outcome is DualOutcome.STRICT_PHRASE
+
+
+def test_strict_phrase_beats_empty_retrieval_flag() -> None:
+    """A phrase-complete answer is not scored empty when stages disagree."""
+
+    score = score_company_answer(
+        answer_text="Manager Coordination",
+        facts=(
+            RequiredFact(
+                fact_id="heading",
+                canonical_phrases=("Manager Coordination",),
+            ),
+        ),
+        stages=RetrievalStageAttribution(
+            fused_count=0,
+            dense_hit=False,
+            bm25_hit=False,
+            term_hit=False,
+            retrieval_empty=True,
+        ),
+    )
+    assert score.empty_retrieval is True
+    assert score.strict_pass is True
+    assert score.outcome is DualOutcome.STRICT_PHRASE
+
+
 def test_runner_requires_env_credentials_and_fresh_conversations(
     tmp_path: Path,
 ) -> None:

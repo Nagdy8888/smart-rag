@@ -31,6 +31,31 @@ from smart_rag_agents.query.nodes.tokens import accumulated_tokens
 from smart_rag_agents.query.state import QueryGraphState
 
 
+def hybrid_has_authorized_evidence(results: tuple[BranchResult, ...]) -> bool:
+    """Return whether Hybrid already returned non-empty authorized evidence.
+
+    Low coverage must not abort answering when selected or ranked IDs are
+    already present: fusion and the answer stage can still use them.
+
+    Args:
+        results: Branch outcomes after company retrieve and optional retry.
+
+    Returns:
+        True when any Hybrid branch has ``ranked_ids`` or diagnostics
+        ``selected_ids``.
+    """
+
+    for item in results:
+        if item.kind is not BranchKind.HYBRID:
+            continue
+        if item.ranked_ids:
+            return True
+        diagnostics = item.hybrid_diagnostics
+        if diagnostics is not None and diagnostics.selected_ids:
+            return True
+    return False
+
+
 def apply_correction_node(
     state: QueryGraphState, deps: QueryGraphDeps
 ) -> QueryGraphState:
@@ -44,7 +69,9 @@ def apply_correction_node(
         ``correction``, possibly extra branch results, ``corrected_route``,
         ``remaining_model_calls`` after any extra retrieve, and
         ``insufficient_evidence`` when exhausted or post-correction
-        coverage is still below the frozen threshold.
+        coverage is still below the frozen threshold *and* Hybrid returned
+        no authorized evidence. Non-empty Hybrid evidence proceeds to
+        fusion and answering.
 
     Persistence writes:
         None. ``routing_correction`` is stored on graph state for packet 3.
@@ -58,7 +85,8 @@ def apply_correction_node(
         is skipped when the reserved envelope cannot enlarge.
 
     Failure/fallback route:
-        Exhaustion is verified partial/insufficient evidence, not an answer.
+        Exhaustion is verified partial/insufficient evidence, not an answer,
+        unless Hybrid already selected authorized evidence.
         Historical relationships cannot take a graph path.
 
     Args:
@@ -147,7 +175,8 @@ def apply_correction_node(
     detail = "one correction applied; fusion and answering follow"
     if not decision.applied:
         detail = "no correction; fusion and answering follow"
-    if decision.exhausted_status == "insufficient_evidence":
+    has_evidence = hybrid_has_authorized_evidence(combined)
+    if decision.exhausted_status == "insufficient_evidence" and not has_evidence:
         terminal = "insufficient_evidence"
         detail = "insufficient evidence; verified partial follows"
     whole_refused = any(
@@ -163,6 +192,7 @@ def apply_correction_node(
         and extra[-1].kind is BranchKind.HYBRID
         and extra[-1].coverage_score is not None
         and extra[-1].coverage_score < updated.coverage_threshold
+        and not has_evidence
     ):
         terminal = "insufficient_evidence"
         detail = "coverage_below_threshold_after_correction"

@@ -36,7 +36,7 @@ from smart_rag_core.retrieval.rerank import (
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
 _V2_DIGEST = "1b356c0de0972ee42758f1ef9f0a7a47b283ec779f97fbe9af8f04e490dffd7a"
-_V3_DIGEST = "9906823616660f79d9a4d40d936f811961e127e095acd7d389b3e0d23f51d6c8"
+_V3_DIGEST = "54bf7e76f5eb9e77bbc853296c29c57470f937feb5a5da5be1f4d95f02fea254"
 _Triple = tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason]
 _RerankFn = Callable[[str, tuple[RerankPassage, ...], float], _Triple]
 
@@ -204,14 +204,14 @@ def _select(
 
 
 def test_v3_pin_matches_file_and_new_fields() -> None:
-    """The v3 file matches its pin and carries dense pin 12 and dense-first."""
+    """The v3 file matches its pin and carries dense pin 20 and dense-first."""
 
     assert FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256 == _V3_DIGEST
     assert _digest(LONG_DOCUMENT_V3_PROFILE_PATH) == _V3_DIGEST
     profile = load_frozen_profile(LONG_DOCUMENT_V3_PROFILE_ID)
     assert profile.profile_id == LONG_DOCUMENT_V3_PROFILE_ID
     assert profile.rollback_profile_id == LONG_DOCUMENT_PROFILE_ID
-    assert profile.dense_head_pin == 12
+    assert profile.dense_head_pin == 20
     assert profile.fallback_order == "dense_first"
     assert profile.rerank_max_per_document == 20
     assert profile.document_quota == 12
@@ -234,20 +234,20 @@ def test_default_and_v2_bytes_and_behavior_are_unchanged() -> None:
         assert profile.fallback_order == "rrf"
 
 
-def test_dense_head_pin_twelve_keeps_bm25_at_five() -> None:
+def test_dense_head_pin_twenty_keeps_bm25_at_five() -> None:
     """The dense pin follows the profile; BM25 stays five; ACL bound holds."""
 
-    dense = tuple(uuid4() for _ in range(15))
+    dense = tuple(uuid4() for _ in range(22))
     bm25 = tuple(uuid4() for _ in range(8))
     fused = dense + bm25
     pins = channel_head_pins(
-        dense_ids=dense, bm25_ids=bm25, fused_ids=fused, dense_head=12
+        dense_ids=dense, bm25_ids=bm25, fused_ids=fused, dense_head=20
     )
-    assert pins == dense[:12] + bm25[:CHANNEL_HEAD_PIN]
+    assert pins == dense[:20] + bm25[:CHANNEL_HEAD_PIN]
     default = channel_head_pins(dense_ids=dense, bm25_ids=bm25, fused_ids=fused)
     assert default == dense[:CHANNEL_HEAD_PIN] + bm25[:CHANNEL_HEAD_PIN]
     bounded = channel_head_pins(
-        dense_ids=dense, bm25_ids=(), fused_ids=dense[:3], dense_head=12
+        dense_ids=dense, bm25_ids=(), fused_ids=dense[:3], dense_head=20
     )
     assert bounded == dense[:3]
 

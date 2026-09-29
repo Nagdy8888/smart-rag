@@ -249,7 +249,7 @@ select:-webkit-autofill {
 }
 
 ::selection {
-  background: var(--color-accent-muted);
+  background: #d8f82166;
   color: var(--color-text);
 }
 

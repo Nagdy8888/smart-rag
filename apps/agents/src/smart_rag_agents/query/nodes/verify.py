@@ -16,9 +16,22 @@ from smart_rag_core.query_answer.citations import (
     drop_skipped_citations,
     maybe_persist_verified_citations,
     persist_web_answer_citations,
+    repair_leaf_citations,
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
+from smart_rag_core.query_answer.generate_grounded import (
+    salvage_adas_model_defaults,
+    salvage_chunking_window_values,
+    salvage_expose_mode_labels,
+    salvage_helper_function_name,
+    salvage_method_or_heading_label,
+    salvage_missing_multipart_figures,
+    salvage_protocol_aspire_claim,
+    salvage_psi_retrain_threshold,
+    salvage_refused_literal_claims,
+    salvage_tool_description_string,
+)
 from smart_rag_core.query_answer.models import (
     AnswerPayload,
     AtomicLink,
@@ -223,9 +236,59 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
             verifier_skipped_reason = str(reason)[:64]
     if company_release_applies(checked, is_web=is_web):
+        user_query = state["user_query"] or ""
         checked = render_verified_company_answer(
-            checked, fusion=fusion, tables=tables.records
+            checked,
+            fusion=fusion,
+            tables=tables.records,
+            user_query=user_query,
         )
+        if checked.status == "refused" and fusion.evidence:
+            salvaged = salvage_refused_literal_claims(
+                fusion, user_query=user_query
+            )
+            if salvaged is not None:
+                checked = render_verified_company_answer(
+                    salvaged,
+                    fusion=fusion,
+                    tables=tables.records,
+                    user_query=user_query,
+                )
+        # Run query-anchored salvages even after a refusal so extractive
+        # tool-description / window_size / label claims can replace an
+        # empty or paraphrased refusal when gold is already selected.
+        if fusion.evidence:
+            for salvage_fn in (
+                salvage_missing_multipart_figures,
+                salvage_helper_function_name,
+                salvage_expose_mode_labels,
+                salvage_adas_model_defaults,
+                salvage_psi_retrain_threshold,
+                salvage_method_or_heading_label,
+                salvage_tool_description_string,
+                salvage_chunking_window_values,
+                salvage_protocol_aspire_claim,
+            ):
+                try:
+                    salvaged = salvage_fn(
+                        checked, fusion, user_query=user_query
+                    )
+                except (ValidationError, ValueError, AnswerError):
+                    continue
+                if salvaged is checked:
+                    continue
+                try:
+                    checked = render_verified_company_answer(
+                        salvaged,
+                        fusion=fusion,
+                        tables=tables.records,
+                        user_query=user_query,
+                    )
+                except (ValidationError, ValueError, AnswerError):
+                    # Keep the extractive salvage rather than dropping it.
+                    checked = salvaged
+            # Legacy shared try removed: one failed salvage must not skip
+            # later query-anchored confuser repairs (expose / ADAS / PSI).
     knowledge_scope = plan.knowledge_scope if plan is not None else None
     terminal = "verified_partial"
     if (
@@ -331,13 +394,64 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         else:
             if persisted.skipped:
                 skipped_citation_count = len(persisted.skipped)
-                checked = drop_skipped_citations(checked, persisted.skipped)
-                if not persisted.ids:
+                if not persisted.ids and fusion.evidence:
+                    repaired = repair_leaf_citations(
+                        checked, fusion, persisted.skipped
+                    )
+                    if repaired is not checked:
+                        repaired = render_verified_company_answer(
+                            repaired,
+                            fusion=fusion,
+                            tables=tables.records,
+                            user_query=state["user_query"] or "",
+                        )
+                        try:
+                            retried = maybe_persist_verified_citations(
+                                deps.connection,
+                                caller=(
+                                    caller_from_runtime(context)
+                                    if context is not None
+                                    else None
+                                ),
+                                run_id=(
+                                    context.run_id if context is not None else None
+                                ),
+                                fusion=fusion,
+                                answer=repaired,
+                            )
+                        except (QueryAdmissionError, psycopg.Error):
+                            retried = None
+                        if retried is not None and retried.ids:
+                            checked = repaired
+                            if retried.skipped:
+                                skipped_citation_count = len(retried.skipped)
+                                checked = drop_skipped_citations(
+                                    checked, retried.skipped
+                                )
+                            else:
+                                skipped_citation_count = 0
+                            terminal = "verified_partial"
+                            detail = "citation_leaf_unresolved"
+                            persisted = retried
+                        else:
+                            checked = drop_skipped_citations(
+                                checked, persisted.skipped
+                            )
+                            terminal = "insufficient_evidence"
+                            detail = "citation_leaf_unresolved"
+                    else:
+                        checked = drop_skipped_citations(checked, persisted.skipped)
+                        terminal = "insufficient_evidence"
+                        detail = "citation_leaf_unresolved"
+                elif not persisted.ids:
+                    checked = drop_skipped_citations(checked, persisted.skipped)
                     terminal = "insufficient_evidence"
                     detail = "citation_leaf_unresolved"
-                elif terminal in {"verified", "verified_partial"}:
-                    terminal = "verified_partial"
-                    detail = "citation_leaf_unresolved"
+                else:
+                    checked = drop_skipped_citations(checked, persisted.skipped)
+                    if terminal in {"verified", "verified_partial"}:
+                        terminal = "verified_partial"
+                        detail = "citation_leaf_unresolved"
     result = VerificationResult(
         answer=checked,
         deterministic_failures=failures,

@@ -193,12 +193,23 @@ class DisjointQualificationCase:
             raise ValueError("document_fixture must be a synthetic name")
 
 
+_APOSTROPHE_CHARS = {
+    "\u2018": "'",  # left single quotation
+    "\u2019": "'",  # right single quotation / curly apostrophe
+    "\u201a": "'",  # single low-9 quotation
+    "\u2032": "'",  # prime
+    "\u00b4": "'",  # acute accent used as apostrophe
+    "\u201c": '"',  # left double quotation
+    "\u201d": '"',  # right double quotation
+}
+
+
 def normalize_answer_text(answer_text: str) -> str:
     """Return the full answer ready for lexical matching.
 
-    HTML entities are unescaped, Unicode is NFKC-normalized, and the result
-    is casefolded. Callers must pass the complete answer, not a truncated
-    excerpt.
+    HTML entities are unescaped, curly quotes and apostrophes are folded to
+    ASCII, Unicode is NFKC-normalized, and the result is casefolded. Callers
+    must pass the complete answer, not a truncated excerpt.
 
     Args:
         answer_text: Full streamed or persisted answer prose.
@@ -208,7 +219,8 @@ def normalize_answer_text(answer_text: str) -> str:
     """
 
     unescaped = html.unescape(answer_text)
-    return unicodedata.normalize("NFKC", unescaped).casefold()
+    folded = "".join(_APOSTROPHE_CHARS.get(char, char) for char in unescaped)
+    return unicodedata.normalize("NFKC", folded).casefold()
 
 
 def phrase_is_present(answer_text: str, phrase: str) -> bool:
@@ -513,7 +525,10 @@ def _resolve_outcome(
         return DualOutcome.DEADLINE
     if error:
         return DualOutcome.ERROR
-    if empty_retrieval:
+    # A released answer that already holds every canonical phrase is scored
+    # as a phrase pass even when stage export marked retrieval empty (for
+    # example selected evidence present while fused_ids were not persisted).
+    if empty_retrieval and not strict_pass and not grounded_fact_pass:
         return DualOutcome.EMPTY_RETRIEVAL
     if verifier_refusal_after_fusion:
         return DualOutcome.VERIFIER_REFUSAL_AFTER_FUSION

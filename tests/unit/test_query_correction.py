@@ -427,7 +427,7 @@ def test_insufficient_evidence_after_correction_ends() -> None:
 
 
 def test_post_correction_coverage_is_recomputed_before_answer() -> None:
-    """A retry that stays below 0.65 cannot proceed to answer generation."""
+    """A retry that stays weak still proceeds when Hybrid already selected IDs."""
 
     from smart_rag_agents.query.deps import QueryGraphDeps
     from smart_rag_agents.query.nodes.correction import apply_correction_node
@@ -446,6 +446,124 @@ def test_post_correction_coverage_is_recomputed_before_answer() -> None:
     state["preparation"] = prep.model_dump(mode="json")
     state["branch_results"] = [item.model_dump(mode="json") for item in results]
     out = apply_correction_node(state, QueryGraphDeps(hybrid_retriever=_FakeHybrid()))
+    assert out["status"] == "correction_applied"
+    assert "fusion and answering follow" in str(out["detail"])
+    assert plan.knowledge_scope.value != "general_knowledge"
+
+
+def test_empty_hybrid_evidence_still_refuses_after_weak_retry() -> None:
+    """Post-correction refusal stays when Hybrid never returned ranked IDs."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.correction import apply_correction_node
+    from smart_rag_agents.query.state import pending_query_state
+
+    class _EmptyHybrid:
+        """Test double with zero authorized Hybrid IDs."""
+
+        query_budget: QueryRetrieveBudget | None = None
+
+        def retrieve(
+            self,
+            *,
+            query: str,
+            caller: CallerContext,
+            profile: object | None = None,
+            deadline_seconds: float | None = None,
+        ) -> object:
+            """Return an empty Hybrid payload.
+
+            Args:
+                query: Branch query.
+                caller: Unused caller.
+                profile: Unused profile.
+                deadline_seconds: Unused slice.
+
+            Returns:
+                Empty ranked Hybrid namespace.
+            """
+
+            del query, caller, profile, deadline_seconds
+            return SimpleNamespace(
+                ranked_ids=(),
+                coverage=SimpleNamespace(
+                    coverage_score=0.10,
+                    uncovered_headings=(),
+                    signal="weak_evidence",
+                    notes=(),
+                ),
+                fallback_reason="none",
+            )
+
+    runtime = _runtime()
+    query = "What is the status of INV-SR-1001?"
+    prep = prepare_query(query, runtime=runtime)
+    plan = compile_retrieval_plan(prep, runtime)
+    empty = BranchResult(
+        branch_id="hyb-0",
+        kind=BranchKind.HYBRID,
+        family=Phase6RouteFamily.HYBRID,
+        run_id=runtime.run_id,
+        reservation_id=runtime.reservation_id,
+        query_text=query,
+        ranked_ids=(),
+        coverage_score=0.20,
+        status="ok",
+    )
+    state = pending_query_state(runtime.model_dump(mode="json"), user_query=query)
+    state["status"] = "branches_executed"
+    state["remaining_corrections"] = 1
+    state["remaining_model_calls"] = 6
+    state["retrieval_plan"] = plan.model_dump(mode="json")
+    state["preparation"] = prep.model_dump(mode="json")
+    state["branch_results"] = [empty.model_dump(mode="json")]
+    out = apply_correction_node(state, QueryGraphDeps(hybrid_retriever=_EmptyHybrid()))
     assert out["status"] == "insufficient_evidence"
     assert out["detail"] == "coverage_below_threshold_after_correction"
-    assert plan.knowledge_scope.value != "general_knowledge"
+
+
+def test_identical_retry_with_selected_evidence_proceeds_to_fusion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exhausted correction does not refuse when Hybrid already selected evidence."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.correction import apply_correction_node
+    from smart_rag_agents.query.state import pending_query_state
+
+    runtime = _runtime()
+    query = "In the Reflexion chip-shopping trace, what price ceiling?"
+    prep = prepare_query(query, runtime=runtime)
+    plan = compile_retrieval_plan(prep, runtime)
+    results = (_hybrid_result(runtime, coverage=0.20, query=query),)
+    state = pending_query_state(runtime.model_dump(mode="json"), user_query=query)
+    state["status"] = "branches_executed"
+    state["remaining_corrections"] = 1
+    state["remaining_model_calls"] = 6
+    state["retrieval_plan"] = plan.model_dump(mode="json")
+    state["preparation"] = prep.model_dump(mode="json")
+    state["branch_results"] = [item.model_dump(mode="json") for item in results]
+
+    def _no_alternate(
+        _prep: object,
+        _cached: str,
+    ) -> str | None:
+        """Force identical_retry_rejected.
+
+        Args:
+            _prep: Unused preparation.
+            _cached: Unused cached ranking query.
+
+        Returns:
+            None so correction exhausts without a retry.
+        """
+
+        return None
+
+    monkeypatch.setattr(
+        "smart_rag_core.query_routing.correction.alternate_retry_query",
+        _no_alternate,
+    )
+    out = apply_correction_node(state, QueryGraphDeps())
+    assert out["status"] == "correction_applied"
+    assert out["detail"] == "no correction; fusion and answering follow"
