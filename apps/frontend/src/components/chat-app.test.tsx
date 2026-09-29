@@ -208,14 +208,19 @@ describe("ChatApp Auto chrome", () => {
   it("shows Answer source, blocks Send on handshake, and has no route send buttons", async () => {
     renderChat(<ChatApp />);
     const send = await screen.findByRole("button", { name: "Send" });
-    const source = screen.getByLabelText("Answer source") as HTMLSelectElement;
-    expect(source).toHaveValue("auto");
-    expect(screen.getByRole("option", { name: "Auto" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Company documents" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "General" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Web" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Company files" })).toBeNull();
-    expect(screen.queryByRole("option", { name: "General knowledge" })).toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "Answer source" })).toHaveAttribute(
+      "data-value",
+      "auto",
+    );
+    expect(screen.getByRole("radio", { name: "Auto" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "Company documents" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "General" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Web" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Company files" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "General knowledge" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Inspect" })).toBeNull();
@@ -693,11 +698,11 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       }),
     );
     renderChat(<ChatApp />);
-    const source = await screen.findByLabelText("Answer source");
-    expect(source).toHaveValue("auto");
-    expect(source).toBeEnabled();
-    await user.selectOptions(source, "general_knowledge");
-    expect(source).toHaveValue("general_knowledge");
+    const source = await screen.findByRole("radiogroup", { name: "Answer source" });
+    expect(source).toHaveAttribute("data-value", "auto");
+    expect(screen.getByRole("radio", { name: "Auto" })).toBeEnabled();
+    await user.click(screen.getByRole("radio", { name: "General" }));
+    expect(source).toHaveAttribute("data-value", "general_knowledge");
     await user.type(screen.getByLabelText("Message"), "Parallel Tool Execution");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
@@ -708,7 +713,8 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       search_scope: "general_knowledge",
     });
     await waitFor(() => {
-      expect(screen.getByLabelText("Answer source")).toBeDisabled();
+      expect(screen.getByRole("radio", { name: "Auto" })).toBeDisabled();
+      expect(screen.getByRole("radio", { name: "General" })).toBeDisabled();
     });
   });
 
@@ -892,10 +898,10 @@ describe("ChatApp Ask workspace", () => {
     );
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("button", { name: "Chat" }));
-    const source = await screen.findByLabelText("Answer source");
-    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
-    await user.selectOptions(source, "web");
-    expect(source).toHaveValue("web");
+    const source = await screen.findByRole("radiogroup", { name: "Answer source" });
+    expect(await screen.findByRole("radio", { name: "Web" })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Web" }));
+    expect(source).toHaveAttribute("data-value", "web");
     await user.type(screen.getByLabelText("Message"), "latest public briefing");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
@@ -927,8 +933,7 @@ describe("ChatApp Ask workspace", () => {
     );
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("button", { name: "Chat" }));
-    const source = await screen.findByLabelText("Answer source");
-    await user.selectOptions(source, "web");
+    await user.click(await screen.findByRole("radio", { name: "Web" }));
     await user.type(screen.getByLabelText("Message"), "latest public briefing");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText(WEB_SEARCH_DISABLED_COPY)).toBeInTheDocument();
@@ -961,10 +966,10 @@ describe("ChatApp Ask workspace", () => {
     );
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("button", { name: "Chat" }));
-    const source = await screen.findByLabelText("Answer source");
-    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
-    await user.selectOptions(source, "web");
-    expect(source).toHaveValue("web");
+    const source = await screen.findByRole("radiogroup", { name: "Answer source" });
+    expect(await screen.findByRole("radio", { name: "Web" })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Web" }));
+    expect(source).toHaveAttribute("data-value", "web");
     await user.type(screen.getByLabelText("Message"), "latest public briefing");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
@@ -1019,8 +1024,8 @@ describe("ChatApp Ask workspace", () => {
     );
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("button", { name: "Chat" }));
-    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("Answer source"), "web");
+    expect(await screen.findByRole("radio", { name: "Web" })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Web" }));
     await user.type(screen.getByLabelText("Message"), "public briefing");
     await user.click(screen.getByRole("button", { name: "Send" }));
     const chip = await screen.findByRole("link", {

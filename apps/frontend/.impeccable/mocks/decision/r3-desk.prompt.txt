@@ -1,0 +1,16 @@
+A working software screenshot of a desktop web app, landscape 16:9, filling the frame edge to edge. Not a poster, not a marketing mock, not a floating card on a gradient. Flat interface, crisp vector UI, large readable sans-serif type (like system UI, 18px body and larger headings). No textures, no paper grain, no metaphors, no illustrations, no stripes, no patterns, no shadows that look painted, no logos, no icons unless a simple current-item mark, no scores, no badges, no avatars, no browser chrome, no window decorations.
+
+Palette only: page background #f4f4f2, ink text #1a1a1a, white panes #ffffff, and one blue #1f4e79. No other colors. No green, red, orange, purple, or gray fills. Dividers are 1px #1a1a1a at low contrast or simple gaps, not colored.
+
+Three panes side by side, full viewport height, aligned to the top.
+
+LEFT RAIL, narrow, about one sixth of the width, white background, full height. At the top, the product name exactly "Smart RAG" in large ink type. Under it a vertical navigation list, large readable labels, one per line, in this order: "Ask" (current item, blue #1f4e79), "Documents", "Tables", "Graph", "Admin" in ink #1a1a1a. Nothing else in the rail.
+
+CENTER PANE, the wide middle, white, with generous padding. At the TOP, a single-line text field with a thin ink border containing exactly this text and nothing else: Where is the retention rule stated?
+Directly under the field, one row: a segmented control of four equal segments labeled exactly "Auto", "Company documents", "General", "Web". "Company documents" is selected: blue #1f4e79 fill with white text. The other three segments are white with ink text and a thin ink outline. Immediately to the right of the segmented control, a solid button labeled exactly "Ask" with blue #1f4e79 fill and white text.
+Below that row, the answer in large ink type, left aligned, reading exactly: The rule is in the passage you can open.
+In that same answer, the words "Access policy, page 4" appear as a blue #1f4e79 text link (underlined), on the next line. No other sentences, no legal quotations, no citations list, no scores.
+
+RIGHT PANE, open and visible, about one quarter of the width, white, separated by a thin vertical gap or hairline, not a hidden drawer, not a modal. Title at the top exactly "Passage". Under it a heading exactly "Access policy, page 4". Under the heading the sentence exactly "The rule is in the passage you can open." No other body text.
+
+All text must be spelled exactly as given, large enough to read, left aligned, no lorem ipsum, no extra UI labels, no timestamps, no user names, no prices.

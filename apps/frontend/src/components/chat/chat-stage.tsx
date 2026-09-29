@@ -166,28 +166,39 @@ export function ChatStage(props: ChatStageProps) {
     <section className={chatStyles.stage} aria-label="Answer">
       <div className={chatStyles.stageHeader}>
         <div className={chatStyles.row}>
-          <label className={chatStyles.scopeField}>
-            Answer source
-            <select
-              className={chatStyles.autoChip}
-              data-action-id="ask.scope"
-              data-testid="answer-source"
-              value={run.searchScope}
-              disabled={run.sending || (chat.runId !== null && chat.terminal === null)}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (isRequestedSearchScope(next)) {
-                  run.setSearchScope(next);
-                }
-              }}
-            >
-              {scopeOptions.map((scope) => (
-                <option key={scope} value={scope}>
+          <div
+            className={chatStyles.scopeField}
+            role="radiogroup"
+            aria-label="Answer source"
+            data-action-id="ask.scope"
+            data-testid="answer-source"
+            data-value={run.searchScope}
+          >
+            {scopeOptions.map((scope) => {
+              const selected = run.searchScope === scope;
+              const scopeLocked =
+                run.sending || (chat.runId !== null && chat.terminal === null);
+              return (
+                <button
+                  key={scope}
+                  type="button"
+                  role="radio"
+                  className={chatStyles.scopeSegment}
+                  aria-checked={selected}
+                  data-selected={selected ? "true" : "false"}
+                  data-scope={scope}
+                  disabled={scopeLocked}
+                  onClick={() => {
+                    if (isRequestedSearchScope(scope)) {
+                      run.setSearchScope(scope);
+                    }
+                  }}
+                >
                   {SEARCH_SCOPE_LABELS[scope]}
-                </option>
-              ))}
-            </select>
-          </label>
+                </button>
+              );
+            })}
+          </div>
           {showSources ? (
             <Button
               type="button"

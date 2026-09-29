@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom/vitest";
@@ -51,34 +50,13 @@ vi.mock("../../lib/env", () => ({
   apiBaseUrl: () => "http://127.0.0.1:8000",
 }));
 
-vi.mock("next/navigation", () => ({
-  usePathname: () => "/",
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
-}));
-
-vi.mock("next/link", () => ({
-  default: ({
-    href,
-    children,
-    ...rest
-  }: {
-    href: string;
-    children: ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <a href={href} {...rest}>
-      {children}
-    </a>
-  ),
-}));
-
 afterEach(() => {
   cleanup();
   window.localStorage.removeItem("smart-rag.nav-expanded");
 });
 
 describe("AppShell", () => {
-  it("exposes a skip link, 232px token nav, and main landmark", () => {
+  it("exposes a skip link, Field top nav, and plate main landmark", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -94,6 +72,7 @@ describe("AppShell", () => {
     const skip = screen.getByRole("link", { name: "Skip to main content" });
     expect(skip).toHaveAttribute("href", "#main");
     expect(screen.getByRole("navigation", { name: "Console" })).toBeInTheDocument();
+    expect(screen.getByText("Smart RAG")).toBeInTheDocument();
     const ask = screen.getByRole("link", { name: "Ask" });
     const documents = screen.getByRole("link", { name: "Documents" });
     const tables = screen.getByRole("link", { name: "Tables" });
@@ -113,35 +92,8 @@ describe("AppShell", () => {
     expect(screen.queryByText(/mfa_enrolled/i)).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
     expect(screen.getByTestId("app-shell-nav")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Collapse navigation" }),
-    ).toHaveAttribute("data-action-id", "shell.nav_toggle");
+    expect(screen.queryByRole("button", { name: "Collapse navigation" })).not.toBeInTheDocument();
     expect(CLIENT_NAV_IS_NOT_AUTHORIZATION).toBe(true);
     expect(screen.queryByRole("link", { name: /Stitch/i })).not.toBeInTheDocument();
-  });
-
-  it("narrows the console rail when Collapse navigation is pressed", async () => {
-    const user = userEvent.setup();
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={client}>
-        <SessionProvider>
-          <AppShell>
-            <p>Console body</p>
-          </AppShell>
-        </SessionProvider>
-      </QueryClientProvider>,
-    );
-    const nav = screen.getByTestId("app-shell-nav");
-    expect(nav).toHaveAttribute("data-expanded", "true");
-    await user.click(screen.getByRole("button", { name: "Collapse navigation" }));
-    expect(nav).toHaveAttribute("data-expanded", "false");
-    await user.click(screen.getByRole("button", { name: "Expand navigation" }));
-    expect(nav).toHaveAttribute("data-expanded", "true");
-    expect(
-      screen.getByRole("button", { name: "Collapse navigation" }),
-    ).toHaveAttribute("data-action-id", "shell.nav_toggle");
   });
 });

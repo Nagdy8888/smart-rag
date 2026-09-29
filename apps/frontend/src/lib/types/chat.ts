@@ -111,7 +111,7 @@ export type AnswerOrigin = (typeof ANSWER_ORIGINS)[number];
 /** Source preference sent on paid POST and echoed on the admitted run. */
 export type RequestedSearchScope = (typeof REQUESTED_SEARCH_SCOPES)[number];
 
-/** Exact Ask dropdown labels. Origin banners use ``answerOriginLabel``. */
+/** Exact Ask source-segment labels. Origin banners use ``answerOriginLabel``. */
 export const SEARCH_SCOPE_LABELS: Record<RequestedSearchScope, string> = {
   auto: "Auto",
   company_documents: "Company documents",

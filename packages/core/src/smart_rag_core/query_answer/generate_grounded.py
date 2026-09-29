@@ -108,6 +108,7 @@ def generate_grounded_answer(
     filtered = bind_company_atomic_links(
         filter_invented_ids(payload, fusion, tables),
         fusion=fusion,
+        user_query=user_query,
     )
     derived = with_derived_answer_text(filtered)
     return derived.model_copy(

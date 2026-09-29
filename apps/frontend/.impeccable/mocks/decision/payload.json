@@ -1,0 +1,145 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned The Strip Bay. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Strip Bay",
+      "kicker": "THE ROLL",
+      "lineage": "air-traffic flight-progress strips",
+      "thesis": "Each question is a paper strip in a bay: cited, or pulled and marked HOLD.",
+      "palette": ["#d8c4a0", "#243028", "#1a1a16", "#9e2b24", "#2c4c6e"],
+      "materials": ["manila strip", "bay board", "grease pencil"],
+      "viewport": "Ask fills the bay: the live strip in front, prior runs racked above it, source chosen as a labeled position.",
+      "risk": "Turns into a toy airplane theme if the columns stop being the question, the access check, and the citation.",
+      "raised": [
+        {
+          "from": "alphabet storm",
+          "raise": "A run changes state as one physical event: the strip seats and its fields fill, never a spinner."
+        },
+        {
+          "from": "mesophotic dive",
+          "raise": "One vertical order rules the bay: the live strip is nearest, earlier runs sit behind it."
+        },
+        {
+          "from": "night six-pack",
+          "raise": "Source, access, and citation must agree before remarks are trusted; disagreement is HOLD."
+        },
+        {
+          "from": "cassette deck",
+          "raise": "Auto, Company documents, General, and Web are labeled positions, not mystery icons."
+        },
+        {
+          "from": "cracktro queue",
+          "raise": "The live strip holds still while it is read. Only the rack behind it may shift."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.png"
+    },
+    {
+      "id": "model-pick",
+      "label": "Closed Stacks",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "library call slips and closed stacks",
+      "thesis": "You file a request slip. The desk returns the passage you may see, or a refusal slip.",
+      "palette": ["#f4efe4", "#1e2a24", "#6b2d2d", "#c4b49a"],
+      "materials": ["call slip", "date stamp", "stack ledger"],
+      "viewport": "Ask is the desk: a written request, then either the returned passage with its shelf mark or a stamped refusal.",
+      "risk": "Also the direction most evidence products land on: a polite archive template.",
+      "comp": ".impeccable/mocks/decision/model-pick.png"
+    },
+    {
+      "id": "challenger-graphite",
+      "label": "Graphite Panels",
+      "verdict": "competitive",
+      "lineage": "dark-first developer consoles",
+      "thesis": "The console is persistent graphite panels. State is a syntax color. Destructive actions sit alone.",
+      "palette": ["#1c1e21", "#2a2d31", "#e7e4dc", "#d2a15a", "#c4523a"],
+      "materials": ["graphite", "hairline seam", "isolated danger"],
+      "viewport": "Ask is one panel among panels that stay put: question, run, and citation change inside the frame.",
+      "case": "Clearer for dense tables and admin than a strip bay. Weaker identification: this is the developer console the product is leaving.",
+      "risk": "Becomes the thin local test tool again, with amber syntax on graphite.",
+      "comp": ".impeccable/mocks/decision/challenger-graphite.png",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-dark-first-developer-console-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/digital-design-canon-dark-first-developer-console.webp"
+    },
+    {
+      "id": "challenger-alphabet-storm",
+      "label": "Alphabet Storm",
+      "verdict": "declined",
+      "lineage": "letters that become weather",
+      "palette": ["#f7f4ee", "#161616", "#c0c6ce", "#b9c4ce"],
+      "materials": ["paper white", "letter black", "rain gray"],
+      "viewport": "A question breaks into weather and reforms as an answer landscape.",
+      "case": "Company members do not recognize letter-weather, and a citation cannot be a storm.",
+      "kept": "A state change is one physical event you can watch.",
+      "risk": "The answer becomes a spectacle and the evidence disappears."
+    },
+    {
+      "id": "challenger-mesophotic",
+      "label": "The Descent",
+      "verdict": "declined",
+      "lineage": "a night dive down a wall",
+      "palette": ["#071018", "#d7e2ea", "#2aa7b8"],
+      "materials": ["abyssal ink", "marine snow", "thermocline cyan"],
+      "viewport": "The question descends through depths until a lamp finds a citation.",
+      "case": "A desk question is not a dive, and depth hides whether the caller may see the text.",
+      "kept": "One axis orders the work, so state has a position.",
+      "risk": "Retrieval becomes atmosphere and the refusal has nowhere to sit."
+    },
+    {
+      "id": "challenger-cracktro",
+      "label": "The Front Line",
+      "verdict": "declined",
+      "lineage": "a cracktro title on a black void",
+      "palette": ["#070707", "#e6e0d4", "#c9842a"],
+      "materials": ["emissive void", "ivory bitmap", "amber caret"],
+      "viewport": "The active question is the brightest line. Nothing is boxed.",
+      "case": "Members do not identify with a demoscene night, and citations need a place to be read.",
+      "kept": "The thing you are reading holds still. Motion stays behind it.",
+      "risk": "A citation with no holder is a line you cannot inspect."
+    },
+    {
+      "id": "challenger-six-pack",
+      "label": "The Six-Pack",
+      "verdict": "declined",
+      "lineage": "a night-flight instrument panel",
+      "palette": ["#10110f", "#f2f0e6", "#7dffa8", "#c4523a"],
+      "materials": ["matte panel", "luminous marks", "damped needles"],
+      "viewport": "Six gauges agree before you trust the answer.",
+      "case": "A cockpit is not this desk, and gauges hide the passage.",
+      "kept": "Trust is a cross-check: source, access, and citation must agree.",
+      "risk": "The question becomes a dial and the document never appears."
+    },
+    {
+      "id": "challenger-cassette",
+      "label": "The Fascia",
+      "verdict": "declined",
+      "lineage": "a cassette-futurist tape deck",
+      "palette": ["#c5c1b6", "#8d8680", "#1a1a16", "#e07a2f"],
+      "materials": ["brushed aluminum", "beige surround", "amber ladder"],
+      "viewport": "Every function is a labeled switch on one bolted panel.",
+      "case": "A tape deck is not a reading desk, and passages do not fit a fascia.",
+      "kept": "Every control is a labeled position you can name.",
+      "risk": "The product becomes a prop and the evidence has no column."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A chat thread, a left rail, source chips, and a citation drawer, played straight.",
+    "palette": ["#f7f7f5", "#17181a", "#3d6df2"],
+    "materials": ["white app shell", "rounded cards", "one blue action"],
+    "viewport": "Ask is a message list. You type at the bottom. Citations open in a side drawer.",
+    "risk": "Indistinguishable from every other assistant, by design.",
+    "comp": ".impeccable/mocks/decision/canon.png"
+  },
+  "steer": true
+}

@@ -1,0 +1,13 @@
+A landscape 16:9 screenshot of working software: the Smart RAG Ask screen. Pure black background, hex #000000, edge to edge. Flat rectangular tiles only. No gradients, no bevels, no shadows, no drop shadows, no icons, no logos, no photographs, no avatars, no scores, no charts, no buttons, no extra sentences, no scrollbars, no rounded cards, no glass, no texture.
+
+Region 1, top edge, a single thin horizontal word row spanning the full width on black. Left to right, large white sans-serif words with even gaps, nothing else: Smart RAG, Ask, Documents, Tables, Graph, Admin. Ask reads as the current word. No icons beside the words.
+
+Region 2, the rest of the first viewport, three large flat tiles side by side, equal height, all fully visible at once, separated by narrow black gutters, no scrolling. Type is large throughout.
+
+Left tile: flat black fill, thin light edge, large white sans-serif question occupying most of the tile, the text exactly: Where is the retention rule stated? Under it one smaller white line exactly: Company documents.
+
+Center tile: solid flooded cyan fill exactly #00b7c3, no gradient. Huge black sans-serif type filling the tile, the text exactly: The rule is in the passage you can open.
+
+Right tile: flat black fill, thin light edge, large white sans-serif label, the text exactly: Access policy, page 4.
+
+Crisp UI screenshot of software, not a poster, not an illustration. Only those words. No other text.

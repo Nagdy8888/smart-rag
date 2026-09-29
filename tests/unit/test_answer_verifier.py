@@ -23,6 +23,7 @@ from smart_rag_core.query_answer.models import (
     VerifierPayload,
 )
 from smart_rag_core.query_answer.release import (
+    align_split_source_identifiers,
     bind_company_atomic_links,
     company_release_applies,
     render_verified_company_answer,
@@ -789,6 +790,246 @@ def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:
     assert "Method Call Protocol" not in released.answer_text
     assert claim in released.answer_text
     assert released.status != "complete"
+
+
+def test_trailing_period_inside_quotes_keeps_a_name_that_is_cited() -> None:
+    """A sentence period inside quotes does not refuse a name in the passage."""
+
+    source = "calculate_sum instead of process_numbers"
+    fusion = verifier_fusion(verifier_passage(1, text=source))
+    chunk_id = fusion.evidence[0].chunk_id
+    claim = (
+        'The book prefers the concise tool name "calculate_sum" '
+        'instead of "process_numbers."'
+    )
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("claim-1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=source,
+                paragraph_index=0,
+                atomic_link_id="claim-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="claim-1",
+                claim=claim,
+                chunk_ids=(chunk_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert released.status != "refused"
+    assert "Insufficient authorized evidence." not in released.answer_text
+    assert "calculate_sum" in released.answer_text
+    assert released.citations[0].span == source
+
+
+def _identifier_payload(source: str, claim: str) -> tuple[FusionResult, AnswerPayload]:
+    """Build one fact claim cited to ``source``.
+
+    Args:
+        source: Canonical passage text.
+        claim: Model claim, which may split a source identifier.
+
+    Returns:
+        Fusion result and company answer payload.
+    """
+
+    fusion = verifier_fusion(verifier_passage(1, text=source))
+    chunk_id = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("claim-1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=source,
+                paragraph_index=0,
+                atomic_link_id="claim-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(link_id="claim-1", claim=claim, chunk_ids=(chunk_id,)),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    return fusion, payload
+
+
+def test_split_source_identifier_survives_a_verifier_rejection() -> None:
+    """Spacing out process_numbers does not erase a cited fact claim."""
+
+    source = "(e.g., calculate_sum instead of process_numbers)"
+    claim = 'The book prefers the tool name "calculate_sum" to process numbers.'
+    fusion, payload = _identifier_payload(source, claim)
+    rejected, _, _ = run_verifier_batch(
+        payload,
+        caller=lambda batch: VerifierPayload(
+            link_verdicts=tuple(
+                VerifierLinkVerdict(
+                    link_id=item.link_id,
+                    supported=False,
+                    reason="unsupported_link",
+                )
+                for item in batch
+            )
+        ),
+        already_called=0,
+    )
+    aligned = align_split_source_identifiers(payload, rejected, fusion=fusion)
+    released = render_verified_company_answer(aligned, fusion=fusion, tables=())
+    assert released.answer_text != "Insufficient authorized evidence."
+    assert "process_numbers" in released.answer_text
+    assert "process numbers" not in released.answer_text
+    assert "calculate_sum" in released.answer_text
+    assert released.citations[0].span == source
+
+
+def test_rejected_exact_names_are_cited_from_the_passage() -> None:
+    """A heading span does not erase a claim whose names are in the passage."""
+
+    source = (
+        "Standard Tool Selection\n\n"
+        "Give every tool a concise, descriptive name "
+        "(e.g., calculate_sum instead of process_numbers) and then stop."
+    )
+    claim = (
+        "The book prefers the concise tool name 'calculate_sum' "
+        "instead of 'process_numbers'."
+    )
+    fusion, payload = _identifier_payload(source, claim)
+    payload = payload.model_copy(
+        update={
+            "citations": (
+                payload.citations[0].model_copy(
+                    update={"span": "Standard Tool Selection"}
+                ),
+            )
+        }
+    )
+    rejected = payload.model_copy(
+        update={
+            "answer_text": "Insufficient authorized evidence.",
+            "paragraphs": (),
+            "citations": (),
+            "atomic_links": (),
+            "status": "refused",
+        }
+    )
+    aligned = align_split_source_identifiers(payload, rejected, fusion=fusion)
+    released = render_verified_company_answer(aligned, fusion=fusion, tables=())
+    assert released.answer_text != "Insufficient authorized evidence."
+    assert "calculate_sum instead of process_numbers" in released.answer_text
+    assert released.citations[0].span is not None
+    assert released.citations[0].span in source
+    assert "process_numbers" in released.citations[0].span
+    assert released.citations[0].span != "Standard Tool Selection"
+
+
+def test_quote_capitalization_uses_the_passage_spelling() -> None:
+    """A lowercase quote of a capitalized cell is kept as the passage wrote it."""
+
+    source = (
+        "Table 8-1. Durable storage option overview\n\n"
+        "Vector stores (e.g., Pinecone) Semantic search, scalable embeddings\n\n"
+        "Higher cost, specialized setup Knowledge-intensive agents"
+    )
+    claim = (
+        "The setup drawback for vector stores such as Pinecone is a "
+        '"higher cost, specialized setup."'
+    )
+    fusion, payload = _identifier_payload(source, claim)
+    payload = payload.model_copy(
+        update={
+            "citations": (
+                payload.citations[0].model_copy(
+                    update={"span": "Table 8-1. Durable storage option overview"}
+                ),
+            )
+        }
+    )
+    rejected = payload.model_copy(
+        update={
+            "answer_text": "Insufficient authorized evidence.",
+            "paragraphs": (),
+            "citations": (),
+            "atomic_links": (),
+            "status": "refused",
+        }
+    )
+    aligned = align_split_source_identifiers(payload, rejected, fusion=fusion)
+    released = render_verified_company_answer(aligned, fusion=fusion, tables=())
+    assert released.answer_text != "Insufficient authorized evidence."
+    assert "Higher cost, specialized setup" in released.answer_text
+    assert released.citations[0].span is not None
+    assert "Higher cost, specialized setup" in released.citations[0].span
+
+
+def test_split_identifier_does_not_keep_an_invented_name() -> None:
+    """A spaced token cannot smuggle in an identifier the passage lacks."""
+
+    source = "(e.g., calculate_sum instead of process_numbers)"
+    claim = 'The book prefers "invented_tool" to process numbers.'
+    fusion, payload = _identifier_payload(source, claim)
+    rejected = payload.model_copy(
+        update={
+            "answer_text": "Insufficient authorized evidence.",
+            "paragraphs": (),
+            "citations": (),
+            "atomic_links": (),
+            "status": "refused",
+        }
+    )
+    aligned = align_split_source_identifiers(payload, rejected, fusion=fusion)
+    assert aligned.atomic_links == ()
+    assert aligned.answer_text == "Insufficient authorized evidence."
+
+
+def test_quoted_name_missing_from_the_passage_is_still_refused() -> None:
+    """A period does not make an absent quoted name look grounded."""
+
+    source = "calculate_sum instead of process_numbers"
+    fusion = verifier_fusion(verifier_passage(1, text=source))
+    chunk_id = fusion.evidence[0].chunk_id
+    claim = 'The book prefers the concise tool name "invented_tool."'
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("claim-1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=source,
+                paragraph_index=0,
+                atomic_link_id="claim-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="claim-1",
+                claim=claim,
+                chunk_ids=(chunk_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert released.answer_text == "Insufficient authorized evidence."
+    assert released.citations == ()
+    assert released.atomic_links == ()
 
 
 def test_one_supported_link_produces_one_citation() -> None:

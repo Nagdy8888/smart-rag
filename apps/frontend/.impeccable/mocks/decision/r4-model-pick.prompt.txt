@@ -1,0 +1,11 @@
+A landscape 16:9 screenshot of working software: the first viewport of the Smart RAG Ask desk. Flat dark interface. Ground color #141618. Panel color #1c2126. Text color #f2f0ea. One green accent #3ddc97. Large type. No glow, no scanlines, no sci-fi, no logos, no scores, no extra widgets, no gradients, no decorative art.
+
+Three panes side by side. Left rail is narrow, about one sixth of the width, panel #1c2126. Center pane is the widest, about half the width, panel #1c2126. Right pane is about one third of the width, panel #1c2126. Thin gaps of the ground color separate the panes. Generous padding. Sharp rectangular panels.
+
+Left rail, top to bottom only: large wordmark "Smart RAG", then a vertical list: "Ask" as the current item with a small green mark, then "Documents", "Tables", "Graph", "Admin". Nothing else in the rail.
+
+Center pane, top to bottom only: the question in the largest type at the very top, exactly "Where is the retention rule stated?". Under it one row of source choices: "Auto", "Company documents" selected in green #3ddc97, "General", "Web". Below that the answer in large type, exactly "The rule is in the passage you can open." No input box, no buttons, no scores.
+
+Right pane titled "Passage" in #f2f0ea. Under the title a heading in green #3ddc97 reading exactly "Access policy, page 4". Under the heading the same sentence "The rule is in the passage you can open." Nothing else.
+
+Quiet editorial software screenshot, crisp UI typography, real product name Smart RAG, exact copy only.

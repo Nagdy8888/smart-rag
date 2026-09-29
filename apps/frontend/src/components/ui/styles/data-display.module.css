@@ -102,16 +102,16 @@
   display: inline-flex;
   align-items: baseline;
   gap: calc(var(--space) * 1);
-  min-height: calc(var(--space) * 6);
+  min-height: calc(var(--space) * 7);
   max-width: 100%;
   height: auto;
-  padding: 2px 6px;
+  padding: 4px 12px;
   border: 1px solid transparent;
-  border-radius: 4px;
-  background: var(--color-evidence-muted);
-  color: var(--color-evidence);
+  border-radius: var(--radius-control);
+  background: var(--color-evidence);
+  color: var(--color-accent-fg);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -125,7 +125,8 @@
 }
 
 .chip:hover {
-  border-color: var(--color-evidence);
+  background: var(--color-evidence-hover);
+  border-color: transparent;
 }
 
 .chip:active {
@@ -135,8 +136,8 @@
 .chipLabel {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  color: var(--color-accent-fg);
+  font-weight: 600;
 }
 
 .chipUnavailable {

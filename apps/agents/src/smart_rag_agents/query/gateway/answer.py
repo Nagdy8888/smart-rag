@@ -111,6 +111,7 @@ def gateway_answer(
     filtered = bind_company_atomic_links(
         filter_invented_ids(payload, fusion, typed_tables),
         fusion=fusion,
+        user_query=query,
     )
     derived = with_derived_answer_text(filtered)
     prompt_tokens, completion_tokens = tokens_from_gateway_response(response)

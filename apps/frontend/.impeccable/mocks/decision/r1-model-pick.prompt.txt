@@ -1,0 +1,15 @@
+Landscape 16:9 flat desktop UI screenshot of the Smart RAG Ask screen. Frontal orthographic interface on a solid #f7f1e4 cream page. Not a photograph, not a courtroom, not a desk.
+
+Top band, one row only, about 8% of the height: at far left the words Smart RAG in bold #1c1c1c. To the right, five nav words each exactly once: Ask, Documents, Tables, Graph, Admin. Ask is current and has a short black underline. Nothing else in this band.
+
+Second band, one row only, about 7% of the height: four source labels each exactly once: Auto, Company documents, General, Web. Company documents sits in a #c6b48a rounded chip and is the selected source. The other three are plain #1c1c1c text.
+
+Third band: the question appears EXACTLY ONCE in large #1c1c1c serif, left aligned: Where is the retention rule stated?
+Do not draw this question a second time anywhere.
+
+Fourth band, directly under that single question: the remarks appear EXACTLY ONCE in smaller #1c1c1c serif: The rule is in the passage you can open.
+Do not draw this sentence a second time anywhere.
+
+Lower half, one exhibit only: a cream sheet set inside a clearly visible #c6b48a folder that frames the sheet. On the folder's right edge, one #7a1f1f tab with cream letters reading Access policy once. On the sheet's left side, one vertical #1c1c1c binder rule. In the margin beside that rule, upright horizontal type (not rotated) showing the digit 4 once and the words page 4 once. The inside of the sheet is blank paper with no sentences.
+
+Every string appears once. No duplicate lines. No logos, no scores, no people, no quotation of a policy, no extra windows.

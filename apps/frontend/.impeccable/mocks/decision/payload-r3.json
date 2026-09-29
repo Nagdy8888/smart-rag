@@ -1,0 +1,57 @@
+{
+  "title": "Choose the visual world",
+  "question": "These are ordinary working layouts. Pick the one that is easiest to use, or re-roll.",
+  "options": [
+    {
+      "id": "index",
+      "label": "The Index",
+      "lineage": "a search field with cited results",
+      "thesis": "You ask at the top. The answer and the passages that support it are on the same screen.",
+      "palette": ["#f6f5f2", "#1c1c1c", "#0f6e56", "#ffffff"],
+      "materials": ["open page", "segmented control", "result row"],
+      "viewport": "Nav across the top. A large ask field under it, focused. Source control directly beneath: Auto, Company documents, General, Web. Then the answer, then the citation rows. A refusal replaces the answer with one plain sentence and an empty result list.",
+      "risk": "Feels like a search box, and a long run has little room to show progress.",
+      "comp": ".impeccable/mocks/decision/r3-index.png"
+    },
+    {
+      "id": "desk",
+      "label": "The Desk",
+      "lineage": "a three-pane work desk",
+      "thesis": "Navigation, the answer, and the open passage stay visible together. Nothing you need is behind a click.",
+      "palette": ["#f4f4f2", "#1a1a1a", "#1f4e79", "#ffffff"],
+      "materials": ["left rail", "answer column", "passage pane"],
+      "viewport": "Left rail: Ask, Documents, Tables, Graph, Admin. Center: the question at the top, the answer under it, citation links in the answer. Right: the passage for Access policy, page 4. A refusal is a banner in the center, and the right pane says nothing was opened.",
+      "risk": "The familiar three-pane app. Clear, and easy to forget.",
+      "comp": ".impeccable/mocks/decision/r3-desk.png"
+    },
+    {
+      "id": "queue",
+      "label": "The Queue",
+      "lineage": "an inbox of runs",
+      "thesis": "Each question is a row with a status: running, cited, or refused. Open a row to read it.",
+      "palette": ["#f7f7f5", "#1c1c1c", "#9a3412", "#ffffff"],
+      "materials": ["list row", "status text", "detail pane"],
+      "viewport": "Left list of questions with the status in words. The selected row opens on the right: question, answer, and citation. A new question is a button at the top of the list, not a chat box at the bottom.",
+      "risk": "The first question takes an extra click. Returning to an old run is easier than asking.",
+      "comp": ".impeccable/mocks/decision/r3-queue.png"
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The chat used by ChatGPT, Microsoft Copilot, and Glean, played straight.",
+    "palette": ["#f7f7f5", "#17181a", "#3d6df2"],
+    "materials": ["left rail", "message list", "citation drawer"],
+    "viewport": "Ask is a thread. You type at the bottom. Citations open in a drawer.",
+    "risk": "Indistinguishable from those products, by design.",
+    "comp": ".impeccable/mocks/decision/r1-canon.png"
+  },
+  "steer": true
+}

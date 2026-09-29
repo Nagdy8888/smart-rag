@@ -1,0 +1,15 @@
+Landscape 16:9 desktop first viewport of the Smart RAG Ask screen, a working interface made of hanging horizontal wayfinding bands. Flat product UI filling the frame, not a photograph of an airport terminal, not a hallway, not a ceiling, not a crowd.
+
+Regions in order, top to bottom, full width, with these scale relationships:
+
+1. A thin black identity strip, about one tenth of the height. Left-aligned white humanist sans-serif, small: Smart RAG
+
+2. One saturated yellow band, color exactly #ffc20e, about two thirds of the height, the only yellow field. Black humanist sans-serif on the yellow, like Frutiger. Inside this band, stacked and left-aligned with wide margins:
+- Navigation as the next decisions only, a single row of medium black type: Ask, Documents, Tables, Graph, Admin. Ask is the followed destination, set heavier with a thick black underline. No other navigation.
+- The destination line, large black type, smaller than the gate number: Where is the retention rule stated?
+- The monumental gate number, the largest type on the screen, black, dominating the band: Access policy, page 4
+- A second line that stays fully visible, medium black type, smaller than the destination line: The rule is in the passage you can open.
+
+3. A smaller band beneath the yellow, about one fifth of the height, black ground, white humanist sans-serif, one row: Auto, Company documents, General, Web. Company documents is highlighted with a white outline and heavier white type. Auto, General, and Web are quieter white.
+
+No airplanes, no clocks, no walking times, no scores, no logos, no illustrations, no people, no pictograms, no arrows. No extra words, prices, dates, claims, buttons, avatars, or chat bubbles. Crisp sharp type, even spacing, high contrast, full-bleed bands.

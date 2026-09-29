@@ -1,0 +1,11 @@
+Full-bleed landscape 16:9 desktop UI mock, the first viewport of the Smart RAG Ask console. A working software interface built from paper coupons, orthographic and flat, edge to edge. No device bezel, no browser chrome, no photograph, no airport, no airplane, no people, no logo mark.
+
+Region 1, tabbed head, full width, about one twelfth of the height, cream coupon stock #f4f1ea. Left: the words Smart RAG in navy #14213d. To the right, five equal hairline tabs in one row, labels exactly: Ask, Documents, Tables, Graph, Admin. Ask is active, marked only by a red #c4202e hairline. Other labels are navy.
+
+Region 2, source row, full width, about one tenth of the height, directly under the head: four equal fixed-field hairline boxes, labels exactly: Auto, Company documents, General, Web. Company documents is selected, navy label with a red #c4202e hairline. The other three are unselected navy hairline boxes on the same stock.
+
+Region 3, question band, full width, about one eighth of the height: one wide navy hairline box. Small navy label Question. Inside, navy text exactly: Where is the retention rule stated?
+
+Region 4, one coupon in front, centered, about three fifths of the viewport height and most of the width, sitting on the same cream stock with a clear margin. No second coupon, no stack, no wallet flap of extra tickets. Cream #f4f1ea coupon stock, navy #14213d hairline border, a vertical perforation dividing a narrow left stub from the main panel. Fixed fields are hairline boxes. The filled field reads Access policy and page 4, both carbon purple #5c4a7a filled figures, the numeral 4 drawn as a carbon numeral. A remarks hairline box contains exactly this sentence and nothing else: The rule is in the passage you can open. A small red #c4202e mark on the coupon reads VALIDATED.
+
+Materials: coupon stock, carbon numerals, hairline boxes. Palette only #f4f1ea, #14213d, #c4202e, #5c4a7a. Crisp print-shop coupon type, high contrast, a usable form. Do not print VOID. No quotation marks, no scores, no prices, no dates, no customer names, no logos, no airplanes, no extra sentences.

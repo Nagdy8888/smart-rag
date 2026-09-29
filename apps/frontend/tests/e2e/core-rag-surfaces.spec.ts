@@ -55,14 +55,12 @@ test("authenticated Auto chrome when a session exists", async ({
   await signInLiveMember(page, request);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Ask" })).toBeVisible();
-  await expect(page.getByLabel("Answer source")).toBeVisible();
   const source = page.getByTestId("answer-source");
-  await expect(source).toHaveValue("auto");
-  await expect(source.locator("option")).toHaveText([
-    "Auto",
-    "Company documents",
-    "General",
-  ]);
+  await expect(source).toBeVisible();
+  await expect(source).toHaveAttribute("data-value", "auto");
+  await expect(page.getByRole("radio", { name: "Auto" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Company documents" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "General" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 

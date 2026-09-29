@@ -1,0 +1,1 @@
+Landscape 16:9 Smart RAG Ask as a straight chat: left rail Ask, Documents, Tables, Graph, Admin; question "Where is the retention rule stated?"; reply "The rule is in the passage you can open."; sources Auto, Company documents selected, General, Web; citation drawer "Access policy, page 4". White shell, ink, one blue action.

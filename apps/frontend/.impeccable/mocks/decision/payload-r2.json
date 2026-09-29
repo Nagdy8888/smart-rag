@@ -1,0 +1,117 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned The Quoted Stockroom. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Quoted Stockroom",
+      "kicker": "THE ROLL",
+      "lineage": "industrial streetwear labels",
+      "thesis": "Every control wears its name in straight quotes. What you cannot use is crossed by the hazard stripe.",
+      "palette": ["#f4f4f2", "#111111", "#ff5a1f", "#111111"],
+      "materials": ["white cotton", "black nylon", "orange zip-tie", "hazard stripe"],
+      "viewport": "Ask is a stockroom wall. Nav plates read \"ASK\" \"DOCUMENTS\" \"TABLES\" \"GRAPH\" \"ADMIN\". The live citation keeps the zip-tie. A blocked row wears the diagonal stripe.",
+      "risk": "The quotes become a costume and the passage is too small to read.",
+      "raised": [
+        {
+          "from": "gravity rain",
+          "raise": "The stripe is the one diagonal. Every label stays square and level."
+        },
+        {
+          "from": "viewfinder",
+          "raise": "Only the live citation wears the zip-tie. Everything else stays in an edge plate."
+        },
+        {
+          "from": "phosphor terminal",
+          "raise": "A refusal is a printed line, not a colored chip."
+        },
+        {
+          "from": "arcade grid",
+          "raise": "Every plate sits on the same square grid. The stripe may cross a plate. It never knocks the label off its cell."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/r2-assigned.png"
+    },
+    {
+      "id": "challenger-yellow",
+      "label": "The Yellow Band",
+      "verdict": "competitive",
+      "lineage": "airport overhead wayfinding",
+      "thesis": "One decision per yellow band. The citation is the gate number, monumental. A closed route stays and says so.",
+      "palette": ["#ffc20e", "#111111", "#ffffff"],
+      "materials": ["yellow panel", "black humanist type", "white pictogram"],
+      "viewport": "Ask is one hanging band. The question is the destination. \"Access policy, page 4\" is the huge gate number. A refusal remains on the band as closed, not removed.",
+      "case": "The locator is impossible to miss. Weaker at a desk: this is a walk to a gate, and the product cannot let a refusal vanish.",
+      "risk": "Becomes an airport theme and the passage never gets a place to be read.",
+      "comp": ".impeccable/mocks/decision/r2-challenger-yellow.png",
+      "hero": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-terminal-yellow-wayfinding-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-terminal-yellow-wayfinding.webp"
+    },
+    {
+      "id": "challenger-rain",
+      "label": "The Gravity Garden",
+      "verdict": "declined",
+      "lineage": "rain that falls toward colored clouds",
+      "palette": ["#3d4a45", "#2f6fed", "#c4342b", "#111111"],
+      "materials": ["dusk garden", "colored rain", "black flower"],
+      "viewport": "Citations fall toward whichever cloud owns them.",
+      "case": "Members do not work in a gravity garden, and rain hides the sentence.",
+      "kept": "One rule stays level while the rest may bend.",
+      "risk": "The answer becomes weather."
+    },
+    {
+      "id": "challenger-viewfinder",
+      "label": "The Viewfinder",
+      "verdict": "declined",
+      "lineage": "a camcorder framing display",
+      "palette": ["#111111", "#f4f1ea", "#e0a100"],
+      "materials": ["corner brackets", "zebra stripe", "amber zoom bar"],
+      "viewport": "Brackets tighten on the passage. Zebra marks what is overdue.",
+      "case": "A camera overlay is not this desk, and the display fights the text.",
+      "kept": "Only one thing is targeted. The rest stays in the corners.",
+      "risk": "The citation becomes a face in a frame."
+    },
+    {
+      "id": "challenger-phosphor",
+      "label": "The Phosphor Tube",
+      "verdict": "declined",
+      "lineage": "a green terminal in a dark room",
+      "palette": ["#071208", "#7dff6a"],
+      "materials": ["curved glass", "phosphor green", "blinking cursor"],
+      "viewport": "The console is one scrolling transcript. States print themselves.",
+      "case": "This is the chat terminal the product is leaving, and the other rooms disappear.",
+      "kept": "A state is a line of text, not a badge.",
+      "risk": "Ask becomes a prompt, and Documents has no door."
+    },
+    {
+      "id": "challenger-arcade",
+      "label": "The Arcade Grid",
+      "verdict": "declined",
+      "lineage": "a pixel arcade cabinet",
+      "palette": ["#070707", "#f4e04a", "#3ecf4a", "#e23b2f"],
+      "materials": ["phosphor black", "fat pixels", "scanlines"],
+      "viewport": "The question is a tile room. Score sits on the top edge.",
+      "case": "A game is not a citation, and a score is a claim this product does not make.",
+      "kept": "Nothing sits off the grid.",
+      "risk": "The passage becomes a sprite."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A chat thread, a left rail, source chips, and a citation drawer, played straight.",
+    "palette": ["#f7f7f5", "#17181a", "#3d6df2"],
+    "materials": ["white app shell", "rounded cards", "one blue action"],
+    "viewport": "Ask is a message list. You type at the bottom. Citations open in a side drawer.",
+    "risk": "Indistinguishable from every other assistant, by design.",
+    "comp": ".impeccable/mocks/decision/r1-canon.png"
+  },
+  "steer": true
+}

@@ -1,17 +1,6 @@
 /**
- * 56px console top bar, command, account, and readiness popover.
+ * Field topbar tools: menu, readiness, command, account.
  */
-
-.topbar {
-  min-height: var(--topbar-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(var(--space) * 3);
-  padding: 0 calc(var(--space) * 4);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-}
 
 .topbarStart,
 .topbarEnd {
@@ -21,45 +10,31 @@
   min-width: 0;
 }
 
+.topbarStart {
+  display: none;
+}
+
 .menuButton,
 .commandButton {
   display: inline-flex;
+  color: var(--color-field-fg, #f4f1ea);
 }
 
-.topbarBrand {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--space) * 2);
+.topbarBrand,
+.topbarTitle,
+.brandMark {
+  display: none;
 }
 
 .topbarBrandName {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 15px;
-  line-height: 20px;
-  letter-spacing: -0.01em;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.topbarTitle {
-  margin: 0;
-  min-width: 0;
-  flex: 1 1 40%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  display: none;
 }
 
 .readiness {
   margin: 0;
-  color: var(--color-text-muted);
+  color: var(--color-field-fg, #f4f1ea);
   font-size: 0.8125rem;
+  opacity: 0.8;
 }
 
 .readinessControl {
@@ -74,9 +49,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--color-surface-muted);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-field-fg, #f4f1ea);
+  border: 1px solid rgb(244 241 234 / 0.35);
   font-size: 12px;
   font-weight: 600;
 }
@@ -87,6 +62,7 @@
   gap: 8px;
   min-width: 240px;
   max-width: 320px;
+  color: var(--color-text);
 }
 
 .readinessPopover ul {
@@ -94,41 +70,22 @@
   padding-left: 1.1rem;
 }
 
-@media (min-width: 1024px) {
-  .menuButton,
-  .topbarBrand {
-    display: none;
-  }
-}
-
 @media (max-width: 1023px) {
-  .topbar {
-    padding-inline-start: calc(var(--space) * 3);
-    overflow-x: hidden;
+  .topbarStart {
+    display: flex;
+  }
+
+  .menuButton {
+    display: inline-flex;
   }
 
   .topbarBrand {
     display: none;
   }
-
-  .menuButton,
-  .commandButton,
-  .avatarMark,
-  .readinessControl button {
-    min-width: 36px;
-    min-height: 36px;
-  }
-
-  .readinessChip {
-    max-width: 4.5rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 
-@media (max-width: 479px) {
-  .commandButton {
+@media (min-width: 1024px) {
+  .menuButton {
     display: none;
   }
 }

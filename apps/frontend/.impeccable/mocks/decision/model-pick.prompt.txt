@@ -1,0 +1,12 @@
+A landscape 16:9 desktop first viewport of a working software interface: the Ask screen of the Smart RAG console. The screen itself, flat and full-bleed, a usable console layout, not a poster and not a photograph of a library.
+
+Surface structure and scale, top to bottom:
+- A thin top bar across the full width, about one twelfth of the frame height. At the left, the product name Smart RAG in compact letterpress type. Immediately to its right, one horizontal navigation of five equal text labels in this exact left-to-right order: Ask, Documents, Tables, Graph, Admin. Ask is the current destination, marked with a short ledger underline.
+- Directly beneath the bar, a single source row, small against the desk. Exactly four positions in this exact left-to-right order, never rearranged: first Auto, second Company documents, third General, fourth Web. Company documents is the second item and the only selected position, drawn as a filled stamped tab. Auto, General, and Web stay plain text to its left and right. Do not move Company documents to the end.
+- The desk fills the remaining four fifths of the viewport. On the left, a large written request slip, about half the desk width and nearly its full height, paper with ledger ruling. The slip's body is the question in typewriter type, centered on the slip: Where is the retention rule stated?
+- Beside the slip on the right, a returned passage card of similar height and slightly narrower width. This is the successful return. A red ink rubber stamp frames two lines: Access policy, page 4 and The rule is in the passage you can open. A small Open control sits at the card's lower edge. The rest of the card is blank ledger ruling. No quoted statute.
+- No refusal slip. No second screen. No modal.
+
+Palette, fully committed: paper #f4efe4, ink green-black #1e2a24, stamp red #6b2d2d, ledger #c4b49a. Type is call-slip letterpress for the product name and navigation, typewriter for the request, and a rubber date-stamp for the shelf mark. Materials are a paper call slip, an ink date stamp, and stack-ledger ruling, drawn as interface surfaces only.
+
+Visible words, spelled exactly and in the positions above: Smart RAG; Ask; Documents; Tables; Graph; Admin; Auto; Company documents; General; Web; Where is the retention rule stated?; Access policy, page 4; The rule is in the passage you can open.; Open. No people, no marble halls, no bookshelves, no stock library photography, no customer logo, no score, no price, no benchmark, no testimonial, no calendar date, no fake legal quotation.

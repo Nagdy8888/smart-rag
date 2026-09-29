@@ -1,0 +1,145 @@
+{
+  "title": "Choose the visual world",
+  "question": "Efficient and cool. The roll assigned The Field. The question, the answer, and the citation stay on one screen. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Field",
+      "kicker": "THE ROLL",
+      "lineage": "one saturated field with the work cut out of it",
+      "thesis": "The screen is a deep color. The work sits on one clear plate: ask, answer, citation. Nothing else competes.",
+      "palette": ["#0e1c24", "#f4f1ea", "#121417", "#e2ff4d"],
+      "materials": ["ink field", "bone plate", "one electric mark"],
+      "viewport": "Nav sits in the field: Ask, Documents, Tables, Graph, Admin. One bone plate holds the question, the source control, the answer, and Access policy, page 4. The citation is the only electric mark. A refusal stays on the plate, unlit, not deleted.",
+      "risk": "Becomes a poster if the plate shrinks and the color starts doing the talking.",
+      "raised": [
+        {
+          "from": "sneaker wall",
+          "raise": "The live citation is the only thing that comes forward."
+        },
+        {
+          "from": "cloud edge",
+          "raise": "Color is the surround. The answer sits on a clear plate so it stays readable."
+        },
+        {
+          "from": "seven-segment",
+          "raise": "A refusal stays on the plate as an unlit row."
+        },
+        {
+          "from": "data field",
+          "raise": "Opening a citation dims everything else. The passage is the high-contrast thing."
+        },
+        {
+          "from": "starship terminal",
+          "raise": "Refusal is the only second color. The answer stays in the primary ink."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/r4-assigned.png"
+    },
+    {
+      "id": "model-pick",
+      "label": "The Night Desk",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "a dark three-pane desk",
+      "thesis": "Navigation, the answer, and the open passage stay visible. The room is dark. One green mark shows what is live.",
+      "palette": ["#141618", "#1c2126", "#f2f0ea", "#3ddc97"],
+      "materials": ["matte night", "quiet panel", "one green mark"],
+      "viewport": "Left rail for Ask, Documents, Tables, Graph, Admin. Center: the question at the top, then the answer. Right: the passage. The citation link is the green mark.",
+      "risk": "Also the dark dashboard most tools already ship.",
+      "comp": ".impeccable/mocks/decision/r4-model-pick.png"
+    },
+    {
+      "id": "challenger-metro",
+      "label": "The Tiles",
+      "verdict": "wins",
+      "lineage": "flat tiles and giant type",
+      "thesis": "The words are the interface. Question, answer, and citation are three tiles on the first screen.",
+      "palette": ["#000000", "#00b7c3", "#f7f7f5"],
+      "materials": ["flat tile", "giant lowercase", "no button chrome"],
+      "viewport": "Black ground. Three tiles, no scrolling: the question, the answer, and Access policy, page 4. Nav words sit on the top edge. The live tile is flooded cyan.",
+      "case": "Bigger type and a more obvious first screen than the field. A tile can still feel like a phone home screen instead of a document.",
+      "risk": "The passage becomes a tile and there is nowhere to read a long page.",
+      "comp": ".impeccable/mocks/decision/r4-challenger-metro.png",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-metro-typographic-tiles-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/digital-design-canon-metro-typographic-tiles.webp"
+    },
+    {
+      "id": "challenger-sneaker",
+      "label": "The Box Wall",
+      "verdict": "declined",
+      "lineage": "a wall of sneaker boxes",
+      "palette": ["#c4552a", "#111111", "#f4f1ea"],
+      "materials": ["cardboard", "end label", "tissue"],
+      "viewport": "You pull a box to open the citation.",
+      "case": "A stack is not this desk, and opening a lid is an extra step.",
+      "kept": "The live item comes forward. The rest stays put.",
+      "risk": "The answer is inside a box."
+    },
+    {
+      "id": "challenger-cloud",
+      "label": "The Cloud Edge",
+      "verdict": "declined",
+      "lineage": "a pastel fringe on a white cloud",
+      "palette": ["#f7f7f5", "#5c6770", "#c9a0dc"],
+      "materials": ["cloud white", "hairline spectrum"],
+      "viewport": "Color sits in a fringe. The text stays gray on white.",
+      "case": "Weather is not the task, and a fringe does not show a citation.",
+      "kept": "Color stays at the edge. The reading surface stays clear.",
+      "risk": "Pretty, and empty."
+    },
+    {
+      "id": "challenger-segments",
+      "label": "The Segments",
+      "verdict": "declined",
+      "lineage": "a seven-segment clock",
+      "palette": ["#100c0c", "#ff2a2a", "#3a1010"],
+      "materials": ["lit segments", "ghost cells"],
+      "viewport": "The answer is four digits on a black clock.",
+      "case": "A sentence does not fit a digit mask.",
+      "kept": "An absent state is drawn, not deleted.",
+      "risk": "The passage cannot be written."
+    },
+    {
+      "id": "challenger-ikeda",
+      "label": "The Bar Field",
+      "verdict": "declined",
+      "lineage": "a black-and-white data field",
+      "palette": ["#000000", "#ffffff"],
+      "materials": ["barcode columns", "monospace"],
+      "viewport": "The screen strobes. Numbers pack the margin.",
+      "case": "A barcode is not a paragraph, and strobe fights reading.",
+      "kept": "Focus dims the rest of the field.",
+      "risk": "The citation becomes texture."
+    },
+    {
+      "id": "challenger-starship",
+      "label": "The Ready Room",
+      "verdict": "declined",
+      "lineage": "a starship crew terminal",
+      "palette": ["#071208", "#7dff6a", "#e0a100"],
+      "materials": ["phosphor", "stencil plate"],
+      "viewport": "The answer types itself one letter at a time.",
+      "case": "Another terminal, and letter-by-letter print is slow.",
+      "kept": "A refusal is a second ink. The answer stays in the first.",
+      "risk": "Cool, and you wait for the sentence."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The chat used by ChatGPT, Microsoft Copilot, and Glean, played straight.",
+    "palette": ["#f7f7f5", "#17181a", "#3d6df2"],
+    "materials": ["left rail", "message list", "citation drawer"],
+    "viewport": "Ask is a thread. You type at the bottom. Citations open in a drawer.",
+    "risk": "Indistinguishable from those products, by design.",
+    "comp": ".impeccable/mocks/decision/r1-canon.png"
+  },
+  "steer": true
+}

@@ -1,0 +1,11 @@
+Working software screenshot of a desktop web console, landscape 16:9, full-bleed window, flat crisp UI, large readable sans-serif. Not a poster, not a device frame, not a campaign. No textures, no gradients, no metaphors, no icons, no logos, no avatars, no scores, no quotation marks, no photography.
+
+Page ground is a visible solid #f7f7f5. Two white panes sit on that ground with a clear gap. Every text string is ink #1c1c1c. Rust #9a3412 appears in exactly one place: the fill of the New question button. No rust borders, no rust underlines, no rust status marks, no colored badges.
+
+Region 1, top bar, full width, short white pane: left, the words Smart RAG. To the right, nav in ink with even gaps: Ask is current by heavier weight only, then Documents, Tables, Graph, Admin.
+
+Region 2, left list, one third of the width, white pane: a rectangular button at the top labeled exactly New question, fill #9a3412, light lettering. Under it, two large-type rows. First row is selected by a pale gray fill only, text exactly Where is the retention rule stated? and beneath it the status word Cited in plain ink. Second row text exactly Prior question and beneath it the status word Refused in plain ink.
+
+Region 3, right detail, two thirds of the width, white pane: heading exactly Where is the retention rule stated? then the sentence exactly The rule is in the passage you can open. then the line exactly Access policy, page 4 with no period after 4. No other text.
+
+Spell every word exactly. Nothing else on screen.

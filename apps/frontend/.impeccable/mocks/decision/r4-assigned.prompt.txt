@@ -1,0 +1,17 @@
+A working software screenshot of a desktop web app, landscape 16:9, filling the frame edge to edge. Not a poster, not a texture, not a marketing page, not a floating card on a gradient. Flat interface, crisp vector UI, very large readable sans-serif type. No photos, no gradients, no paper grain, no illustrations, no logos, no icons, no scores, no badges, no avatars, no browser chrome, no window frame, no extra sentences.
+
+Palette only: deep ink field #0e1c24 filling the screen, one bone plate #f4f1ea, black ink #121417, and one electric yellow-green #e2ff4d. The yellow-green appears once, only on the citation. No other colors.
+
+Region 1, full width, a short navigation band on the deep ink field, about one eighth of the height. Left, the wordmark exactly "Smart RAG" in bone #f4f1ea, letters only, no symbol. To the right of the wordmark, one horizontal row of nav words sitting directly on the ink field, in this order: "Ask" (current, bone #f4f1ea, heavier), "Documents", "Tables", "Graph", "Admin" in quieter bone. No chips, no buttons, no logos.
+
+Region 2, one wide bone plate #f4f1ea centered under the nav, about four fifths of the width and most of the remaining height, with deep ink #0e1c24 visible as a margin around it. All of the work is on this plate. Black ink #121417. Large type a person can read in one glance. Stacked top to bottom, left aligned, generous gaps, nothing else on the plate:
+
+First, the question as the largest line, exactly: Where is the retention rule stated?
+
+Second, a source control, one horizontal segmented control of four segments labeled exactly "Auto", "Company documents", "General", "Web". "Company documents" is selected: solid black ink #121417 fill with bone #f4f1ea text. The other three segments are bone with black ink text and a thin black outline. No yellow-green here.
+
+Third, the answer in large black ink type, exactly: The rule is in the passage you can open.
+
+Fourth, the citation exactly "Access policy, page 4" with a solid electric yellow-green #e2ff4d marker behind those words only. That marker is the only bright color on the screen.
+
+No other text, no timestamps, no user names, no prices, no scores.

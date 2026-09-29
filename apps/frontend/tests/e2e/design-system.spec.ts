@@ -10,7 +10,7 @@ test("login has no console navigation", async ({ page }) => {
   await expect(page.locator("#main")).toBeVisible();
 });
 
-test("authenticated desktop navigation is 232px when a session exists", async ({
+test("authenticated desktop navigation is a Field top bar when a session exists", async ({
   page,
   request,
 }) => {
@@ -19,8 +19,11 @@ test("authenticated desktop navigation is 232px when a session exists", async ({
   await page.goto("/");
   const nav = page.getByTestId("app-shell-nav");
   await expect(nav).toBeVisible();
-  const width = await nav.evaluate((element) => element.getBoundingClientRect().width);
-  expect(width).toBe(232);
+  const box = await nav.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeGreaterThanOrEqual(40);
+  expect(box!.height).toBeLessThan(120);
+  expect(box!.width).toBeGreaterThan(400);
   await expect(page.getByRole("link", { name: "Ask" })).toHaveAttribute(
     "href",
     "/",

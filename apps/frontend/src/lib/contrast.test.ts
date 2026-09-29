@@ -3,34 +3,30 @@ import { contrastRatio, relativeLuminance, WCAG_AA_NORMAL_TEXT } from "./contras
 import {
   COLOR_ACCENT,
   COLOR_ACCENT_FG,
-  COLOR_BG,
   COLOR_DANGER,
   COLOR_SURFACE,
   COLOR_PRIMARY,
   COLOR_PRIMARY_FG,
   COLOR_SURFACE_MUTED,
   COLOR_EVIDENCE,
-  COLOR_EVIDENCE_MUTED,
+  COLOR_FIELD,
+  COLOR_FIELD_FG,
   COLOR_TEXT,
   COLOR_TEXT_MUTED,
   COLOR_WARNING,
 } from "./design-tokens";
 
 describe("WCAG AA token contrast", () => {
-  it("meets 4.5:1 for body, muted, accent, and danger pairs", () => {
+  it("meets 4.5:1 for Field plate and field pairs", () => {
     const pairs: Array<[string, string, string]> = [
-      ["text on canvas", COLOR_TEXT, COLOR_BG],
-      ["text on surface", COLOR_TEXT, COLOR_SURFACE],
-      ["muted on surface", COLOR_TEXT_MUTED, COLOR_SURFACE],
-      ["accent foreground", COLOR_ACCENT_FG, COLOR_ACCENT],
-      ["danger on surface", COLOR_DANGER, COLOR_SURFACE],
+      ["field text on field", COLOR_FIELD_FG, COLOR_FIELD],
+      ["text on plate", COLOR_TEXT, COLOR_SURFACE],
+      ["muted on plate", COLOR_TEXT_MUTED, COLOR_SURFACE],
+      ["accent foreground on electric", COLOR_ACCENT_FG, COLOR_ACCENT],
+      ["danger on plate", COLOR_DANGER, COLOR_SURFACE],
       ["primary foreground", COLOR_PRIMARY_FG, COLOR_PRIMARY],
-      ["accent on surface", COLOR_ACCENT, COLOR_SURFACE],
-      ["accent on canvas", COLOR_ACCENT, COLOR_BG],
-      ["muted on canvas", COLOR_TEXT_MUTED, COLOR_BG],
-      ["muted on muted surface", COLOR_TEXT_MUTED, COLOR_SURFACE_MUTED],
-      ["evidence marker text", COLOR_EVIDENCE, COLOR_EVIDENCE_MUTED],
-      ["evidence on surface", COLOR_EVIDENCE, COLOR_SURFACE],
+      ["muted on muted plate", COLOR_TEXT_MUTED, COLOR_SURFACE_MUTED],
+      ["evidence chip text", COLOR_ACCENT_FG, COLOR_EVIDENCE],
     ];
     for (const [label, fg, bg] of pairs) {
       expect(contrastRatio(fg, bg), label).toBeGreaterThanOrEqual(
@@ -39,6 +35,9 @@ describe("WCAG AA token contrast", () => {
     }
     expect(relativeLuminance(COLOR_SURFACE)).toBeGreaterThan(
       relativeLuminance(COLOR_TEXT),
+    );
+    expect(relativeLuminance(COLOR_FIELD_FG)).toBeGreaterThan(
+      relativeLuminance(COLOR_FIELD),
     );
   });
 

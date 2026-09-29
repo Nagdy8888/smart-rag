@@ -1,0 +1,17 @@
+A working software screenshot of a web app console, landscape 16:9, first viewport only. Flat UI screenshot, not a poster, not a marketing page, not a device mock. No browser chrome, no window frame, no drop shadows, no textures, no paper, no stripes, no patterns, no metaphors, no illustrations, no photos, no logos, no icons, no avatars, no scores, no quotation marks.
+
+Solid page background #f6f5f2 filling the entire frame. All text is #1c1c1c except white text on the green controls. One green only: #0f6e56. White cards. Plain sans-serif. Large readable type. Generous quiet margins. Lots of empty page. Content is a single left-aligned column centered horizontally, with wide side margins. Stack these regions top to bottom with clear vertical gaps, nothing else:
+
+1. Top bar, full width, same #f6f5f2 as the page, no separate bar color. Left: the words Smart RAG in medium weight. To the right of the name, text links in a row with even gaps: Ask (current, same ink, slightly heavier), Documents, Tables, Graph, Admin. No icons, no logo mark, no underline colors.
+
+2. A wide white rounded field, almost the full content column, one line of large ink text exactly: Where is the retention rule stated?
+
+3. A segmented control directly under the field, four segments in one white rounded group: Auto | Company documents | General | Web. Company documents is selected: fill #0f6e56 with white text. The other three segments are white with #1c1c1c text. No icons.
+
+4. A primary button labeled exactly Ask, fill #0f6e56, white text, left aligned, not full width, large and obvious.
+
+5. Answer text, large, left aligned, ink #1c1c1c, exactly this sentence and nothing more: The rule is in the passage you can open.
+
+6. Exactly one citation row on a white card: Access policy, page 4. Do not add a second or third citation. No quotes, no scores, no page thumbnails.
+
+Do not add a sidebar, footer, user menu, search icon, timestamps, model names, confidence, extra buttons, or decorative graphics.

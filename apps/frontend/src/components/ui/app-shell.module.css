@@ -1,5 +1,5 @@
 /**
- * Viewport-bounded shell layout. Nav and topbar own their modules.
+ * Field shell: ink top bar, bone plate main.
  */
 
 .shell {
@@ -10,8 +10,8 @@
   min-height: 100vh;
   min-height: 100dvh;
   overflow: hidden;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--color-field, var(--color-bg));
+  color: var(--color-field-fg, #f4f1ea);
   font-family: var(--font-sans);
   line-height: var(--line-height-en);
 }
@@ -41,14 +41,40 @@
   min-height: 0;
 }
 
-.content {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+.topbar {
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--color-surface);
+  flex-shrink: 0;
+  align-items: center;
+  gap: calc(var(--space) * 4);
+  min-height: 72px;
+  padding: 0 calc(var(--space) * 5);
+  background: var(--color-field, var(--color-bg));
+  color: var(--color-field-fg, #f4f1ea);
+  border-bottom: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.brandName {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-field-fg, #f4f1ea);
+}
+
+.topbarTools {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 2);
+  margin-inline-start: auto;
+  min-width: 0;
 }
 
 .main {
@@ -57,21 +83,21 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: calc(var(--space) * 4);
+  overflow: hidden;
+  padding: 0 calc(var(--space) * 5) calc(var(--space) * 5);
 }
 
-@media (min-width: 768px) {
-  .main {
-    padding: calc(var(--space) * 5);
-  }
-}
-
-@media (min-width: 1280px) {
-  .main {
-    padding: calc(var(--space) * 6);
-  }
+.plate {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-plate, var(--color-surface));
+  color: var(--color-text);
+  border-radius: var(--radius-card);
+  padding: calc(var(--space) * 5);
 }
 
 .srOnly {
@@ -86,20 +112,28 @@
   border: 0;
 }
 
-@media (min-width: 1024px) {
-  .layout {
-    flex-direction: row;
-    align-items: stretch;
-  }
-}
-
-/* Motion */
-.main > * {
+.plate > * {
   animation: enter-fade var(--duration-fast) var(--ease-in-out) backwards;
 }
 
 @keyframes enter-fade {
   from {
     opacity: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .topbar {
+    padding: 0 calc(var(--space) * 3);
+    min-height: 64px;
+  }
+
+  .main {
+    padding: 0 calc(var(--space) * 3) calc(var(--space) * 3);
+  }
+
+  .plate {
+    padding: calc(var(--space) * 4);
+    border-radius: var(--radius-md);
   }
 }

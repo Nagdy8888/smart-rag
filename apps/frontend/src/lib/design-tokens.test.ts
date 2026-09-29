@@ -43,14 +43,14 @@ describe("design token source of truth", () => {
   const css = readFileSync(cssPath, "utf8");
   const root = parseRootTokens(css);
 
-  it("matches the quiet work-tool palette in CSS and TS", () => {
+  it("matches The Field palette in CSS and TS", () => {
     for (const [name, value] of Object.entries(DESIGN_TOKENS)) {
       expect(root[name], name).toBe(value);
     }
-    expect(COLOR_BG).toBe("#F7F7F5");
-    expect(COLOR_ACCENT).toBe("#3B5B8C");
-    expect(RADIUS_SM).toBe("6px");
-    expect(RADIUS_MD).toBe("8px");
+    expect(COLOR_BG).toBe("#0e1c24");
+    expect(COLOR_ACCENT).toBe("#d8f821");
+    expect(RADIUS_SM).toBe("12px");
+    expect(RADIUS_MD).toBe("24px");
     expect(CONTROL_HEIGHT).toBe("40px");
   });
 

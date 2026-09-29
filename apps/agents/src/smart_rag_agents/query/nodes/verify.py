@@ -26,6 +26,7 @@ from smart_rag_core.query_answer.models import (
     VerifierPayload,
 )
 from smart_rag_core.query_answer.release import (
+    align_split_source_identifiers,
     bind_company_atomic_links,
     company_release_applies,
     render_verified_company_answer,
@@ -81,8 +82,11 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         Deadline/step exhaustion emits verified partial, not fake success.
 
     Failure/fallback route:
-        Unsupported links are removed or refused. Unsupported chains drop
-        the composed conclusion. Inspection/NoRetrieval stay refused.
+        Unsupported links are removed or refused. A rejected fact whose
+        quoted literals and identifiers already occur in the cited passage
+        is kept as a verbatim excerpt of that passage. Unsupported chains
+        drop the composed conclusion.
+        Inspection/NoRetrieval stay refused.
         Missing gateway, omitted verifier links, or a schema-invalid
         verifier payload never terminate ``verified``. Omitted IDs force
         ``verified_partial`` and ``verifier_omitted_links``. Invalid
@@ -151,7 +155,15 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "detail": "web_evidence_insufficient",
             "answer": payload.model_dump(mode="json"),
         }
-    prepared = payload if is_web else bind_company_atomic_links(payload, fusion=fusion)
+    prepared = (
+        payload
+        if is_web
+        else bind_company_atomic_links(
+            payload,
+            fusion=fusion,
+            user_query=state["user_query"] or None,
+        )
+    )
     checked, failures = deterministic_check_answer(
         prepared,
         fusion=fusion,
@@ -166,6 +178,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     added_prompt_tokens = 0
     added_completion_tokens = 0
     verifier_skipped_reason: str | None = None
+    pre_verifier = checked
     if checked.atomic_links and not is_web:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
@@ -200,6 +213,11 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 checked,
                 caller=caller,
                 already_called=verifier_calls,
+            )
+            checked = align_split_source_identifiers(
+                pre_verifier,
+                checked,
+                fusion=fusion,
             )
         except (AnswerError, QueryCeilingError) as exc:
             reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"

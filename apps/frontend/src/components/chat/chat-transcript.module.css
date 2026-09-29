@@ -45,15 +45,18 @@
 
 .userBubble {
   margin: 0;
-  margin-inline-start: auto;
-  max-width: 85%;
+  margin-inline-start: 0;
+  max-width: 68ch;
   min-width: 0;
-  padding: calc(var(--space) * 2) calc(var(--space) * 4);
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-md);
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
   color: var(--color-text);
-  font-size: 15px;
-  line-height: var(--line-height-ar);
+  font-family: var(--font-sans);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -63,8 +66,8 @@
   max-width: 68ch;
   min-width: 0;
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 26px;
+  font-size: 18px;
+  line-height: 28px;
   color: var(--color-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -272,6 +275,68 @@
   align-items: center;
 }
 
+.scopeField {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--color-plate, var(--color-surface));
+}
+
+.scopeSegment {
+  appearance: none;
+  margin: 0;
+  min-height: 40px;
+  padding: 0 calc(var(--space) * 4);
+  border: 0;
+  border-inline-end: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast),
+    color var(--motion-fast);
+}
+
+.scopeSegment:last-child {
+  border-inline-end: 0;
+}
+
+.scopeSegment:hover:not(:disabled):not([data-selected="true"]) {
+  background: var(--color-surface-muted);
+}
+
+.scopeSegment[data-selected="true"],
+.scopeSegment[aria-checked="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.scopeSegment:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.scopeLegend {
+  font-size: var(--text-label-size);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.scopeSegments {
+  display: contents;
+}
+
 .autoChip {
   height: var(--control-height-compact);
   min-height: var(--control-height-compact);
@@ -288,15 +353,6 @@
 
 .autoChip:hover:not(:disabled) {
   border-color: var(--color-border-strong);
-}
-
-.scopeField {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--space) * 2);
-  font-size: var(--text-label-size);
-  font-weight: 500;
-  color: var(--color-text-secondary);
 }
 
 .srOnly {
@@ -388,11 +444,32 @@
   .conversation {
     padding-inline: 16px;
   }
+
+  .userBubble {
+    font-size: 22px;
+  }
+
+  .answerProse {
+    font-size: 16px;
+    line-height: 26px;
+  }
+}
+
+@media (max-width: 479px) {
+  .userBubble {
+    font-size: 20px;
+  }
+
+  .scopeSegment {
+    min-height: 36px;
+    padding: 0 calc(var(--space) * 3);
+    font-size: 13px;
+  }
 }
 
 /* Motion */
 .userBubble.liveTurn {
-  transform-origin: bottom right;
+  transform-origin: bottom left;
   animation: enter-rise var(--duration-fast) var(--ease-smooth-out) backwards;
 }
 

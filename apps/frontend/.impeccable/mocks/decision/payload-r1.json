@@ -1,0 +1,144 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned The Condition Report. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Condition Report",
+      "kicker": "THE ROLL",
+      "lineage": "conservation-lab condition reports",
+      "thesis": "The answer is a report of what was examined. What was not examined stays blank.",
+      "palette": ["#f3efe6", "#2b2a26", "#8f2d2a", "#d7d2c6", "#1f4d3a"],
+      "materials": ["condition sheet", "specimen label", "pencil tick"],
+      "viewport": "Ask is one sheet. The question is the object. Each row is a passage and its location. A blank row means not examined.",
+      "risk": "Turns into a museum label and the question stops being something you ask.",
+      "raised": [
+        {
+          "from": "tensegrity column",
+          "raise": "A remark with no citation stays visibly unexamined. It never balances into an answer."
+        },
+        {
+          "from": "cloud quarry",
+          "raise": "Opening a citation reveals the passage on the sheet, in place."
+        },
+        {
+          "from": "flash scrawl",
+          "raise": "Earlier runs stay on the sheet as lighter marks. The live question is the heavy mark."
+        },
+        {
+          "from": "ascii grid",
+          "raise": "One ink. State is the weight of a mark, not a colored chip."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/r1-assigned.png"
+    },
+    {
+      "id": "model-pick",
+      "label": "The Exhibit Binder",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "court exhibit binders",
+      "thesis": "The answer is an exhibit. The number in the margin is the citation.",
+      "palette": ["#f7f1e4", "#1c1c1c", "#7a1f1f", "#c6b48a"],
+      "materials": ["exhibit tab", "binder rule", "margin number"],
+      "viewport": "Ask is an open binder. The question sits at the top. The returned passage is an exhibit with its tab and page number.",
+      "risk": "Also the legal-folder template most evidence products reach for.",
+      "comp": ".impeccable/mocks/decision/r1-model-pick.png"
+    },
+    {
+      "id": "challenger-ticket",
+      "label": "The Coupon Wallet",
+      "verdict": "competitive",
+      "lineage": "jet-age airline ticket wallets",
+      "thesis": "The question is a coupon. A refusal is a VOID stamp. Nothing is deleted.",
+      "palette": ["#f4f1ea", "#14213d", "#c4202e", "#5c4a7a"],
+      "materials": ["coupon stock", "carbon numerals", "VOID stamp"],
+      "viewport": "Ask is one coupon in a wallet. Validated fields hold the citation. A refusal stamps VOID across the coupon and leaves it in the book.",
+      "case": "VOID is a clearer refusal than a blank row. Weaker identification: another travel paper after the strip bay.",
+      "risk": "Becomes a souvenir ticket and the passage has nowhere to be read.",
+      "comp": ".impeccable/mocks/decision/r1-challenger-ticket.png",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-jet-age-ticket-wallet-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/vernacular-ephemera-jet-age-ticket-wallet.webp"
+    },
+    {
+      "id": "challenger-bench",
+      "label": "The Select Rail",
+      "verdict": "competitive",
+      "lineage": "a film cutting bench",
+      "thesis": "Passages are frames on a rail. A grease cross is cited. A punched corner is not allowed.",
+      "palette": ["#0e0e0e", "#e25a1c", "#f4f1ea"],
+      "materials": ["film grain", "orange flag", "punched window"],
+      "viewport": "Ask is a rail of frames. The flag marks where you stopped. Set-aside passages hang on pins below. Copy sits only in the white windows.",
+      "case": "Clearer run states than a report sheet. Weaker identification: a film bench is not this desk.",
+      "risk": "The orange field becomes a theme and the passage is too small to read.",
+      "comp": ".impeccable/mocks/decision/r1-challenger-bench.png",
+      "hero": "https://impeccable.style/worlds/cards/operate-a-cutting-bench-select-rail-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/operate-a-cutting-bench-select-rail.webp"
+    },
+    {
+      "id": "challenger-tensegrity",
+      "label": "The Tension Column",
+      "verdict": "declined",
+      "lineage": "a tensegrity column of rods and cord",
+      "palette": ["#e7e2da", "#1a1a1a", "#c4342b", "#9a958e"],
+      "materials": ["carbon rod", "red cord", "concrete ground"],
+      "viewport": "Claims float apart until a citation pulls them taut.",
+      "case": "Members do not recognize a sculpture, and a force diagram hides the passage.",
+      "kept": "A claim with no counterforce stays slack.",
+      "risk": "The answer becomes a diagram of tension and the document never opens."
+    },
+    {
+      "id": "challenger-quarry",
+      "label": "The Cloud Quarry",
+      "verdict": "declined",
+      "lineage": "a quarry that cuts weather",
+      "palette": ["#f7f7f5", "#7eb6d6", "#8d9094", "#c0c4c8"],
+      "materials": ["cumulus block", "sky void", "silver cut"],
+      "viewport": "A saw opens a block and either a passage or an empty sky falls out.",
+      "case": "Weather is not this desk, and a dissolving building cannot hold a citation.",
+      "kept": "Inspection reveals the interior in place.",
+      "risk": "The product becomes a dream and access has no field."
+    },
+    {
+      "id": "challenger-scrawl",
+      "label": "The Scrawled Sleeve",
+      "verdict": "declined",
+      "lineage": "a flash photo defaced with marker",
+      "palette": ["#111111", "#f2f2f0", "#d6ff3c"],
+      "materials": ["crushed flash", "marker scrawl", "corner sticker"],
+      "viewport": "The answer is a photograph written over in marker.",
+      "case": "A nightclub sleeve is not a company desk, and scrawl hides the evidence.",
+      "kept": "History stays on the surface. The live mark is heavier.",
+      "risk": "The citation becomes graffiti."
+    },
+    {
+      "id": "challenger-ascii",
+      "label": "The Glyph Grid",
+      "verdict": "declined",
+      "lineage": "a scene drawn in typewriter characters",
+      "palette": ["#071208", "#b6f27a"],
+      "materials": ["phosphor", "monospace grid"],
+      "viewport": "The answer is a picture made of characters.",
+      "case": "Members do not read phosphor portraits, and the citation stops being a sentence.",
+      "kept": "One grid and one ink. Emphasis is density, not a second palette.",
+      "risk": "The passage becomes texture."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A chat thread, a left rail, source chips, and a citation drawer, played straight.",
+    "palette": ["#f7f7f5", "#17181a", "#3d6df2"],
+    "materials": ["white app shell", "rounded cards", "one blue action"],
+    "viewport": "Ask is a message list. You type at the bottom. Citations open in a side drawer.",
+    "risk": "Indistinguishable from every other assistant, by design.",
+    "comp": ".impeccable/mocks/decision/r1-canon.png"
+  },
+  "steer": true
+}

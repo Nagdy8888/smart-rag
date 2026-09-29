@@ -1,0 +1,42 @@
+{
+  "title": "Approve the Ask composition",
+  "question": "The Field is the world. Which composition should the console be built from?",
+  "options": [
+    {
+      "id": "field-01",
+      "label": "The plate",
+      "kicker": "THE COMP",
+      "thesis": "One bone plate in the dark field. The question, the source, the answer, and the citation stack in that order.",
+      "palette": ["#0e1c24", "#f4f1ea", "#121417", "#e2ff4d"],
+      "materials": ["ink field", "bone plate", "electric chip"],
+      "viewport": "Nav in the field. The plate is centered. The citation is a small electric mark.",
+      "risk": "The passage itself is not open. You see the locator, then have to open it.",
+      "comp": ".impeccable/mocks/field-01.png"
+    },
+    {
+      "id": "field-02",
+      "label": "The split",
+      "thesis": "The plate is the page. The question stays on the left. The passage is open on the right.",
+      "palette": ["#0e1c24", "#f4f1ea", "#121417", "#e2ff4d"],
+      "materials": ["ink field", "bone plate", "electric bar"],
+      "viewport": "Thin nav. Two columns. The citation is the heading of the open passage.",
+      "risk": "The answer is written twice, once in each column.",
+      "comp": ".impeccable/mocks/field-02.png"
+    },
+    {
+      "id": "field-03",
+      "label": "The answer first",
+      "thesis": "The answer is the largest thing on the plate. The citation is a full-width electric strip.",
+      "palette": ["#0e1c24", "#f4f1ea", "#121417", "#e2ff4d"],
+      "materials": ["ink rail", "bone plate", "electric strip"],
+      "viewport": "Nav is a left rail. Question and sources sit above a huge answer. The locator is the bottom strip.",
+      "risk": "A long answer will push the citation off the first screen.",
+      "comp": ".impeccable/mocks/field-03.png"
+    }
+  ],
+  "buildPath": {
+    "value": "comp",
+    "toggle": false
+  },
+  "steer": true
+}

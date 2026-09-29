@@ -16,7 +16,6 @@ import {
   ACCOUNT_NAV_ITEM,
   ADMIN_NAV_ITEM,
   PRIMARY_NAV_ITEMS,
-  consolePageTitle,
   navItemIsCurrent,
   showAdminNav,
   type ShellNavItem,
@@ -35,7 +34,7 @@ import topbarStyles from "./app-topbar.module.css";
 
 const styles = { ...layoutStyles, ...navStyles, ...topbarStyles };
 
-export { navItemIsCurrent, consolePageTitle };
+export { navItemIsCurrent };
 
 /**
  * Render one grouped list of console links.
@@ -225,8 +224,6 @@ export function ConsoleTopbar() {
     };
   }, [mobileOpen]);
 
-  const pathname = usePathname() ?? "/";
-
   return (
     <>
       <div className={styles.topbarStart}>
@@ -246,13 +243,6 @@ export function ConsoleTopbar() {
           <Icon name="menu" />
           <span className={styles.srOnly}>Menu</span>
         </Button>
-        <div className={styles.topbarBrand}>
-          <span className={styles.brandMark} aria-hidden="true">
-            SR
-          </span>
-          <p className={styles.topbarBrandName}>Smart RAG</p>
-        </div>
-        <h1 className={styles.topbarTitle}>{consolePageTitle(pathname)}</h1>
       </div>
       <div className={styles.topbarEnd}>
         <ReadinessIndicator />

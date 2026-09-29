@@ -56,8 +56,8 @@ def main(argv: list[str] | None = None) -> int:
 
     The ready probe and Ask HTTP client use a 60 s timeout. Conversation
     create and admit retries survive hosted Auth/readiness blips. A second
-    TimeoutException, TransportError, or RuntimeError records a timeout
-    row instead of aborting remaining questions.
+    TimeoutException, TransportError, HTTPStatusError, or RuntimeError
+    records a timeout row instead of aborting remaining questions.
 
     Args:
         argv: Optional CLI arguments.
@@ -140,7 +140,12 @@ def main(argv: list[str] | None = None) -> int:
                     conversation_id,
                     question.prompt,
                 )
-            except (httpx.TimeoutException, httpx.TransportError, RuntimeError):
+            except (
+                httpx.TimeoutException,
+                httpx.TransportError,
+                httpx.HTTPStatusError,
+                RuntimeError,
+            ):
                 token = _login(client, environ)
                 token_started = time.monotonic()
                 try:
@@ -154,7 +159,12 @@ def main(argv: list[str] | None = None) -> int:
                         conversation_id,
                         question.prompt,
                     )
-                except (httpx.TimeoutException, httpx.TransportError, RuntimeError):
+                except (
+                    httpx.TimeoutException,
+                    httpx.TransportError,
+                    httpx.HTTPStatusError,
+                    RuntimeError,
+                ):
                     streamed = {
                         "answer": "",
                         "terminal": "timeout",
