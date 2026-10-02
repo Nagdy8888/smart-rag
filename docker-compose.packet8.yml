@@ -15,7 +15,8 @@ services:
       - private
       - packet8-host
     ports:
-      - "127.0.0.1:54329:5432"
+      # 55432 avoids Windows Hyper-V excluded range that currently covers :54329.
+      - "127.0.0.1:55432:5432"
   clamav:
     networks:
       - private

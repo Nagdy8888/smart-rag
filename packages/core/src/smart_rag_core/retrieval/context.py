@@ -26,6 +26,7 @@ from smart_rag_core.retrieval.rerank import (
     promote_host_literal_passages,
     promote_ide_product_passages,
     promote_method_label_passages,
+    promote_listed_literal_passages,
     promote_named_code_definition_passages,
     promote_named_table_passages,
     promote_protocol_aspire_passages,
@@ -95,7 +96,10 @@ def _promote_query_anchor_passages(
     promoted = promote_named_code_definition_passages(
         promoted, query=query, pool=search, limit=limit
     )
-    return promote_named_table_passages(
+    promoted = promote_named_table_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    return promote_listed_literal_passages(
         promoted, query=query, pool=search, limit=limit
     )
 

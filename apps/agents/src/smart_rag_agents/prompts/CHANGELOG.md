@@ -26,6 +26,7 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | `answer_v4` | 2026-09-24 | Ordered claims with `source_id` + `span` citations; application assigns link IDs, paragraphs, and ownership. First claim answers directly. `answer_v3` stays immutable. |
 | `answer_v4` | 2026-09-29 | Prefer expose Manual/Assist/Auto over figure Manual/Ask/Agent; prefer ADAS dated model defaults over undated gpt-4o@0 samples. Schema unchanged. |
 | `answer_v4` | 2026-09-29 | Prefer exact heading/method/description-string/`window_size` literals over paraphrases. Schema unchanged. |
+| `answer_v5` | 2026-10-02 | When asked, emit fenced Python code or GFM pipe tables in the first claim; soften one-sentence rule for those asks. Citation `span` stays exact source text. `answer_v4` stays immutable. |
 | `verifier_v1` | 2026-08-16 | One batched check of at most six atomic links. No second call. |
 | `verifier_v2` | 2026-09-16 | Reject invented acronym expansions and fact literals missing from cited sources. One call, six-link cap unchanged. |
 | `optional_catalog_v1` | 2026-08-16 | Level 0 catalog capabilities and immutable safety rules. No core retrieve tools. |

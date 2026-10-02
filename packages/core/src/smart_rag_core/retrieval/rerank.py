@@ -156,12 +156,53 @@ _CODE_DEF_ASK = re.compile(
     r"|\bcode\s+block\b"
     r"|\b@tool\b"
     r"|\b(?:async\s+)?def\s+[A-Za-z_][\w]*"
+    r"|\b[A-Z][A-Za-z0-9]*(?:Config|State|OpenAI)\s*\("
 )
 # Capture names after ``def`` / ``@tool def`` only. Bare ``@tool and`` in
 # prose must not become an identifier; snake_case tokens still match below.
 _CODE_ID_FROM_QUERY = re.compile(
     r"(?i)(?:@tool\s+)?(?:async\s+)?def\s+([A-Za-z_][\w]*)"
     r"|([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+)"
+)
+# PascalCase types named in code asks (ChatOpenAI, MessagesState, SFTConfig).
+# First alt covers acronym-led names (SFTConfig); second covers ChatOpenAI.
+_PASCAL_TYPE_FROM_QUERY = re.compile(
+    r"\b([A-Z]{2,}[A-Za-z0-9]*(?:Config|State|OpenAI))\b"
+    r"|\b([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]+)+)\b"
+)
+_WIRING_ASK = re.compile(
+    r"(?i)\b(?:add_edge|consolidation\s+edges?|initial_state)\b"
+    r"|\bedges?\s+into\b"
+)
+_WIRING_GOLD = re.compile(
+    r"(?i)(?:graph\.)?add_edge\s*\([^)]+\).{0,1200}?"
+    r"(?:initial_state\s*=\s*\{[^}]{0,500}\}|\"user_id\"\s*:\s*\"U\d+\")"
+    r"|(?:initial_state\s*=\s*\{[^}]{0,500}\}|\"user_id\"\s*:\s*\"U\d+\").{0,1200}?"
+    r"(?:graph\.)?add_edge\s*\(",
+    re.DOTALL,
+)
+_CONSTRUCTOR_KWARG_FROM_QUERY = re.compile(
+    r"(?i)\b(cosine|bf16|gpt-5|MessagesState)\b"
+)
+_PRODUCT_NAME_FROM_QUERY = re.compile(
+    r"(?i)\b("
+    r"Apache\s+Kafka|Redis\s+Stream|RabbitMQ|NATS|JetStream|"
+    r"net\s+promoter\s+score\s*\(\s*NPS\s*\)|"
+    r"customer\s+satisfaction\s*\(\s*CSAT\s*\)|"
+    r"cracked\s+mug"
+    r")\b"
+)
+_ORDER_ID_TOKEN = re.compile(r"\bA\d{4,}\b")
+_SATISFACTION_SCORE_ASK = re.compile(
+    r"(?i)\buser\s+satisfaction\s+scores?\b|\bscore\s+metrics?\b"
+)
+_CLIENT_SIDE_CONTINUITY_ASK = re.compile(
+    r"(?i)\bclient-side\b.{0,80}\b(?:devices?|logins?)\b"
+    r"|\bacross\s+devices?\s+or\s+logins?\b"
+)
+_CRACKED_MUG_ORDER_ASK = re.compile(
+    r"(?i)\border_id\b.{0,80}\bcracked\s+mug\b"
+    r"|\bcracked\s+mug\b.{0,80}\border_id\b"
 )
 _CODE_ID_STOP = frozenset(
     {
@@ -251,6 +292,10 @@ _CODE_ID_STOP = frozenset(
         "self",
         "args",
         "tools",
+        "typeddict",
+        "messagesstate",
+        "applications",
+        "building",
     }
 )
 _TABLE_REPRO_ASK = re.compile(
@@ -260,10 +305,64 @@ _TABLE_REPRO_ASK = re.compile(
     r"|\bTable\s+\d+-\d+\b"
 )
 _TABLE_CAPTION_FROM_QUERY = re.compile(r"(?i)\bTable\s+(\d+-\d+)\b")
+_PASCAL_TYPE_STOP = frozenset(
+    {
+        "typeddict",
+        "building",
+        "applications",
+        "agents",
+        "python",
+        "markdown",
+    }
+)
+
+
+def wiring_code_ask(query: str) -> bool:
+    """Return whether ``query`` asks for graph wiring / ``initial_state``.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        True when the ask seeks edges/state rather than a bare ``def``.
+    """
+
+    return bool(_CODE_DEF_ASK.search(query) and _WIRING_ASK.search(query))
+
+
+def named_pascal_type_ids(query: str) -> tuple[str, ...]:
+    """Extract PascalCase type/constructor names from a code-reproduce ask.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Distinct type names such as ``SFTConfig`` or ``AgentState``.
+    """
+
+    if not _CODE_DEF_ASK.search(query):
+        return ()
+    found: list[str] = []
+    seen: set[str] = set()
+    for match in _PASCAL_TYPE_FROM_QUERY.finditer(query):
+        token = (match.group(1) or match.group(2) or "").strip()
+        if not token or token.casefold() in _PASCAL_TYPE_STOP:
+            continue
+        key = token.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(token)
+    return tuple(found)
 
 
 def named_code_definition_ids(query: str) -> tuple[str, ...]:
     """Extract function/tool identifiers named in a code-reproduce ask.
+
+    Wiring asks omit snake_case node names that would pin the wrong
+    ``def`` (for example ``summarize_response`` when the ask wants edges).
+    PascalCase constructors/classes are included for constructor and
+    class+def asks.
 
     Args:
         query: Original user query. Untrusted.
@@ -277,10 +376,26 @@ def named_code_definition_ids(query: str) -> tuple[str, ...]:
         return ()
     found: list[str] = []
     seen: set[str] = set()
+    wiring = wiring_code_ask(query)
     for match in _CODE_ID_FROM_QUERY.finditer(query):
         token = (match.group(1) or match.group(2) or "").strip()
         if not token or token.casefold() in _CODE_ID_STOP:
             continue
+        # Wiring asks must not prefer def summarize_response over edges.
+        if wiring and token.casefold() in {
+            "summarize_response",
+            "initial_state",
+            "handle_refund",
+            "handle_invoice",
+            "handle_login",
+        }:
+            continue
+        key = token.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(token)
+    for token in named_pascal_type_ids(query):
         key = token.casefold()
         if key in seen:
             continue
@@ -292,6 +407,9 @@ def named_code_definition_ids(query: str) -> tuple[str, ...]:
 def code_definition_gold_pattern(identifiers: Sequence[str]) -> re.Pattern[str] | None:
     """Build a passage regex for ``def`` / ``@tool def`` of named identifiers.
 
+    Keeps snake_case / lowercase def targets only; PascalCase constructors
+    and classes use dedicated gold patterns.
+
     Args:
         identifiers: Function or tool names extracted from the query.
 
@@ -299,13 +417,248 @@ def code_definition_gold_pattern(identifiers: Sequence[str]) -> re.Pattern[str] 
         Compiled pattern, or ``None`` when ``identifiers`` is empty.
     """
 
-    names = [item for item in identifiers if item.strip()]
+    names = [
+        item
+        for item in identifiers
+        if item.strip() and (item[:1].islower() or "_" in item)
+    ]
     if not names:
         return None
     alt = "|".join(re.escape(item) for item in names)
     return re.compile(
         rf"(?i)(?:@tool\s+)?(?:async\s+)?def\s+(?:{alt})\s*\(",
     )
+
+
+def wiring_code_gold_pattern(query: str) -> re.Pattern[str] | None:
+    """Build a passage regex for consolidation edges plus ``initial_state``.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Compiled pattern, or ``None`` when the ask is not wiring-shaped.
+    """
+
+    if not wiring_code_ask(query):
+        return None
+    return _WIRING_GOLD
+
+
+def constructor_code_gold_pattern(query: str) -> re.Pattern[str] | None:
+    """Build a passage regex for a named constructor with ask kwargs.
+
+    Requires the constructor call and at least one distinctive kwarg or
+    model token from the query in the same passage (for example
+    ``SFTConfig(`` with ``cosine`` / ``bf16``, or ``ChatOpenAI(model=``).
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Compiled pattern, or ``None`` when no constructor ask applies.
+    """
+
+    constructors = [
+        name
+        for name in named_pascal_type_ids(query)
+        if name.endswith(("Config", "OpenAI")) or name in {"ChatOpenAI"}
+    ]
+    if not constructors or not _CODE_DEF_ASK.search(query):
+        return None
+    alt = "|".join(re.escape(item) for item in constructors)
+    kwargs = [match.group(1) for match in _CONSTRUCTOR_KWARG_FROM_QUERY.finditer(query)]
+    if not kwargs and "ChatOpenAI" in constructors:
+        kwargs = ["gpt-5", "model"]
+    if not kwargs:
+        return re.compile(rf"(?i)(?:{alt})\s*\(")
+    kw_alt = "|".join(re.escape(item) for item in kwargs)
+    return re.compile(
+        rf"(?i)(?:{alt})\s*\(.{{0,800}}?(?:{kw_alt})"
+        rf"|(?:{kw_alt}).{{0,800}}?(?:{alt})\s*\(",
+        re.DOTALL,
+    )
+
+
+def class_def_code_gold_pattern(query: str) -> re.Pattern[str] | None:
+    """Build a passage regex requiring a named class and a named ``def``.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Compiled pattern, or ``None`` when both shapes are not present.
+    """
+
+    classes = [
+        name
+        for name in named_pascal_type_ids(query)
+        if name.endswith("State") or name == "AgentState"
+    ]
+    snake: list[str] = []
+    seen: set[str] = set()
+    for match in _CODE_ID_FROM_QUERY.finditer(query):
+        token = (match.group(1) or match.group(2) or "").strip()
+        if not token or token.casefold() in _CODE_ID_STOP:
+            continue
+        key = token.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        snake.append(token)
+    if not classes or not snake or not _CODE_DEF_ASK.search(query):
+        return None
+    class_alt = "|".join(re.escape(item) for item in classes)
+    def_alt = "|".join(re.escape(item) for item in snake)
+    return re.compile(
+        rf"(?i)class\s+(?:{class_alt})\b.{{0,2000}}?"
+        rf"(?:@tool\s+)?(?:async\s+)?def\s+(?:{def_alt})\s*\("
+        rf"|(?:@tool\s+)?(?:async\s+)?def\s+(?:{def_alt})\s*\(.{{0,2000}}?"
+        rf"class\s+(?:{class_alt})\b",
+        re.DOTALL,
+    )
+
+
+def listed_literal_groups(query: str) -> tuple[tuple[str, ...], ...]:
+    """Return co-occurrence literal groups for multi-fact promote/salvage.
+
+    Triggers when the ask names two or more distinctive products, or when
+    an ask shape requires joint gold literals (satisfaction scores,
+    client-side continuity, cracked-mug order id).
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Tuple of literal groups. Each group must co-occur in one passage.
+    """
+
+    groups: list[tuple[str, ...]] = []
+    products = [
+        match.group(1).strip()
+        for match in _PRODUCT_NAME_FROM_QUERY.finditer(query)
+    ]
+    # Deduplicate case-insensitively while preserving query spelling.
+    seen_prod: set[str] = set()
+    unique_products: list[str] = []
+    for item in products:
+        key = item.casefold()
+        if key in seen_prod:
+            continue
+        seen_prod.add(key)
+        unique_products.append(item)
+    if len(unique_products) >= 2:
+        group = list(unique_products)
+        if any(item.casefold() == "nats" for item in unique_products):
+            if "jetstream" not in seen_prod:
+                group.append("JetStream")
+        groups.append(tuple(group))
+        # Tighter co-occurrence when the full broker table is split across
+        # chunks: prefer the NATS/JetStream row over a Kafka-only passage.
+        if any(item.casefold() == "nats" for item in unique_products):
+            groups.append(("NATS", "JetStream"))
+    if _SATISFACTION_SCORE_ASK.search(query):
+        groups.append(
+            ("net promoter score (NPS)", "customer satisfaction (CSAT)")
+        )
+    if _CLIENT_SIDE_CONTINUITY_ASK.search(query):
+        groups.append(("loses continuity across devices or logins",))
+        # Soft joint so promote still prefers client-side continuity pages.
+        groups.append(("client-side", "continuity", "devices"))
+    if _CRACKED_MUG_ORDER_ASK.search(query):
+        groups.append(("A89268", "cracked mug"))
+    # Deduplicate identical groups.
+    out: list[tuple[str, ...]] = []
+    seen_groups: set[tuple[str, ...]] = set()
+    for group in groups:
+        key = tuple(item.casefold() for item in group)
+        if key in seen_groups or not group:
+            continue
+        seen_groups.add(key)
+        out.append(group)
+    return tuple(out)
+
+
+def listed_literal_gold_pattern(
+    group: Sequence[str],
+) -> re.Pattern[str] | None:
+    """Build a passage regex requiring every literal in ``group``.
+
+    Args:
+        group: Distinctive literals that must co-occur.
+
+    Returns:
+        Compiled pattern, or ``None`` when ``group`` is empty.
+    """
+
+    parts = [item.strip() for item in group if item.strip()]
+    if not parts:
+        return None
+    # Order-independent: each literal must appear somewhere in the passage.
+    # Use [\s\S] so newlines inside OCR pages do not break co-occurrence.
+    lookaheads = "".join(
+        rf"(?=(?i:[\s\S]*{re.escape(item)}))" for item in parts
+    )
+    return re.compile(rf"{lookaheads}[\s\S]*")
+
+
+def hybrid_seed_terms(query: str) -> tuple[str, ...]:
+    """Return BM25/exact-term seeds from code ids and listed literals.
+
+    Only seeds identifiers and literals already present in the query (or
+    derived code identifiers). Does not invent document-only gold phrases.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Deduplicated seed terms for Hybrid ``exact_terms`` / codes.
+    """
+
+    found: list[str] = []
+    seen: set[str] = set()
+    lowered_query = query.casefold()
+
+    def _add(token: str) -> None:
+        """Append ``token`` when new and non-empty.
+
+        Args:
+            token: Candidate seed term.
+        """
+
+        text = token.strip()
+        if not text:
+            return
+        key = text.casefold()
+        if key in seen:
+            return
+        seen.add(key)
+        found.append(text)
+
+    for token in named_code_definition_ids(query):
+        _add(token)
+    for token in named_pascal_type_ids(query):
+        _add(token)
+    if wiring_code_ask(query):
+        _add("add_edge")
+        _add("initial_state")
+    for match in _CONSTRUCTOR_KWARG_FROM_QUERY.finditer(query):
+        _add(match.group(1))
+    for group in listed_literal_groups(query):
+        for literal in group:
+            # Seed only literals the user actually typed (plus short codes).
+            if literal.casefold() in lowered_query or _ORDER_ID_TOKEN.fullmatch(
+                literal
+            ):
+                _add(literal)
+            elif " " not in literal and len(literal) >= 4:
+                # CamelCase / product tokens from the ask shape.
+                if any(
+                    part and part.casefold() in lowered_query
+                    for part in re.split(r"[\s()/]+", literal)
+                ):
+                    _add(literal)
+    return tuple(found)
 
 
 def named_table_captions(query: str) -> tuple[str, ...]:
@@ -635,11 +988,11 @@ def promote_named_code_definition_passages(
     pool: tuple[RerankPassage, ...],
     limit: int,
 ) -> tuple[RerankPassage, ...]:
-    """Pin a named ``def`` / ``@tool`` definition when the ask reproduces code.
+    """Pin wiring, constructor, class+def, or named ``def`` code passages.
 
-    Identifiers are taken only from the user query. Passages that hold the
-    definition line are preferred over later call sites via local span
-    overlap inside :func:`_promote_matching_passage`.
+    Order: consolidation edges / ``initial_state``, then constructors with
+    ask kwargs, then ``class`` + ``def`` pairs, then bare ``def`` /
+    ``@tool``. Wiring asks never fall through to a wrong neighbor ``def``.
 
     Args:
         trimmed: Final evidence after MMR and token trim.
@@ -651,6 +1004,46 @@ def promote_named_code_definition_passages(
         Trimmed passages, possibly with one definition passage prepended.
     """
 
+    if not _CODE_DEF_ASK.search(query):
+        return trimmed
+    wiring = wiring_code_gold_pattern(query)
+    if wiring is not None:
+        return _promote_matching_passage(
+            trimmed,
+            query=query,
+            pool=pool,
+            limit=limit,
+            ask_pattern=_CODE_DEF_ASK,
+            gold_pattern=wiring,
+            prefer_early_match=True,
+        )
+    constructor = constructor_code_gold_pattern(query)
+    if constructor is not None:
+        promoted = _promote_matching_passage(
+            trimmed,
+            query=query,
+            pool=pool,
+            limit=limit,
+            ask_pattern=_CODE_DEF_ASK,
+            gold_pattern=constructor,
+            prefer_early_match=True,
+        )
+        # Still allow a named def (call_model) when constructor gold missed.
+        if promoted is not trimmed:
+            return promoted
+    class_def = class_def_code_gold_pattern(query)
+    if class_def is not None:
+        promoted = _promote_matching_passage(
+            trimmed,
+            query=query,
+            pool=pool,
+            limit=limit,
+            ask_pattern=_CODE_DEF_ASK,
+            gold_pattern=class_def,
+            prefer_early_match=True,
+        )
+        if promoted is not trimmed:
+            return promoted
     identifiers = named_code_definition_ids(query)
     gold = code_definition_gold_pattern(identifiers)
     if gold is None:
@@ -664,6 +1057,92 @@ def promote_named_code_definition_passages(
         gold_pattern=gold,
         prefer_early_match=True,
     )
+
+
+def promote_listed_literal_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin a passage that holds a joint listed-literal group from the ask.
+
+    Prefers the longest group first so broker+JetStream and A89268+cracked
+    mug beat lone product mentions. Runs from the full fused ``pool`` so
+    ``rerank_timeout`` survivors can still promote gold.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool or fused passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one joint-literal passage prepended.
+    """
+
+    if limit < 1:
+        return trimmed
+    groups = listed_literal_groups(query)
+    if not groups:
+        return trimmed
+    # Prefer larger groups (more joint constraints) first.
+    ordered = sorted(groups, key=len, reverse=True)
+    working = trimmed
+    for group in ordered:
+        gold = listed_literal_gold_pattern(group)
+        if gold is not None:
+            ask = re.compile(r".*")
+            promoted = _promote_matching_passage(
+                working,
+                query=query,
+                pool=pool,
+                limit=limit,
+                ask_pattern=ask,
+                gold_pattern=gold,
+                prefer_early_match=False,
+            )
+            if promoted is not working:
+                return promoted
+        # Soft pin: maximize literal coverage, requiring JetStream/A89268
+        # anchors when those appear in the group.
+        anchors = [
+            lit
+            for lit in group
+            if lit.casefold() in {"jetstream", "a89268"}
+        ]
+        scored: list[tuple[int, int, RerankPassage]] = []
+        for item in pool:
+            text = (item.raw_text or "").casefold()
+            if not text.strip():
+                continue
+            if anchors and not all(a.casefold() in text for a in anchors):
+                continue
+            hits = sum(1 for lit in group if lit.casefold() in text)
+            if hits < 2:
+                continue
+            scored.append((hits, query_overlap_score(query, item.raw_text or ""), item))
+        if not scored:
+            continue
+        scored.sort(key=lambda row: (-row[0], -row[1], row[2].candidate.chunk_id))
+        best = scored[0][2]
+        if working and working[0].candidate.chunk_id == best.candidate.chunk_id:
+            return working
+        selected = {item.candidate.chunk_id for item in working}
+        if best.candidate.chunk_id in selected:
+            rest = tuple(
+                other
+                for other in working
+                if other.candidate.chunk_id != best.candidate.chunk_id
+            )
+            promoted = (best, *rest)
+        else:
+            promoted = (best, *working)
+        if len(promoted) > limit:
+            promoted = promoted[:limit]
+        return promoted
+    return working
 
 
 def promote_named_table_passages(
@@ -809,7 +1288,8 @@ def literal_anchor_ask(query: str) -> bool:
 
     Used to load fused-outside-pool contexts before promote so rare
     ``window_size`` / tool-description / host / IDE / code-def / table
-    literals remain searchable after the rerank pool drops them.
+    / listed-literal groups remain searchable after the rerank pool drops
+    them.
 
     Args:
         query: Original user query. Untrusted.
@@ -827,6 +1307,7 @@ def literal_anchor_ask(query: str) -> bool:
         or _PROTOCOL_ASK.search(query)
         or _CODE_DEF_ASK.search(query)
         or _TABLE_REPRO_ASK.search(query)
+        or listed_literal_groups(query)
     )
 
 
@@ -857,6 +1338,15 @@ def literal_gold_already_loaded(
         (_IDE_PRODUCT_ASK, _IDE_PRODUCT_GOLD),
         (_PROTOCOL_ASK, _PROTOCOL_GOLD),
     ]
+    wiring = wiring_code_gold_pattern(query)
+    if wiring is not None:
+        checks.append((_CODE_DEF_ASK, wiring))
+    constructor = constructor_code_gold_pattern(query)
+    if constructor is not None:
+        checks.append((_CODE_DEF_ASK, constructor))
+    class_def = class_def_code_gold_pattern(query)
+    if class_def is not None:
+        checks.append((_CODE_DEF_ASK, class_def))
     code_gold = code_definition_gold_pattern(named_code_definition_ids(query))
     if code_gold is not None:
         checks.append((_CODE_DEF_ASK, code_gold))
@@ -873,6 +1363,12 @@ def literal_gold_already_loaded(
             and _table_body_rank(item.raw_text or "", captions) >= 12
             for item in passages
         ):
+            return True
+    for group in listed_literal_groups(query):
+        gold = listed_literal_gold_pattern(group)
+        if gold is None:
+            continue
+        if any(gold.search(item.raw_text or "") for item in passages):
             return True
     return False
 

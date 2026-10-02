@@ -16,6 +16,7 @@ from smart_rag_core.retrieval.cache_store import (
     RetrievalCacheStore,
 )
 from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
+from smart_rag_core.retrieval.rerank import hybrid_seed_terms
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
@@ -350,7 +351,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             + str_list_field(profile, "exact_terms")
             + str_list_field(profile, "quoted_phrases")
             + str_list_field(profile, "entities")
-            + str_list_field(profile, "approved_aliases"),
+            + str_list_field(profile, "approved_aliases")
+            + hybrid_seed_terms(query),
             (
                 *source_selectors,
                 *str_list_field(profile, "requested_sources"),

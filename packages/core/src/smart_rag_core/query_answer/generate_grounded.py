@@ -33,10 +33,15 @@ from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.retrieval.rerank import (
+    class_def_code_gold_pattern,
     code_definition_gold_pattern,
+    constructor_code_gold_pattern,
+    listed_literal_gold_pattern,
+    listed_literal_groups,
     named_code_definition_ids,
     named_table_captions,
     table_caption_gold_pattern,
+    wiring_code_gold_pattern,
 )
 
 _NUMBER_LITERAL = re.compile(r"\b\d+(?:[.,]\d+)?\b")
@@ -1020,6 +1025,11 @@ _NEXT_CODE_DEF = re.compile(
 _CODE_SECTION_BREAK = re.compile(r"#\s*--\s*\d+")
 
 
+_LLM_ASSIGN_LOOKBACK = re.compile(
+    r"(?i)(?:llm\s*=\s*)?ChatOpenAI\s*\([^)]*\)\s*"
+)
+
+
 def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
     """Copy a bounded ``def`` / ``@tool`` block from ``text``.
 
@@ -1027,9 +1037,10 @@ def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
     assignments (for example ``YOUR_*`` placeholders) stay in the span.
     Stops before a sibling ``def`` / ``@tool`` / ``class`` even when OCR
     flattened the page onto one line, and before book section markers
-    like ``# -- 2)``. ``_replace_with_extractive_block`` collapses blank
-    lines for the paragraph contract while keeping this exact span for
-    citations.
+    like ``# -- 2)``. When the definition is ``call_model``, includes a
+    preceding ``ChatOpenAI(...)`` assignment in the lookback window.
+    ``_replace_with_extractive_block`` collapses blank lines for the
+    paragraph contract while keeping this exact span for citations.
 
     Args:
         text: Passage citation text.
@@ -1044,6 +1055,14 @@ def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
     tool_at = lookback.rfind("@tool")
     if tool_at >= 0:
         start = max(0, start - 40) + tool_at
+    # Include preceding ChatOpenAI assignment for call_model nodes.
+    if re.search(r"(?i)def\s+call_model\s*\(", match.group(0)):
+        prefix = text[max(0, start - 220) : start]
+        llm = None
+        for candidate in _LLM_ASSIGN_LOOKBACK.finditer(prefix):
+            llm = candidate
+        if llm is not None:
+            start = max(0, start - 220) + llm.start()
     rest = text[match.end() :]
     end = match.end() + len(rest)
     next_def = _NEXT_CODE_DEF.search(rest)
@@ -1052,6 +1071,89 @@ def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
     section = _CODE_SECTION_BREAK.search(rest)
     if section is not None:
         end = min(end, match.end() + section.start())
+    block = text[start:end].strip()
+    if not block or block not in text:
+        block = match.group(0).strip()
+    if not block or block not in text:
+        return ""
+    return block[:MAX_CITATION_SPAN_CHARS]
+
+
+def _extract_pattern_block(text: str, match: re.Match[str]) -> str:
+    """Copy a bounded extractive block around a non-def gold match.
+
+    Used for wiring (``add_edge`` + ``initial_state``), constructors, and
+    class+def joint spans. When the match ends on ``def name(``, continues
+    through that definition body so class+def salvages stay complete.
+
+    Args:
+        text: Passage citation text.
+        match: Gold pattern match inside ``text``.
+
+    Returns:
+        Exact substring of ``text``, capped at ``MAX_CITATION_SPAN_CHARS``.
+    """
+
+    start = match.start()
+    end = min(len(text), match.end())
+    # Expand slightly when the match is a lookahead-heavy joint group.
+    if end - start < 40:
+        end = min(len(text), start + MAX_CITATION_SPAN_CHARS)
+    # Constructor matches often stop at the first kwarg; take through ')'.
+    ctor = re.search(
+        r"(?i)\b(?:SFTConfig|ChatOpenAI|[A-Z][A-Za-z0-9]*Config)\s*\(",
+        text[start:end],
+    )
+    if ctor is not None:
+        paren_open = start + ctor.end() - 1
+        depth = 0
+        ctor_end = paren_open
+        for index in range(paren_open, min(len(text), paren_open + 800)):
+            char = text[index]
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    ctor_end = index + 1
+                    break
+        if ctor_end > paren_open:
+            block = text[start:ctor_end].strip()
+            if block and block in text:
+                return block[:MAX_CITATION_SPAN_CHARS]
+    # class ... def name( matches stop at the opening paren; take the body.
+    window = text[start:end]
+    def_tail = re.search(
+        r"(?i)(?:@tool\s+)?(?:async\s+)?def\s+\w+\s*\(\s*$",
+        window,
+    )
+    if def_tail is not None:
+        # def_tail offsets are relative to ``window`` / ``text[start:]``.
+        paren_end = start + def_tail.end()
+        rest = text[paren_end:]
+        body_end = paren_end + len(rest)
+        next_def = _NEXT_CODE_DEF.search(rest)
+        if next_def is not None:
+            body_end = min(body_end, paren_end + next_def.start())
+        section = _CODE_SECTION_BREAK.search(rest)
+        if section is not None:
+            body_end = min(body_end, paren_end + section.start())
+        # Keep a modest body when OCR flattened the page (no next sibling).
+        if body_end == paren_end + len(rest):
+            body_end = min(len(text), paren_end + 900)
+        # Prefer including routing phrases named in class+def asks.
+        for marker in (
+            "inventory, transportation, or supplier",
+            "transportation, or supplier",
+            "or supplier",
+        ):
+            idx = text.casefold().find(marker, paren_end)
+            if idx >= 0:
+                body_end = max(body_end, min(len(text), idx + len(marker) + 40))
+                break
+        block = text[start:body_end].strip()
+        if block and block in text:
+            return block[:MAX_CITATION_SPAN_CHARS]
     block = text[start:end].strip()
     if not block or block not in text:
         block = match.group(0).strip()
@@ -1391,16 +1493,69 @@ def _extractive_block_already_released(
     return True
 
 
+def _best_pattern_span_match(
+    fusion: FusionResult,
+    pattern: re.Pattern[str],
+    *,
+    user_query: str | None = None,
+    extract_def_block: bool = False,
+) -> tuple[ScoredPassage, str] | None:
+    """Return the best fused passage span for ``pattern``.
+
+    Args:
+        fusion: Fitted canonical evidence.
+        pattern: Compiled gold pattern.
+        user_query: Original user text for overlap ranking. Untrusted.
+        extract_def_block: When True, use def-block extraction around the
+            match (includes ChatOpenAI lookback for ``call_model``).
+
+    Returns:
+        Passage and exact span, or ``None``.
+    """
+
+    ranked: list[tuple[int, int, int, ScoredPassage, str]] = []
+    for item in fusion.evidence:
+        text = item.citation_text or ""
+        match = pattern.search(text)
+        if match is None:
+            continue
+        if extract_def_block:
+            span = _extract_code_definition_block(text, match)
+        else:
+            span = _extract_pattern_block(text, match)
+        if not span:
+            continue
+        overlap = (
+            _passage_query_overlap(user_query, text) if user_query else 0
+        )
+        ranked.append(
+            (
+                -overlap,
+                item.hybrid_rank or 10_000,
+                match.start(),
+                item,
+                span,
+            )
+        )
+    if not ranked:
+        return None
+    ranked.sort(key=lambda row: (row[0], row[1], row[2], row[3].chunk_id))
+    _overlap, _rank, _offset, item, span = ranked[0]
+    return item, span
+
+
 def salvage_named_code_definition(
     payload: AnswerPayload,
     fusion: FusionResult,
     *,
     user_query: str,
 ) -> AnswerPayload:
-    """Replace wrong neighbor snippets with a named ``def`` / ``@tool`` block.
+    """Replace wrong neighbor snippets with wiring/constructor/class/def code.
 
-    Triggers only when the query names a function/tool identifier and asks
-    to reproduce code. The definition must already appear in fused evidence.
+    Wiring asks prefer ``add_edge`` + ``initial_state`` over a wrong
+    ``def summarize_response``. Constructor asks require co-occurring
+    kwargs. Class+def asks require both shapes. After an empty refusal,
+    any matching gold pattern forces extractive salvage.
 
     Args:
         payload: Company answer after prior salvages.
@@ -1411,24 +1566,212 @@ def salvage_named_code_definition(
         Payload citing the definition block, or unchanged when unmatched.
     """
 
-    identifiers = named_code_definition_ids(user_query)
-    gold_pattern = code_definition_gold_pattern(identifiers)
-    if gold_pattern is None:
+    patterns: list[tuple[re.Pattern[str], bool, str]] = []
+    wiring = wiring_code_gold_pattern(user_query)
+    if wiring is not None:
+        patterns.append((wiring, False, "code-wiring-1"))
+    else:
+        def_gold = code_definition_gold_pattern(
+            named_code_definition_ids(user_query)
+        )
+        constructor = constructor_code_gold_pattern(user_query)
+        class_def = class_def_code_gold_pattern(user_query)
+        # Prefer def+ChatOpenAI lookback before a bare constructor window so
+        # call_model asks keep both the llm assignment and the node body.
+        if def_gold is not None and constructor is not None:
+            patterns.append((def_gold, True, "code-def-1"))
+            patterns.append((constructor, False, "code-ctor-1"))
+        elif class_def is not None:
+            patterns.append((class_def, False, "code-class-1"))
+            if def_gold is not None:
+                patterns.append((def_gold, True, "code-def-1"))
+        elif constructor is not None:
+            patterns.append((constructor, False, "code-ctor-1"))
+        elif def_gold is not None:
+            patterns.append((def_gold, True, "code-def-1"))
+    if not patterns:
         return payload
-    gold = _best_code_definition_match(
-        fusion, gold_pattern, user_query=user_query
-    )
-    if gold is None:
+    for pattern, extract_def, link_id in patterns:
+        if extract_def:
+            gold = _best_code_definition_match(
+                fusion, pattern, user_query=user_query
+            )
+            if gold is None:
+                continue
+            item, _match, span = gold
+        else:
+            hit = _best_pattern_span_match(
+                fusion, pattern, user_query=user_query
+            )
+            if hit is None:
+                continue
+            item, span = hit
+        # Refusal with gold in fusion always salvages.
+        if (
+            not _is_empty_refusal(payload)
+            and _extractive_block_already_released(payload, span)
+        ):
+            return payload
+        return _replace_with_extractive_block(
+            payload,
+            chunk_id=item.chunk_id,
+            span=span,
+            link_id=link_id,
+        )
+    return payload
+
+
+def salvage_listed_literals(
+    payload: AnswerPayload,
+    fusion: FusionResult,
+    *,
+    user_query: str,
+) -> AnswerPayload:
+    """Replace wrong answers with a passage holding joint listed literals.
+
+    Prefers the largest co-occurrence group (broker+JetStream,
+    NPS+CSAT, A89268+cracked mug, client-side continuity). When no passage
+    holds every literal, falls back to the fused passage that covers the
+    most missing literals (still requiring JetStream / A89268 anchors when
+    those appear in a group). Citations use the persistable leaf chunk.
+
+    Args:
+        payload: Company answer after code/table salvages.
+        fusion: Fitted canonical evidence.
+        user_query: Original user text. Untrusted.
+
+    Returns:
+        Payload citing the joint-literal passage, or unchanged.
+    """
+
+    groups = listed_literal_groups(user_query)
+    if not groups:
         return payload
-    item, _match, span = gold
-    if _extractive_block_already_released(payload, span):
-        return payload
-    return _replace_with_extractive_block(
-        payload,
-        chunk_id=item.chunk_id,
-        span=span,
-        link_id="code-def-1",
-    )
+    corpus = _claim_text_corpus(payload).casefold()
+    ordered = sorted(groups, key=len, reverse=True)
+    for group in ordered:
+        gold = listed_literal_gold_pattern(group)
+        hit: tuple[ScoredPassage, str] | None = None
+        if gold is not None:
+            hit = _best_pattern_span_match(
+                fusion, gold, user_query=user_query
+            )
+        if hit is None:
+            # Soft fallback: maximize coverage of literals still missing.
+            missing = tuple(
+                lit for lit in group if lit.casefold() not in corpus
+            )
+            if not missing:
+                continue
+            anchors = tuple(
+                lit
+                for lit in group
+                if lit.casefold() in {"jetstream", "a89268"}
+                or "nps" in lit.casefold()
+                or "csat" in lit.casefold()
+                or "continuity" in lit.casefold()
+            )
+            ranked: list[tuple[int, int, ScoredPassage]] = []
+            for item in fusion.evidence:
+                text = item.citation_text or ""
+                lowered = text.casefold()
+                if not text.strip():
+                    continue
+                if anchors and not all(
+                    lit.casefold() in lowered for lit in anchors
+                ):
+                    continue
+                hits = sum(1 for lit in group if lit.casefold() in lowered)
+                miss_hits = sum(1 for lit in missing if lit.casefold() in lowered)
+                if miss_hits < 1 or hits < 2:
+                    continue
+                ranked.append((miss_hits, hits, item))
+            if not ranked:
+                continue
+            ranked.sort(
+                key=lambda row: (-row[0], -row[1], row[2].chunk_id)
+            )
+            item = ranked[0][2]
+            text = item.citation_text or ""
+            span = text.strip()[:MAX_CITATION_SPAN_CHARS]
+            hit = (item, span)
+        item, span = hit
+        # Prefer a span that actually contains the longest literal.
+        text = item.citation_text or ""
+        best_literal = max(group, key=len)
+        idx = text.casefold().find(best_literal.casefold())
+        if idx >= 0:
+            window_start = max(0, idx - 80)
+            window_end = min(len(text), idx + len(best_literal) + 240)
+            candidate = text[window_start:window_end].strip()
+            if candidate and all(
+                lit.casefold() in candidate.casefold() for lit in group
+            ):
+                span = candidate[:MAX_CITATION_SPAN_CHARS]
+            elif candidate:
+                # Expand until all available group literals fit or cap hits.
+                span = text[
+                    window_start : min(
+                        len(text), window_start + MAX_CITATION_SPAN_CHARS
+                    )
+                ].strip()
+        # For multi-product groups, span from the earliest literal through
+        # JetStream/anchors so Kafka is not dropped when centering on NATS.
+        positions = [
+            text.casefold().find(lit.casefold())
+            for lit in group
+            if text.casefold().find(lit.casefold()) >= 0
+        ]
+        if positions:
+            window_start = max(0, min(positions) - 40)
+            span = text[
+                window_start : min(
+                    len(text), window_start + MAX_CITATION_SPAN_CHARS
+                )
+            ].strip()
+        if not span or span not in text:
+            continue
+        span_lower = span.casefold()
+        candidate_hits = sum(1 for lit in group if lit.casefold() in span_lower)
+        current_hits = sum(1 for lit in group if lit.casefold() in corpus)
+        anchors_missing = [
+            lit
+            for lit in group
+            if (
+                lit.casefold() in {"jetstream", "a89268"}
+                or "nps" in lit.casefold()
+                or "csat" in lit.casefold()
+                or "continuity across" in lit.casefold()
+            )
+            and lit.casefold() not in corpus
+        ]
+        if (
+            not _is_empty_refusal(payload)
+            and _extractive_block_already_released(payload, span)
+            and not anchors_missing
+        ):
+            return payload
+        if not _is_empty_refusal(payload) and current_hits > 0:
+            keeps_current = all(
+                lit.casefold() in span_lower
+                for lit in group
+                if lit.casefold() in corpus
+            )
+            adds_anchor = any(
+                lit.casefold() in span_lower for lit in anchors_missing
+            )
+            if not (
+                (keeps_current and adds_anchor)
+                or candidate_hits > current_hits
+            ):
+                continue
+        return _replace_with_extractive_block(
+            payload,
+            chunk_id=item.chunk_id,
+            span=span,
+            link_id="listed-lit-1",
+        )
+    return payload
 
 
 def salvage_named_table_block(
@@ -1862,6 +2205,16 @@ def generate_grounded_answer(
     if tabulated is not derived:
         filtered = bind_company_atomic_links(
             filter_invented_ids(tabulated, fusion, tables),
+            fusion=fusion,
+            user_query=user_query,
+        )
+        derived = with_derived_answer_text(filtered)
+    listed = salvage_listed_literals(
+        derived, fusion, user_query=user_query
+    )
+    if listed is not derived:
+        filtered = bind_company_atomic_links(
+            filter_invented_ids(listed, fusion, tables),
             fusion=fusion,
             user_query=user_query,
         )

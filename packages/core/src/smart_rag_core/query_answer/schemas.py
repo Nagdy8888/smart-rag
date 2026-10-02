@@ -149,7 +149,7 @@ def answer_json_schema() -> dict[str, object]:
 
 
 def answer_claims_json_schema() -> dict[str, object]:
-    """Return the strict ``answer_v4`` claims structured-output schema.
+    """Return the strict answer claims structured-output schema.
 
     The schema is the same for every request so the provider can reuse
     its processed form. ``source_id`` is a plain string; application code

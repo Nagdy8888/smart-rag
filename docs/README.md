@@ -196,6 +196,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/HARD_KNOWN_ANSWER_50_2026-09-28.md](./evaluation/HARD_KNOWN_ANSWER_50_2026-09-28.md) | engineering-lead | draft | 2026-09-29 | eng, reviewers |
 | [evaluation/FRESH_KNOWN_ANSWER_25_2026-09-29.md](./evaluation/FRESH_KNOWN_ANSWER_25_2026-09-29.md) | engineering-lead | draft | 2026-09-29 | eng, reviewers |
 | [evaluation/CODE_TABLE_KNOWN_ANSWER_20_2026-09-29.md](./evaluation/CODE_TABLE_KNOWN_ANSWER_20_2026-09-29.md) | engineering-lead | draft | 2026-09-29 | eng, reviewers |
+| [evaluation/MIX_HARD_KNOWN_ANSWER_24_2026-10-02.md](./evaluation/MIX_HARD_KNOWN_ANSWER_24_2026-10-02.md) | engineering-lead | draft | 2026-10-02 | eng, reviewers |
 | [evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md](./evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, frontend, reviewers |
 | [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
@@ -230,5 +231,11 @@ The table below is the complete maintained map. Packet evidence under
 | [reviews/2026-08-16-phases-01-05-closeout.md](./reviews/2026-08-16-phases-01-05-closeout.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 | [reviews/2026-08-19-production-readiness/README.md](./reviews/2026-08-19-production-readiness/README.md) | independent-reviewer | draft | 2026-08-19 | eng, security, ops, client-approver |
 | [reviews/2026-08-19-comprehensive-audit/README.md](./reviews/2026-08-19-comprehensive-audit/README.md) | independent-reviewer | draft | 2026-08-19 | eng, security, ops, product, client-approver |
+| [reviews/2026-10-02-app-review/README.md](./reviews/2026-10-02-app-review/README.md) | engineering-lead | draft | 2026-10-02 | eng, security, ops, product, client-approver |
+| [reviews/2026-10-02-app-review/01-security-review.md](./reviews/2026-10-02-app-review/01-security-review.md) | engineering-lead | draft | 2026-10-02 | eng, security |
+| [reviews/2026-10-02-app-review/02-system-design-review.md](./reviews/2026-10-02-app-review/02-system-design-review.md) | engineering-lead | draft | 2026-10-02 | eng, reviewers |
+| [reviews/2026-10-02-app-review/03-agent-brain-review.md](./reviews/2026-10-02-app-review/03-agent-brain-review.md) | engineering-lead | draft | 2026-10-02 | eng, reviewers |
+| [reviews/2026-10-02-app-review/04-smarter-agent-roadmap.md](./reviews/2026-10-02-app-review/04-smarter-agent-roadmap.md) | engineering-lead | draft | 2026-10-02 | eng, product, client-approver |
+| [reviews/2026-10-02-app-review/05-frontend-review.md](./reviews/2026-10-02-app-review/05-frontend-review.md) | engineering-lead | draft | 2026-10-02 | frontend, eng |
 
 Back to [root README](../README.md).

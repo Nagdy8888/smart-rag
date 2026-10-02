@@ -14,9 +14,9 @@ from smart_rag_core.models.env_pins import (
 )
 from smart_rag_core.text_constants import PARAGRAPH_DELIMITER
 
-ANSWER_PROMPT_VERSION = "answer_v4"
+ANSWER_PROMPT_VERSION = "answer_v5"
 ANSWER_PROMPT_SHA256 = (
-    "e3abc071d22cff75b378725dc7428b40096d5125d91c6447f2f3abf4715a47bc"
+    "5a46305ccb915ec1a7a01c9303556453f20dcc30b7219c5d3b5578ca680b24da"
 )
 MAX_ANSWER_PARAGRAPHS = 6
 MAX_ANSWER_CITATIONS = 12

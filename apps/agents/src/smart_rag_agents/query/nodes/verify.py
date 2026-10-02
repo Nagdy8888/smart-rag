@@ -20,6 +20,7 @@ from smart_rag_core.query_answer.citations import (
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
+from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
 from smart_rag_core.query_answer.generate_grounded import (
     salvage_adas_model_defaults,
     salvage_chunking_window_values,
@@ -27,6 +28,7 @@ from smart_rag_core.query_answer.generate_grounded import (
     salvage_helper_function_name,
     salvage_method_or_heading_label,
     salvage_missing_multipart_figures,
+    salvage_listed_literals,
     salvage_named_code_definition,
     salvage_named_table_block,
     salvage_protocol_aspire_claim,
@@ -272,6 +274,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 salvage_protocol_aspire_claim,
                 salvage_named_code_definition,
                 salvage_named_table_block,
+                salvage_listed_literals,
             ):
                 try:
                     salvaged = salvage_fn(
@@ -293,6 +296,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     checked = salvaged
             # Legacy shared try removed: one failed salvage must not skip
             # later query-anchored confuser repairs (expose / ADAS / PSI).
+        checked = format_requested_answer_shape(
+            checked, user_query=user_query
+        )
     knowledge_scope = plan.knowledge_scope if plan is not None else None
     terminal = "verified_partial"
     if (

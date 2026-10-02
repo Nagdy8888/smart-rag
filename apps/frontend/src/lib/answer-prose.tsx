@@ -54,6 +54,9 @@ export function renderAnswerProse(
           ),
         );
       }
+      if (block.kind !== "p") {
+        return null;
+      }
       return createElement(
         "p",
         {

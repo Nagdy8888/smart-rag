@@ -141,17 +141,21 @@ def test_answer_v3_remains_registered_and_hashed() -> None:
     assert "paragraphs" in required
 
 
-def test_answer_v4_is_current_and_hashed() -> None:
-    """Pinned answer_v4 hash matches the immutable prompt file."""
+def test_answer_v5_is_current_and_hashed() -> None:
+    """Pinned answer_v5 hash matches the immutable prompt file."""
 
-    entry = load_prompt("answer_v4", environment="dev")
-    assert ANSWER_PROMPT_VERSION == "answer_v4"
+    entry = load_prompt("answer_v5", environment="dev")
+    assert ANSWER_PROMPT_VERSION == "answer_v5"
     assert entry.sha256 == ANSWER_PROMPT_SHA256
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v4.md")
-    body = prompt_text("answer_v4")
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v5.md")
+    body = prompt_text("answer_v5")
     assert "Do not write `answer_text`" in body
     assert "first claim answers the question directly" in body.lower()
+    assert "fenced" in body.lower()
+    assert "pipe table" in body.lower()
     assert "acronym" in body.lower()
+    v4 = load_prompt("answer_v4", environment="dev")
+    assert v4.sha256 == verifier_prompt_digest("answer_v4.md")
     schema = answer_claims_json_schema()
     properties = schema["properties"]
     required = schema["required"]

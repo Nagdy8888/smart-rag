@@ -5,6 +5,9 @@ from __future__ import annotations
 import re
 
 from smart_rag_core.query_answer.bind import bind_company_atomic_links
+from smart_rag_core.query_answer.format_shape import (
+    strip_markdown_fences_for_literal_guard,
+)
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -212,11 +215,12 @@ def _link_fails_literal_guard(
     """
 
     source_text = _cited_source_text(link, fusion=fusion, tables=tables)
-    if _acronym_expansion_fails(link.claim, source_text):
+    claim_for_guard = strip_markdown_fences_for_literal_guard(link.claim)
+    if _acronym_expansion_fails(claim_for_guard, source_text):
         return True
     if link.kind != "fact":
         return False
-    return _fact_literals_missing(link.claim, source_text)
+    return _fact_literals_missing(claim_for_guard, source_text)
 
 
 def _cited_source_text(

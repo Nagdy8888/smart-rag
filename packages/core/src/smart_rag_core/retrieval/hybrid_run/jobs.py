@@ -135,6 +135,13 @@ class HybridChannelJobsMixin:
                 """
 
                 variant_texts = texts if texts else (query,)
+                # Ask-gated code/list seeds as an extra BM25 variant so
+                # SFTConfig / AgentState / broker names are not dense-only.
+                from smart_rag_core.retrieval.rerank import hybrid_seed_terms
+
+                seed_text = " ".join(hybrid_seed_terms(query)[:8]).strip()
+                if seed_text and seed_text not in variant_texts:
+                    variant_texts = (*variant_texts, seed_text)[:4]
                 try:
                     retrieve_variants = getattr(
                         bm25_retriever, "retrieve_variants", None
