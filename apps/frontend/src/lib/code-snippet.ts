@@ -6,36 +6,210 @@
 
 const DEF_PATTERN = /\b(?:async\s+)?def\s+\w+\s*\(/;
 const CLASS_PATTERN = /\bclass\s+\w+/;
+const TOOL_PATTERN = /@tool\b/;
 const HEADER_PATTERN =
   /^((?:async\s+)?(?:def|class)\s+\w+\s*\([^)]*\)[^:]*):\s*([\s\S]*)$/;
+/** Whole-paragraph fenced block (blank lines inside the body are allowed). */
+const FENCE_WHOLE =
+  /^\s*```([a-zA-Z0-9_+-]*)[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```[ \t]*\s*$/;
+/** First fenced block anywhere in the paragraph. */
+const FENCE_ANYWHERE =
+  /```([a-zA-Z0-9_+-]*)[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/;
+/** Opening fence without a closer — still show as code when body has source. */
+const FENCE_OPEN_ONLY =
+  /^\s*```([a-zA-Z0-9_+-]*)[ \t]*\r?\n([\s\S]+)$/;
+
+export type CodeSnippetModel = {
+  /** Formatted source for the code body. */
+  code: string;
+  /** Language label when known, else null. */
+  language: string | null;
+};
 
 /**
- * Return whether a verified paragraph contains a function or class to show as code.
+ * Return whether a verified paragraph contains a function, class, or fence.
  *
- * @param text - One verified paragraph.
- * @returns True when a definition is present.
+ * @param text - One verified paragraph (prefer decoded).
+ * @returns True when a definition, `@tool`, or fenced block is present.
  */
 export function isCodeSnippet(text: string): boolean {
-  return DEF_PATTERN.test(text) || CLASS_PATTERN.test(text);
+  if (extractFencedCode(text) !== null) {
+    return true;
+  }
+  return DEF_PATTERN.test(text) || CLASS_PATTERN.test(text) || TOOL_PATTERN.test(text);
+}
+
+/**
+ * Return display code and an optional language label for a code paragraph.
+ *
+ * @param text - Paragraph that mixes a sentence with source code or a fence.
+ * @returns Snippet model for the CodeBlock UI. Not a new stored answer.
+ */
+export function formatCodeSnippetModel(text: string): CodeSnippetModel {
+  const fenced = extractFencedCode(text);
+  if (fenced !== null) {
+    return fenced;
+  }
+  const code = formatCodeSnippet(text);
+  return {
+    code,
+    language: inferLanguageFromSalvage(code),
+  };
 }
 
 /**
  * Return only the function or class, with the docstring and return on their own lines.
  *
- * The split follows the signature colon after the parameter list, so type
- * hints inside the parentheses stay on the `def` line. Quote characters in
- * the docstring do not matter.
+ * Multiline salvage bodies keep their newlines. Compacted one-liners still go
+ * through the legacy reformatter. The split follows the signature colon after
+ * the parameter list, so type hints inside the parentheses stay on the `def`
+ * line.
  *
  * @param text - Paragraph that mixes a sentence with source code.
  * @returns Snippet display text. Not a new stored answer.
  */
 export function formatCodeSnippet(text: string): string {
+  const fenced = extractFencedCode(text);
+  if (fenced !== null) {
+    return fenced.code;
+  }
   const source = text.replace(/\r\n/g, "\n");
-  const starts = [source.search(/@\w+/), source.search(DEF_PATTERN), source.search(CLASS_PATTERN)].filter(
-    (index) => index >= 0,
-  );
+  const starts = [
+    source.search(TOOL_PATTERN),
+    source.search(DEF_PATTERN),
+    source.search(CLASS_PATTERN),
+  ].filter((index) => index >= 0);
   const start = starts.length === 0 ? 0 : Math.min(...starts);
-  const flat = source.slice(start).replace(/\s+/g, " ").trim();
+  const body = source.slice(start).trim();
+  if (body.includes("\n")) {
+    let cleaned = body
+      .split("\n")
+      .map((line) => line.replace(/[ \t]+$/g, ""))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    cleaned = trimTrailingCodeJunk(cleaned);
+    // Sparse newlines from salvage (def + body jammed on one line) still need
+    // the compact reformatter; true multiline defs keep their line breaks.
+    if (looksLikeCompactedCode(cleaned)) {
+      return formatCompactCodeSnippet(cleaned.replace(/\n+/g, " "));
+    }
+    return cleaned;
+  }
+  return formatCompactCodeSnippet(body);
+}
+
+/**
+ * Extract the first Markdown fenced code block from a paragraph.
+ *
+ * @param text - Verified paragraph text.
+ * @returns Code and language, or null when no fence is present.
+ */
+function extractFencedCode(text: string): CodeSnippetModel | null {
+  const source = text.replace(/\r\n/g, "\n");
+  const whole = source.match(FENCE_WHOLE);
+  if (whole) {
+    return {
+      language: normalizeLanguage(whole[1] ?? ""),
+      code: (whole[2] ?? "").replace(/\n+$/, "").replace(/^\n+/, ""),
+    };
+  }
+  const anywhere = source.match(FENCE_ANYWHERE);
+  if (anywhere) {
+    return {
+      language: normalizeLanguage(anywhere[1] ?? ""),
+      code: (anywhere[2] ?? "").replace(/\n+$/, "").replace(/^\n+/, ""),
+    };
+  }
+  const openOnly = source.match(FENCE_OPEN_ONLY);
+  if (!openOnly) {
+    return null;
+  }
+  const body = (openOnly[2] ?? "")
+    .replace(/\n?[ \t]*```[ \t]*\s*$/, "")
+    .replace(/\n+$/, "")
+    .replace(/^\n+/, "");
+  if (!body.trim()) {
+    return null;
+  }
+  return {
+    language: normalizeLanguage(openOnly[1] ?? ""),
+    code: body,
+  };
+}
+
+/**
+ * Normalize a fence language tag for the header label.
+ *
+ * @param raw - Fence info string.
+ * @returns Lowercased label, or null when empty.
+ */
+function normalizeLanguage(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * Infer a language label for salvaged Python-ish snippets.
+ *
+ * @param code - Formatted salvage body.
+ * @returns `python` when tools/defs look Pythonic, else null.
+ */
+function inferLanguageFromSalvage(code: string): string | null {
+  if (TOOL_PATTERN.test(code) || DEF_PATTERN.test(code) || CLASS_PATTERN.test(code)) {
+    return "python";
+  }
+  return null;
+}
+
+/**
+ * Drop book section markers and sibling defs that trail a salvage snippet.
+ *
+ * @param text - Multiline or flat code snippet.
+ * @returns Snippet cut before trailing junk when present.
+ */
+function trimTrailingCodeJunk(text: string): string {
+  const section = text.search(/\n?\s*#\s*--\s*\d+/);
+  // Only look for a sibling def after the primary ``return`` so the main
+  // ``@tool`` / ``def`` header is never mistaken for trailing junk.
+  const returnAt = text.search(/\breturn\b/);
+  const searchFrom = returnAt >= 0 ? returnAt + "return".length : text.length;
+  const siblingRel = text
+    .slice(searchFrom)
+    .search(/\n\s*(?:@tool\b|(?:async\s+)?def\s+\w+\s*\(|class\s+\w+)/);
+  const sibling = siblingRel >= 0 ? searchFrom + siblingRel : -1;
+  const cuts = [section, sibling].filter((index) => index > 0);
+  if (cuts.length === 0) {
+    return text;
+  }
+  return text.slice(0, Math.min(...cuts)).trim();
+}
+
+/**
+ * Return whether multiline text still looks like a flattened one-liner.
+ *
+ * @param text - Candidate snippet after trimming.
+ * @returns True when a signature and body share a line.
+ */
+function looksLikeCompactedCode(text: string): boolean {
+  return text.split("\n").some((line) => {
+    const hasDef = DEF_PATTERN.test(line);
+    const hasToolThenDef = /@tool\b/.test(line) && DEF_PATTERN.test(line);
+    const hasDefAndReturn = hasDef && /\breturn\b/.test(line);
+    return hasToolThenDef || hasDefAndReturn;
+  });
+}
+
+/**
+ * Reformat a single-line compacted definition into readable lines.
+ *
+ * @param flatSource - One-line code starting at `@tool` / `def` / `class`.
+ * @returns Multiline display text.
+ */
+function formatCompactCodeSnippet(flatSource: string): string {
+  let flat = flatSource.replace(/\s+/g, " ").trim();
+  // Drop book section markers that salvage sometimes trails after a tool body.
+  flat = flat.replace(/\s+#\s*--\s*\d+[\s\S]*$/, "").trim();
   const lines: string[] = [];
   const decorator = flat.match(/^((?:@\w+\s*)+)/);
   let rest = flat;
@@ -52,7 +226,13 @@ export function formatCodeSnippet(text: string): string {
   const returnAt = body.search(/\breturn\b/);
   if (returnAt > 0) {
     const docstring = body.slice(0, returnAt).trim();
-    const statement = body.slice(returnAt).trim();
+    let statement = body.slice(returnAt).trim();
+    const cut = statement.search(
+      /\s+#\s*--|\s+(?:@tool\b|(?:async\s+)?def\s+\w+\s*\(|class\s+\w+)/,
+    );
+    if (cut > 0) {
+      statement = statement.slice(0, cut).trim();
+    }
     if (docstring) {
       lines.push(`    ${docstring}`);
     }
@@ -60,7 +240,14 @@ export function formatCodeSnippet(text: string): string {
       lines.push(`    ${statement}`);
     }
   } else if (body) {
-    lines.push(`    ${body}`);
+    let trimmedBody = body;
+    const cut = trimmedBody.search(
+      /\s+#\s*--|\s+(?:@tool\b|(?:async\s+)?def\s+\w+\s*\(|class\s+\w+)/,
+    );
+    if (cut > 0) {
+      trimmedBody = trimmedBody.slice(0, cut).trim();
+    }
+    lines.push(`    ${trimmedBody}`);
   }
   return lines.join("\n");
 }

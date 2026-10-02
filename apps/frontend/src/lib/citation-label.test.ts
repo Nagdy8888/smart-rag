@@ -190,6 +190,31 @@ describe("splitVerifiedParagraphs", () => {
     expect(splitVerifiedParagraphs("One.\n\nTwo.")).toEqual(["One.", "Two."]);
     expect(splitVerifiedParagraphs("")).toEqual([]);
   });
+
+  it("keeps fenced code intact when a blank line sits before the closing fence", () => {
+    const answer = [
+      "Use **bold** carefully.",
+      "",
+      "- Alpha",
+      "- Beta",
+      "",
+      "```python",
+      "def hello():",
+      "    return 1",
+      "",
+      "```",
+      "",
+      "| Model | Score |",
+      "| --- | --- |",
+      "| Gemma | 72 |",
+    ].join("\n");
+    expect(splitVerifiedParagraphs(answer)).toEqual([
+      "Use **bold** carefully.",
+      "- Alpha\n- Beta",
+      "```python\ndef hello():\n    return 1\n\n```",
+      "| Model | Score |\n| --- | --- |\n| Gemma | 72 |",
+    ]);
+  });
 });
 
 describe("paragraph citation grouping", () => {

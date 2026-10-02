@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-10-01
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -121,7 +121,13 @@ running loop; a process-scoped client would stay bound to uvicorn and fail
 inside `web_scope`. Per-run `QueryGraphDeps` (Exa gateway, `app_api`
 connection) are injected through `QueryGraphContext` and a task-local
 binding so worker-thread nodes cannot fall back to the empty compile-time
-deps.
+deps. Missing `app_api` connection or runtime context is
+`web_runtime_unavailable`, distinct from `web_search_unconfigured` (missing
+Exa key/gateway). After sources persist, synthesis uses budgeted
+`web_answer_v1` via `ModelGateway` when the gateway and prompt are bound;
+provider or parse failure falls back to extractive mock synthesis. Live Exa
+calls remain operator-gated and are not required to prove the offline agent
+path. Critique stays deterministic (`propose_follow_ups`).
 
 Requested Company never manufactures `company_signal=True`. Explicit Company
 or General does not spend the profile model merely to decide company versus

@@ -19,15 +19,18 @@ from smart_rag_core.gateways.exa_search import (
     ExaSearchResponse,
 )
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.web_research.bound_store import BoundWebStore
 from smart_rag_core.web_research.exceptions import WebResearchError
 from smart_rag_core.web_research.executor import run_web_research
 from smart_rag_core.web_research.fetch import CrawlProxyCandidateFetch
+from smart_rag_core.web_research.models import WebSourceRecord
 from smart_rag_core.web_research.planner import propose_follow_ups
 
 from smart_rag_agents.query.deps import QueryGraphDeps
+from smart_rag_agents.query.gateway.web_answer import synthesize_web_answer
 from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_nodes
 from smart_rag_agents.query.state import QueryGraphState
 
@@ -278,15 +281,18 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
 
     External/model calls:
         Injected Exa search/contents, optional crawl-proxy fallback, one
-        critique, one synthesis. Never constructed inside this node.
+        deterministic critique, and one ``web_answer_v1`` synthesis when a
+        model gateway and prompt are bound (extractive mock otherwise).
+        Never constructed inside this node.
 
     Budget/deadline behavior:
         At most two rounds, five external ops, 50s remaining deadline.
 
     Failure/fallback route:
-        Typed ``web_search_*`` / ``web_evidence_insufficient`` /
-        ``web_content_unavailable``. Never Hybrid, general, or company
-        retrieve. Does not emit ``token_delta``.
+        Typed ``web_search_*`` / ``web_runtime_unavailable`` /
+        ``web_evidence_insufficient`` / ``web_content_unavailable``.
+        Never Hybrid, general, or company retrieve. Does not emit
+        ``token_delta``.
 
     Args:
         state: State after ``compile_plan``.
@@ -319,7 +325,7 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         )
     if deps.connection is None or context is None:
         return _fail_closed(
-            state, status="routing_rejected", detail="web_search_unconfigured"
+            state, status="routing_rejected", detail="web_runtime_unavailable"
         )
     fetch = None
     if isinstance(deps.crawl_proxy_gateway, CrawlProxyGateway):
@@ -330,6 +336,27 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         caller=caller_from_runtime(context),
         run_id=context.run_id,
     )
+
+    def _synthesize(
+        query: str, sources: tuple[WebSourceRecord, ...]
+    ) -> AnswerPayload:
+        """Build the Web draft via gateway or extractive fallback.
+
+        Args:
+            query: Sanitized user query.
+            sources: Persisted Web sources.
+
+        Returns:
+            Grounded ``AnswerPayload``.
+        """
+
+        return synthesize_web_answer(
+            deps, query=query, sources=sources, context=context
+        )
+
+    synthesize = None
+    if deps.model_gateway is not None and deps.web_answer_prompt_text:
+        synthesize = _synthesize
     try:
         result = run_web_research(
             user_query=_exa_query(state),
@@ -341,6 +368,7 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             progress=_emit_progress,
             forbidden_snippets=forbidden_web_memory_snippets(state),
             critique=propose_follow_ups,
+            synthesize=synthesize,
         )
     except WebResearchError as exc:
         port.aclose()

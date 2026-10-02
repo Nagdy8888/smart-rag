@@ -10,6 +10,10 @@ from smart_rag_core.query_answer.assembly import fit_source_records
 from smart_rag_core.query_answer.claims import parse_provider_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import filter_invented_ids
+from smart_rag_core.query_answer.generate_grounded import (
+    salvage_named_code_definition,
+    salvage_named_table_block,
+)
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
 from smart_rag_core.query_answer.release import bind_company_atomic_links
@@ -28,6 +32,41 @@ from smart_rag_agents.query.gateway.sync_bridge import (
 )
 from smart_rag_agents.query.nodes.tokens import tokens_from_gateway_response
 
+
+def _apply_code_table_salvages(
+    payload: AnswerPayload,
+    *,
+    fusion: FusionResult,
+    tables: tuple[TableEvidenceRecord, ...],
+    query: str,
+) -> AnswerPayload:
+    """Run named code/table extractive salvages and re-bind surviving claims.
+
+    Args:
+        payload: Provider answer after invented-id filtering.
+        fusion: Fitted canonical evidence.
+        tables: Fitted table records.
+        query: Original user query. Untrusted.
+
+    Returns:
+        Payload after salvage + bind + derived answer text.
+    """
+
+    working = payload
+    for salvage_fn in (
+        salvage_named_code_definition,
+        salvage_named_table_block,
+    ):
+        salvaged = salvage_fn(working, fusion, user_query=query)
+        if salvaged is working:
+            continue
+        working = bind_company_atomic_links(
+            filter_invented_ids(salvaged, fusion, tables),
+            fusion=fusion,
+            user_query=query,
+        )
+        working = with_derived_answer_text(working)
+    return working
 
 def gateway_answer(
     deps: QueryGraphDeps,
@@ -114,6 +153,12 @@ def gateway_answer(
         user_query=query,
     )
     derived = with_derived_answer_text(filtered)
+    derived = _apply_code_table_salvages(
+        derived,
+        fusion=fusion,
+        tables=typed_tables,
+        query=query,
+    )
     prompt_tokens, completion_tokens = tokens_from_gateway_response(response)
     return (
         derived.model_copy(update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}),

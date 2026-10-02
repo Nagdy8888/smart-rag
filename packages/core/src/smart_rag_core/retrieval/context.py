@@ -26,6 +26,8 @@ from smart_rag_core.retrieval.rerank import (
     promote_host_literal_passages,
     promote_ide_product_passages,
     promote_method_label_passages,
+    promote_named_code_definition_passages,
+    promote_named_table_passages,
     promote_protocol_aspire_passages,
     promote_tool_description_passages,
     should_skip_trivial_exact,
@@ -87,7 +89,13 @@ def _promote_query_anchor_passages(
     promoted = promote_ide_product_passages(
         promoted, query=query, pool=search, limit=limit
     )
-    return promote_protocol_aspire_passages(
+    promoted = promote_protocol_aspire_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    promoted = promote_named_code_definition_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    return promote_named_table_passages(
         promoted, query=query, pool=search, limit=limit
     )
 
@@ -188,14 +196,16 @@ def expand_parents(
 ) -> tuple[tuple[RerankPassage, ...], tuple[UUID, ...]]:
     """Load strongest authorized parents and adjacent siblings.
 
-    Adjacent passages are taken from the already-authorized pool when they
-    share a version and sit at ``chunk_index ± 1``. Parents are rechecked
-    through ``load_context`` because they may be non-representative.
+    Adjacent passages are taken from the already-authorized fused passage
+    list (or pool) when they share a version and sit at ``chunk_index ± 1``.
+    Using the full fused list matters for table asks: the titled row body
+    often sits on the next chunk after a prose intro that ranked into the
+    rerank pool.
 
     Args:
         selected: MMR-selected child passages.
         load_context: Authoritative context loader (rechecks ACL).
-        pool: Authorized fused pool used to discover adjacent IDs.
+        pool: Authorized fused passages used to discover adjacent IDs.
 
     Returns:
         Expanded list and parent IDs that survived recheck.
@@ -407,7 +417,7 @@ def select_hybrid_context(
         pinned_ids=pinned_ids,
     )
     if len(pool) < 2:
-        expanded, parent_ids = expand_parents(pool, load_context, pool=pool)
+        expanded, parent_ids = expand_parents(pool, load_context, pool=passages)
         trimmed = trim_token_budget(
             expanded,
             budget=token_budget,
@@ -435,7 +445,9 @@ def select_hybrid_context(
             limit=evidence_max,
             candidate_depth=mmr_depth,
         )
-        expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
+        expanded, parent_ids = expand_parents(
+            mmr_selected, load_context, pool=passages
+        )
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
         trimmed = _promote_query_anchor_passages(
             trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
@@ -464,7 +476,9 @@ def select_hybrid_context(
             limit=evidence_max,
             candidate_depth=mmr_depth,
         )
-        expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
+        expanded, parent_ids = expand_parents(
+            mmr_selected, load_context, pool=passages
+        )
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
         trimmed = _promote_query_anchor_passages(
             trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
@@ -506,7 +520,7 @@ def select_hybrid_context(
         limit=evidence_max,
         candidate_depth=mmr_depth,
     )
-    expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
+    expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=passages)
     trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
     trimmed = _promote_query_anchor_passages(
         trimmed, query=query, pool=pool, limit=evidence_max, fused=passages

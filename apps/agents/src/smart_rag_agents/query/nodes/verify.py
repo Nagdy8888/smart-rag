@@ -27,6 +27,8 @@ from smart_rag_core.query_answer.generate_grounded import (
     salvage_helper_function_name,
     salvage_method_or_heading_label,
     salvage_missing_multipart_figures,
+    salvage_named_code_definition,
+    salvage_named_table_block,
     salvage_protocol_aspire_claim,
     salvage_psi_retrain_threshold,
     salvage_refused_literal_claims,
@@ -268,6 +270,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 salvage_tool_description_string,
                 salvage_chunking_window_values,
                 salvage_protocol_aspire_claim,
+                salvage_named_code_definition,
+                salvage_named_table_block,
             ):
                 try:
                     salvaged = salvage_fn(

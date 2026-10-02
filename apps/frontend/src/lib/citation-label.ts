@@ -90,6 +90,10 @@ export function citationHeading(value: unknown): string {
 /**
  * Split verified answer text on blank lines. Do not trim paragraphs.
  *
+ * Blank lines inside Markdown fenced code blocks do not end a paragraph, so a
+ * fence with an empty line before the closing \`\`\` stays one code block
+ * instead of a broken snippet plus a stray fence line.
+ *
  * @param answerText - Authoritative verified answer.
  * @returns Paragraph strings, or empty when the answer is empty.
  */
@@ -97,7 +101,33 @@ export function splitVerifiedParagraphs(answerText: string): string[] {
   if (answerText === "") {
     return [];
   }
-  return answerText.split("\n\n");
+  const source = answerText.replace(/\r\n/g, "\n");
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+  let inFence = false;
+
+  const flush = (): void => {
+    if (current.length === 0) {
+      return;
+    }
+    paragraphs.push(current.join("\n"));
+    current = [];
+  };
+
+  for (const line of source.split("\n")) {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      current.push(line);
+      continue;
+    }
+    if (!inFence && line.trim() === "") {
+      flush();
+      continue;
+    }
+    current.push(line);
+  }
+  flush();
+  return paragraphs;
 }
 
 /**

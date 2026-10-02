@@ -13,6 +13,7 @@ from smart_rag_core.query_answer.schemas import (
     eval_judge_json_schema,
     pdf_eval_judge_json_schema,
     verifier_json_schema,
+    web_answer_json_schema,
 )
 from smart_rag_core.query_answer.versions import (
     ALLOWED_ANSWER_MODEL_IDS,
@@ -29,6 +30,8 @@ from smart_rag_core.query_answer.versions import (
     VERIFIER_MAX_OUTPUT_TOKENS,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
+    WEB_ANSWER_PROMPT_SHA256,
+    WEB_ANSWER_PROMPT_VERSION,
 )
 
 
@@ -115,6 +118,80 @@ def execute_openai_answer(
             raise OpenAIAnswerError("answer_budget_denied") from error
         raise OpenAIAnswerError("answer_provider_error") from error
     return _parse_response(response, kind="answer")
+
+
+def execute_openai_web_answer(
+    *,
+    api_key: str,
+    prompt_text: str,
+    prompt_sha256: str,
+    prompt_version: str,
+    model_id: str,
+    user_query: str,
+    source_records: str,
+    timeout_seconds: float,
+) -> tuple[dict[str, object], str, int, int]:
+    """Make exactly one structured Web-answer Responses call.
+
+    Args:
+        api_key: Provider credential. Never logged.
+        prompt_text: Pinned ``web_answer_v1`` body.
+        prompt_sha256: Expected prompt digest.
+        prompt_version: Expected prompt version.
+        model_id: Allow-listed model.
+        user_query: Sanitized user text.
+        source_records: Delimited untrusted Web excerpts.
+        timeout_seconds: Client timeout. SDK retries are disabled.
+
+    Returns:
+        Parsed JSON payload, provider request id, input tokens, output tokens.
+
+    Raises:
+        OpenAIAnswerError: Timeout, auth, HTTP, version, or parse failures.
+        ValueError: If versions or the model id are not allow-listed.
+
+    Side Effects:
+        One HTTPS Responses request. ``max_retries=0``. No tools.
+    """
+
+    if (
+        prompt_version != WEB_ANSWER_PROMPT_VERSION
+        or prompt_sha256 != WEB_ANSWER_PROMPT_SHA256
+    ):
+        raise OpenAIAnswerError("web_answer_version_mismatch")
+    if model_id not in ALLOWED_ANSWER_MODEL_IDS:
+        raise OpenAIAnswerError("web_answer_version_mismatch")
+    if timeout_seconds <= 0:
+        raise OpenAIAnswerError("web_answer_budget_denied")
+    client = traced_openai_client(
+        api_key=api_key, max_retries=0, timeout=timeout_seconds
+    )
+    user_payload = {"query": user_query, "sources": source_records}
+    try:
+        response = client.responses.create(
+            model=model_id,
+            instructions=prompt_text,
+            input=json.dumps(user_payload, separators=(",", ":")),
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "web_answer",
+                    "strict": True,
+                    "schema": web_answer_json_schema(),
+                }
+            },
+            max_output_tokens=ANSWER_MAX_OUTPUT_TOKENS,
+            store=False,
+        )
+    except APITimeoutError as error:
+        raise OpenAIAnswerError("web_answer_timeout") from error
+    except AuthenticationError as error:
+        raise OpenAIAnswerError("web_answer_provider_error") from error
+    except APIStatusError as error:
+        if error.status_code == 429:
+            raise OpenAIAnswerError("web_answer_budget_denied") from error
+        raise OpenAIAnswerError("web_answer_provider_error") from error
+    return _parse_response(response, kind="web_answer")
 
 
 def execute_openai_verifier(

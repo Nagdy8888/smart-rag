@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-28
+last-reviewed: 2026-10-01
 audience: engineering, reviewers, client-approver
 ---
 
@@ -30,7 +30,8 @@ The table below is the complete maintained map. Packet evidence under
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [agent/QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md) | engineering-lead | draft | 2026-09-15 | eng, security |
 | [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-09-22 | eng |
-| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
+| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-10-01 | eng, reviewers |
+| [evaluation/WEB_MODE_ASK_15_2026-10-01.md](./evaluation/WEB_MODE_ASK_15_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, reviewers |
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
@@ -194,6 +195,8 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/ANSWER_ONLY_50_2026-09-24.md](./evaluation/ANSWER_ONLY_50_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/HARD_KNOWN_ANSWER_50_2026-09-28.md](./evaluation/HARD_KNOWN_ANSWER_50_2026-09-28.md) | engineering-lead | draft | 2026-09-29 | eng, reviewers |
 | [evaluation/FRESH_KNOWN_ANSWER_25_2026-09-29.md](./evaluation/FRESH_KNOWN_ANSWER_25_2026-09-29.md) | engineering-lead | draft | 2026-09-29 | eng, reviewers |
+| [evaluation/CODE_TABLE_KNOWN_ANSWER_20_2026-09-29.md](./evaluation/CODE_TABLE_KNOWN_ANSWER_20_2026-09-29.md) | engineering-lead | draft | 2026-09-29 | eng, reviewers |
+| [evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md](./evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, frontend, reviewers |
 | [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
 | [evaluation/HYBRID_STAGE_TIMINGS_2026-09.md](./evaluation/HYBRID_STAGE_TIMINGS_2026-09.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |

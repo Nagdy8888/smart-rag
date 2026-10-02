@@ -22,6 +22,8 @@ from smart_rag_core.gateways.model_types import (
     RerankModelResponse,
     VerifierModelRequest,
     VerifierModelResponse,
+    WebAnswerModelRequest,
+    WebAnswerModelResponse,
     mock_lightrag_llm_content,
     reject_oversize_model_input,
 )
@@ -29,6 +31,7 @@ from smart_rag_core.gateways.openai_answer import (
     execute_openai_answer,
     execute_openai_eval_judge,
     execute_openai_verifier,
+    execute_openai_web_answer,
 )
 from smart_rag_core.gateways.openai_conversation_title import (
     execute_openai_conversation_title,
@@ -193,6 +196,45 @@ class OpenAIRerankAdapter:
             timeout_seconds=request.remaining_deadline_seconds,
         )
         return AnswerModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+    async def generate_web_answer(
+        self, request: WebAnswerModelRequest
+    ) -> WebAnswerModelResponse:
+        """Execute one Responses Web-answer operation.
+
+        Args:
+            request: Bounded Web-answer request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIAnswerError: Typed provider failure.
+            ValueError: Input bound errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0``.
+        """
+
+        joined = request.query + request.source_records
+        reject_oversize_model_input(joined, self._max_input_chars)
+        payload, request_id, input_tokens, output_tokens = execute_openai_web_answer(
+            api_key=self._api_key,
+            prompt_text=request.prompt_text,
+            prompt_sha256=request.prompt_sha256,
+            prompt_version=request.prompt_version,
+            model_id=request.model_id,
+            user_query=request.query,
+            source_records=request.source_records,
+            timeout_seconds=request.remaining_deadline_seconds,
+        )
+        return WebAnswerModelResponse(
             mode="openai",
             payload=payload,
             request_id=request_id,

@@ -150,6 +150,210 @@ _PROTOCOL_GOLD = re.compile(
     r"|aspires to do (?:the same )?for AI agents what HTTP enabled",
     re.DOTALL,
 )
+_CODE_DEF_ASK = re.compile(
+    r"(?i)\breproduce\b.{0,120}\b(?:code|fenced|python|@tool|\bdef\b)"
+    r"|\bfenced\b.{0,60}\b(?:python|code)"
+    r"|\bcode\s+block\b"
+    r"|\b@tool\b"
+    r"|\b(?:async\s+)?def\s+[A-Za-z_][\w]*"
+)
+# Capture names after ``def`` / ``@tool def`` only. Bare ``@tool and`` in
+# prose must not become an identifier; snake_case tokens still match below.
+_CODE_ID_FROM_QUERY = re.compile(
+    r"(?i)(?:@tool\s+)?(?:async\s+)?def\s+([A-Za-z_][\w]*)"
+    r"|([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+)"
+)
+_CODE_ID_STOP = frozenset(
+    {
+        "order_id",
+        "tool_name",
+        "user_query",
+        "raw_text",
+        "chunk_id",
+        "page_number",
+        "state_graph",
+        "human_message",
+        "base_message",
+        "company_documents",
+        "markdown_pipe",
+        "pipe_table",
+        "code_block",
+        "building_applications",
+        "function",
+        "definition",
+        "tool",
+        "block",
+        "python",
+        "fenced",
+        "reproduce",
+        "markdown",
+        "table",
+        "snippet",
+        "heuristic",
+        "example",
+        "wiring",
+        "setup",
+        "assignment",
+        "operations",
+        "kwargs",
+        "and",
+        "the",
+        "for",
+        "with",
+        "from",
+        "into",
+        "that",
+        "this",
+        "when",
+        "then",
+        "else",
+        "not",
+        "are",
+        "was",
+        "were",
+        "have",
+        "has",
+        "been",
+        "will",
+        "can",
+        "may",
+        "use",
+        "using",
+        "used",
+        "via",
+        "per",
+        "its",
+        "our",
+        "your",
+        "any",
+        "all",
+        "each",
+        "both",
+        "such",
+        "than",
+        "also",
+        "only",
+        "just",
+        "like",
+        "over",
+        "list",
+        "name",
+        "named",
+        "call",
+        "called",
+        "return",
+        "returns",
+        "true",
+        "false",
+        "none",
+        "type",
+        "types",
+        "self",
+        "args",
+        "tools",
+    }
+)
+_TABLE_REPRO_ASK = re.compile(
+    r"(?i)\breproduce\b.{0,120}\btable\b"
+    r"|\btable\b.{0,80}\b(?:markdown|pipe)\b"
+    r"|\bMarkdown\s+pipe\s+table\b"
+    r"|\bTable\s+\d+-\d+\b"
+)
+_TABLE_CAPTION_FROM_QUERY = re.compile(r"(?i)\bTable\s+(\d+-\d+)\b")
+
+
+def named_code_definition_ids(query: str) -> tuple[str, ...]:
+    """Extract function/tool identifiers named in a code-reproduce ask.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Distinct identifier strings in query order. Empty when the ask is
+        not code-shaped or no usable identifier is present.
+    """
+
+    if not _CODE_DEF_ASK.search(query):
+        return ()
+    found: list[str] = []
+    seen: set[str] = set()
+    for match in _CODE_ID_FROM_QUERY.finditer(query):
+        token = (match.group(1) or match.group(2) or "").strip()
+        if not token or token.casefold() in _CODE_ID_STOP:
+            continue
+        key = token.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(token)
+    return tuple(found)
+
+
+def code_definition_gold_pattern(identifiers: Sequence[str]) -> re.Pattern[str] | None:
+    """Build a passage regex for ``def`` / ``@tool def`` of named identifiers.
+
+    Args:
+        identifiers: Function or tool names extracted from the query.
+
+    Returns:
+        Compiled pattern, or ``None`` when ``identifiers`` is empty.
+    """
+
+    names = [item for item in identifiers if item.strip()]
+    if not names:
+        return None
+    alt = "|".join(re.escape(item) for item in names)
+    return re.compile(
+        rf"(?i)(?:@tool\s+)?(?:async\s+)?def\s+(?:{alt})\s*\(",
+    )
+
+
+def named_table_captions(query: str) -> tuple[str, ...]:
+    """Extract ``Table N-M`` captions named in a table-reproduce ask.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Distinct caption strings such as ``Table 2-1``. Empty when the ask
+        is not table-shaped or no caption is present.
+    """
+
+    if not _TABLE_REPRO_ASK.search(query):
+        return ()
+    found: list[str] = []
+    seen: set[str] = set()
+    for match in _TABLE_CAPTION_FROM_QUERY.finditer(query):
+        caption = f"Table {match.group(1)}"
+        key = caption.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(caption)
+    return tuple(found)
+
+
+def table_caption_gold_pattern(captions: Sequence[str]) -> re.Pattern[str] | None:
+    """Build a passage regex for named table captions with nearby row text.
+
+    Prefers a caption that is followed within a short window by a digit or
+    model-like token so prose intros without the table body rank lower.
+
+    Args:
+        captions: Captions extracted from the query (for example ``Table 2-1``).
+
+    Returns:
+        Compiled pattern, or ``None`` when ``captions`` is empty.
+    """
+
+    names = [item for item in captions if item.strip()]
+    if not names:
+        return None
+    alt = "|".join(re.escape(item) for item in names)
+    return re.compile(
+        rf"(?i)(?:{alt}).{{0,400}}?(?:\d(?:\.\d+)?|[A-Za-z][A-Za-z0-9]+(?:\s+[A-Za-z0-9.-]+){{1,6}})",
+        re.DOTALL,
+    )
 
 
 def promote_helper_naming_passages(
@@ -424,12 +628,188 @@ def promote_protocol_aspire_passages(
     )
 
 
+def promote_named_code_definition_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin a named ``def`` / ``@tool`` definition when the ask reproduces code.
+
+    Identifiers are taken only from the user query. Passages that hold the
+    definition line are preferred over later call sites via local span
+    overlap inside :func:`_promote_matching_passage`.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool or fused passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one definition passage prepended.
+    """
+
+    identifiers = named_code_definition_ids(query)
+    gold = code_definition_gold_pattern(identifiers)
+    if gold is None:
+        return trimmed
+    return _promote_matching_passage(
+        trimmed,
+        query=query,
+        pool=pool,
+        limit=limit,
+        ask_pattern=_CODE_DEF_ASK,
+        gold_pattern=gold,
+        prefer_early_match=True,
+    )
+
+
+def promote_named_table_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin a named ``Table N-M`` body when the ask reproduces a table.
+
+    Prefers titled caption+rows passages over prose intros that only
+    mention the table name.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool or fused passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages, possibly with one caption+rows passage prepended.
+    """
+
+    captions = named_table_captions(query)
+    gold = table_caption_gold_pattern(captions)
+    if gold is None or limit < 1 or not _TABLE_REPRO_ASK.search(query):
+        return trimmed
+    matches = [item for item in pool if gold.search(item.raw_text or "")]
+    if not matches:
+        return trimmed
+    titled = [
+        item
+        for item in matches
+        if any(
+            f"{caption.casefold()}." in (item.raw_text or "").casefold()
+            for caption in captions
+        )
+    ]
+    if titled:
+        matches = titled
+
+    def _rank_key(pair: tuple[int, RerankPassage]) -> tuple[int, int, int, int]:
+        """Prefer dense table bodies over prose intros.
+
+        Args:
+            pair: ``(pool_index, passage)``.
+
+        Returns:
+            Ascending sort tuple (smaller = better).
+        """
+
+        index, item = pair
+        text = item.raw_text or ""
+        match = gold.search(text)
+        span = match.group(0) if match is not None else ""
+        return (
+            -_table_body_rank(text, captions),
+            -local_literal_overlap_score(query, text, span),
+            -query_overlap_score(query, text),
+            index,
+        )
+
+    ranked = sorted(enumerate(matches), key=_rank_key)
+    best = ranked[0][1]
+    if trimmed and trimmed[0].candidate.chunk_id == best.candidate.chunk_id:
+        return trimmed
+    selected = {item.candidate.chunk_id for item in trimmed}
+    if best.candidate.chunk_id in selected:
+        rest = tuple(
+            other
+            for other in trimmed
+            if other.candidate.chunk_id != best.candidate.chunk_id
+        )
+        promoted = (best, *rest)
+    else:
+        promoted = (best, *trimmed)
+    if len(promoted) > limit:
+        promoted = promoted[:limit]
+    return promoted
+
+
+_TABLE_TITLE_RANK = re.compile(r"(?i)Table\s+\d+-\d+\.")
+_TABLE_PROSE_RANK = re.compile(
+    r"(?i)\b(?:a small selection|are shown along|at a glance|you can adapt|"
+    r"as you.?ll see in|see in table|shown in table|refer to table)\b",
+)
+_NUMBER_RANK = re.compile(r"\b\d+(?:[.,]\d+)?\b")
+
+
+def _table_body_rank(text: str, captions: tuple[str, ...]) -> int:
+    """Score table-body density for promote ranking.
+
+    Args:
+        text: Passage text.
+        captions: Query captions such as ``Table 2-1``.
+
+    Returns:
+        Higher prefers the passage. Titled caption pages outrank denser
+        continuation pages that only back-reference the table in prose.
+    """
+
+    if not text:
+        return -100
+    score = 0
+    lowered = text.casefold()
+    titled = False
+    for caption in captions:
+        key = caption.casefold()
+        if f"{key}." in lowered:
+            score += 24
+            titled = True
+        elif key in lowered:
+            score += 2
+    digits = _NUMBER_RANK.findall(text)
+    score += min(12, len(digits))
+    header_hits = sum(
+        1
+        for token in (
+            "model",
+            "maintainer",
+            "metric",
+            "stack",
+            "role",
+            "approach",
+            "product team",
+            "key strength",
+        )
+        if token in lowered
+    )
+    score += 3 * header_hits
+    if _TABLE_PROSE_RANK.search(text):
+        score -= 8
+    if not titled and _TABLE_PROSE_RANK.search(text):
+        score -= 20
+    if _TABLE_TITLE_RANK.search(text) is None and _TABLE_PROSE_RANK.search(text):
+        score -= 6
+    return score
+
+
 def literal_anchor_ask(query: str) -> bool:
     """Return whether ``query`` asks for a pinned literal or label.
 
     Used to load fused-outside-pool contexts before promote so rare
-    ``window_size`` / tool-description / host / IDE literals remain
-    searchable after the rerank pool drops them.
+    ``window_size`` / tool-description / host / IDE / code-def / table
+    literals remain searchable after the rerank pool drops them.
 
     Args:
         query: Original user query. Untrusted.
@@ -445,6 +825,8 @@ def literal_anchor_ask(query: str) -> bool:
         or _HOST_LITERAL_ASK.search(query)
         or _IDE_PRODUCT_ASK.search(query)
         or _PROTOCOL_ASK.search(query)
+        or _CODE_DEF_ASK.search(query)
+        or _TABLE_REPRO_ASK.search(query)
     )
 
 
@@ -453,6 +835,10 @@ def literal_gold_already_loaded(
     passages: Sequence[RerankPassage],
 ) -> bool:
     """Return whether pool passages already hold the ask's gold literal.
+
+    Table asks require a titled caption+rows body, not a prose intro that
+    only mentions ``Table N-M``. Otherwise fused-outside-pool reload never
+    runs and salvage cannot find the row text.
 
     Args:
         query: Original user query. Untrusted.
@@ -463,18 +849,30 @@ def literal_gold_already_loaded(
         needed for literal promote.
     """
 
-    checks = (
+    checks: list[tuple[re.Pattern[str], re.Pattern[str]]] = [
         (_CHUNKING_ASK, _CHUNKING_GOLD),
         (_TOOL_DESCRIPTION_ASK, _TOOL_DESCRIPTION_GOLD),
         (_METHOD_LABEL_ASK, _METHOD_LABEL_GOLD),
         (_HOST_LITERAL_ASK, _HOST_LITERAL_GOLD),
         (_IDE_PRODUCT_ASK, _IDE_PRODUCT_GOLD),
         (_PROTOCOL_ASK, _PROTOCOL_GOLD),
-    )
+    ]
+    code_gold = code_definition_gold_pattern(named_code_definition_ids(query))
+    if code_gold is not None:
+        checks.append((_CODE_DEF_ASK, code_gold))
     for ask_pattern, gold_pattern in checks:
         if not ask_pattern.search(query):
             continue
         if any(gold_pattern.search(item.raw_text or "") for item in passages):
+            return True
+    captions = named_table_captions(query)
+    table_gold = table_caption_gold_pattern(captions)
+    if table_gold is not None and _TABLE_REPRO_ASK.search(query):
+        if any(
+            table_gold.search(item.raw_text or "")
+            and _table_body_rank(item.raw_text or "", captions) >= 12
+            for item in passages
+        ):
             return True
     return False
 
@@ -536,13 +934,17 @@ def _promote_matching_passage(
     limit: int,
     ask_pattern: re.Pattern[str],
     gold_pattern: re.Pattern[str],
+    prefer_early_match: bool = False,
 ) -> tuple[RerankPassage, ...]:
     """Prepend the best fused/pool passage matching ``gold_pattern``.
 
     Callers may pass the full fused passage list as ``pool`` so rare
     literals outside the rerank pool can still be pinned. When several
     passages match, the highest query-term overlap wins so a nearby
-    duplicate page does not block the gold holder.
+    duplicate page does not block the gold holder. When
+    ``prefer_early_match`` is set, an earlier ``gold_pattern`` offset in
+    the passage wins first so a primary ``def`` page beats a later
+    reprint that only mentions the tool in passing.
 
     Args:
         trimmed: Final evidence after MMR and token trim.
@@ -551,6 +953,7 @@ def _promote_matching_passage(
         limit: Maximum passages to retain.
         ask_pattern: Query shape that enables promotion.
         gold_pattern: Passage text that should be pinned.
+        prefer_early_match: Prefer earlier match offsets in the passage.
 
     Returns:
         Trimmed passages, possibly with the best matching passage prepended.
@@ -564,23 +967,32 @@ def _promote_matching_passage(
     if not matches:
         return trimmed
 
-    def _rank_key(pair: tuple[int, RerankPassage]) -> tuple[int, int, int]:
-        """Sort key: global overlap, local gold-span overlap, pool order.
+    def _rank_key(pair: tuple[int, RerankPassage]) -> tuple[int, int, int, int]:
+        """Sort key for duplicate gold holders.
 
         Args:
             pair: ``(pool_index, passage)``.
 
         Returns:
-            Ascending sort tuple (more negative = better).
+            Ascending sort tuple (more negative / smaller = better).
         """
 
         index, item = pair
         text = item.raw_text or ""
         match = gold_pattern.search(text)
         span = match.group(0) if match is not None else ""
+        offset = match.start() if match is not None else 10_000
+        if prefer_early_match:
+            return (
+                offset,
+                -local_literal_overlap_score(query, text, span),
+                -query_overlap_score(query, text),
+                index,
+            )
         return (
             -query_overlap_score(query, text),
             -local_literal_overlap_score(query, text, span),
+            offset,
             index,
         )
 

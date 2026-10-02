@@ -31,6 +31,8 @@ from smart_rag_core.gateways.model_types import (
     RerankModelResponse,
     VerifierModelRequest,
     VerifierModelResponse,
+    WebAnswerModelRequest,
+    WebAnswerModelResponse,
 )
 from smart_rag_core.gateways.openai_adapter import OpenAIRerankAdapter
 from smart_rag_core.observability.langsmith_tracing import (
@@ -141,6 +143,25 @@ class ModelGateway:
         """
 
         return await self._adapter.generate_general_chat(request)
+
+    @model_call_traceable(name="model.web_answer")
+    async def generate_web_answer(
+        self, request: WebAnswerModelRequest
+    ) -> WebAnswerModelResponse:
+        """Delegate one Web-research synthesis request. Never a hidden retry.
+
+        Args:
+            request: Bounded Web-answer request.
+
+        Returns:
+            Structured Web-answer response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_web_answer(request)
 
     @model_call_traceable(name="model.conversation_title")
     async def generate_conversation_title(

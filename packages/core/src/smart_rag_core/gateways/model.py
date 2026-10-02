@@ -30,12 +30,15 @@ from smart_rag_core.gateways.model_types import (
     RerankModelResponse,
     VerifierModelRequest,
     VerifierModelResponse,
+    WebAnswerModelRequest,
+    WebAnswerModelResponse,
 )
 from smart_rag_core.gateways.openai_adapter import OpenAIRerankAdapter
 from smart_rag_core.gateways.openai_answer import (
     execute_openai_answer,
     execute_openai_eval_judge,
     execute_openai_verifier,
+    execute_openai_web_answer,
 )
 from smart_rag_core.gateways.openai_conversation_title import (
     execute_openai_conversation_title,
@@ -72,6 +75,8 @@ __all__ = [
     "RerankModelResponse",
     "VerifierModelRequest",
     "VerifierModelResponse",
+    "WebAnswerModelRequest",
+    "WebAnswerModelResponse",
     "block_openai_network",
     "create_model_gateway",
     "execute_openai_answer",
@@ -82,4 +87,5 @@ __all__ = [
     "execute_openai_query_profile",
     "execute_openai_rerank",
     "execute_openai_verifier",
+    "execute_openai_web_answer",
 ]

@@ -49,7 +49,7 @@ class QueryGraphDeps:
         web_critique_prompt_text: Pinned ``web_critique_v1`` body. Critique
             itself is deterministic; the file pins the live-model contract.
         web_answer_prompt_text: Pinned ``web_answer_v1`` body. Synthesis uses
-            persisted excerpts; the file pins the live-model contract.
+            the budgeted model gateway when bound, otherwise extractive mock.
         model_gateway: Optional ``ModelGateway``. Compile constructs none.
         optional_policy: Frozen mapping-versus-discovery policy.
         force_discovery: Test hook for the one catalog round.

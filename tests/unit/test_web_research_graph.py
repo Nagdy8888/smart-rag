@@ -629,3 +629,259 @@ def test_verify_answer_node_web_skips_model_verifier() -> None:
     assert answer.table_citations == ()
     assert answer.answer_origin is KnowledgeScope.WEB
     assert len(answer.web_citations) == 1
+
+
+def test_empty_search_urls_are_evidence_insufficient() -> None:
+    """Zero normalized Exa URLs fail closed as insufficient evidence."""
+
+    @dataclass
+    class _EmptySearch(FakeSearch):
+        """Search port that never returns candidates."""
+
+        def search(
+            self,
+            *,
+            query: str,
+            remaining_deadline_seconds: float,
+            num_results: int,
+        ) -> ExaSearchResponse:
+            """Return an empty candidate set.
+
+            Args:
+                query: Sanitized query.
+                remaining_deadline_seconds: Remaining deadline.
+                num_results: Requested hit count.
+
+            Returns:
+                Empty Exa search response.
+            """
+
+            del remaining_deadline_seconds, num_results
+            self.queries.append(query)
+            return ExaSearchResponse(
+                candidates=(),
+                allowed_urls=frozenset(),
+                metadata=_META,
+            )
+
+    with pytest.raises(WebResearchError, match="web_evidence_insufficient"):
+        run_web_research(
+            user_query="search the web for latest news",
+            search=_EmptySearch(),
+            store=FakeStore(),
+            remaining_deadline_seconds=lambda: 40.0,
+        )
+
+
+def test_web_scope_missing_runtime_is_not_unconfigured() -> None:
+    """Missing DB/runtime context must not reuse the Exa-key detail."""
+
+    from pydantic import SecretStr
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.web_scope import web_scope_node
+    from smart_rag_agents.query.state import pending_query_state
+    from smart_rag_core.gateways.exa_search import ExaSearchGateway
+
+    state = pending_query_state(user_query="search the web for latest news")
+    state["status"] = "planned"
+    gateway = ExaSearchGateway(api_key=SecretStr("test-exa-key-not-used"))
+    missing_runtime = web_scope_node(
+        state,
+        QueryGraphDeps(
+            web_search_enabled=True,
+            web_search_configured=True,
+            exa_search_gateway=gateway,
+            connection=None,
+        ),
+    )
+    assert missing_runtime["status"] == "routing_rejected"
+    assert missing_runtime["detail"] == "web_runtime_unavailable"
+    assert missing_runtime["answer"] is None
+
+
+def test_synthesize_web_answer_drops_invented_ids() -> None:
+    """Gateway synthesis keeps only persisted Web source IDs and spans."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.gateway.web_answer import synthesize_web_answer
+    from smart_rag_core.gateways.model import WebAnswerModelResponse
+
+    source = WebSourceRecord(
+        web_source_id="11111111-1111-4111-8111-111111111111",
+        source_index=0,
+        url=_PAGE,
+        title="News",
+        excerpt=_EXCERPT,
+        content_hash=excerpt_sha256(_EXCERPT),
+    )
+
+    class _Gateway:
+        """Fixture gateway that invents one extra citation id."""
+
+        async def generate_web_answer(self, request: object) -> WebAnswerModelResponse:
+            """Return one valid and one invented citation.
+
+            Args:
+                request: Web-answer request.
+
+            Returns:
+                Structured fixture payload.
+            """
+
+            del request
+            return WebAnswerModelResponse(
+                mode="mock",
+                payload={
+                    "answer_text": _EXCERPT[:40],
+                    "status": "complete",
+                    "web_citations": [
+                        {
+                            "web_source_id": source.web_source_id,
+                            "span": _EXCERPT[:20],
+                        },
+                        {
+                            "web_source_id": "99999999-9999-4999-8999-999999999999",
+                            "span": "not present",
+                        },
+                    ],
+                    "atomic_links": [
+                        {
+                            "link_id": "l1",
+                            "claim": _EXCERPT[:20],
+                            "web_source_ids": [source.web_source_id],
+                        },
+                        {
+                            "link_id": "l2",
+                            "claim": "invented claim",
+                            "web_source_ids": [
+                                "99999999-9999-4999-8999-999999999999"
+                            ],
+                        },
+                    ],
+                },
+                request_id="fixture-web",
+                input_tokens=1,
+                output_tokens=1,
+            )
+
+    payload = synthesize_web_answer(
+        QueryGraphDeps(
+            model_gateway=_Gateway(),
+            web_answer_prompt_text="web_answer fixture prompt",
+        ),
+        query="search the web for latest news",
+        sources=(source,),
+        context=None,
+    )
+    assert payload.answer_origin is KnowledgeScope.WEB
+    assert payload.citations == ()
+    assert payload.table_citations == ()
+    assert len(payload.web_citations) == 1
+    assert payload.web_citations[0].web_source_id == source.web_source_id
+    assert len(payload.atomic_links) == 1
+    assert payload.atomic_links[0].web_source_ids == (source.web_source_id,)
+
+
+def test_synthesize_web_answer_falls_back_to_mock_on_provider_error() -> None:
+    """Provider failures degrade to extractive mock, not Hybrid."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.gateway.web_answer import synthesize_web_answer
+    from smart_rag_core.web_research.synthesis import mock_web_answer
+
+    source = WebSourceRecord(
+        web_source_id="11111111-1111-4111-8111-111111111111",
+        source_index=0,
+        url=_PAGE,
+        title="News",
+        excerpt=_EXCERPT,
+        content_hash=excerpt_sha256(_EXCERPT),
+    )
+
+    class _BoomGateway:
+        """Gateway that always fails the Web-answer call."""
+
+        async def generate_web_answer(self, request: object) -> object:
+            """Raise before returning a payload.
+
+            Args:
+                request: Web-answer request.
+
+            Raises:
+                RuntimeError: Always.
+            """
+
+            del request
+            raise RuntimeError("provider down")
+
+    payload = synthesize_web_answer(
+        QueryGraphDeps(
+            model_gateway=_BoomGateway(),
+            web_answer_prompt_text="web_answer fixture prompt",
+        ),
+        query="search the web for latest news",
+        sources=(source,),
+        context=None,
+    )
+    expected = mock_web_answer(
+        query="search the web for latest news",
+        sources=(source,),
+    )
+    assert payload.answer_origin is KnowledgeScope.WEB
+    assert payload.citations == ()
+    assert payload.table_citations == ()
+    assert payload.web_citations
+    assert payload.answer_text == expected.answer_text
+
+
+def test_run_web_research_uses_injected_synthesize() -> None:
+    """Executor prefers the injected synthesize callable over extractive mock."""
+
+    search = FakeSearch()
+    called: list[int] = []
+
+    def _synthesize(
+        query: str, sources: tuple[WebSourceRecord, ...]
+    ) -> AnswerPayload:
+        """Record invocation and return a grounded Web draft.
+
+        Args:
+            query: Sanitized query.
+            sources: Persisted sources.
+
+        Returns:
+            Complete Web answer.
+        """
+
+        del query
+        called.append(len(sources))
+        source = sources[0]
+        span = source.excerpt[:20]
+        return AnswerPayload(
+            answer_text="Synthesized public web answer.",
+            citations=(),
+            web_citations=(
+                WebCitation(web_source_id=source.web_source_id, span=span),
+            ),
+            atomic_links=(
+                AtomicLink(
+                    link_id="web-1",
+                    claim=span,
+                    web_source_ids=(source.web_source_id,),
+                ),
+            ),
+            table_citations=(),
+            status="complete",
+            answer_origin=KnowledgeScope.WEB,
+        )
+
+    result = run_web_research(
+        user_query="search the web for latest news",
+        search=search,
+        store=FakeStore(),
+        remaining_deadline_seconds=lambda: 40.0,
+        synthesize=_synthesize,
+    )
+    assert called == [len(result.sources)]
+    assert result.answer.answer_text == "Synthesized public web answer."
+    assert result.answer.answer_origin is KnowledgeScope.WEB

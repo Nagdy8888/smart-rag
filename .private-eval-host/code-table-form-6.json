@@ -1,0 +1,146 @@
+[
+  {
+    "id": "ct01",
+    "page": 40,
+    "kind": "code",
+    "prompt": "In the company document Building Applications with AI Agents, reproduce the cancel_order tool definition from the first-agent example as a fenced Python code block (not a prose paraphrase). Use only that document.",
+    "facts": [
+      {
+        "id": "ct01-f1",
+        "canonical": [
+          "def cancel_order(order_id: str) -> str:"
+        ]
+      },
+      {
+        "id": "ct01-f2",
+        "canonical": [
+          "Cancel an order that hasn't shipped."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ct05",
+    "page": 117,
+    "kind": "code",
+    "prompt": "In the company document Building Applications with AI Agents, reproduce the query_wolfram_alpha @tool function as a fenced Python code block (not a prose paraphrase). Use only that document.",
+    "facts": [
+      {
+        "id": "ct05-f1",
+        "canonical": [
+          "def query_wolfram_alpha(expression: str) -> str:"
+        ]
+      },
+      {
+        "id": "ct05-f2",
+        "canonical": [
+          "YOUR_WOLFRAM_ALPHA_APP_ID"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ct13",
+    "page": 44,
+    "kind": "table",
+    "prompt": "In the company document Building Applications with AI Agents, reproduce Table 2-1 (Selected open weight models by performance and size) as a Markdown pipe table with the model rows shown on that page (not a prose list). Use only that document.",
+    "facts": [
+      {
+        "id": "ct13-f1",
+        "canonical": [
+          "Llama 3.1 Instruct Turbo"
+        ]
+      },
+      {
+        "id": "ct13-f2",
+        "canonical": [
+          "Gemma 2"
+        ]
+      },
+      {
+        "id": "ct13-f3",
+        "canonical": [
+          "72.1"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ct14",
+    "page": 225,
+    "kind": "table",
+    "prompt": "In the company document Building Applications with AI Agents, reproduce Table 8-2 (Agent coordination techniques) as a Markdown pipe table (not a prose list). Include the A2A Protocol row. Use only that document.",
+    "facts": [
+      {
+        "id": "ct14-f1",
+        "canonical": [
+          "A2A Protocol"
+        ]
+      },
+      {
+        "id": "ct14-f2",
+        "canonical": [
+          "Agent Cards"
+        ]
+      },
+      {
+        "id": "ct14-f3",
+        "canonical": [
+          "Message brokers"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ct15",
+    "page": 252,
+    "kind": "table",
+    "prompt": "In the company document Building Applications with AI Agents, reproduce Table 10-2 (Comparison of monitoring and observability stacks) as a Markdown pipe table (not a prose list). Use only that document.",
+    "facts": [
+      {
+        "id": "ct15-f1",
+        "canonical": [
+          "Grafana + Loki/Tempo"
+        ]
+      },
+      {
+        "id": "ct15-f2",
+        "canonical": [
+          "Langfuse"
+        ]
+      },
+      {
+        "id": "ct15-f3",
+        "canonical": [
+          "SigNoz"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ct16",
+    "page": 262,
+    "kind": "table",
+    "prompt": "In the company document Building Applications with AI Agents, reproduce Table 10-3 (RACI matrix of monitoring metrics) as a Markdown pipe table (not a prose list). Include the Hallucination rates row. Use only that document.",
+    "facts": [
+      {
+        "id": "ct16-f1",
+        "canonical": [
+          "Hallucination rates"
+        ]
+      },
+      {
+        "id": "ct16-f2",
+        "canonical": [
+          "Task success rate"
+        ]
+      },
+      {
+        "id": "ct16-f3",
+        "canonical": [
+          "Token usage/cost"
+        ]
+      }
+    ]
+  }
+]

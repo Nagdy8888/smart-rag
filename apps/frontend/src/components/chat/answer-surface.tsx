@@ -4,7 +4,7 @@
 
 "use client";
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import {
   MIXED_SCOPE_CLARIFICATION,
   answerOriginLabel,
@@ -28,7 +28,16 @@ import {
   routeLabel,
 } from "../../lib/run-details";
 import { formatRelativeTime } from "../../lib/relative-time";
-import { formatCodeSnippet, isCodeSnippet } from "../../lib/code-snippet";
+import {
+  isAnswerTable,
+  parseAnswerTable,
+  type AnswerTableModel,
+} from "../../lib/answer-table";
+import { renderAnswerProse } from "../../lib/answer-prose";
+import {
+  formatCodeSnippetModel,
+  isCodeSnippet,
+} from "../../lib/code-snippet";
 import { displayText } from "../../lib/safe-text";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -38,6 +47,7 @@ import { LimitationCallout } from "../ui/limitation-callout";
 import { LiveRegion } from "../ui/live-region";
 import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
+import { AnswerCodeBlock } from "./answer-code-block";
 import { RunProgressTimeline } from "./run-progress-timeline";
 import { VerifiedAnswerReveal } from "./verified-answer-reveal";
 import styles from "./chat-transcript.module.css";
@@ -267,6 +277,122 @@ export function visibleParagraphSlice(
 }
 
 /**
+ * Render one complete verified paragraph as code, table, or prose.
+ *
+ * Incomplete reveal slices stay as prose so streaming does not flash
+ * a half-parsed table. Detection runs only when the paragraph is fully
+ * visible. Text is decoded before classification so history escapes match
+ * live SSE text.
+ *
+ * @param text - Visible paragraph text.
+ * @param complete - True when the full paragraph is available.
+ * @returns Code, table, or prose React node.
+ */
+function renderAnswerParagraphBody(text: string, complete: boolean): ReactNode {
+  const decoded = displayText(text);
+  // Lone fence markers left after a bad split stay out of the transcript.
+  if (/^\s*```[a-zA-Z0-9_+-]*\s*$/.test(decoded.trim())) {
+    return null;
+  }
+  if (complete && isCodeSnippet(decoded)) {
+    const snippet = formatCodeSnippetModel(decoded);
+    return (
+      <AnswerCodeBlock code={snippet.code} language={snippet.language} />
+    );
+  }
+  if (complete && isAnswerTable(decoded)) {
+    const table = parseAnswerTable(decoded);
+    if (table !== null) {
+      return <AnswerTableView table={table} />;
+    }
+  }
+  return renderAnswerProse(
+    decoded,
+    styles.answerProse,
+    styles.answerList,
+    styles.answerInlineCode,
+  );
+}
+
+/**
+ * Render a parsed answer table with React text cells only.
+ *
+ * @param props - Parsed table model.
+ * @returns Table or preformatted table block.
+ */
+function AnswerTableView({ table }: { table: AnswerTableModel }): ReactNode {
+  if (table.preformatted) {
+    return (
+      <figure className={styles.answerTableFigure} data-testid="answer-table">
+        {table.caption ? (
+          <figcaption className={styles.answerTableCaption}>
+            <UserText value={table.caption} />
+          </figcaption>
+        ) : null}
+        <pre className={styles.answerTablePre} dir="ltr">
+          <UserText value={table.preformatted} />
+        </pre>
+      </figure>
+    );
+  }
+  return (
+    <figure className={styles.answerTableFigure} data-testid="answer-table">
+      {table.caption ? (
+        <figcaption className={styles.answerTableCaption}>
+          <UserText value={table.caption} />
+        </figcaption>
+      ) : null}
+      <div className={styles.answerTableScroll}>
+        <table className={styles.answerTable}>
+          <thead>
+            <tr>
+              {table.headers.map((header, index) => (
+                <th key={`h-${String(index)}`} scope="col">
+                  <UserText value={header} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {table.rows.map((row, rowIndex) => (
+              <tr key={`r-${String(rowIndex)}`}>
+                {row.map((cell, cellIndex) => (
+                  <td key={`c-${String(rowIndex)}-${String(cellIndex)}`}>
+                    <UserText value={cell} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </figure>
+  );
+}
+
+/**
+ * Render verified answer text through the live code/table/prose path.
+ *
+ * Used by the empty-state format gallery so samples match production Ask
+ * rendering without citations or streaming reveal.
+ *
+ * @param props - Full answer body to classify and render.
+ * @returns Paragraph blocks with no citation chips.
+ */
+export function AnswerContentPreview({ text }: { text: string }) {
+  return (
+    <AnswerParagraphs
+      answerText={text}
+      visibleText={text}
+      citations={[]}
+      answerOrigin="general_knowledge"
+      hrefForCitation={() => undefined}
+      onSelectCitation={() => undefined}
+    />
+  );
+}
+
+/**
  * Render verified paragraphs with inline chips and a legacy footer.
  *
  * @param props - Full answer, visible prefix, citations, and chip handlers.
@@ -316,17 +442,7 @@ function AnswerParagraphs({
             data-paragraph-index={String(index)}
             key={`p-${String(index)}`}
           >
-            {slice.complete && isCodeSnippet(slice.text) ? (
-              <pre className={styles.codeSnippet} data-testid="answer-code-snippet">
-                <code dir="ltr">
-                  <UserText value={formatCodeSnippet(slice.text)} />
-                </code>
-              </pre>
-            ) : (
-              <p className={styles.answerProse} dir="auto">
-                <UserText value={slice.text} />
-              </p>
-            )}
+            {renderAnswerParagraphBody(slice.text, slice.complete)}
             <ParagraphCitations
               citations={mapped}
               hrefForCitation={hrefForCitation}
@@ -550,16 +666,14 @@ export const AnswerSurface = memo(function AnswerSurface({
               authoritativeReady={answer.trim() !== ""}
               onShowFull={onShowFullAnswer ?? (() => undefined)}
             >
-              {shouldShowCitations(answerOrigin) ? (
-                <AnswerParagraphs
-                  answerText={answer}
-                  visibleText={visibleAnswer ?? answer}
-                  citations={citations}
-                  answerOrigin={answerOrigin}
-                  hrefForCitation={hrefForCitation}
-                  onSelectCitation={onSelectCitation}
-                />
-              ) : null}
+              <AnswerParagraphs
+                answerText={answer}
+                visibleText={visibleAnswer ?? answer}
+                citations={citations}
+                answerOrigin={answerOrigin}
+                hrefForCitation={hrefForCitation}
+                onSelectCitation={onSelectCitation}
+              />
             </VerifiedAnswerReveal>
           ) : null}
           {showClarification ? (

@@ -66,33 +66,187 @@
   max-width: 40rem;
   min-width: 0;
   font-family: var(--font-sans);
-  font-size: 20px;
-  line-height: 1.45;
+  font-size: 1.0625rem;
+  line-height: 1.65;
   color: var(--color-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
-.codeSnippet {
+.answerProse strong {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.answerProse + .answerProse,
+.answerList + .answerProse,
+.answerProse + .answerList {
+  margin-block-start: calc(var(--space) * 3);
+}
+
+.answerList {
   margin: 0;
-  width: fit-content;
+  max-width: 40rem;
+  padding-inline-start: 1.35rem;
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+
+.answerList li {
+  margin-block: 0.35em;
+  padding-inline-start: 0.15rem;
+  overflow-wrap: anywhere;
+}
+
+.answerList li::marker {
+  color: var(--color-text-muted, var(--color-text));
+}
+
+.answerInlineCode {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.12em 0.35em;
+  border-radius: calc(var(--radius-md) * 0.6);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.codeBlock {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space) * 2);
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.codeBlockLang {
+  color: var(--color-text-muted, var(--color-text));
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.codeBlockBody {
+  margin: 0;
+  width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  padding: 12px 14px;
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-md);
+  padding: 14px 16px;
   color: var(--color-text);
   font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.55;
+  font-size: 0.8125rem;
+  line-height: 1.6;
   white-space: pre;
 }
 
-.codeSnippet code,
-.codeSnippet code span {
+.codeBlockBody code,
+.codeBlockBody code span {
   white-space: pre;
   font-family: inherit;
+}
+
+.answerTableFigure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+  width: 100%;
+  max-width: 100%;
+}
+
+.answerTableCaption {
+  margin: 0;
+  color: var(--color-text-muted, var(--color-text));
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.answerTableScroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.answerTable {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.answerTable th,
+.answerTable td {
+  border-bottom: 1px solid var(--color-border);
+  border-inline-end: 1px solid var(--color-border);
+  padding: 10px 12px;
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.answerTable th:last-child,
+.answerTable td:last-child {
+  border-inline-end: 0;
+}
+
+.answerTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.answerTable th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.answerTable tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--color-surface-muted) 45%, transparent);
+}
+
+.answerTablePre {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 14px 16px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: pre;
 }
 
 .answerBody {
@@ -385,13 +539,74 @@
   width: 100%;
   max-width: 760px;
   margin: 0 auto;
+  display: grid;
+  gap: calc(var(--space) * 3);
 }
 
 .emptyPromptsLabel {
-  margin: 0 0 calc(var(--space) * 1);
+  margin: calc(var(--space) * 2) 0 0;
   color: var(--color-text-muted);
   font-size: var(--text-label-size);
   line-height: var(--text-label-height);
+}
+
+.formatGallery {
+  display: grid;
+  gap: calc(var(--space) * 2);
+  padding: calc(var(--space) * 3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-bg));
+}
+
+.formatGalleryHeader {
+  display: grid;
+  gap: calc(var(--space) * 0.5);
+}
+
+.formatGalleryTitle {
+  margin: 0;
+  font-size: var(--text-body-size, 1rem);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.formatGalleryBlurb {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-height);
+}
+
+.formatGalleryTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 1);
+}
+
+.formatGalleryTab {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-height);
+  padding: calc(var(--space) * 1) calc(var(--space) * 2);
+  cursor: pointer;
+}
+
+.formatGalleryTab[data-selected="true"] {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-surface, #fff);
+}
+
+.formatGalleryPanel {
+  min-width: 0;
+  padding-top: calc(var(--space) * 1);
+  border-top: 1px solid var(--color-border);
 }
 
 .emptyPromptList {
@@ -451,7 +666,8 @@
     font-size: 24px;
   }
 
-  .answerProse {
+  .answerProse,
+  .answerList {
     font-size: 17px;
     line-height: 1.5;
   }

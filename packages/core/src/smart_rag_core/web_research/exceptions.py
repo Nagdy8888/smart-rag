@@ -6,6 +6,7 @@ _WEB_REASONS = frozenset(
     {
         "web_search_disabled",
         "web_search_unconfigured",
+        "web_runtime_unavailable",
         "web_search_auth_failed",
         "web_search_quota_exhausted",
         "web_search_rate_limited",

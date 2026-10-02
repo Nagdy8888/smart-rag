@@ -23,6 +23,8 @@ from smart_rag_core.gateways.model_types import (
     RerankModelResponse,
     VerifierModelRequest,
     VerifierModelResponse,
+    WebAnswerModelRequest,
+    WebAnswerModelResponse,
 )
 
 
@@ -92,6 +94,20 @@ class ModelAdapter(Protocol):
 
         Returns:
             Structured general-chat response.
+        """
+
+        ...
+
+    async def generate_web_answer(
+        self, request: WebAnswerModelRequest
+    ) -> WebAnswerModelResponse:
+        """Generate at most one Web-research synthesis payload.
+
+        Args:
+            request: Validated Web-answer request.
+
+        Returns:
+            Structured Web-answer response.
         """
 
         ...

@@ -152,9 +152,100 @@ describe("AnswerSurface origin chrome", () => {
         '@tool def multiply(x: float, y: float) -> float: """Multiply.""" return x * y <img src=x onerror=alert(1)>',
     });
     const snippet = screen.getByTestId("answer-code-snippet");
-    expect(snippet.tagName).toBe("PRE");
+    expect(snippet.querySelector("pre")).not.toBeNull();
     expect(snippet.textContent).toContain("def multiply");
     expect(snippet.textContent).toContain("\n");
+    expect(snippet.textContent).toMatch(/python/i);
+    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("renders code and tables for general_knowledge without citation gating", () => {
+    const { unmount } = renderSurface({
+      answerOrigin: "general_knowledge",
+      citations: [],
+      answer: [
+        "```python",
+        "def hello():",
+        "    return 1",
+        "```",
+      ].join("\n"),
+    });
+    expect(screen.getByTestId("answer-code-snippet")).toBeInTheDocument();
+    expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
+    unmount();
+
+    renderSurface({
+      answerOrigin: "general_knowledge",
+      citations: [],
+      answer: [
+        "| Model | Score |",
+        "| --- | --- |",
+        "| Gemma | 72 |",
+      ].join("\n"),
+    });
+    const table = screen.getByTestId("answer-table");
+    expect(table.querySelector("table")).not.toBeNull();
+    expect(table.textContent).toContain("Gemma");
+  });
+
+  it("formats prose lists and bold for non-citation origins", () => {
+    const { container } = renderSurface({
+      answerOrigin: "deterministic",
+      citations: [],
+      answer: ["Use **care**.", "", "- One", "- Two"].join("\n"),
+    });
+    expect(screen.getAllByTestId("answer-prose").length).toBeGreaterThan(0);
+    expect(container.querySelector("strong")).toHaveTextContent("care");
+    expect(container.querySelectorAll("li")).toHaveLength(2);
+  });
+
+  it("renders a mixed bold/list/fence/table answer without a stray fence", () => {
+    const { container } = renderSurface({
+      answerOrigin: "general_knowledge",
+      citations: [],
+      answer: [
+        "Use **bold** carefully.",
+        "",
+        "- Alpha",
+        "- Beta",
+        "",
+        "```python",
+        "def hello():",
+        "    return 1",
+        "",
+        "```",
+        "",
+        "| Model | Score |",
+        "| --- | --- |",
+        "| Gemma | 72 |",
+      ].join("\n"),
+    });
+    expect(container.querySelector("strong")).toHaveTextContent("bold");
+    expect(container.querySelectorAll("li")).toHaveLength(2);
+    const snippet = screen.getByTestId("answer-code-snippet");
+    expect(snippet.textContent).toContain("def hello");
+    expect(snippet.textContent).not.toMatch(/```/);
+    const table = screen.getByTestId("answer-table");
+    expect(table.querySelector("table")).not.toBeNull();
+    expect(table.textContent).toContain("Gemma");
+    expect(container.textContent).not.toMatch(/```/);
+  });
+
+  it("renders a pipe table as a table and keeps markup inert", () => {
+    const { container } = renderSurface({
+      answerOrigin: "company_documents",
+      answer: [
+        "Table 2-1 Selected models",
+        "| Model | Payload |",
+        "| --- | --- |",
+        "| Gemma 2 | <img src=x onerror=alert(1)> |",
+      ].join("\n"),
+    });
+    const table = screen.getByTestId("answer-table");
+    expect(table.querySelector("table")).not.toBeNull();
+    expect(table.textContent).toContain("Gemma 2");
+    expect(table.textContent).toContain("<img src=x onerror=alert(1)>");
     expect(container.querySelector("img")).toBeNull();
   });
 

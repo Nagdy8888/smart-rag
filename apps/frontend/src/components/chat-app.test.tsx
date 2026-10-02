@@ -1152,10 +1152,22 @@ describe("ChatApp Ask workspace", () => {
   it("fills the composer from a prompt chip without sending", async () => {
     const user = userEvent.setup();
     renderChat(<ChatApp />);
-    const chipLabel = "What is LCEL according to the uploaded PDF?";
+    const chipLabel =
+      "Reproduce the cancel_order tool as a fenced Python code block from Building Applications with AI Agents.";
     await user.click(await screen.findByRole("button", { name: chipLabel }));
     expect(screen.getByLabelText("Message")).toHaveValue(chipLabel);
     expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it("shows the answer format gallery on an empty Ask stage", async () => {
+    renderChat(<ChatApp />);
+    expect(
+      await screen.findByTestId("answer-format-gallery"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Code" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("renders fetched transcript messages in ascending order", async () => {

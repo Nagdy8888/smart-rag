@@ -236,6 +236,67 @@ def general_chat_json_schema() -> dict[str, object]:
     }
 
 
+def web_answer_json_schema() -> dict[str, object]:
+    """Return the strict Web-research synthesis schema.
+
+    Returns:
+        OpenAI ``json_schema`` document with ``answer_text``, ``status``,
+        ``web_citations``, and ``atomic_links``. Company citation lists
+        are omitted from the provider contract.
+    """
+
+    web_citation = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["web_source_id", "span"],
+        "properties": {
+            "web_source_id": {"type": "string", "minLength": 1, "maxLength": 36},
+            "span": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_CITATION_SPAN_CHARS,
+            },
+        },
+    }
+    atomic_link = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["link_id", "claim", "web_source_ids"],
+        "properties": {
+            "link_id": {"type": "string", "minLength": 1, "maxLength": 64},
+            "claim": {"type": "string", "minLength": 1, "maxLength": 2000},
+            "web_source_ids": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": MAX_CLAIM_CITATIONS,
+                "items": {"type": "string", "minLength": 1, "maxLength": 36},
+            },
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["answer_text", "status", "web_citations", "atomic_links"],
+        "properties": {
+            "answer_text": {"type": "string", "maxLength": 16_384},
+            "status": {
+                "type": "string",
+                "enum": ["complete", "partial", "refused"],
+            },
+            "web_citations": {
+                "type": "array",
+                "maxItems": MAX_ANSWER_CITATIONS,
+                "items": web_citation,
+            },
+            "atomic_links": {
+                "type": "array",
+                "maxItems": MAX_VERIFIER_LINKS,
+                "items": atomic_link,
+            },
+        },
+    }
+
+
 def verifier_json_schema(link_ids: tuple[str, ...]) -> dict[str, object]:
     """Return the strict verifier schema bound to supplied link IDs.
 

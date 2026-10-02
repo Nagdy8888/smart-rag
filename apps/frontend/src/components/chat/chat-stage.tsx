@@ -20,6 +20,7 @@ import { SEARCH_SCOPE_LABELS, isRequestedSearchScope } from "../../lib/types";
 import { visibleSearchScopes } from "../../lib/web-search";
 import { Button } from "../ui/button";
 import { LimitationCallout } from "../ui/limitation-callout";
+import { AnswerFormatGallery } from "./answer-format-gallery";
 import { AnswerSurface } from "./answer-surface";
 import { ChatComposer } from "./chat-composer";
 import { FeedbackPopover } from "./feedback-popover";
@@ -29,11 +30,14 @@ import { RunDetailsSheet } from "./run-details-sheet";
 import type { FeedbackTag } from "../../lib/types";
 import chatStyles from "./chat-transcript.module.css";
 
-/** Starter prompts grounded in the live company corpus (agent PDF + CMU plots). */
+/**
+ * Live Ask chips that tend to return code or tables from the company PDF.
+ * The format gallery above shows rendering without sending.
+ */
 const PROMPT_CHIPS = [
-  "What is LCEL according to the uploaded PDF?",
-  "How does Single Tool Execution differ from Parallel Tool Execution?",
-  "What is the relationship between Katniss Everdeen and Peeta Mellark?",
+  "Reproduce the cancel_order tool as a fenced Python code block from Building Applications with AI Agents.",
+  "Reproduce Table 10-3 (RACI matrix of monitoring metrics) as a Markdown pipe table from Building Applications with AI Agents.",
+  "Reproduce Table 2-1 (Selected open weight models) as a Markdown pipe table from Building Applications with AI Agents.",
 ] as const;
 
 export type ChatStageProps = {
@@ -289,6 +293,10 @@ export function ChatStage(props: ChatStageProps) {
         ) : null}
         {showEmptyPrompts ? (
           <div className={chatStyles.emptyPrompts}>
+            <AnswerFormatGallery />
+            <p className={chatStyles.emptyPromptsLabel}>
+              Or ask the company document
+            </p>
             {PROMPT_CHIPS.map((chip) => (
               <Button
                 key={chip}

@@ -24,6 +24,8 @@ from smart_rag_core.gateways.model_types import (
     RerankModelResponse,
     VerifierModelRequest,
     VerifierModelResponse,
+    WebAnswerModelRequest,
+    WebAnswerModelResponse,
     mock_lightrag_llm_content,
     reject_oversize_model_input,
     string_tuple,
@@ -44,6 +46,8 @@ from smart_rag_core.query_answer.versions import (
     MAX_VERIFIER_LINKS,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
+    WEB_ANSWER_PROMPT_SHA256,
+    WEB_ANSWER_PROMPT_VERSION,
 )
 from smart_rag_core.query_profile.models import ModelInferredProfile
 from smart_rag_core.query_profile.versions import (
@@ -334,6 +338,79 @@ class MockModelAdapter:
             mode="mock",
             payload=payload,
             request_id=f"mock-answer-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+    async def generate_web_answer(
+        self, request: WebAnswerModelRequest
+    ) -> WebAnswerModelResponse:
+        """Return a fixture Web answer citing only supplied source IDs.
+
+        Args:
+            request: Structured Web-answer request.
+
+        Returns:
+            Mock payload with ``answer_text``, ``web_citations``, and
+            ``atomic_links``.
+
+        Raises:
+            ValueError: If versions or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != WEB_ANSWER_PROMPT_VERSION
+            or request.prompt_sha256 != WEB_ANSWER_PROMPT_SHA256
+        ):
+            raise ValueError("web_answer_prompt_version_mismatch")
+        joined = request.query + request.source_records
+        reject_oversize_model_input(joined, self._max_input_chars)
+        web_citations: list[dict[str, object]] = []
+        links: list[dict[str, object]] = []
+        sentences: list[str] = []
+        for index, source_id in enumerate(request.web_source_ids, start=1):
+            if len(web_citations) >= MAX_ANSWER_PARAGRAPHS:
+                break
+            if source_id not in request.source_records:
+                continue
+            marker = f"id={source_id}"
+            start = request.source_records.find(marker)
+            span = f"Public web excerpt for {source_id}"[:180]
+            if start >= 0:
+                snippet = request.source_records[start : start + 400]
+                for line in snippet.splitlines():
+                    cleaned = line.strip()
+                    if (
+                        cleaned
+                        and not cleaned.startswith("<<")
+                        and not cleaned.startswith("title=")
+                        and not cleaned.startswith("url_")
+                    ):
+                        span = cleaned[:180]
+                        break
+            link_id = f"web-{index}"
+            web_citations.append({"web_source_id": source_id, "span": span})
+            links.append(
+                {
+                    "link_id": link_id,
+                    "claim": span[:200],
+                    "web_source_ids": [source_id],
+                }
+            )
+            sentences.append(span)
+        text = " ".join(sentences)[:4000]
+        return WebAnswerModelResponse(
+            mode="mock",
+            payload={
+                "answer_text": text or "Insufficient public web evidence.",
+                "status": "complete" if web_citations else "refused",
+                "web_citations": web_citations,
+                "atomic_links": links,
+            },
+            request_id=f"mock-web-answer-{self._fixture_id}",
             input_tokens=0,
             output_tokens=0,
         )
