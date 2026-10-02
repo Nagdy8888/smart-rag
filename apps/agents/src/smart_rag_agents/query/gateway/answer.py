@@ -69,7 +69,8 @@ def _apply_code_table_salvages(
             user_query=query,
         )
         working = with_derived_answer_text(working)
-    return format_requested_answer_shape(working, user_query=query)
+    # Formatting is applied once by the caller after salvage returns.
+    return working
 
 
 def gateway_answer(
