@@ -457,7 +457,15 @@ def align_split_source_identifiers(
     if links == after.atomic_links:
         return after
     paragraphs = tuple(
-        paragraph.model_copy(update={"text": restored.claim})
+        paragraph.model_copy(
+            update={
+                "text": re.sub(
+                    r"\n{2,}",
+                    "\n",
+                    restored.claim.replace("\r\n", "\n").replace("\r", "\n"),
+                ).strip()[:4000]
+            }
+        )
         if (restored := repaired.get(paragraph.link_ids[0])) is not None
         and paragraph.link_ids == (restored.link_id,)
         else paragraph
@@ -701,7 +709,11 @@ def _rebuild_paragraphs_and_citations(
         paragraphs.append(
             AnswerParagraph(
                 paragraph_index=index,
-                text=link.claim.strip()[:4000],
+                text=re.sub(
+                    r"\n{2,}",
+                    "\n",
+                    link.claim.replace("\r\n", "\n").replace("\r", "\n"),
+                ).strip()[:4000],
                 link_ids=link_ids[:6],
             )
         )

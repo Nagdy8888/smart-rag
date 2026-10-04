@@ -189,6 +189,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
 | [evaluation/COMPANY_ASK_LANGSMITH.md](./evaluation/COMPANY_ASK_LANGSMITH.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
 | [evaluation/RAG_AGENT_10_2026-10-04.md](./evaluation/RAG_AGENT_10_2026-10-04.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
+| [evaluation/FRESH_KNOWN_ANSWER_50_2026-10-04.md](./evaluation/FRESH_KNOWN_ANSWER_50_2026-10-04.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
 | [evaluation/QUERY_LATENCY_REPORT.md](./evaluation/QUERY_LATENCY_REPORT.md) | engineering-lead | active | 2026-09-24 | eng, reviewers |
 | [evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md](./evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |

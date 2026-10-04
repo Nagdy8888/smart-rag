@@ -136,12 +136,26 @@ class HybridChannelJobsMixin:
 
                 variant_texts = texts if texts else (query,)
                 # Ask-gated code/list seeds as an extra BM25 variant so
-                # SFTConfig / AgentState / broker names are not dense-only.
+                # SFTConfig / AgentState / broker names / TOC literals are
+                # not dense-only. Prepend so a full variant cap cannot drop
+                # the seed (``(*texts, seed)[:4]`` previously discarded it).
                 from smart_rag_core.retrieval.rerank import hybrid_seed_terms
 
-                seed_text = " ".join(hybrid_seed_terms(query)[:8]).strip()
+                seed_terms = hybrid_seed_terms(query)[:8]
+                seed_text = " ".join(seed_terms).strip()
+                extras: list[str] = []
                 if seed_text and seed_text not in variant_texts:
-                    variant_texts = (*variant_texts, seed_text)[:4]
+                    extras.append(seed_text)
+                # Solo high-signal phrases (Table of Contents, CrewAI) as
+                # their own BM25 scans when ask-shape seeding added them.
+                for solo in seed_terms:
+                    if solo in {"CrewAI", "Table of Contents"} and solo not in (
+                        *variant_texts,
+                        *extras,
+                    ):
+                        extras.append(solo)
+                if extras:
+                    variant_texts = (*extras, *variant_texts)[:4]
                 try:
                     retrieve_variants = getattr(
                         bm25_retriever, "retrieve_variants", None
@@ -210,6 +224,18 @@ class HybridChannelJobsMixin:
                     Per-variant term candidate lists, or a named term outage.
                 """
 
+                # Ask-gated listed/code seeds as extra term needles so
+                # TOC/preface literals (CrewAI, Table of Contents) are not
+                # dense/BM25-only.
+                from smart_rag_core.retrieval.rerank import hybrid_seed_terms
+
+                term_texts = texts if texts else (query,)
+                seed_extras: list[str] = []
+                for seed in hybrid_seed_terms(query)[:6]:
+                    if seed and seed not in term_texts and seed not in seed_extras:
+                        seed_extras.append(seed)
+                if seed_extras:
+                    term_texts = (*seed_extras, *term_texts)[:8]
                 if self._supabase_dsn:
                     from smart_rag_core.retrieval.terms import TermRetriever
 
@@ -218,7 +244,7 @@ class HybridChannelJobsMixin:
                             return collect_term_lists(
                                 TermRetriever(connection).retrieve,
                                 caller=caller,
-                                texts=texts,
+                                texts=term_texts,
                             )
                         except Exception:
                             return TermRetrievalResult(
@@ -231,7 +257,7 @@ class HybridChannelJobsMixin:
                     return collect_term_lists(
                         term_retriever.retrieve,
                         caller=caller,
-                        texts=texts,
+                        texts=term_texts,
                     )
                 except Exception:
                     return TermRetrievalResult(

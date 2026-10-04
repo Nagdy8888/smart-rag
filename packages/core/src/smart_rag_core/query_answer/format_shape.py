@@ -36,7 +36,12 @@ _PIPE_TABLE_ASK = re.compile(
     r"|\btable\b.{0,80}\b(?:markdown|pipe)\b"
     r"|\bMarkdown\s+pipe\s+table\b"
     r"|\bpipe\s+table\b"
-    r"|\bTable\s+\d+-\d+\b"
+)
+# Exact-phrase asks may name ``Table N-M`` as a locator without requesting
+# a Markdown pipe reshape of a one-line gold span.
+_EXACT_PHRASE_SHAPE_ASK = re.compile(
+    r"(?i)\bexact\s+(?:wording|phrase|name|code\s+fragment)\b"
+    r"|\bcode\s+fragment\s+from\s+the\s+page\b"
 )
 _FENCE_BLOCK = re.compile(
     r"^\s*```([a-zA-Z0-9_+-]*)[ \t]*\n([\s\S]*?)\n[ \t]*```[ \t]*\s*$"
@@ -62,7 +67,15 @@ def requested_answer_shape(user_query: str) -> RequestedShape:
     """
 
     query = user_query or ""
-    wants_table = bool(_PIPE_TABLE_ASK.search(query) or named_table_captions(query))
+    # Bare ``Table N-M`` (via named captions) is not enough: exact-phrase
+    # asks locate a cell without requesting pipe-table display reshape.
+    wants_table = bool(
+        _PIPE_TABLE_ASK.search(query)
+        or (
+            named_table_captions(query)
+            and _EXACT_PHRASE_SHAPE_ASK.search(query) is None
+        )
+    )
     wants_code = bool(_FENCE_ASK.search(query) or named_code_definition_ids(query))
     if wants_table and wants_code:
         if re.search(r"(?i)pipe\s+table|Markdown\s+pipe", query):

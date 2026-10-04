@@ -33,6 +33,7 @@ from smart_rag_core.query_answer.generate_grounded import (
     salvage_named_table_block,
     salvage_protocol_aspire_claim,
     salvage_psi_retrain_threshold,
+    salvage_query_literal_extractive,
     salvage_refused_literal_claims,
     salvage_tool_description_string,
 )
@@ -172,23 +173,30 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "detail": "web_evidence_insufficient",
             "answer": payload.model_dump(mode="json"),
         }
-    prepared = (
-        payload
-        if is_web
-        else bind_company_atomic_links(
-            payload,
-            fusion=fusion,
-            user_query=state["user_query"] or None,
+    try:
+        prepared = (
+            payload
+            if is_web
+            else bind_company_atomic_links(
+                payload,
+                fusion=fusion,
+                user_query=state["user_query"] or None,
+            )
         )
-    )
-    checked, failures = deterministic_check_answer(
-        prepared,
-        fusion=fusion,
-        tables=tables.records,
-        evidence_required=route_needs_retrieval(plan) and not is_web,
-        web_excerpts=web_excerpts if is_web else None,
-        require_paragraphs=route_needs_retrieval(plan) and not is_web,
-    )
+    except (ValidationError, ValueError, AnswerError):
+        prepared = payload
+    try:
+        checked, failures = deterministic_check_answer(
+            prepared,
+            fusion=fusion,
+            tables=tables.records,
+            evidence_required=route_needs_retrieval(plan) and not is_web,
+            web_excerpts=web_excerpts if is_web else None,
+            require_paragraphs=route_needs_retrieval(plan) and not is_web,
+        )
+    except (ValidationError, ValueError, AnswerError):
+        checked = prepared
+        failures = ()
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
     omitted: tuple[str, ...] = ()
@@ -231,33 +239,44 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 caller=caller,
                 already_called=verifier_calls,
             )
-            checked = align_split_source_identifiers(
-                pre_verifier,
-                checked,
-                fusion=fusion,
-            )
+            try:
+                checked = align_split_source_identifiers(
+                    pre_verifier,
+                    checked,
+                    fusion=fusion,
+                )
+            except (ValidationError, ValueError, AnswerError):
+                # Identifier realignment must not abort verify as run_failed.
+                pass
         except (AnswerError, QueryCeilingError) as exc:
             reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
             verifier_skipped_reason = str(reason)[:64]
     if company_release_applies(checked, is_web=is_web):
         user_query = state["user_query"] or ""
-        checked = render_verified_company_answer(
-            checked,
-            fusion=fusion,
-            tables=tables.records,
-            user_query=user_query,
-        )
+        try:
+            checked = render_verified_company_answer(
+                checked,
+                fusion=fusion,
+                tables=tables.records,
+                user_query=user_query,
+            )
+        except (ValidationError, ValueError, AnswerError):
+            # Keep the pre-render payload; later salvages may still repair.
+            pass
         if checked.status == "refused" and fusion.evidence:
             salvaged = salvage_refused_literal_claims(
                 fusion, user_query=user_query
             )
             if salvaged is not None:
-                checked = render_verified_company_answer(
-                    salvaged,
-                    fusion=fusion,
-                    tables=tables.records,
-                    user_query=user_query,
-                )
+                try:
+                    checked = render_verified_company_answer(
+                        salvaged,
+                        fusion=fusion,
+                        tables=tables.records,
+                        user_query=user_query,
+                    )
+                except (ValidationError, ValueError, AnswerError):
+                    checked = salvaged
         # Run query-anchored salvages even after a refusal so extractive
         # tool-description / window_size / label claims can replace an
         # empty or paraphrased refusal when gold is already selected.
@@ -275,6 +294,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 salvage_named_code_definition,
                 salvage_named_table_block,
                 salvage_listed_literals,
+                salvage_query_literal_extractive,
             ):
                 try:
                     salvaged = salvage_fn(
@@ -296,9 +316,14 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     checked = salvaged
             # Legacy shared try removed: one failed salvage must not skip
             # later query-anchored confuser repairs (expose / ADAS / PSI).
-        checked = format_requested_answer_shape(
-            checked, user_query=user_query
-        )
+        try:
+            checked = format_requested_answer_shape(
+                checked, user_query=user_query
+            )
+        except (ValidationError, ValueError, AnswerError):
+            # Pipe-table / fence reshaping must not fail the verified path
+            # after a successful extractive salvage.
+            pass
     knowledge_scope = plan.knowledge_scope if plan is not None else None
     terminal = "verified_partial"
     if (
@@ -409,12 +434,15 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                         checked, fusion, persisted.skipped
                     )
                     if repaired is not checked:
-                        repaired = render_verified_company_answer(
-                            repaired,
-                            fusion=fusion,
-                            tables=tables.records,
-                            user_query=state["user_query"] or "",
-                        )
+                        try:
+                            repaired = render_verified_company_answer(
+                                repaired,
+                                fusion=fusion,
+                                tables=tables.records,
+                                user_query=state["user_query"] or "",
+                            )
+                        except (ValidationError, ValueError, AnswerError):
+                            pass
                         try:
                             retried = maybe_persist_verified_citations(
                                 deps.connection,
@@ -462,26 +490,48 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     if terminal in {"verified", "verified_partial"}:
                         terminal = "verified_partial"
                         detail = "citation_leaf_unresolved"
-    result = VerificationResult(
-        answer=checked,
-        deterministic_failures=failures,
-        verifier_call_count=1 if verifier_calls else 0,
-        omitted_link_ids=omitted,
-        verifier_skipped_reason=verifier_skipped_reason,
-        skipped_citation_count=skipped_citation_count,
-        status=terminal
-        if terminal
-        in {"verified", "verified_partial", "refused", "insufficient_evidence"}
-        else "verified_partial",
-    )
+    try:
+        result = VerificationResult(
+            answer=checked,
+            deterministic_failures=failures,
+            verifier_call_count=1 if verifier_calls else 0,
+            omitted_link_ids=omitted,
+            verifier_skipped_reason=verifier_skipped_reason,
+            skipped_citation_count=skipped_citation_count,
+            status=terminal
+            if terminal
+            in {"verified", "verified_partial", "refused", "insufficient_evidence"}
+            else "verified_partial",
+        )
+        verification_dump = result.model_dump(mode="json")
+        answer_dump = checked.model_dump(mode="json")
+    except (ValidationError, ValueError):
+        # Schema-invalid terminal payload must not abort the graph as
+        # ``run_failed`` after a successful salvage/release path.
+        terminal = "verified_partial"
+        detail = "payload_schema_invalid"
+        verification_dump = {
+            "answer": raw_answer,
+            "deterministic_failures": [],
+            "verifier_call_count": 0,
+            "omitted_link_ids": [],
+            "verifier_skipped_reason": None,
+            "skipped_citation_count": 0,
+            "status": terminal,
+        }
+        answer_dump = (
+            checked.model_dump(mode="json")
+            if isinstance(checked, AnswerPayload)
+            else raw_answer
+        )
     return cast(
         QueryGraphState,
         {
             **state,
             "status": terminal,
             "detail": detail,
-            "answer": checked.model_dump(mode="json"),
-            "verification": result.model_dump(mode="json"),
+            "answer": answer_dump,
+            "verification": verification_dump,
             "remaining_model_calls": remaining,
             "verifier_call_count": verifier_calls,
             "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),

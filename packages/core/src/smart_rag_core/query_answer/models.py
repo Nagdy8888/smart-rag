@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -75,21 +76,28 @@ class AnswerParagraph(BaseModel):
     @field_validator("text")
     @classmethod
     def _reject_embedded_delimiter(cls, value: str) -> str:
-        """Reject paragraph bodies that already contain the join delimiter.
+        """Collapse blank lines so extractive OCR spans stay one paragraph.
 
         Args:
             value: Candidate paragraph text.
 
         Returns:
-            The validated text.
+            Text without ``PARAGRAPH_DELIMITER`` (blank lines collapsed).
 
         Raises:
-            ValueError: If the body contains ``PARAGRAPH_DELIMITER``.
+            ValueError: If the body is empty after normalization.
         """
 
-        if PARAGRAPH_DELIMITER in value:
+        normalized = re.sub(
+            r"\n{2,}",
+            "\n",
+            value.replace("\r\n", "\n").replace("\r", "\n"),
+        ).strip()
+        if not normalized:
             raise ValueError("paragraph_index_invalid")
-        return value
+        if PARAGRAPH_DELIMITER in normalized:
+            raise ValueError("paragraph_index_invalid")
+        return normalized
 
 
 class AnswerCitation(BaseModel):

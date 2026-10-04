@@ -189,11 +189,14 @@ class LangGraphExecuteMixin(
             raise
         except Exception as exc:
             LOGGER.info(
-                "query sse stream failed",
+                "query sse stream failed: %s: %s",
+                type(exc).__name__,
+                str(exc)[:500],
                 extra={
                     "event": "query.sse.executor_failed",
                     "run_id": str(context.run_id),
                     "error_type": type(exc).__name__,
+                    "error_detail": str(exc)[:500],
                 },
             )
             self._set_termination(reason="error", terminal_event_type="error")

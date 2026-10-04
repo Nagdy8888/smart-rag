@@ -70,6 +70,13 @@ def test_requested_shape_detects_fence_and_pipe() -> None:
         == "pipe_table"
     )
     assert requested_answer_shape("What is Manual Assist Auto?") == "none"
+    assert (
+        requested_answer_shape(
+            "in Table 3-1 GUI examples, what exact phrase names Cursor "
+            "among AI coding assistants? Give the exact wording from the page."
+        )
+        == "none"
+    )
 
 
 def test_ensure_fenced_code_idempotent() -> None:

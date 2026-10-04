@@ -758,3 +758,118 @@ def test_hybrid_seed_terms_include_code_and_listed_literals() -> None:
     )
     assert any("Kafka" in item for item in broker_seeds)
     assert any(item == "NATS" or "NATS" in item for item in broker_seeds)
+
+
+def test_listed_literal_remain5_ask_shapes_promote_and_seed() -> None:
+    """TOC / coordination / learning / tool-sequence groups pin gold spans."""
+
+    toc_q = (
+        "what agentic framework section title appears in the Table of "
+        "Contents immediately after LangGraph and AutoGen?"
+    )
+    assert any("CrewAI" in group for group in listed_literal_groups(toc_q))
+    toc_seeds = hybrid_seed_terms(toc_q)
+    assert "CrewAI" in toc_seeds
+    assert "Table of Contents" in toc_seeds
+    toc_wrong = _passage(text="LangGraph and AutoGen comparison trade-offs")
+    toc_gold = _passage(
+        text=(
+            "12 LangGraph                                                    "
+            "13 AutoGen                                                      "
+            "14 CrewAI                                                       "
+            "15 Knowledge and Memory                                         "
+        )
+    )
+    toc_promoted = promote_listed_literal_passages(
+        (toc_wrong,),
+        query=toc_q,
+        pool=(toc_wrong, toc_gold),
+        limit=12,
+    )
+    assert toc_promoted[0].candidate.chunk_id == toc_gold.candidate.chunk_id
+
+    coord_q = (
+        "when scaling to multiagent systems, which coordination pattern "
+        "does the book list alongside democratic and hierarchical approaches?"
+    )
+    assert any(
+        "actor-critic" in group for group in listed_literal_groups(coord_q)
+    )
+    assert "actor-critic" in hybrid_seed_terms(coord_q)
+    coord_wrong = _passage(text="Manager Coordination centralizes oversight")
+    coord_gold = _passage(
+        text=(
+            "How do I scale from single-agent to multiagent systems, "
+            "including coordination patterns like democratic, hierarchical, "
+            "or actor-critic approaches?"
+        )
+    )
+    coord_promoted = promote_listed_literal_passages(
+        (coord_wrong,),
+        query=coord_q,
+        pool=(coord_wrong, coord_gold),
+        limit=12,
+    )
+    assert coord_promoted[0].candidate.chunk_id == coord_gold.candidate.chunk_id
+
+    learn_q = (
+        "in the Chapter 11 roadmap, which continuous-learning modes are "
+        "listed after in-context learning?"
+    )
+    assert any(
+        "offline retraining" in group
+        for group in listed_literal_groups(learn_q)
+    )
+    learn_seeds = hybrid_seed_terms(learn_q)
+    assert "offline retraining" in learn_seeds
+    assert "online reinforcement" in learn_seeds
+    learn_wrong = _passage(text="In-context learning adapts without weights")
+    learn_gold = _passage(
+        text=(
+            "Chapter 11 lists continuous-learning modes after in-context "
+            "learning: offline retraining and online reinforcement."
+        )
+    )
+    learn_promoted = promote_listed_literal_passages(
+        (learn_wrong,),
+        query=learn_q,
+        pool=(learn_wrong, learn_gold),
+        limit=12,
+    )
+    assert learn_promoted[0].candidate.chunk_id == learn_gold.candidate.chunk_id
+
+    tool_q = (
+        "after local tools and API-based tools, what third tool category "
+        "will the Tool Use chapter cover in sequence?"
+    )
+    assert any("MCP tools" in group for group in listed_literal_groups(tool_q))
+    assert "MCP tools" in hybrid_seed_terms(tool_q)
+    tool_wrong = _passage(
+        text=(
+            "While local tools enable agents to perform tasks independently, "
+            "API-based tools enable agents to connect with external services."
+        )
+    )
+    tool_gold = _passage(
+        text=(
+            "agent, which we will cover in sequence: local tools, "
+            "API-based tools, and MCP tools."
+        )
+    )
+    tool_promoted = promote_listed_literal_passages(
+        (tool_wrong,),
+        query=tool_q,
+        pool=(tool_wrong, tool_gold),
+        limit=12,
+    )
+    assert tool_promoted[0].candidate.chunk_id == tool_gold.candidate.chunk_id
+    fusion = verifier_fusion(
+        verifier_passage(1, text=tool_wrong.raw_text, rank=1),
+        verifier_passage(2, text=tool_gold.raw_text, rank=2),
+    )
+    salvaged = salvage_listed_literals(
+        _payload(tool_wrong.raw_text, chunk=verifier_uid(1)),
+        fusion,
+        user_query=tool_q,
+    )
+    assert "MCP tools" in salvaged.answer_text
