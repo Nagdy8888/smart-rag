@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections.abc import Mapping, Sequence
@@ -25,6 +26,14 @@ if str(REPO) not in sys.path:
 
 from smart_rag_core.evaluation.accuracy_promotion import (  # noqa: E402
     decide_accuracy_promotion,
+)
+from smart_rag_core.evaluation.company_ask_diagnosis import (  # noqa: E402
+    classify_ask_drop,
+)
+from smart_rag_core.evaluation.company_ask_langsmith import (  # noqa: E402
+    DEFAULT_COMPANY_ASK_LANGSMITH_PROJECT,
+    CompanyAskLangSmithError,
+    publish_company_ask_experiment,
 )
 from smart_rag_core.evaluation.company_ask_regression import (  # noqa: E402
     AskRegressionConfigError,
@@ -97,6 +106,36 @@ def main(argv: list[str] | None = None) -> int:
             "missed fact ids, rerank, profile, gold-page fusion, and citation "
             "failure codes. Never prints the answer body or gold phrases."
         ),
+    )
+    parser.add_argument(
+        "--langsmith-publish",
+        action="store_true",
+        help=(
+            "After local dual-metric scoring, publish a LangSmith dataset + "
+            "experiment. Requires --answers-out, APP_ENV=local, and "
+            "--upload-private-content."
+        ),
+    )
+    parser.add_argument(
+        "--upload-private-content",
+        action="store_true",
+        help=(
+            "Required with --langsmith-publish. Uploads prompts, answers, and "
+            "gold phrases to LangSmith (local only)."
+        ),
+    )
+    parser.add_argument(
+        "--langsmith-project",
+        default=DEFAULT_COMPANY_ASK_LANGSMITH_PROJECT,
+        help=(
+            "LangSmith project for --langsmith-publish "
+            f"(default {DEFAULT_COMPANY_ASK_LANGSMITH_PROJECT})."
+        ),
+    )
+    parser.add_argument(
+        "--langsmith-experiment-prefix",
+        default=None,
+        help="Optional sanitized experiment prefix suffix for LangSmith.",
     )
     args = parser.parse_args(argv)
     try:
@@ -285,6 +324,60 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     print(f"reasons={','.join(decision.reasons) or 'none'}", flush=True)
+    if args.langsmith_publish:
+        if args.answers_out is None:
+            print("blocked=langsmith_publish_requires_answers_out", file=sys.stderr)
+            return 2
+        try:
+            from langsmith import Client
+
+            os.environ["LANGSMITH_PROJECT"] = args.langsmith_project
+            os.environ["LANGCHAIN_PROJECT"] = args.langsmith_project
+            from company_ask_langsmith_enrich import (
+                enrich_diagnosis_signals,
+                enrich_run_usage,
+            )
+
+            os.environ.setdefault("LANGSMITH_TRACING", "true")
+            os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+            answer_rows = {
+                question_id: {
+                    str(field): value
+                    for field, value in cast(dict[str, object], row).items()
+                }
+                for question_id, row in answers.items()
+            }
+            diagnosis = enrich_diagnosis_signals(
+                questions,
+                answer_rows=answer_rows,
+                results=results,
+            )
+            usage = enrich_run_usage(answer_rows)
+            published = publish_company_ask_experiment(
+                Client(),
+                questions=questions,
+                answer_rows=answer_rows,
+                app_env=os.environ.get("APP_ENV", "").strip() or "local",
+                project_name=args.langsmith_project,
+                upload_private_content=args.upload_private_content,
+                experiment_prefix=args.langsmith_experiment_prefix,
+                diagnosis=diagnosis,
+                usage=usage,
+            )
+        except CompanyAskLangSmithError as exc:
+            print(f"blocked=langsmith_publish:{exc}", file=sys.stderr)
+            return 2
+        except Exception as exc:
+            print(f"blocked=langsmith_publish_failed:{exc}", file=sys.stderr)
+            return 2
+        print(
+            "langsmith_project={project} dataset={dataset} experiment_url={url}".format(
+                project=published.project_name,
+                dataset=published.dataset_name,
+                url=published.experiment_url or "unavailable",
+            ),
+            flush=True,
+        )
     return 0
 
 
@@ -983,55 +1076,6 @@ def _yes_no(value: bool | None) -> str:
     if value is None:
         return "unknown"
     return "yes" if value else "no"
-
-
-def classify_ask_drop(
-    *,
-    outcome: str,
-    grounded: bool,
-    gold_page_in_fusion: bool | None,
-    citation_failures: tuple[str, ...],
-    gold_page_in_fused: bool | None = None,
-    gold_page_in_rerank_pool: bool | None = None,
-) -> str:
-    """Name the first stage that explains a missed known answer.
-
-    Args:
-        outcome: Dual-metric outcome value.
-        grounded: Whether every required fact matched.
-        gold_page_in_fusion: Whether the gold page was in fused evidence.
-        citation_failures: Deterministic citation failure codes.
-        gold_page_in_fused: Whether the gold page was in ``fused_ids``.
-        gold_page_in_rerank_pool: Whether the gold page entered the rerank pool.
-
-    Returns:
-        A short drop bucket: ``pass``, ``retrieval_miss``,
-        ``rerank_pool_drop``, ``selection_drop``, ``citation``,
-        ``verifier_refusal``, ``phrasing``, ``deadline``, ``error``, or the
-        raw outcome when none of those rules apply.
-    """
-
-    if outcome in {"strict_phrase", "fact_covered"} and grounded:
-        return "pass"
-    if outcome == "error":
-        return "error"
-    if outcome == "deadline":
-        return "deadline"
-    if outcome == "empty_retrieval" or gold_page_in_fused is False:
-        return "retrieval_miss"
-    if gold_page_in_fused and gold_page_in_rerank_pool is False:
-        return "rerank_pool_drop"
-    if gold_page_in_rerank_pool and gold_page_in_fusion is False:
-        return "selection_drop"
-    if gold_page_in_fused is None and gold_page_in_fusion is False:
-        return "retrieval_miss"
-    if citation_failures or outcome == "verifier_refusal_after_fusion":
-        return "citation" if citation_failures else "verifier_refusal"
-    if outcome == "wrong_phrasing":
-        return "phrasing"
-    if outcome == "partial":
-        return "partial"
-    return outcome
 
 
 def _token(value: object, *, empty: str = "-") -> str:

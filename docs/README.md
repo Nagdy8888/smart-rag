@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-10-01
+last-reviewed: 2026-10-04
 audience: engineering, reviewers, client-approver
 ---
 
@@ -20,6 +20,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 6. [Quality targets](./QUALITY_TARGETS.md)
 7. [Company-documents Ask baseline](./evaluation/COMPANY_DOCUMENTS_RAG_100.md)
 8. [Dual-metric scoring](./evaluation/DUAL_METRIC_SCORING.md)
+9. [Company-Ask LangSmith experiments](./evaluation/COMPANY_ASK_LANGSMITH.md)
 
 The table below is the complete maintained map. Packet evidence under
 [development/phase-06/](./development/phase-06/) is indexed from
@@ -185,7 +186,9 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PDF_HYBRID_EVALUATION.md](./evaluation/PDF_HYBRID_EVALUATION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
 | [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers, client-approver |
-| [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
+| [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
+| [evaluation/COMPANY_ASK_LANGSMITH.md](./evaluation/COMPANY_ASK_LANGSMITH.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
+| [evaluation/RAG_AGENT_10_2026-10-04.md](./evaluation/RAG_AGENT_10_2026-10-04.md) | engineering-lead | draft | 2026-10-04 | eng, reviewers |
 | [evaluation/QUERY_LATENCY_REPORT.md](./evaluation/QUERY_LATENCY_REPORT.md) | engineering-lead | active | 2026-09-24 | eng, reviewers |
 | [evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md](./evaluation/QUERY_LATENCY_REPAIR_EVIDENCE.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md](./evaluation/KNOWN_ANSWER_50_REVIEW_2026-09-22.md) | engineering-lead | complete | 2026-09-22 | eng, reviewers |

@@ -64,11 +64,15 @@ class CompanyAskQuestion:
             ids only.
         prompt: User question text.
         facts: Required facts for dual-metric scoring.
+        page: Optional gold page number for citation/fused diagnosis.
+        kind: Optional question kind (``code`` / ``table`` / ``text``).
     """
 
     question_id: str
     prompt: str
     facts: tuple[RequiredFact, ...]
+    page: int | None = None
+    kind: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,11 +288,25 @@ def load_private_gold(path: Path) -> tuple[CompanyAskQuestion, ...]:
         if not question_id or not prompt or not isinstance(raw_facts, list):
             raise AskRegressionConfigError("gold item is missing id, prompt, or facts")
         facts = tuple(_fact_from_mapping(raw) for raw in cast(list[object], raw_facts))
+        page_raw = mapping.get("page")
+        page = (
+            page_raw
+            if isinstance(page_raw, int) and not isinstance(page_raw, bool)
+            else None
+        )
+        kind_raw = mapping.get("kind")
+        kind = (
+            str(kind_raw).strip()
+            if kind_raw is not None and str(kind_raw).strip()
+            else None
+        )
         questions.append(
             CompanyAskQuestion(
                 question_id=question_id,
                 prompt=prompt,
                 facts=facts,
+                page=page,
+                kind=kind,
             )
         )
     return tuple(questions)

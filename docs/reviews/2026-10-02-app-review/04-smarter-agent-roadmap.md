@@ -143,6 +143,12 @@ weekly job that samples verified/partial/refused runs against holdout questions,
 rate) into the governance dashboards. This turns every "make it smarter" change
 into a measured bet instead of a vibe.
 
+Operator path already available for private gold suites: run
+`scripts/run_company_ask.py` then publish dual-metric scores to LangSmith via
+`scripts/publish_company_ask_langsmith.py` (or `--langsmith-publish`). See
+[COMPANY_ASK_LANGSMITH.md](../../evaluation/COMPANY_ASK_LANGSMITH.md). That
+covers offline regression boards; continuous online sampling remains open.
+
 ## S10 — Arabic retrieval depth
 
 Arabic normalization parity (`arabic_norm_v1`) is enforced on BM25. Remaining

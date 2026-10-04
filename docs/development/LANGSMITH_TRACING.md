@@ -2,7 +2,7 @@
 title: LangSmith tracing for model and embedding calls
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-10-04
 audience: engineering, operators, security
 ---
 
@@ -245,6 +245,15 @@ Live mock/live-agent runs need `LANGSMITH_TRACING=true`, a key, a project,
 local Supabase, an active synthetic member, and ingested synthetic corpus.
 `--llm-judge` requires `--live-agent`. ParadeDB absence fails unless
 `--allow-bm25-degraded`.
+
+## Private company-Ask dual-metric experiments
+
+To score a `.private-eval` gold suite in the LangSmith **Datasets /
+Experiments** UI (not only local JSON), use
+[COMPANY_ASK_LANGSMITH.md](../evaluation/COMPANY_ASK_LANGSMITH.md). Default
+project: `smart-rag-company-ask-eval`. Requires `APP_ENV=local` and
+`--upload-private-content`. This is separate from redacted Ask traces in
+`smart-rag-demo-3` and from hosted online evaluators below.
 
 ## Dedicated online workspace evaluators
 

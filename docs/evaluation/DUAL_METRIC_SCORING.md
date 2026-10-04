@@ -2,7 +2,7 @@
 title: Dual-metric company Ask scoring
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-21
+last-reviewed: 2026-10-04
 audience: engineering, reviewers
 ---
 
@@ -61,11 +61,15 @@ flowchart TD
 ## Commands
 
 ```powershell
-uv run python -m pytest tests/unit/test_retrieval_dual_metric_scorer.py tests/unit/test_accuracy_promotion.py -q
+uv run python -m pytest tests/unit/test_retrieval_dual_metric_scorer.py tests/unit/test_accuracy_promotion.py tests/unit/test_company_ask_langsmith.py -q
 uv run python scripts/run_company_ask.py --gold .private-eval/pdf-gold-100.json --out .private-eval/p06-64-dual-summary.json --credentials .private-eval/eval-credentials.json --answers-out .private-eval/p06-64-answers.json --stage-export .private-eval/p06-68-stage-export.json
 uv run python scripts/eval_ask_stage_export.py --answers .private-eval/p06-64-answers.json --out .private-eval/p06-68-stage-export.json
 uv run python scripts/rescore_company_ask.py --gold .private-eval/gold.json --answers .private-eval/answers.json --stage-export .private-eval/p06-68-stage-export.json --out .private-eval/dual-summary.json
+uv run python scripts/publish_company_ask_langsmith.py --gold .private-eval/gold.json --answers .private-eval/answers.json --dry-run
 ```
+
+To see the same dual-metric board in LangSmith (local private upload), follow
+[COMPANY_ASK_LANGSMITH.md](./COMPANY_ASK_LANGSMITH.md).
 
 Do not paste passwords, DSNs, or unrestricted source text into docs or
 committed tests.
