@@ -72,7 +72,23 @@ Kept. Target `5b_removed_after_draft` / `salvage_overwrite` improved.
 
 ## After G1b
 
-not run yet
+Kept. Guard exits 0. Retrieval-stage sum did not grow; strict drop ≤ 3.
+
+| Metric | After G1a | After G1b |
+| --- | ---: | ---: |
+| ok | 16 | 16 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 15 | 14 |
+| 3_fusion_pool | 6 | 5 |
+| 4_rerank_select | 2 | 1 |
+| 5a_draft_missing | 4 | 5 |
+| 5b_removed_after_draft | 3 | 5 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+| strict passes | 12/40 | 11/40 |
+| retrieval stage sum (2+3+4) | 23 | 20 |
+| salvage_overwrite | 0 | 0 |
+| refused_after_draft | 3 | 5 |
+| gold-literal guard | FAIL rerank only | exit 0 |
 
 ## After G2
 
