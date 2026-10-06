@@ -92,7 +92,25 @@ Kept. Guard exits 0. Retrieval-stage sum did not grow; strict drop ≤ 3.
 
 ## After G2
 
-not run yet
+Reverted by stop rule. Target `5b_removed_after_draft` /
+`refused_after_draft`+`trimmed_or_rewritten` stayed flat (5 → 5).
+Strict delta 0. Probe before revert: G1a/G1b/G2 present. Image rebuilt
+for live proof: yes (G2 present). p90_wall_seconds 33.015.
+
+| Metric | After G1b | After G2 |
+| --- | ---: | ---: |
+| ok | 16 | 16 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 14 | 15 |
+| 3_fusion_pool | 5 | 5 |
+| 4_rerank_select | 1 | 1 |
+| 5a_draft_missing | 5 | 4 |
+| 5b_removed_after_draft | 5 | 5 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+| strict passes | 11/40 | 11/40 |
+| salvage_overwrite | 0 | 0 |
+| refused_after_draft | 5 | 5 |
+| trimmed_or_rewritten | 0 | 0 |
 
 ## After G3
 
