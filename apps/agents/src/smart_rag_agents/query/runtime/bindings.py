@@ -51,7 +51,6 @@ class QueryGraphProcessBindings:
         crawl_proxy_gateway: Injected crawl-proxy client, or None.
         web_critique_prompt_text: Pinned ``web_critique_v1`` body.
         web_answer_prompt_text: Pinned ``web_answer_v1`` body.
-        locate_prompt_text: Pinned ``locate_v1`` body.
         model_input_max_chars: Existing ``MODEL_INPUT_MAX_CHARS`` bound.
     """
 
@@ -71,5 +70,4 @@ class QueryGraphProcessBindings:
     crawl_proxy_gateway: object | None = None
     web_critique_prompt_text: str = ""
     web_answer_prompt_text: str = ""
-    locate_prompt_text: str = ""
     model_input_max_chars: int = 32_768

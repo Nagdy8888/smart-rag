@@ -27,7 +27,6 @@ from smart_rag_core.query_answer.generate import (
     apply_degraded_scope_framing,
     generate_answer,
 )
-from smart_rag_core.query_answer.locate import LocatedQuote
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.versions import ANSWER_MODEL_ID
 from smart_rag_core.query_routing.constants import FALLBACK_RETRIEVERS_UNBOUND
@@ -41,7 +40,6 @@ from smart_rag_core.query_routing.serde import plan_from_state
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.answer import gateway_answer
 from smart_rag_agents.query.gateway.general_chat import gateway_general_chat
-from smart_rag_agents.query.nodes.answer_locate import run_locate_step
 from smart_rag_agents.query.nodes.shared import (
     route_needs_retrieval,
     runtime_after_consume,
@@ -67,34 +65,26 @@ def generate_answer_node(
         ``remaining_model_calls``.
 
     State outputs:
-        ``answer``, ``answer_locate`` (ID-only locate diagnostics), accumulated
-        ``prompt_tokens`` / ``completion_tokens``, decremented
-        ``remaining_model_calls`` when a counted ``usage_kind=answer`` call
-        ran, and ``authorized_runtime`` with the post-answer reservation
-        version.
+        ``answer``, accumulated ``prompt_tokens`` / ``completion_tokens``,
+        decremented ``remaining_model_calls`` when a counted
+        ``usage_kind=answer`` call ran, and ``authorized_runtime`` with the
+        post-answer reservation version.
 
     Persistence writes:
-        Counted ``answer`` usage for the answer call and, when it runs, the
-        locate call.
+        Counted ``answer`` usage when a connection and gateway are bound.
 
     External/model calls:
-        Zero or one ``locate_v1`` call, then zero or one answer generation.
-        Never a second answer generation. LightRAG ``answer_generate`` stays 0.
+        Zero or one answer generation. Never a second. LightRAG
+        ``answer_generate`` stays 0.
 
     Budget/deadline behavior:
         Uses ``execute_counted_model_call`` against the run-local reservation
         when a live adapter runs. Deadline exhaustion is verified partial.
-        The locate call runs only with at least ``LOCATE_CALL_RESERVE`` calls
-        and ``LOCATE_MIN_SECONDS`` remaining, and its timeout is
-        ``LOCATE_TIMEOUT_SECONDS``.
 
     Failure/fallback route:
         Empty evidence, NoRetrieval, and graph inspection refuse without a
         fake success. Missing ``model_gateway`` or unbound Hybrid when the
-        route needs retrieval never terminates ``verified``. A failed or
-        skipped locate call never blocks the answer call; a refused answer
-        with validated quotes is released as cited quotes with status
-        ``partial``.
+        route needs retrieval never terminates ``verified``.
 
     Args:
         state: State after table composition.
@@ -139,9 +129,6 @@ def generate_answer_node(
     added_completion_tokens = 0
     runtime_update: dict[str, object] = {}
     fit_update: dict[str, object] = {}
-    locate_update: dict[str, object] = {}
-    locate_prompt_tokens = 0
-    locate_completion_tokens = 0
     needs_rag_model = (
         bool(fusion.evidence or tables.records)
         and knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
@@ -244,26 +231,6 @@ def generate_answer_node(
             ).model_dump(mode="json"),
         }
     if needs_model and deps.model_gateway is not None and prompt_ready:
-        located: tuple[LocatedQuote, ...] = ()
-        if needs_rag_model:
-            outcome = run_locate_step(
-                deps,
-                query=str(state.get("user_query") or ""),
-                fusion=working_fusion,
-                tables=working_tables,
-                context=context,
-                remaining_model_calls=remaining,
-            )
-            located = outcome.quotes
-            remaining = outcome.remaining_model_calls
-            locate_prompt_tokens = outcome.prompt_tokens
-            locate_completion_tokens = outcome.completion_tokens
-            locate_update["answer_locate"] = outcome.diagnostics
-            if outcome.context is not None and outcome.context is not context:
-                runtime_update["authorized_runtime"] = outcome.context.model_dump(
-                    mode="json"
-                )
-            context = outcome.context
 
         def _send() -> tuple[AnswerPayload, int, int]:
             """Invoke one RAG or general-chat gateway operation.
@@ -290,7 +257,6 @@ def generate_answer_node(
                 fusion=working_fusion,
                 tables=working_tables,
                 context=context,
-                located=located,
             )
 
         def _usage_from_result(
@@ -352,7 +318,6 @@ def generate_answer_node(
                         "detail": reason,
                         "answer": payload.model_dump(mode="json"),
                         **fit_update,
-                        **locate_update,
                     },
                 )
             return {
@@ -445,13 +410,8 @@ def generate_answer_node(
             "answer_call_count": answer_calls,
             "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
             "keyword_extract_count": 0,
-            **accumulated_tokens(
-                state,
-                added_prompt_tokens + locate_prompt_tokens,
-                added_completion_tokens + locate_completion_tokens,
-            ),
+            **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
             **runtime_update,
             **fit_update,
-            **locate_update,
         },
     )

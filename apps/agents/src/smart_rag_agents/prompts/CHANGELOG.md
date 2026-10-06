@@ -28,8 +28,6 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | `answer_v4` | 2026-09-29 | Prefer exact heading/method/description-string/`window_size` literals over paraphrases. Schema unchanged. |
 | `answer_v5` | 2026-10-02 | When asked, emit fenced Python code or GFM pipe tables in the first claim; soften one-sentence rule for those asks. Citation `span` stays exact source text. `answer_v4` stays immutable. |
 | `answer_v6` | 2026-10-06 | Remove question-specific bullets (mode labels, named-example model defaults, chunking literals) and source-derived examples; generic rules only. Schema unchanged. `answer_v5` stays immutable. |
-| `answer_v7` | 2026-10-06 | `answer_v6` plus one bullet: use the optional `Located quotes:` list after the query; cite only source records. Schema unchanged. |
-| `locate_v1` | 2026-10-06 | New. Copy up to 3 exact quotes that answer the question, using the answer claims schema. Runs before the answer call when budget and deadline allow. |
 | `verifier_v1` | 2026-08-16 | One batched check of at most six atomic links. No second call. |
 | `verifier_v2` | 2026-09-16 | Reject invented acronym expansions and fact literals missing from cited sources. One call, six-link cap unchanged. |
 | `optional_catalog_v1` | 2026-08-16 | Level 0 catalog capabilities and immutable safety rules. No core retrieve tools. |
