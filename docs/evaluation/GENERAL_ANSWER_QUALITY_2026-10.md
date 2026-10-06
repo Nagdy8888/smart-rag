@@ -145,4 +145,39 @@ G4b skipped: depends on G4a committed with passing parse check.
 
 ## Acceptance (G5)
 
-not run yet
+Probe: G1a present, G1b present, G2 MISSING, G3 MISSING. Parser
+`parser_v1_pdf_reflow_v4`, chunking `chunking_v2` (G4a not kept).
+`test_verifier_verbatim_support.py` omitted (G2 reverted). Unit tier /
+PR checks still fail on pre-existing inventory + claims-contract tests
+(not introduced by kept packets).
+
+Kept packets: G0, G1a, G1b. Reverted: G2, G3, G4a (no commit). Skipped:
+G4b.
+
+| Check | G0 baseline | G5 final | Target | Result |
+| --- | --- | --- | --- | --- |
+| holdout40 strict passes (runner) | 5/40 | 10/40 | >= 30 and >= G0 | fail |
+| holdout40 5a + 5b facts | 15 | 6 | <= floor(G0 / 2) = 7 | pass |
+| gold-literal guard | n/a | exit 0 | exit 0 | pass |
+| negatives5 refusals | n/a | 5/5 | 5/5 | pass |
+| verifier/release/invented tests | n/a | 40 passed | 0 failed | pass |
+| holdout40 p90 wall seconds | 45.469 | 32.219 | <= G0 + 5.0 | pass |
+| dev40 strict passes (info) | 9/40 | 10/40 | info | - |
+
+### Holdout stages (fact counts)
+
+| Stage | G0 | G5 |
+| --- | ---: | ---: |
+| ok | 6 | 14 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 19 | 20 |
+| 3_fusion_pool | 4 | 3 |
+| 4_rerank_select | 0 | 1 |
+| 5a_draft_missing | 4 | 4 |
+| 5b_removed_after_draft | 11 | 2 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+Failed target: holdout40 strict passes 10/40 is above G0 (5/40) but
+below the absolute bar of 30/40, so acceptance target 1 fails.
+Generation losses (5a+5b) halved as required; salvage_overwrite went to
+0 on the holdout.
