@@ -127,23 +127,39 @@ text is dropped. Company `answer_v2` passage citations require an exact
 1–1000 character span contained in canonical text. Empty spans are
 legacy whole-passage only when paragraph mappings are not required.
 
-Prompt versions: `answer_v4` (current), `answer_v3`, `answer_v2`, and
-`answer_v1` (historical), `verifier_v2` (current), `verifier_v1` (historical),
-`web_critique_v1`, and `web_answer_v1` under
-`apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
-LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Before
-deterministic paragraph mapping, company payloads bind omitted atomic
-links from paragraphs (and omitted paragraphs from links) and replace
-missing or non-substring spans with the first non-empty paragraph of
-authorized `citation_text`. Blank-line collapses are not used because
-they are not source substrings. Invented
-span text is never persisted. Direct `deterministic_check_answer` still
-fail-closes unaligned spans that skip that bind step. Live
-company answers derive released `answer_text` from surviving atomic-link
-claims, then a composed conclusion only when the complete chain
-survived. Fusion passages are never backfilled as citations. Acronym
-expansions and fact literals are fail-closed even when a mock verifier
-marks a cited ID supported.
+Prompt versions: `answer_v6` (current), `answer_v5` / `answer_v4` /
+`answer_v3` / `answer_v2` / `answer_v1` (historical), `verifier_v2`
+(current), `verifier_v1` (historical), `web_critique_v1`, and
+`web_answer_v1` under `apps/agents/src/smart_rag_agents/prompts/`.
+Company hashes are LF-normalized SHA-256 in
+`smart_rag_core.query_answer.versions`. Before deterministic paragraph
+mapping, company payloads bind omitted atomic links from paragraphs
+(and omitted paragraphs from links) and replace missing or
+non-substring spans with the first non-empty paragraph of authorized
+`citation_text`. Blank-line collapses are not used because they are not
+source substrings. Invented span text is never persisted. Direct
+`deterministic_check_answer` still fail-closes unaligned spans that skip
+that bind step. Live company answers derive released `answer_text` from
+surviving atomic-link claims, then a composed conclusion only when the
+complete chain survived. Fusion passages are never backfilled as
+citations. Acronym expansions and fact literals are fail-closed even
+when a mock verifier marks a cited ID supported.
+
+### Verbatim support override (G2)
+
+When the small-model verifier returns `unsupported` for a **fact** claim,
+the fusion step still keeps that claim when both hold:
+
+1. The claim cites at least one passage ID present in the authorized
+   fusion set.
+2. After whitespace/case normalization, the claim text (at least
+   12 characters) is a contiguous substring of that cited passage.
+
+The override applies only to `kind=fact`. It does not override
+`contradicted`, does not invent citations, and does not change the
+six-link verifier budget. Diagnostics emit
+`verbatim_support_override` when the override fires. Unit coverage:
+`tests/unit/test_verifier_verbatim_support.py`.
 
 Company PDF chat chips use the typed toolbar page (`pdf_page_number` =
 locator `page_index + 1`) and canonical `document_title`. Printed

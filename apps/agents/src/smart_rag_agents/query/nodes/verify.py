@@ -83,6 +83,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     External/model calls:
         Zero or one small verifier call covering at most six material
         links. A seventh link is omitted. Never a second verifier call.
+        Links whose claim occurs word-for-word in a cited passage stay
+        supported even when the verifier rejects them.
 
     Budget/deadline behavior:
         Deadline/step exhaustion emits verified partial, not fake success.
@@ -228,6 +230,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 checked,
                 caller=caller,
                 already_called=verifier_calls,
+                fusion=fusion,
             )
             try:
                 checked = align_split_source_identifiers(

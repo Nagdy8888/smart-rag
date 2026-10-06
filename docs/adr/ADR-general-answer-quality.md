@@ -31,7 +31,7 @@ pool 5, ingestion 1.
    on 2026-10-06.
 2. A verifier "unsupported" verdict does not remove a fact claim whose
    normalized text is a verbatim substring (at least 12 characters) of
-   a cited passage.
+   a cited passage. Implemented in G2 on 2026-10-06.
 3. Optional (G3, only if the stage report justifies it): one
    `locate_v1` gpt-4o-mini call before the answer call, recorded under
    the existing `usage_kind = "answer"` so no migration is needed, and
