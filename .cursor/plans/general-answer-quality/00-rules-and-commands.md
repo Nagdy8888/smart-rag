@@ -121,8 +121,8 @@ Model stays **gpt-4o-mini** everywhere. No model change is allowed.
 - Docs (markdownlint, links, Mermaid): `uv run python scripts/check.py --tier docs`
   (about 6 minutes; run once near the end of a packet).
 - Everything fast: `uv run python scripts/check.py --tier fast`.
-- Current book: document `b56d5774-8810-4ee9-a4d3-f3c93fa90ea7`, version
-  `d7e3206a-b262-44d7-90bc-b1572d864c35`, parser
+- Current book: document `ebaa1d17-446d-47f3-9d5c-941d3a45a60a`, version
+  `940edc86-be9b-4a12-b1bd-64f57d29393a`, parser
   `parser_v1_pdf_reflow_v4`, 1,005 chunks. The ids are also in
   `.private-eval/ingest-ids.json` (keys `document_id`, `version_id`).
 - Gold JSON schema (what `load_private_gold` in

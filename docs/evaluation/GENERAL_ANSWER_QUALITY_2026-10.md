@@ -137,22 +137,45 @@ live proof: yes (G3 present). p90_wall_seconds G3=44.093, G2=33.015.
 
 ## After G4
 
-G4a tried; reverted by stop rule before commit (working tree restored).
-Private parse check: indented_code_elements 0→77, pipe_table_elements
-0→24, but code_facts_in_one_element 14/14→13/14 and
-table_facts_in_one_element 14/14→13/14 (must not drop). No G4a SHA.
-G4b skipped: depends on G4a committed with passing parse check.
+Reverted by stop rule. G4a SHA `05d193d` passed private parse check
+(indented_code_elements 0→77, pipe_table_elements 0→24,
+code_facts_in_one_element 14/14→14/14, table_facts_in_one_element
+14/14→14/14). G4b re-ingest document `90d008d3-2cca-4951-98d4-7fdc5a6d6b27`,
+version `580f4450-f0d4-44cc-b22c-3fb985fdbe9e` (`parser_v1_pdf_reflow_v5`,
+1,038 chunks; pipe_table_chunks 0→41, indented_line_chunks 0→97).
+`dev40-g4` vs last kept `dev40-g1b`: code+table strict 9 vs 11 (must go
+up — fail); total strict 9 vs 11 (drop 2 ≤ 3 — pass). p90_wall_seconds
+36.875. G4a reverted (`3bc034e`); book re-ingested as document
+`ebaa1d17-446d-47f3-9d5c-941d3a45a60a`, version
+`940edc86-be9b-4a12-b1bd-64f57d29393a` (`parser_v1_pdf_reflow_v4`,
+1,005 chunks).
+
+| Metric | After G1b | After G4 (`dev40-g4`) |
+| --- | ---: | ---: |
+| ok | 16 | 13 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 14 | 15 |
+| 3_fusion_pool | 5 | 6 |
+| 4_rerank_select | 1 | 0 |
+| 5a_draft_missing | 5 | 10 |
+| 5b_removed_after_draft | 5 | 2 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+| strict passes | 11/40 | 9/40 |
+| code strict | 5 | 5 |
+| table strict | 6 | 4 |
+| code+table strict | 11 | 9 |
+| salvage_overwrite | 0 | 0 |
+| refused_after_draft | 5 | 2 |
 
 ## Acceptance (G5)
 
 Probe: G1a present, G1b present, G2 MISSING, G3 MISSING. Parser
-`parser_v1_pdf_reflow_v4`, chunking `chunking_v2` (G4a not kept).
-`test_verifier_verbatim_support.py` omitted (G2 reverted). Unit tier /
-PR checks still fail on pre-existing inventory + claims-contract tests
-(not introduced by kept packets).
+`parser_v1_pdf_reflow_v4`, chunking `chunking_v2` (G4a not kept after
+stop-rule revert). `test_verifier_verbatim_support.py` omitted (G2
+reverted). Unit tier / PR checks still fail on pre-existing inventory +
+claims-contract tests (not introduced by kept packets).
 
-Kept packets: G0, G1a, G1b. Reverted: G2, G3, G4a (no commit). Skipped:
-G4b.
+Kept packets: G0, G1a, G1b. Reverted: G2, G3, G4a (after G4b measure).
 
 | Check | G0 baseline | G5 final | Target | Result |
 | --- | --- | --- | --- | --- |
@@ -181,3 +204,7 @@ Failed target: holdout40 strict passes 10/40 is above G0 (5/40) but
 below the absolute bar of 30/40, so acceptance target 1 fails.
 Generation losses (5a+5b) halved as required; salvage_overwrite went to
 0 on the holdout.
+
+## Approvals recorded
+
+- 2026-10-06 - G4b re-ingest pre-approved: "no need for my approval make g4b".
