@@ -46,6 +46,7 @@ class QueryGraphDeps:
         general_chat_prompt_text: Pinned ``general_chat_v1`` body when a live
             general-chat adapter runs.
         verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
+        locate_prompt_text: Pinned ``locate_v1`` body. None skips the locate call.
         web_critique_prompt_text: Pinned ``web_critique_v1`` body. Critique
             itself is deterministic; the file pins the live-model contract.
         web_answer_prompt_text: Pinned ``web_answer_v1`` body. Synthesis uses
@@ -81,6 +82,7 @@ class QueryGraphDeps:
     answer_prompt_text: str | None = None
     general_chat_prompt_text: str | None = None
     verifier_prompt_text: str | None = None
+    locate_prompt_text: str | None = None
     web_critique_prompt_text: str | None = None
     web_answer_prompt_text: str | None = None
     model_gateway: object | None = None

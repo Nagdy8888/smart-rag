@@ -14,9 +14,9 @@ from smart_rag_core.models.env_pins import (
 )
 from smart_rag_core.text_constants import PARAGRAPH_DELIMITER
 
-ANSWER_PROMPT_VERSION = "answer_v6"
+ANSWER_PROMPT_VERSION = "answer_v7"
 ANSWER_PROMPT_SHA256 = (
-    "b575d304e0f6a862b3a0fce45496778e090fc650600a71f6499571aae92f5728"
+    "577195860384d7dc137d95962b95addec3e17dccc4d68282530e16ee91db00ff"
 )
 MAX_ANSWER_PARAGRAPHS = 6
 MAX_ANSWER_CITATIONS = 12
@@ -37,6 +37,37 @@ VERIFIER_MAX_OUTPUT_TOKENS = 1000
 MAX_VERIFIER_LINKS = 6
 MAX_ANSWER_GENERATIONS = 1
 MAX_VERIFIER_CALLS = 1
+LOCATE_PROMPT_VERSION = "locate_v1"
+LOCATE_PROMPT_SHA256 = (
+    "ddf6d5e37a6a562666c8443f88b8372d1c56fd73a49d2ecac6b9fa0a056ef141"
+)
+LOCATE_MAX_QUOTES = 3
+LOCATE_QUOTE_MAX_CHARS = 600
+LOCATE_TIMEOUT_SECONDS = 8.0
+LOCATE_MIN_SECONDS = 18.0
+LOCATE_CALL_RESERVE = 2
+
+
+def answer_operation_pin_allowed(prompt_version: str, prompt_sha256: str) -> bool:
+    """Return whether a prompt pin may use the structured answer operation.
+
+    The answer operation serves the current answer prompt and the
+    locate-quote prompt. Both use the same strict claims schema.
+
+    Args:
+        prompt_version: Requested prompt version.
+        prompt_sha256: Requested prompt digest.
+
+    Returns:
+        True for the current answer pin or the locate pin.
+    """
+
+    return (prompt_version, prompt_sha256) in {
+        (ANSWER_PROMPT_VERSION, ANSWER_PROMPT_SHA256),
+        (LOCATE_PROMPT_VERSION, LOCATE_PROMPT_SHA256),
+    }
+
+
 EVAL_JUDGE_PROMPT_VERSION = "eval_judge_v1"
 EVAL_JUDGE_PROMPT_SHA256 = (
     "4901762bfa4a7207690384c52d57a3cde3a06ad647b1cf21fc574b8738fc9ae8"
@@ -86,6 +117,13 @@ __all__ = [
     "EVAL_PDF_JUDGE_PROMPT_VERSION",
     "GENERAL_CHAT_PROMPT_SHA256",
     "GENERAL_CHAT_PROMPT_VERSION",
+    "LOCATE_CALL_RESERVE",
+    "LOCATE_MAX_QUOTES",
+    "LOCATE_MIN_SECONDS",
+    "LOCATE_PROMPT_SHA256",
+    "LOCATE_PROMPT_VERSION",
+    "LOCATE_QUOTE_MAX_CHARS",
+    "LOCATE_TIMEOUT_SECONDS",
     "MAX_ANSWER_CITATIONS",
     "MAX_ANSWER_GENERATIONS",
     "MAX_ANSWER_PARAGRAPHS",
@@ -102,4 +140,5 @@ __all__ = [
     "WEB_ANSWER_PROMPT_VERSION",
     "WEB_CRITIQUE_PROMPT_SHA256",
     "WEB_CRITIQUE_PROMPT_VERSION",
+    "answer_operation_pin_allowed",
 ]

@@ -20,8 +20,6 @@ from smart_rag_core.query_answer.versions import (
     ALLOWED_EVAL_JUDGE_MODEL_IDS,
     ALLOWED_VERIFIER_MODEL_IDS,
     ANSWER_MAX_OUTPUT_TOKENS,
-    ANSWER_PROMPT_SHA256,
-    ANSWER_PROMPT_VERSION,
     EVAL_JUDGE_MAX_OUTPUT_TOKENS,
     EVAL_JUDGE_PROMPT_SHA256,
     EVAL_JUDGE_PROMPT_VERSION,
@@ -32,6 +30,7 @@ from smart_rag_core.query_answer.versions import (
     VERIFIER_PROMPT_VERSION,
     WEB_ANSWER_PROMPT_SHA256,
     WEB_ANSWER_PROMPT_VERSION,
+    answer_operation_pin_allowed,
 )
 
 
@@ -66,7 +65,7 @@ def execute_openai_answer(
         api_key: Provider credential. Never logged.
         prompt_text: Pinned answer prompt body.
         prompt_sha256: Expected prompt digest.
-        prompt_version: Expected prompt version.
+        prompt_version: The current answer pin or the locate pin.
         model_id: Allow-listed model.
         user_query: Original user text.
         source_records: Delimited untrusted source records.
@@ -83,7 +82,7 @@ def execute_openai_answer(
         One HTTPS Responses request. ``max_retries=0``. No tools.
     """
 
-    if prompt_version != ANSWER_PROMPT_VERSION or prompt_sha256 != ANSWER_PROMPT_SHA256:
+    if not answer_operation_pin_allowed(prompt_version, prompt_sha256):
         raise OpenAIAnswerError("answer_version_mismatch")
     if model_id not in ALLOWED_ANSWER_MODEL_IDS:
         raise OpenAIAnswerError("answer_version_mismatch")

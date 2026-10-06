@@ -2,7 +2,7 @@
 title: Answer verification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-24
+last-reviewed: 2026-10-06
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 3
 ---
@@ -127,11 +127,14 @@ text is dropped. Company `answer_v2` passage citations require an exact
 1–1000 character span contained in canonical text. Empty spans are
 legacy whole-passage only when paragraph mappings are not required.
 
-Prompt versions: `answer_v4` (current), `answer_v3`, `answer_v2`, and
-`answer_v1` (historical), `verifier_v2` (current), `verifier_v1` (historical),
-`web_critique_v1`, and `web_answer_v1` under
+Prompt versions: `answer_v7` (current), `answer_v6` … `answer_v1`
+(historical), `locate_v1` (optional quote extraction before the answer
+call; same claims schema), `verifier_v2` (current), `verifier_v1`
+(historical), `web_critique_v1`, and `web_answer_v1` under
 `apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
-LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Before
+LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. The
+answer stage may make up to two counted ``answer`` calls per question
+(locate then answer) when budget and deadline allow. Before
 deterministic paragraph mapping, company payloads bind omitted atomic
 links from paragraphs (and omitted paragraphs from links) and replace
 missing or non-substring spans with the first non-empty paragraph of
@@ -171,6 +174,35 @@ persist sources → draft) → `verify_answer` → END. Hold-until-verify:
 
 Compile still constructs no sockets or OpenAI clients. Mock mode works
 without network.
+
+### Locate-quote call
+
+When the company answer path has a bound `locate_v1` prompt, at least
+two remaining model calls, and at least 18 seconds before the run
+deadline, `generate_answer` runs one optional locate call before the
+answer call. The locate timeout is 8 seconds. Usage is recorded as
+`usage_kind = "answer"` (no new kind). Validated quotes that occur
+word-for-word in a cited passage are appended to the model-facing
+query as a `Located quotes:` list. If the answer call refuses but
+quotes remain, those quotes are released as cited `partial` claims.
+Diagnostics land in state key `answer_locate` (status, reason,
+quote_count, chunk_ids only). Provider error, timeout, or invalid
+payload mark locate as `failed`; the answer call still runs.
+
+```mermaid
+flowchart TD
+  fit["fit_source_records"] --> gate{"locate prompt bound, 2 or more calls left, 18 s or more left"}
+  gate -->|no| answerCall["answer_v7 call, plain query"]
+  gate -->|yes| locateCall["locate_v1 call, usage_kind answer, 8 s timeout"]
+  locateCall --> validate["keep quotes found word-for-word in cited passage"]
+  validate --> answerCallQuotes["answer_v7 call, query plus Located quotes"]
+  answerCallQuotes --> refused{"answer refused and quotes exist"}
+  refused -->|yes| fallback["release quotes as cited claims, status partial"]
+  refused -->|no| keep["keep model answer"]
+  fallback --> verify["verify_answer"]
+  keep --> verify
+  answerCall --> verify
+```
 
 ```mermaid
 flowchart TD

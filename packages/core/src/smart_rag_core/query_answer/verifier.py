@@ -16,6 +16,8 @@ from smart_rag_core.query_answer.versions import MAX_VERIFIER_CALLS, MAX_VERIFIE
 
 VerifierCaller = Callable[[tuple[AtomicLink, ...]], VerifierPayload]
 
+VERBATIM_MIN_CHARS = 12
+
 
 def select_material_links(
     links: tuple[AtomicLink, ...],

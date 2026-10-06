@@ -34,8 +34,6 @@ from smart_rag_core.query_answer.models import AtomicLink
 from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.verifier import mock_verifier_payload
 from smart_rag_core.query_answer.versions import (
-    ANSWER_PROMPT_SHA256,
-    ANSWER_PROMPT_VERSION,
     CONVERSATION_TITLE_PROMPT_SHA256,
     CONVERSATION_TITLE_PROMPT_VERSION,
     EVAL_JUDGE_PROMPT_SHA256,
@@ -48,6 +46,7 @@ from smart_rag_core.query_answer.versions import (
     VERIFIER_PROMPT_VERSION,
     WEB_ANSWER_PROMPT_SHA256,
     WEB_ANSWER_PROMPT_VERSION,
+    answer_operation_pin_allowed,
 )
 from smart_rag_core.query_profile.models import ModelInferredProfile
 from smart_rag_core.query_profile.versions import (
@@ -220,9 +219,8 @@ class MockModelAdapter:
             None. No network, retrieval, or tool calls.
         """
 
-        if (
-            request.prompt_version != ANSWER_PROMPT_VERSION
-            or request.prompt_sha256 != ANSWER_PROMPT_SHA256
+        if not answer_operation_pin_allowed(
+            request.prompt_version, request.prompt_sha256
         ):
             raise ValueError("answer_prompt_version_mismatch")
         joined = request.query + request.source_records

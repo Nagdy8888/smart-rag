@@ -34,7 +34,7 @@ The table below is the complete maintained map. Packet evidence under
 | [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-10-01 | eng, reviewers |
 | [evaluation/WEB_MODE_ASK_15_2026-10-01.md](./evaluation/WEB_MODE_ASK_15_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, reviewers |
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
-| [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-22 | eng, reviewers |
+| [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-10-06 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-27 | eng, security |
 | [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-09-16 | eng, frontend |

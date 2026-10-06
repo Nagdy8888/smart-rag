@@ -66,6 +66,7 @@ class QueryGraphState(TypedDict):
         web_sources: Persisted Web source mappings for the verify excerpt
             store. Empty on company routes.
         answer_context_fit: ID-only source-fit diagnostics, or null.
+        answer_locate: ID-only locate-call diagnostics (status, reason, quote_count, chunk_ids), or null.
     """
 
     status: Literal[
@@ -137,6 +138,7 @@ class QueryGraphState(TypedDict):
     cost_usd: float | None
     web_sources: list[dict[str, object]]
     answer_context_fit: dict[str, object] | None
+    answer_locate: dict[str, object] | None
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -224,4 +226,5 @@ def pending_query_state(
         "cost_usd": None,
         "web_sources": [],
         "answer_context_fit": None,
+        "answer_locate": None,
     }

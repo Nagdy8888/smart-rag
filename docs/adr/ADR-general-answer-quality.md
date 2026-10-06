@@ -34,7 +34,7 @@ pool 5, ingestion 1.
    a cited passage. Tried in G2 on 2026-10-06; reverted by stop rule
    (`refused_after_draft`+`trimmed_or_rewritten` stayed flat at 5 on
    `dev40-g2` vs `dev40-g1b`).
-3. Optional (G3, only if the stage report justifies it): one
+3. Implemented in G3 on 2026-10-06: one
    `locate_v1` gpt-4o-mini call before the answer call, recorded under
    the existing `usage_kind = "answer"` so no migration is needed, and
    skipped when it would consume the answer-stage reserve.

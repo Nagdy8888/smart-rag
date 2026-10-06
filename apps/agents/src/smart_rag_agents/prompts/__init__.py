@@ -8,12 +8,14 @@ QUERY_PROFILE_PROMPT_VERSION = "query_profile_v1"
 QUERY_PROFILE_PROMPT_PATH = Path(__file__).resolve().parent / "query_profile_v1.md"
 RERANK_PROMPT_VERSION = "rerank_v2"
 RERANK_PROMPT_PATH = Path(__file__).resolve().parent / "rerank_v2.md"
-ANSWER_PROMPT_VERSION = "answer_v6"
-ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v6.md"
+ANSWER_PROMPT_VERSION = "answer_v7"
+ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v7.md"
 GENERAL_CHAT_PROMPT_VERSION = "general_chat_v1"
 GENERAL_CHAT_PROMPT_PATH = Path(__file__).resolve().parent / "general_chat_v1.md"
 VERIFIER_PROMPT_VERSION = "verifier_v2"
 VERIFIER_PROMPT_PATH = Path(__file__).resolve().parent / "verifier_v2.md"
+LOCATE_PROMPT_VERSION = "locate_v1"
+LOCATE_PROMPT_PATH = Path(__file__).resolve().parent / "locate_v1.md"
 OPTIONAL_CATALOG_PROMPT_VERSION = "optional_catalog_v1"
 OPTIONAL_CATALOG_PROMPT_PATH = (
     Path(__file__).resolve().parent / "optional_catalog_v1.md"
@@ -95,6 +97,19 @@ def verifier_prompt_text() -> str:
     """
 
     return VERIFIER_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def locate_prompt_text() -> str:
+    """Return the locate-quote prompt body used before the answer call.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return LOCATE_PROMPT_PATH.read_text(encoding="utf-8")
 
 
 def optional_catalog_prompt_text() -> str:
