@@ -159,9 +159,10 @@ def apply_laptop_ingest_environ() -> None:
     writer_user = env.get("PARADEDB_WRITER_USER", "paradedb_writer")
     writer_password = env.get("PARADEDB_WRITER_PASSWORD", "")
     paradedb_db = env.get("PARADEDB_DB", "paradedb")
+    # packet8 publishes ParadeDB on 55432 (Hyper-V often excludes :54329).
     os.environ["PARADEDB_URL"] = (
         f"postgresql://{quote(writer_user, safe='')}:{quote(writer_password, safe='')}"
-        f"@127.0.0.1:54329/{paradedb_db}"
+        f"@127.0.0.1:55432/{paradedb_db}"
     )
     worker_dsn = os.environ.get("SUPABASE_DB_URL", "").strip()
     graph_enabled = os.environ.get("WORKER_GRAPH_ENABLED", "true").strip().lower()
@@ -183,7 +184,7 @@ def apply_laptop_ingest_environ() -> None:
     os.environ.setdefault("JOB_HEARTBEAT_INTERVAL_SECONDS", "30")
     storage_set = bool(env.get("SUPABASE_STORAGE_ADMIN_SECRET"))
     print("laptop_ingest_worker=host", flush=True)
-    print("paradedb_host=127.0.0.1:54329", flush=True)
+    print("paradedb_host=127.0.0.1:55432", flush=True)
     print("clamav_host=127.0.0.1:13310", flush=True)
     print(f"storage_admin_present={str(storage_set).lower()}", flush=True)
     print(
