@@ -127,7 +127,7 @@ Private artifacts: `.private-eval/runs/fresh50-2026-10-04-baseline/`.
 ## Post-fix result
 
 Phase D shipped an extractive salvage for exact-wording paraphrases
-(`salvage_query_literal_extractive` in `generate_grounded.py` + verify loop),
+(`salvage_query_literal_extractive` in `generate_grounded.py` + verify loop; removed in G1a),
 with book-title name anchors excluded so prompts that always name the book
 cannot clobber grounded answers.
 
@@ -195,7 +195,7 @@ uv run python scripts/run_company_ask.py `
 
 ## Post-fix 2 result (extractive localization)
 
-Strengthened `salvage_query_literal_extractive` to localize exact-ask spans by
+Strengthened `salvage_query_literal_extractive` (removed later in G1a) to localize exact-ask spans by
 query locators (names, snake_case, dotted hosts), code-shaped `def` lines,
 TOC “immediately after …” successors, glued heading labels, and
 locator-centered windows inside long paragraphs. Regression tests live in

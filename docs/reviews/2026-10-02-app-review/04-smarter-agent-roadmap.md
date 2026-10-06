@@ -45,7 +45,7 @@ general mechanism covers the same cases without hard-coding:
 3. Emit the span verbatim as the first claim with its citation; pass the rest of
    the answer to the model as usual.
 
-This is a generalization of `salvage_refused_literal_claims`, which already does
+This is a generalization of `salvage_refused_literal_claims` (removed in G1a), which already did
 query-anchored extraction for distinctive literals — it just only runs after a
 refusal. Running the equivalent **before** generation, for literal-shaped asks,
 removes the need for most per-question code. Roll out behind a flag, measure on

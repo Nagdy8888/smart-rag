@@ -5,7 +5,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 from smart_rag_core.query_answer.generate_grounded import (
-    salvage_listed_literals,
     salvage_named_code_definition,
     salvage_named_table_block,
 )
@@ -19,17 +18,19 @@ from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.retrieval.rerank import (
     RerankPassage,
     hybrid_seed_terms,
-    listed_literal_groups,
     literal_anchor_ask,
     named_code_definition_ids,
     named_table_captions,
-    promote_listed_literal_passages,
     promote_named_code_definition_passages,
     promote_named_table_passages,
 )
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
-from tests.support.answer_verifier import verifier_fusion, verifier_passage, verifier_uid
+from tests.support.answer_verifier import (
+    verifier_fusion,
+    verifier_passage,
+    verifier_uid,
+)
 
 
 def _passage(*, text: str) -> RerankPassage:
@@ -82,9 +83,7 @@ def _payload(text: str, *, chunk: str) -> AnswerPayload:
                 atomic_link_id="claim-1",
             ),
         ),
-        atomic_links=(
-            AtomicLink(link_id="claim-1", claim=text, chunk_ids=(chunk,)),
-        ),
+        atomic_links=(AtomicLink(link_id="claim-1", claim=text, chunk_ids=(chunk,)),),
         status="complete",
         answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     )
@@ -96,9 +95,7 @@ def test_literal_anchor_ask_matches_reproduce_code_and_table() -> None:
     assert literal_anchor_ask(
         "reproduce the cancel_order tool definition as a fenced Python code block"
     )
-    assert literal_anchor_ask(
-        "reproduce Table 2-1 as a Markdown pipe table"
-    )
+    assert literal_anchor_ask("reproduce Table 2-1 as a Markdown pipe table")
     assert named_code_definition_ids(
         "reproduce the cancel_order @tool function as a fenced code block"
     ) == ("cancel_order",)
@@ -117,7 +114,7 @@ def test_promote_named_code_definition_prefers_def_over_invoke() -> None:
     invoke = _passage(
         text=(
             'example_order = {"order_id": "A12345"}\n'
-            "result = graph.invoke({\"order\": example_order})\n"
+            'result = graph.invoke({"order": example_order})\n'
             "cancel_order is called later"
         )
     )
@@ -187,8 +184,7 @@ def test_salvage_named_code_definition_replaces_wrong_neighbor() -> None:
         payload,
         fusion,
         user_query=(
-            "reproduce the cancel_order tool definition as a fenced "
-            "Python code block"
+            "reproduce the cancel_order tool definition as a fenced Python code block"
         ),
     )
     assert "def cancel_order(order_id: str) -> str:" in salvaged.answer_text
@@ -302,8 +298,7 @@ def test_salvage_named_code_definition_stops_before_sibling_def() -> None:
         payload,
         fusion,
         user_query=(
-            "reproduce the cancel_order tool definition as a fenced "
-            "Python code block"
+            "reproduce the cancel_order tool definition as a fenced Python code block"
         ),
     )
     assert "def cancel_order(order_id: str) -> str:" in salvaged.answer_text
@@ -391,9 +386,7 @@ def test_salvage_named_table_keeps_later_rows_after_capitalized_line() -> None:
     salvaged = salvage_named_table_block(
         payload,
         fusion,
-        user_query=(
-            "reproduce Table 10-2 as a Markdown pipe table (not a prose list)"
-        ),
+        user_query=("reproduce Table 10-2 as a Markdown pipe table (not a prose list)"),
     )
     assert "Table 10-2." in salvaged.answer_text
     assert "Grafana + Loki/Tempo" in salvaged.answer_text
@@ -471,271 +464,13 @@ def test_salvage_named_code_trims_trailing_sibling_when_already_present() -> Non
         payload,
         fusion,
         user_query=(
-            "reproduce the cancel_order tool definition as a fenced "
-            "Python code block"
+            "reproduce the cancel_order tool definition as a fenced Python code block"
         ),
     )
     assert "def cancel_order(order_id: str) -> str:" in salvaged.answer_text
     assert "has been cancelled." in salvaged.answer_text
     assert "call_model" not in salvaged.answer_text
     assert "# -- 2)" not in salvaged.answer_text
-
-
-def test_wiring_ask_prefers_edges_over_summarize_def() -> None:
-    """Consolidation-edge asks pin add_edge/U1234, not def summarize_response."""
-
-    wrong = _passage(
-        text=(
-            "def summarize_response(state):\n"
-            '    return {"summary": state["messages"][-1]}\n'
-        )
-    )
-    gold = _passage(
-        text=(
-            "graph.add_edge(handle_refund, summarize_response)\n"
-            "graph.add_edge(summarize_response, END)\n"
-            'initial_state = {"user_id": "U1234", "issue_type": "billing"}\n'
-        )
-    )
-    query = (
-        "reproduce the consolidation edges into summarize_response plus "
-        "the initial_state dict used to execute the graph as a fenced "
-        "Python code block"
-    )
-    assert "summarize_response" not in named_code_definition_ids(query)
-    promoted = promote_named_code_definition_passages(
-        (wrong,),
-        query=query,
-        pool=(wrong, gold),
-        limit=12,
-    )
-    assert promoted[0].candidate.chunk_id == gold.candidate.chunk_id
-    fusion = verifier_fusion(
-        verifier_passage(1, text=wrong.raw_text, rank=1),
-        verifier_passage(2, text=gold.raw_text, rank=2),
-    )
-    salvaged = salvage_named_code_definition(
-        _payload(wrong.raw_text, chunk=verifier_uid(1)),
-        fusion,
-        user_query=query,
-    )
-    assert "graph.add_edge(handle_refund, summarize_response)" in salvaged.answer_text
-    assert '"user_id": "U1234"' in salvaged.answer_text
-    assert "def summarize_response" not in salvaged.answer_text
-
-
-def test_call_model_salvage_includes_chatopenai_assignment() -> None:
-    """call_model salvage keeps the preceding ChatOpenAI(model=...) line."""
-
-    gold = (
-        'llm = ChatOpenAI(model="gpt-5")\n'
-        "def call_model(state: MessagesState):\n"
-        "    response = llm.invoke(state['messages'])\n"
-        '    return {"messages": response}\n'
-    )
-    fusion = verifier_fusion(verifier_passage(1, text=gold, rank=1))
-    payload = _payload(
-        "def call_model(state: MessagesState): return {'messages': response}",
-        chunk=verifier_uid(1),
-    )
-    salvaged = salvage_named_code_definition(
-        payload,
-        fusion,
-        user_query=(
-            "reproduce the call_model node that uses MessagesState and "
-            'ChatOpenAI model gpt-5 as a fenced Python code block'
-        ),
-    )
-    assert 'ChatOpenAI(model="gpt-5")' in salvaged.answer_text
-    assert "def call_model(state: MessagesState):" in salvaged.answer_text
-
-
-def test_sftconfig_constructor_promote_and_salvage() -> None:
-    """SFTConfig asks require cosine/bf16 in the same constructor passage."""
-
-    partial = _passage(text='lr_scheduler_type="cosine" appears in prose nearby')
-    gold = _passage(
-        text=(
-            "training_args = SFTConfig(\n"
-            '    lr_scheduler_type="cosine",\n'
-            "    bf16=True,\n"
-            ")\n"
-        )
-    )
-    query = (
-        "reproduce the SFTConfig(...) call that sets cosine scheduling "
-        "and bf16 as a fenced Python code block"
-    )
-    promoted = promote_named_code_definition_passages(
-        (partial,),
-        query=query,
-        pool=(partial, gold),
-        limit=12,
-    )
-    assert promoted[0].candidate.chunk_id == gold.candidate.chunk_id
-    fusion = verifier_fusion(verifier_passage(1, text=gold.raw_text, rank=1))
-    salvaged = salvage_named_code_definition(
-        _payload('lr_scheduler_type="cosine"', chunk=verifier_uid(1)),
-        fusion,
-        user_query=query,
-    )
-    assert "SFTConfig(" in salvaged.answer_text
-    assert "bf16=True" in salvaged.answer_text
-
-
-def test_agentstate_supervisor_refusal_salvage() -> None:
-    """Empty refusal is replaced when class AgentState + supervisor_node exist."""
-
-    gold = (
-        "class AgentState(TypedDict):\n"
-        "    messages: list\n"
-        "def supervisor_node(state: AgentState):\n"
-        '    """Route to inventory, transportation, or supplier."""\n'
-        '    return {"next": "inventory"}\n'
-    )
-    fusion = verifier_fusion(verifier_passage(1, text=gold, rank=1))
-    payload = _payload("Insufficient authorized evidence.", chunk=verifier_uid(1))
-    payload = payload.model_copy(
-        update={
-            "status": "refused",
-            "paragraphs": (),
-            "citations": (),
-            "atomic_links": (),
-            "answer_text": "",
-        }
-    )
-    salvaged = salvage_named_code_definition(
-        payload,
-        fusion,
-        user_query=(
-            "reproduce the AgentState TypedDict and the supervisor_node "
-            "function that must output only inventory, transportation, or "
-            "supplier as a fenced Python code block"
-        ),
-    )
-    assert salvaged.status == "complete"
-    assert "class AgentState(TypedDict):" in salvaged.answer_text
-    assert "def supervisor_node(state: AgentState):" in salvaged.answer_text
-    assert "inventory, transportation, or supplier" in salvaged.answer_text
-
-
-def test_listed_literal_nps_csat_and_jetstream() -> None:
-    """NPS+CSAT and broker+JetStream joint groups promote and salvage."""
-
-    satisfaction_q = (
-        "which two named score metrics does the book list under user "
-        "satisfaction scores for evaluating agent UX?"
-    )
-    groups = listed_literal_groups(satisfaction_q)
-    assert any("NPS" in " ".join(group) for group in groups)
-    nps_wrong = _passage(text="Measurement headings: latency and cost")
-    nps_gold = _passage(
-        text=(
-            "user satisfaction scores such as net promoter score (NPS) "
-            "and customer satisfaction (CSAT) are tracked weekly"
-        )
-    )
-    promoted = promote_listed_literal_passages(
-        (nps_wrong,),
-        query=satisfaction_q,
-        pool=(nps_wrong, nps_gold),
-        limit=12,
-    )
-    assert promoted[0].candidate.chunk_id == nps_gold.candidate.chunk_id
-    fusion = verifier_fusion(verifier_passage(1, text=nps_gold.raw_text, rank=1))
-    salvaged = salvage_listed_literals(
-        _payload("latency and cost", chunk=verifier_uid(1)),
-        fusion,
-        user_query=satisfaction_q,
-    )
-    assert "net promoter score (NPS)" in salvaged.answer_text
-    assert "customer satisfaction (CSAT)" in salvaged.answer_text
-
-    broker_q = (
-        "present the message-broker options Apache Kafka, Redis Stream "
-        "and RabbitMQ, and NATS as a Markdown pipe table"
-    )
-    broker_groups = listed_literal_groups(broker_q)
-    assert any("JetStream" in group for group in broker_groups)
-    lone = _passage(text="Apache Kafka | high throughput")
-    with_jet = _passage(
-        text=(
-            "Apache Kafka | logs\nRedis Stream | Redis\n"
-            "RabbitMQ | queues\nNATS | JetStream messaging\n"
-        )
-    )
-    promoted_b = promote_listed_literal_passages(
-        (lone,),
-        query=broker_q,
-        pool=(lone, with_jet),
-        limit=12,
-    )
-    assert promoted_b[0].candidate.chunk_id == with_jet.candidate.chunk_id
-
-
-def test_listed_literal_continuity_and_cracked_mug_joint() -> None:
-    """Client-side continuity and A89268+cracked mug require joint literals."""
-
-    continuity_q = (
-        "what continuity problem does a purely client-side context "
-        "(for example stored in browser memory) create across devices "
-        "or logins?"
-    )
-    near = _passage(text="Server-side sessions keep continuity on page 83.")
-    gold = _passage(
-        text=(
-            "A purely client-side context loses continuity across devices "
-            "or logins when the browser memory is cleared."
-        )
-    )
-    promoted = promote_listed_literal_passages(
-        (near,),
-        query=continuity_q,
-        pool=(near, gold),
-        limit=12,
-    )
-    assert promoted[0].candidate.chunk_id == gold.candidate.chunk_id
-    fusion = verifier_fusion(
-        verifier_passage(1, text=near.raw_text, rank=1),
-        verifier_passage(2, text=gold.raw_text, rank=2),
-    )
-    salvaged = salvage_listed_literals(
-        _payload(near.raw_text, chunk=verifier_uid(1)),
-        fusion,
-        user_query=continuity_q,
-    )
-    assert "loses continuity across devices or logins" in salvaged.answer_text
-    assert salvaged.citations[0].chunk_id == verifier_uid(2)
-
-    mug_q = (
-        "what order_id is given for the simple cracked mug refund case?"
-    )
-    lone_id = _passage(text='{"order_id": "A89268", "status": "open"}')
-    joint = _passage(
-        text=(
-            'The simple cracked mug refund uses order_id "A89268" '
-            "in the ecommerce customer support measurement example."
-        )
-    )
-    promoted_m = promote_listed_literal_passages(
-        (lone_id,),
-        query=mug_q,
-        pool=(lone_id, joint),
-        limit=12,
-    )
-    assert promoted_m[0].candidate.chunk_id == joint.candidate.chunk_id
-    fusion_m = verifier_fusion(
-        verifier_passage(1, text=lone_id.raw_text, rank=1),
-        verifier_passage(2, text=joint.raw_text, rank=2),
-    )
-    salvaged_m = salvage_listed_literals(
-        _payload(lone_id.raw_text, chunk=verifier_uid(1)),
-        fusion_m,
-        user_query=mug_q,
-    )
-    assert "A89268" in salvaged_m.answer_text
-    assert "cracked mug" in salvaged_m.answer_text
-    assert salvaged_m.citations[0].chunk_id == verifier_uid(2)
 
 
 def test_hybrid_seed_terms_include_code_and_listed_literals() -> None:
@@ -758,118 +493,3 @@ def test_hybrid_seed_terms_include_code_and_listed_literals() -> None:
     )
     assert any("Kafka" in item for item in broker_seeds)
     assert any(item == "NATS" or "NATS" in item for item in broker_seeds)
-
-
-def test_listed_literal_remain5_ask_shapes_promote_and_seed() -> None:
-    """TOC / coordination / learning / tool-sequence groups pin gold spans."""
-
-    toc_q = (
-        "what agentic framework section title appears in the Table of "
-        "Contents immediately after LangGraph and AutoGen?"
-    )
-    assert any("CrewAI" in group for group in listed_literal_groups(toc_q))
-    toc_seeds = hybrid_seed_terms(toc_q)
-    assert "CrewAI" in toc_seeds
-    assert "Table of Contents" in toc_seeds
-    toc_wrong = _passage(text="LangGraph and AutoGen comparison trade-offs")
-    toc_gold = _passage(
-        text=(
-            "12 LangGraph                                                    "
-            "13 AutoGen                                                      "
-            "14 CrewAI                                                       "
-            "15 Knowledge and Memory                                         "
-        )
-    )
-    toc_promoted = promote_listed_literal_passages(
-        (toc_wrong,),
-        query=toc_q,
-        pool=(toc_wrong, toc_gold),
-        limit=12,
-    )
-    assert toc_promoted[0].candidate.chunk_id == toc_gold.candidate.chunk_id
-
-    coord_q = (
-        "when scaling to multiagent systems, which coordination pattern "
-        "does the book list alongside democratic and hierarchical approaches?"
-    )
-    assert any(
-        "actor-critic" in group for group in listed_literal_groups(coord_q)
-    )
-    assert "actor-critic" in hybrid_seed_terms(coord_q)
-    coord_wrong = _passage(text="Manager Coordination centralizes oversight")
-    coord_gold = _passage(
-        text=(
-            "How do I scale from single-agent to multiagent systems, "
-            "including coordination patterns like democratic, hierarchical, "
-            "or actor-critic approaches?"
-        )
-    )
-    coord_promoted = promote_listed_literal_passages(
-        (coord_wrong,),
-        query=coord_q,
-        pool=(coord_wrong, coord_gold),
-        limit=12,
-    )
-    assert coord_promoted[0].candidate.chunk_id == coord_gold.candidate.chunk_id
-
-    learn_q = (
-        "in the Chapter 11 roadmap, which continuous-learning modes are "
-        "listed after in-context learning?"
-    )
-    assert any(
-        "offline retraining" in group
-        for group in listed_literal_groups(learn_q)
-    )
-    learn_seeds = hybrid_seed_terms(learn_q)
-    assert "offline retraining" in learn_seeds
-    assert "online reinforcement" in learn_seeds
-    learn_wrong = _passage(text="In-context learning adapts without weights")
-    learn_gold = _passage(
-        text=(
-            "Chapter 11 lists continuous-learning modes after in-context "
-            "learning: offline retraining and online reinforcement."
-        )
-    )
-    learn_promoted = promote_listed_literal_passages(
-        (learn_wrong,),
-        query=learn_q,
-        pool=(learn_wrong, learn_gold),
-        limit=12,
-    )
-    assert learn_promoted[0].candidate.chunk_id == learn_gold.candidate.chunk_id
-
-    tool_q = (
-        "after local tools and API-based tools, what third tool category "
-        "will the Tool Use chapter cover in sequence?"
-    )
-    assert any("MCP tools" in group for group in listed_literal_groups(tool_q))
-    assert "MCP tools" in hybrid_seed_terms(tool_q)
-    tool_wrong = _passage(
-        text=(
-            "While local tools enable agents to perform tasks independently, "
-            "API-based tools enable agents to connect with external services."
-        )
-    )
-    tool_gold = _passage(
-        text=(
-            "agent, which we will cover in sequence: local tools, "
-            "API-based tools, and MCP tools."
-        )
-    )
-    tool_promoted = promote_listed_literal_passages(
-        (tool_wrong,),
-        query=tool_q,
-        pool=(tool_wrong, tool_gold),
-        limit=12,
-    )
-    assert tool_promoted[0].candidate.chunk_id == tool_gold.candidate.chunk_id
-    fusion = verifier_fusion(
-        verifier_passage(1, text=tool_wrong.raw_text, rank=1),
-        verifier_passage(2, text=tool_gold.raw_text, rank=2),
-    )
-    salvaged = salvage_listed_literals(
-        _payload(tool_wrong.raw_text, chunk=verifier_uid(1)),
-        fusion,
-        user_query=tool_q,
-    )
-    assert "MCP tools" in salvaged.answer_text

@@ -22,20 +22,8 @@ from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
 from smart_rag_core.query_answer.generate_grounded import (
-    salvage_adas_model_defaults,
-    salvage_chunking_window_values,
-    salvage_expose_mode_labels,
-    salvage_helper_function_name,
-    salvage_method_or_heading_label,
-    salvage_missing_multipart_figures,
-    salvage_listed_literals,
     salvage_named_code_definition,
     salvage_named_table_block,
-    salvage_protocol_aspire_claim,
-    salvage_psi_retrain_threshold,
-    salvage_query_literal_extractive,
-    salvage_refused_literal_claims,
-    salvage_tool_description_string,
 )
 from smart_rag_core.query_answer.models import (
     AnswerPayload,
@@ -100,6 +88,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         Deadline/step exhaustion emits verified partial, not fake success.
 
     Failure/fallback route:
+        After release rendering, only the named code-definition and named
+        table-block extractive repairs may replace the claims.
         Unsupported links are removed or refused. A rejected fact whose
         quoted literals and identifiers already occur in the cited passage
         is kept as a verbatim excerpt of that passage. Unsupported chains
@@ -261,45 +251,15 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 user_query=user_query,
             )
         except (ValidationError, ValueError, AnswerError):
-            # Keep the pre-render payload; later salvages may still repair.
+            # Keep the pre-render payload; the structural salvages below may still repair.
             pass
-        if checked.status == "refused" and fusion.evidence:
-            salvaged = salvage_refused_literal_claims(
-                fusion, user_query=user_query
-            )
-            if salvaged is not None:
-                try:
-                    checked = render_verified_company_answer(
-                        salvaged,
-                        fusion=fusion,
-                        tables=tables.records,
-                        user_query=user_query,
-                    )
-                except (ValidationError, ValueError, AnswerError):
-                    checked = salvaged
-        # Run query-anchored salvages even after a refusal so extractive
-        # tool-description / window_size / label claims can replace an
-        # empty or paraphrased refusal when gold is already selected.
         if fusion.evidence:
             for salvage_fn in (
-                salvage_missing_multipart_figures,
-                salvage_helper_function_name,
-                salvage_expose_mode_labels,
-                salvage_adas_model_defaults,
-                salvage_psi_retrain_threshold,
-                salvage_method_or_heading_label,
-                salvage_tool_description_string,
-                salvage_chunking_window_values,
-                salvage_protocol_aspire_claim,
                 salvage_named_code_definition,
                 salvage_named_table_block,
-                salvage_listed_literals,
-                salvage_query_literal_extractive,
             ):
                 try:
-                    salvaged = salvage_fn(
-                        checked, fusion, user_query=user_query
-                    )
+                    salvaged = salvage_fn(checked, fusion, user_query=user_query)
                 except (ValidationError, ValueError, AnswerError):
                     continue
                 if salvaged is checked:
@@ -314,12 +274,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 except (ValidationError, ValueError, AnswerError):
                     # Keep the extractive salvage rather than dropping it.
                     checked = salvaged
-            # Legacy shared try removed: one failed salvage must not skip
-            # later query-anchored confuser repairs (expose / ADAS / PSI).
         try:
-            checked = format_requested_answer_shape(
-                checked, user_query=user_query
-            )
+            checked = format_requested_answer_shape(checked, user_query=user_query)
         except (ValidationError, ValueError, AnswerError):
             # Pipe-table / fence reshaping must not fail the verified path
             # after a successful extractive salvage.
@@ -430,9 +386,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             if persisted.skipped:
                 skipped_citation_count = len(persisted.skipped)
                 if not persisted.ids and fusion.evidence:
-                    repaired = repair_leaf_citations(
-                        checked, fusion, persisted.skipped
-                    )
+                    repaired = repair_leaf_citations(checked, fusion, persisted.skipped)
                     if repaired is not checked:
                         try:
                             repaired = render_verified_company_answer(
@@ -472,9 +426,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                             detail = "citation_leaf_unresolved"
                             persisted = retried
                         else:
-                            checked = drop_skipped_citations(
-                                checked, persisted.skipped
-                            )
+                            checked = drop_skipped_citations(checked, persisted.skipped)
                             terminal = "insufficient_evidence"
                             detail = "citation_leaf_unresolved"
                     else:

@@ -323,43 +323,24 @@ def _ocr_body_to_pipe_table(text: str) -> str:
     if re.search(r"(?i)^Table\s+\d+-\d+", lines[0]):
         caption = lines[0]
         body_lines = lines[1:] or lines
-    # Method / How it works / Best for style (Table 7-1 OCR).
-    joined = " ".join(body_lines)
-    method_split = re.split(
-        r"(?i)(?=Supervised\s+fine|Vision\s+fine|Direct\s+preference|"
-        r"Reinforcement\s+fine)",
-        joined,
-    )
     rows: list[tuple[str, str]] = []
-    if len(method_split) >= 2:
-        for chunk in method_split:
-            chunk = chunk.strip()
-            if not chunk or re.fullmatch(r"(?i)Method How it works Best for", chunk):
-                continue
-            # First sentence-ish as method label; rest as detail.
-            parts = re.split(r"(?<=[.!?])\s+", chunk, maxsplit=1)
-            method = parts[0].strip()
-            detail = parts[1].strip() if len(parts) > 1 else chunk
-            if method:
-                rows.append((_cell(method[:120]), _cell(detail[:400] or method)))
-    if not rows:
-        # Strategy / Broker style: pair consecutive lines.
-        if len(body_lines) >= 2:
-            header_guess = body_lines[0]
-            if re.search(r"(?i)strategy|broker|method|role", header_guess):
-                body_lines = body_lines[1:]
-            index = 0
-            while index < len(body_lines):
-                left = body_lines[index]
-                right = body_lines[index + 1] if index + 1 < len(body_lines) else ""
-                if right and len(left) <= 80:
-                    rows.append((_cell(left), _cell(right)))
-                    index += 2
-                else:
-                    rows.append((_item_label(index), _cell(left)))
-                    index += 1
-        else:
-            rows.append(("Content", _cell(body_lines[0][:500])))
+    # Pair consecutive lines as label/detail rows.
+    if len(body_lines) >= 2:
+        header_guess = body_lines[0]
+        if re.search(r"(?i)strategy|broker|method|role", header_guess):
+            body_lines = body_lines[1:]
+        index = 0
+        while index < len(body_lines):
+            left = body_lines[index]
+            right = body_lines[index + 1] if index + 1 < len(body_lines) else ""
+            if right and len(left) <= 80:
+                rows.append((_cell(left), _cell(right)))
+                index += 2
+            else:
+                rows.append((_item_label(index), _cell(left)))
+                index += 1
+    else:
+        rows.append(("Content", _cell(body_lines[0][:500])))
     if not rows:
         return text
     header_left = "Item"

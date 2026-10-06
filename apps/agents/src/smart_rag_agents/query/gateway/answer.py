@@ -9,10 +9,9 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_answer.assembly import fit_source_records
 from smart_rag_core.query_answer.claims import parse_provider_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
-from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
+from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.generate_grounded import (
-    salvage_listed_literals,
     salvage_named_code_definition,
     salvage_named_table_block,
 )
@@ -42,7 +41,10 @@ def _apply_code_table_salvages(
     tables: tuple[TableEvidenceRecord, ...],
     query: str,
 ) -> AnswerPayload:
-    """Run named code/table extractive salvages and re-bind surviving claims.
+    """Run the named code-definition and table-block salvages, then re-bind.
+
+    Both repairs apply only when the query names a ``def`` identifier or a
+    numbered table caption and canonical evidence holds that block.
 
     Args:
         payload: Provider answer after invented-id filtering.
@@ -51,15 +53,11 @@ def _apply_code_table_salvages(
         query: Original user query. Untrusted.
 
     Returns:
-        Payload after salvage + bind + derived answer text.
+        Payload after salvage, bind, and derived answer text.
     """
 
     working = payload
-    for salvage_fn in (
-        salvage_named_code_definition,
-        salvage_named_table_block,
-        salvage_listed_literals,
-    ):
+    for salvage_fn in (salvage_named_code_definition, salvage_named_table_block):
         salvaged = salvage_fn(working, fusion, user_query=query)
         if salvaged is working:
             continue
