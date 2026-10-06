@@ -131,7 +131,7 @@ Evidence of question-specific handling for known benchmark items:
 | Layer | File | Evidence |
 | --- | --- | --- |
 | Prompt | `apps/agents/src/smart_rag_agents/prompts/answer_v4.md:33-45` | "When the question asks which mode labels to expose…", "…named example's default model and temperature (ADAS, LLMAgentBase)…", "…`window_size` and `overlap`…" — bespoke answer-shape rules for specific eval asks |
-| Retrieval | `packages/core/src/smart_rag_core/retrieval/rerank.py:428-668` | `promote_adas_model_passages`, `promote_chunking_window_passages`, `promote_tool_description_passages`, `promote_protocol_aspire_passages`, `promote_host_literal_passages`, `promote_ide_product_passages`, `promote_named_code_definition_passages`, … |
+| Retrieval | `packages/core/src/smart_rag_core/retrieval/rerank.py` | Named code-definition and named table-caption promotions only (question-specific `promote_*` helpers removed in G1b). |
 | Answer | `packages/core/src/smart_rag_core/query_answer/generate_grounded.py:45-131, 613-1015, 1394-1478` | Gold regexes (`_ADAS_MODEL_GOLD`, `_PSI_RETRAIN_GOLD`, `_PROTOCOL_GOLD`, `_CHUNKING_GOLD`, `_TOOL_DESCRIPTION_GOLD`, `_METHOD_LABEL_GOLD`) and ~11 `salvage_*` functions applied at `:1777-1849` |
 | Verify | `apps/agents/src/smart_rag_agents/query/nodes/verify.py:249-296` | The same salvage loop re-runs inside the verify node to rescue refusals |
 

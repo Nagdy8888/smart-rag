@@ -176,10 +176,9 @@ _BOOK_TITLE_NAME_STOP = frozenset(
 def distinctive_query_names(user_query: str) -> tuple[str, ...]:
     """Extract capitalized product/name tokens from the user question.
 
-    Exact-wording asks often name the target entity (``Tempo``, ``SigNoz``)
-    without numerals. Those names are strong passage anchors when they
-    already appear in selected evidence. Book-title tokens from prompts
-    that always name *Building Applications with AI Agents* are excluded.
+    Exact-wording asks often name the target entity without numerals. Those
+    names are strong passage anchors when they already appear in selected
+    evidence. Tokens in ``_BOOK_TITLE_NAME_STOP`` are excluded.
 
     Args:
         user_query: Original user text. Untrusted.

@@ -17,7 +17,6 @@ from smart_rag_core.query_answer.models import (
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.retrieval.rerank import (
     RerankPassage,
-    hybrid_seed_terms,
     literal_anchor_ask,
     named_code_definition_ids,
     named_table_captions,
@@ -471,25 +470,3 @@ def test_salvage_named_code_trims_trailing_sibling_when_already_present() -> Non
     assert "has been cancelled." in salvaged.answer_text
     assert "call_model" not in salvaged.answer_text
     assert "# -- 2)" not in salvaged.answer_text
-
-
-def test_hybrid_seed_terms_include_code_and_listed_literals() -> None:
-    """Code ids and in-query listed literals seed Hybrid exact terms."""
-
-    seeds = hybrid_seed_terms(
-        "reproduce the SFTConfig(...) call that sets cosine scheduling "
-        "and bf16 as a fenced Python code block"
-    )
-    assert "SFTConfig" in seeds
-    wiring_seeds = hybrid_seed_terms(
-        "reproduce the consolidation edges into summarize_response plus "
-        "the initial_state dict as a fenced Python code block"
-    )
-    assert "add_edge" in wiring_seeds
-    assert "initial_state" in wiring_seeds
-    broker_seeds = hybrid_seed_terms(
-        "present Apache Kafka, Redis Stream and RabbitMQ, and NATS "
-        "as a Markdown pipe table"
-    )
-    assert any("Kafka" in item for item in broker_seeds)
-    assert any(item == "NATS" or "NATS" in item for item in broker_seeds)

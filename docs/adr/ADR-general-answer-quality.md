@@ -27,7 +27,8 @@ pool 5, ingestion 1.
 1. Delete question-specific salvage, promotion, and seed code and the
    matching prompt bullets (`answer_v6`). Keep only structural repairs:
    named code definition, named table block, requested shape.
-   Done in G1a (answer side) on 2026-10-06.
+   Done in G1a (answer side) on 2026-10-06. Retrieval side done in G1b
+   on 2026-10-06.
 2. A verifier "unsupported" verdict does not remove a fact claim whose
    normalized text is a verbatim substring (at least 12 characters) of
    a cited passage.

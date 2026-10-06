@@ -19,18 +19,8 @@ from smart_rag_core.retrieval.rerank import (
     build_rerank_pool,
     literal_anchor_ask,
     literal_gold_already_loaded,
-    promote_adas_model_passages,
-    promote_chunking_window_passages,
-    promote_expose_mode_passages,
-    promote_helper_naming_passages,
-    promote_host_literal_passages,
-    promote_ide_product_passages,
-    promote_method_label_passages,
-    promote_listed_literal_passages,
     promote_named_code_definition_passages,
     promote_named_table_passages,
-    promote_protocol_aspire_passages,
-    promote_tool_description_passages,
     should_skip_trivial_exact,
     trim_token_budget,
 )
@@ -51,57 +41,28 @@ def _promote_query_anchor_passages(
     limit: int,
     fused: tuple[RerankPassage, ...] | None = None,
 ) -> tuple[RerankPassage, ...]:
-    """Pin helper-name, expose-mode, ADAS, and literal-label passages.
+    """Pin the code-definition or table-caption passage the query names.
+
+    Only identifiers and ``Table N-M`` captions typed in the query can pin a
+    passage, so the promotion works the same way for any document.
 
     Args:
         trimmed: Final evidence after MMR and token trim.
         query: Original user query. Untrusted.
         pool: Rerank pool passages.
         limit: Maximum passages to retain.
-        fused: Optional full fused passage list. When set, literal anchors
-            may promote a fused chunk that missed the rerank pool.
+        fused: Optional full fused passage list. When set, a named block may
+            be promoted from a fused chunk that missed the rerank pool.
 
     Returns:
-        Trimmed passages after additive query-anchor promotions.
+        Trimmed passages after at most two additive promotions.
     """
 
     search = fused if fused is not None else pool
-    promoted = promote_helper_naming_passages(
-        trimmed, query=query, pool=pool, limit=limit
-    )
-    promoted = promote_expose_mode_passages(
-        promoted, query=query, pool=pool, limit=limit
-    )
-    promoted = promote_adas_model_passages(
-        promoted, query=query, pool=pool, limit=limit
-    )
-    promoted = promote_chunking_window_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
-    promoted = promote_tool_description_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
-    promoted = promote_method_label_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
-    promoted = promote_host_literal_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
-    promoted = promote_ide_product_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
-    promoted = promote_protocol_aspire_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
     promoted = promote_named_code_definition_passages(
-        promoted, query=query, pool=search, limit=limit
+        trimmed, query=query, pool=search, limit=limit
     )
-    promoted = promote_named_table_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
-    return promote_listed_literal_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
+    return promote_named_table_passages(promoted, query=query, pool=search, limit=limit)
 
 
 def passages_from_context(
@@ -176,9 +137,7 @@ def load_literal_fused_passages(
     if literal_gold_already_loaded(query, passages):
         return passages
     have = {item.candidate.chunk_id for item in passages}
-    missing = tuple(
-        item.chunk_id for item in fused if item.chunk_id not in have
-    )
+    missing = tuple(item.chunk_id for item in fused if item.chunk_id not in have)
     if not missing:
         return passages
     extra = load_context(missing)
@@ -187,9 +146,7 @@ def load_literal_fused_passages(
     by_id = {item.candidate.chunk_id: item for item in passages}
     for item in passages_from_context(fused, extra, channel_hits):
         by_id.setdefault(item.candidate.chunk_id, item)
-    return tuple(
-        by_id[item.chunk_id] for item in fused if item.chunk_id in by_id
-    )
+    return tuple(by_id[item.chunk_id] for item in fused if item.chunk_id in by_id)
 
 
 def expand_parents(
@@ -449,9 +406,7 @@ def select_hybrid_context(
             limit=evidence_max,
             candidate_depth=mmr_depth,
         )
-        expanded, parent_ids = expand_parents(
-            mmr_selected, load_context, pool=passages
-        )
+        expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=passages)
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
         trimmed = _promote_query_anchor_passages(
             trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
@@ -480,9 +435,7 @@ def select_hybrid_context(
             limit=evidence_max,
             candidate_depth=mmr_depth,
         )
-        expanded, parent_ids = expand_parents(
-            mmr_selected, load_context, pool=passages
-        )
+        expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=passages)
         trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
         trimmed = _promote_query_anchor_passages(
             trimmed, query=query, pool=pool, limit=evidence_max, fused=passages
