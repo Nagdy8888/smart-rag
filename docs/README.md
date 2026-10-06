@@ -204,6 +204,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md](./evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, frontend, reviewers |
 | [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
+| [evaluation/GENERAL_ANSWER_QUALITY_2026-10.md](./evaluation/GENERAL_ANSWER_QUALITY_2026-10.md) | engineering-lead | draft | 2026-10-06 | eng, reviewers |
 | [evaluation/HYBRID_STAGE_TIMINGS_2026-09.md](./evaluation/HYBRID_STAGE_TIMINGS_2026-09.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
@@ -220,6 +221,8 @@ The table below is the complete maintained map. Packet evidence under
 | [runbooks/storage-db-reconciliation.md](./runbooks/storage-db-reconciliation.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [runbooks/bm25-rebuild.md](./runbooks/bm25-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [runbooks/demo-local-ingest-aws-ask.md](./runbooks/demo-local-ingest-aws-ask.md) | engineering-lead | draft | 2026-09-16 | eng, ops |
+| [runbooks/answer-quality-repair-loop.md](./runbooks/answer-quality-repair-loop.md) | engineering-lead | draft | 2026-10-06 | eng, reviewers |
+| [adr/ADR-general-answer-quality.md](./adr/ADR-general-answer-quality.md) | engineering-lead | proposed | 2026-10-06 | eng, reviewers |
 | [datasets/MovieSummaries/DEMO_SLICES.md](./datasets/MovieSummaries/DEMO_SLICES.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [runbooks/instance-rebuild.md](./runbooks/instance-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [security/OPENAI_DATA_GOVERNANCE.md](./security/OPENAI_DATA_GOVERNANCE.md) | product-owner | accepted | 2026-09-10 | client, security |

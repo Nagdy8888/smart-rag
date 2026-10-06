@@ -44,6 +44,7 @@ audience: engineering
 | General Hybrid retrieval accuracy | accepted | 6 overlay | [ADR-hybrid-retrieval-accuracy.md](./ADR-hybrid-retrieval-accuracy.md) |
 | Honest RAG accuracy repair | accepted | 6 overlay | [ADR-honest-rag-accuracy.md](./ADR-honest-rag-accuracy.md) |
 | Repair answers lost after retrieval | accepted | 6 overlay | [ADR-retrieved-answer-loss-repair.md](./ADR-retrieved-answer-loss-repair.md) |
+| General answer-quality repair | proposed | answer quality | [ADR-general-answer-quality.md](./ADR-general-answer-quality.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical-passage LightRAG sources | accepted | 5 | [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md) |

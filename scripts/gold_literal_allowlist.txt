@@ -1,0 +1,3 @@
+# Paths exempt from scripts/check_gold_literals.py (one per line, then "# reason").
+apps/agents/src/smart_rag_agents/prompts/answer_v4.md  # frozen historical prompt; edits are forbidden
+apps/agents/src/smart_rag_agents/prompts/answer_v5.md  # frozen historical prompt; edits are forbidden

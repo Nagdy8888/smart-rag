@@ -1,0 +1,14 @@
+---
+description: Answer-quality fixes must be general; never encode eval questions or gold answers in code or prompts
+alwaysApply: true
+---
+
+# General Fixes Only
+
+- Never add code, regexes, constants, prompt bullets, or test names that mention a specific eval question, gold phrase, book page, book-specific term, or eval set id.
+- A retrieval or answer change is allowed only when the stage report (`scripts/eval_stage_loss.py`) shows the same loss pattern in at least 3 failed questions across at least 2 different sets, and the change works for any document.
+- Run `uv run python scripts/check_gold_literals.py` before every commit that touches `packages/` or `apps/`; it must exit 0.
+- Tune and debug only on the dev set. The sealed holdout runs only for the baseline and the final acceptance; never read its per-question results.
+- If a change does not lower its target stage count on the dev set, revert it. Do not fix forward with new special cases.
+- Older tuned sets are not targets. Do not add code to win back their scores.
+- See `docs/runbooks/answer-quality-repair-loop.md` for the loop and commands.
