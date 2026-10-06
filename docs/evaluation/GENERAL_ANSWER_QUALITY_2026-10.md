@@ -54,7 +54,21 @@ Counts only. Private questions, gold phrases, and answer text stay under
 
 ## After G1a
 
-not run yet
+Kept. Target `5b_removed_after_draft` / `salvage_overwrite` improved.
+
+| Metric | G0 baseline | After G1a |
+| --- | ---: | ---: |
+| ok | 14 | 16 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 15 | 15 |
+| 3_fusion_pool | 7 | 6 |
+| 4_rerank_select | 0 | 2 |
+| 5a_draft_missing | 6 | 4 |
+| 5b_removed_after_draft | 4 | 3 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+| strict passes | 9/40 | 12/40 |
+| salvage_overwrite | 4 | 0 |
+| refused_after_draft | 0 | 3 |
 
 ## After G1b
 
