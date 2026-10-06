@@ -114,7 +114,26 @@ for live proof: yes (G2 present). p90_wall_seconds 33.015.
 
 ## After G3
 
-not run yet
+Gate: continue (`5a_draft_missing=4` on `dev40-g2`, threshold ≥3).
+Reverted by stop rule. Target `5a_draft_missing` stayed flat vs kept
+baseline `dev40-g1b` (5 → 5). Strict +1. Locate `ran:None=33`,
+`failed:deadline_exhausted=7`, `quotes_total=42`. Image rebuilt for
+live proof: yes (G3 present). p90_wall_seconds G3=44.093, G2=33.015.
+
+| Metric | After G1b | After G3 |
+| --- | ---: | ---: |
+| ok | 16 | 17 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 14 | 14 |
+| 3_fusion_pool | 5 | 4 |
+| 4_rerank_select | 1 | 2 |
+| 5a_draft_missing | 5 | 5 |
+| 5b_removed_after_draft | 5 | 4 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+| strict passes | 11/40 | 12/40 |
+| salvage_overwrite | 0 | 0 |
+| refused_after_draft | 5 | 4 |
+| trimmed_or_rewritten | 0 | 0 |
 
 ## After G4
 

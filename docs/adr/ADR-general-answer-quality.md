@@ -37,7 +37,9 @@ pool 5, ingestion 1.
 3. Optional (G3, only if the stage report justifies it): one
    `locate_v1` gpt-4o-mini call before the answer call, recorded under
    the existing `usage_kind = "answer"` so no migration is needed, and
-   skipped when it would consume the answer-stage reserve.
+   skipped when it would consume the answer-stage reserve. Tried in G3
+   on 2026-10-06; reverted by stop rule (`5a_draft_missing` stayed flat
+   at 5 on `dev40-g3` vs `dev40-g1b`; locate `ran:None=33`).
 4. PDF reflow keeps line breaks and indentation for monospace code
    lines and rebuilds captioned (or page-continued) tables as Markdown
    pipe tables from line geometry (`parser_v1_pdf_reflow_v5`); the
