@@ -227,6 +227,43 @@ def build_pdf_hyphen_fixture() -> tuple[bytes, str]:
     return payload, sha256_bytes(payload)
 
 
+def build_pdf_layout_fixture() -> tuple[bytes, str]:
+    """Build a one-page PDF with a captioned table, a code listing, and prose.
+
+    Returns:
+        PDF bytes and SHA-256 digest.
+    """
+
+    document = _open_pdf()
+    page = _call_vendor(document, "new_page")
+    _call_vendor(page, "insert_text", (72, 50), "Table 2-1. Sample costs", fontsize=10)
+    rows = (
+        (80, ("Name", "Kind", "Cost")),
+        (93, ("alpha", "tool", "low")),
+        (106, ("beta", "agent", "high")),
+    )
+    for y, cells in rows:
+        for x, text in zip((75.6, 150.0, 250.0), cells, strict=True):
+            _call_vendor(page, "insert_text", (x, y), text, fontsize=9)
+    _call_vendor(
+        page, "insert_text", (72, 140), "def f(x):", fontsize=8.5, fontname="cour"
+    )
+    _call_vendor(
+        page, "insert_text", (92, 151), "return x", fontsize=8.5, fontname="cour"
+    )
+    _call_vendor(
+        page,
+        "insert_text",
+        (72, 180),
+        "Body text after the table and the code.",
+        fontsize=10.5,
+        fontname="tiro",
+    )
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
+    return payload, sha256_bytes(payload)
+
+
 def build_pdf_page_label_fixture() -> tuple[bytes, str]:
     """Build a one-page PDF whose printed label is 50, not file page 1.
 

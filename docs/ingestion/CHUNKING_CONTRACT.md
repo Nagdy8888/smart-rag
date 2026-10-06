@@ -2,14 +2,14 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-25
+last-reviewed: 2026-10-06
 owning_phase: 3
 audience: engineering
 ---
 
 # Chunking contract
 
-**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v2` (new ingest). Historical rows may still carry `chunking_v1`; readers must remain compatible. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
+**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v3` (new ingest). Historical rows may still carry `chunking_v1` or `chunking_v2`; readers must remain compatible. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
 
 ## Hierarchy
 
@@ -24,7 +24,7 @@ Typed parser elements become **document → section (parent) → passage** chunk
 | Normal hard cap | **600 tokens** |
 | Parent section cap | **1,500 tokens** |
 
-`chunking_v1` kept 401–600 token ordinary prose unsplit. `chunking_v2` splits that band toward 200–400 using paragraph then sentence boundaries, then token windows. Page-break elements still flush the prose buffer; page-boundary merge is allowed only when the parser proves continuous reading order and the same heading ancestry. Cross-heading merge is forbidden. Parents are not counted as ordinary prose.
+`chunking_v1` kept 401–600 token ordinary prose unsplit. `chunking_v2` splits that band toward 200–400 using paragraph then sentence boundaries, then token windows. `chunking_v3` keeps a paragraph with single newlines (code, tables) whole up to `LINE_STRUCTURED_MAX_TOKENS` (536) and otherwise splits it only at line ends, repeating a pipe table's header rows. Page-break elements still flush the prose buffer; page-boundary merge is allowed only when the parser proves continuous reading order and the same heading ancestry. Cross-heading merge is forbidden. Parents are not counted as ordinary prose.
 
 Count-only analysis of private PDF SHA-256
 `72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1`
@@ -59,6 +59,33 @@ hyphen, and a suspended hyphen at a line end is joined to the next
 word. Hyphens inside a line are untouched. Any change to this rule
 changes `PDF_PARSER_VERSION`, the parser config hash, and every PDF
 chunk ID, so the stored document needs a re-ingest.
+
+### Code and tables (parser_v1_pdf_reflow_v5)
+
+Monospace lines (PyMuPDF flag bit 3 or a monospace font name) rebuild
+indentation; a newline is kept when indentation changes (indented body
+or dedent), and same-indent top-level monospace rows stay space-joined
+so a phrase split across vendor rows remains one substring for
+`phrase_is_present`. Captioned tables (or a page-top continuation with
+the same columns) become Markdown pipe tables from shared row-top and
+column-left geometry, followed by a reading-order plain projection
+(space-joined cells per row) so a phrase that spans adjacent cells
+remains one substring; wrapped cell lines with a smaller gap than the
+row pitch join into their cell. Element kinds stay `PARAGRAPH`. Limits:
+tables need a caption within 60 points or a same-column continuation;
+merged cells come out as empty cells; monospace lines split at one row
+by the vendor are not re-merged into a single vendor line.
+
+```mermaid
+flowchart LR
+  dictText["page.get_text dict"] --> extract["extract_pdf_text_blocks: monospace, text_x0, char_width"]
+  extract --> tables["detect_pdf_tables: row bands, columns, caption or continuation"]
+  tables --> classify["table block and monospace lines forced to PARAGRAPH"]
+  classify --> indent["indent_pdf_code_lines"]
+  indent --> merge["merge_consecutive_pdf_paragraphs: code joined by newline, table isolated"]
+  merge --> elements["PARAGRAPH elements"]
+  elements --> splitter["_split_prose_text: keep line-structured paragraphs whole up to 536 tokens"]
+```
 
 ## Atomicity
 

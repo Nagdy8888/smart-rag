@@ -1,4 +1,4 @@
-"""PDF line joins for ASCII, U+2010, and U+00AD line-end hyphens (A6)."""
+"""PDF line joins for line-end hyphens (A6) and the current parser version."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def test_inline_u2010_compound_is_untouched() -> None:
     assert joined == f"multi{U2010}agent coordination"
 
 
-def test_pdf_parser_version_is_reflow_v4() -> None:
-    """The line-join change carries a new PDF parser version identity."""
+def test_pdf_parser_version_is_reflow_v5() -> None:
+    """The code and table layout change carries a new PDF parser version identity."""
 
-    assert PDF_PARSER_VERSION == "parser_v1_pdf_reflow_v4"
+    assert PDF_PARSER_VERSION == "parser_v1_pdf_reflow_v5"
