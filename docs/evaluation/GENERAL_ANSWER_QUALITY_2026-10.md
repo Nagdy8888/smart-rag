@@ -137,7 +137,11 @@ live proof: yes (G3 present). p90_wall_seconds G3=44.093, G2=33.015.
 
 ## After G4
 
-not run yet
+G4a tried; reverted by stop rule before commit (working tree restored).
+Private parse check: indented_code_elements 0→77, pipe_table_elements
+0→24, but code_facts_in_one_element 14/14→13/14 and
+table_facts_in_one_element 14/14→13/14 (must not drop). No G4a SHA.
+G4b skipped: depends on G4a committed with passing parse check.
 
 ## Acceptance (G5)
 
