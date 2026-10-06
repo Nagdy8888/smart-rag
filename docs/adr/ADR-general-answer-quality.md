@@ -45,7 +45,9 @@ pool 5, ingestion 1.
    pipe tables from line geometry (`parser_v1_pdf_reflow_v5`); the
    prose splitter keeps paragraphs with single newlines whole up to
    536 tokens and otherwise splits them at line ends, repeating a pipe
-   table's header (`chunking_v3`). Implemented in G4a on 2026-10-06.
+   table's header (`chunking_v3`). Tried in G4a on 2026-10-06; reverted
+   by stop rule before commit (code/table facts in one element each
+   dropped 14/14 → 13/14). G4b skipped.
 5. Fixed measurement loop with dev40 and sealed holdout40 and a stop
    rule (see the runbook).
 

@@ -23,10 +23,8 @@ from smart_rag_core.ingestion.parser.helpers import (
     as_int,
     build_coverage,
     classify_pdf_text_block,
-    detect_pdf_tables,
     element_id,
     extract_pdf_text_blocks,
-    indent_pdf_code_lines,
     median_font_size,
     merge_consecutive_pdf_paragraphs,
     pdf_page_label,
@@ -63,8 +61,6 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         Typed parse. ``page_labels`` is aligned with zero-based
         ``page_index``. Labels are not stored on element locators, so
         element IDs stay stable across unlabeled and labeled files.
-        Monospace code lines keep line breaks and rebuilt indentation;
-        captioned tables become Markdown pipe tables.
     """
 
     started = time.monotonic()
@@ -84,10 +80,7 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
     page_labels: list[str] = []
     sortable: list[tuple[int, TypedElement]] = []
     ocr_pages = 0
-    previous_table_columns: tuple[float, ...] = ()
     for page_index in range(page_count):
-        carried_columns = previous_table_columns
-        previous_table_columns = ()
         page = document.load_page(page_index)
         page_labels.append(pdf_page_label(page))
         text = str(vendor_call(vendor_attr(page, "get_text"), "text"))
@@ -122,35 +115,19 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         )
         median_size = median_font_size(sizes)
         if dict_blocks:
-            tables = detect_pdf_tables(dict_blocks, previous_columns=carried_columns)
-            if tables:
-                previous_table_columns = tables[-1].columns
-            table_at = {min(table.members): table.block for table in tables}
-            in_table = frozenset(index for table in tables for index in table.members)
             classified: list[tuple[ElementKind, PdfTextBlock]] = []
-            for index, block in enumerate(dict_blocks):
-                if index in table_at:
-                    classified.append((ElementKind.PARAGRAPH, table_at[index]))
-                    continue
-                if index in in_table:
-                    continue
+            for block in dict_blocks:
                 cleaned = block.text.strip()
                 if not cleaned:
                     continue
-                kind = (
-                    ElementKind.PARAGRAPH
-                    if block.monospace
-                    else classify_pdf_text_block(
-                        text=cleaned,
-                        max_size=block.max_size,
-                        median_size=median_size,
-                        bold=block.bold,
-                    )
+                kind = classify_pdf_text_block(
+                    text=cleaned,
+                    max_size=block.max_size,
+                    median_size=median_size,
+                    bold=block.bold,
                 )
                 classified.append((kind, block))
-            for kind, block in merge_consecutive_pdf_paragraphs(
-                indent_pdf_code_lines(tuple(classified))
-            ):
+            for kind, block in merge_consecutive_pdf_paragraphs(tuple(classified)):
                 cleaned = block.text.strip()
                 x0, y0, x1, y1 = block.bbox
                 locator = PdfLocator(

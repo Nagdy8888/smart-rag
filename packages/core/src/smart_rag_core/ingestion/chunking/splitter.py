@@ -2,20 +2,16 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from smart_rag_core.ingestion.chunking import tokenizer
 from smart_rag_core.ingestion.chunking.limits import (
-    LINE_STRUCTURED_MAX_TOKENS,
     PASSAGE_HARD_MAX_TOKENS,
     PASSAGE_OVERLAP_MAX_TOKENS,
     PASSAGE_OVERLAP_MIN_TOKENS,
     PASSAGE_TARGET_MAX_TOKENS,
 )
 from smart_rag_core.ingestion.parser.types import TypedElement
-
-_PIPE_RULE = re.compile(r"^\|(?:\s*:?-{3,}:?\s*\|)+\s*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,10 +148,7 @@ def _expand_to_target(segment: ProseSegment) -> list[ProseSegment]:
 
 
 def _split_prose_text(text: str, target_max: int) -> list[str]:
-    """Prefer paragraph, then line (code and tables), then sentence splits before token windows.
-
-    A paragraph with single newlines is kept whole up to
-    ``LINE_STRUCTURED_MAX_TOKENS``, else split at line ends.
+    """Prefer paragraph then sentence splits before token windows.
 
     Args:
         text: Prose text.
@@ -176,54 +169,10 @@ def _split_prose_text(text: str, target_max: int) -> list[str]:
         for part in packed:
             expanded.extend(_split_prose_text(part, target_max))
         return expanded
-    single = paragraphs[0] if len(paragraphs) == 1 else text
-    if "\n" in single:
-        if tokenizer.count_tokens(single) <= LINE_STRUCTURED_MAX_TOKENS:
-            return [single]
-        return _split_line_structured(single, LINE_STRUCTURED_MAX_TOKENS)
     sentences = _sentence_parts(text)
     if len(sentences) > 1:
         return _pack_parts(sentences, target_max, joiner=" ")
     return _split_by_tokens(text, target_max)
-
-
-def _split_line_structured(text: str, limit: int) -> list[str]:
-    """Split code or table text at line ends, never inside a line.
-
-    A Markdown pipe table repeats its header and separator rows in every
-    fragment. A single line longer than ``limit`` falls back to token
-    windows.
-
-    Args:
-        text: Paragraph with single newlines.
-        limit: Token ceiling per fragment.
-
-    Returns:
-        Ordered fragments.
-    """
-
-    lines = text.split("\n")
-    header: list[str] = []
-    if len(lines) > 2 and lines[0].startswith("|") and _PIPE_RULE.match(lines[1]):
-        header, lines = lines[:2], lines[2:]
-    fragments: list[str] = []
-    current: list[str] = []
-    for line in lines:
-        candidate = "\n".join([*header, *current, line])
-        if current and tokenizer.count_tokens(candidate) > limit:
-            fragments.append("\n".join([*header, *current]))
-            current = [line]
-        else:
-            current.append(line)
-    if current:
-        fragments.append("\n".join([*header, *current]))
-    result: list[str] = []
-    for fragment in fragments:
-        if tokenizer.count_tokens(fragment) > limit:
-            result.extend(_split_by_tokens(fragment, limit))
-        else:
-            result.append(fragment)
-    return result
 
 
 def _sentence_parts(text: str) -> list[str]:

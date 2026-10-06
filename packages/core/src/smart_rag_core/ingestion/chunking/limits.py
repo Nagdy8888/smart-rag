@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 CHUNKING_POLICY_VERSION_V1 = "chunking_v1"
-CHUNKING_POLICY_VERSION = "chunking_v3"
+CHUNKING_POLICY_VERSION = "chunking_v2"
 TOKENIZER_VERSION = "cl100k_base_v1"
 DEDUP_POLICY_VERSION = "dedup_v1"
 
@@ -12,11 +12,6 @@ PASSAGE_TARGET_MAX_TOKENS = 400
 PASSAGE_HARD_MAX_TOKENS = 600
 PASSAGE_OVERLAP_MIN_TOKENS = 40
 PASSAGE_OVERLAP_MAX_TOKENS = 60
-LINE_STRUCTURED_MAX_TOKENS = PASSAGE_HARD_MAX_TOKENS - PASSAGE_OVERLAP_MAX_TOKENS - 4
-"""Largest code or table paragraph (text with single newlines) kept whole.
-
-It leaves room for the overlap prefix so the passage stays under the hard cap.
-"""
 PARENT_MAX_TOKENS = 1500
 
 NEAR_DUP_SIMILARITY_THRESHOLD = 0.92

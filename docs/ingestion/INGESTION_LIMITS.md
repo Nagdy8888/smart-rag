@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-10-06
+last-reviewed: 2026-09-24
 audience: engineering, ops
 ---
 
@@ -142,7 +142,7 @@ Primary references: [RFC 9309 robots](https://www.rfc-editor.org/rfc/rfc9309.htm
 | OCR languages | codes | eng+ara | eng+ara | Phase 1 multilingual gate | parser | `media_only`/diagnostic | Language coverage gap |
 | OCR min confidence | percent | 30 | 30 | Measured dev fixtures | parser | omit low-conf boxes | OCR recall review |
 | Parser config version | text | `parser_v1` | — | Packet 5 sign-off | parser | reject stale replay | Policy drift |
-| PDF parser version | text | `parser_v1_pdf_reflow_v5` | — | General answer-quality repair: code line breaks and captioned tables | PDF adapter | new version identity | Heading classification or line-join change |
+| PDF parser version | text | `parser_v1_pdf_reflow_v4` | — | Answer-loss repair (U+2010 and U+00AD line joins) | PDF adapter | new version identity | Heading classification or line-join change |
 | Cleaning policy version | text | `cleaning_v1` | — | Packet 5 sign-off | parser | reject stale replay | Cleaning rule change |
 | Parser network | policy | none | none | ADR parser isolation | infra | block job | Egress probe from parser |
 | Parser secrets | policy | none | none | ADR parser isolation | infra | block launch | Secret mount detected |
@@ -178,7 +178,6 @@ Primary references: [PyMuPDF docs](https://pymupdf.readthedocs.io/), [python-doc
 | Passage target tokens | tokens | 200–400 | — | CHUNKING_CONTRACT | worker | split/merge | <90% ordinary prose in band |
 | Passage overlap | tokens | 50 | 40–60 | CHUNKING_CONTRACT | worker | metric fail | Overlap drift |
 | Passage hard cap | tokens | 600 | 600 | CHUNKING_CONTRACT | worker | atomic exception only | Silent split defect |
-| Line-structured paragraph keep limit | tokens | 536 (`LINE_STRUCTURED_MAX_TOKENS`) | — | hard cap 600 minus overlap 60 minus 4 | worker | split at line ends | Code/table layout loss |
 | Parent cap | tokens | 1500 | 1500 | CHUNKING_CONTRACT | worker | truncate child refs | Parent reconstruction fail |
 | Near-dup threshold | ratio | 0.92 | 0.92 | Packet 6 provisional | worker | exact-only fallback | Precision/recall gate |
 | Near-dup precision gate | ratio | 0.99 | 0.99 | QT-CHK dedup | worker | exact-only fallback | Fixture regression |
