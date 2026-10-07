@@ -24,6 +24,7 @@ from smart_rag_core.query_answer.format_shape import format_requested_answer_sha
 from smart_rag_core.query_answer.generate_grounded import (
     salvage_named_code_definition,
     salvage_named_table_block,
+    salvage_quote_shaped_cover,
 )
 from smart_rag_core.query_answer.models import (
     AnswerPayload,
@@ -257,6 +258,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             for salvage_fn in (
                 salvage_named_code_definition,
                 salvage_named_table_block,
+                salvage_quote_shaped_cover,
             ):
                 try:
                     salvaged = salvage_fn(checked, fusion, user_query=user_query)
