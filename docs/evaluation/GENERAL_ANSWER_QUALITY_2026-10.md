@@ -205,6 +205,34 @@ below the absolute bar of 30/40, so acceptance target 1 fails.
 Generation losses (5a+5b) halved as required; salvage_overwrite went to
 0 on the holdout.
 
+## Decision
+
+Rejected by the user on 2026-10-07 for a new repair cycle (retrieval
+then draft, gpt-4o-mini only). holdout40 retired to
+`.private-eval/dev-retired-holdout40-2026-10-v1.json` (original file
+also remains; both are now dev data). Next cycle targets stage
+`2_retrieval` first (20 facts on `holdout40-g5-final`), then
+`5a_draft_missing`. Cycle baselines: `dev40-g5-final` (strict 10/40,
+`2_retrieval` 14, `5a` 7) and `spot30-post-g5` (strict 20/30, `5a` 10).
+
+## Cycle 2 — retrieval then draft (2026-10-07)
+
+### Baselines (carried)
+
+| Set | Strict | 2_retrieval | 5a | 5b |
+| --- | ---: | ---: | ---: | ---: |
+| `dev40-g5-final` | 10/40 | 14 | 7 | 5 |
+| `spot30-post-g5` | 20/30 | 1 | 10 | 0 |
+
+### After retrieval-1
+
+not run yet
+
+### After draft-1
+
+not run yet
+
 ## Approvals recorded
 
 - 2026-10-06 - G4b re-ingest pre-approved: "no need for my approval make g4b".
+- 2026-10-07 - New cycle: retrieval then draft; gpt-4o-mini only.
