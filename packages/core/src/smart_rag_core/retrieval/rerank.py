@@ -156,38 +156,28 @@ def named_code_definition_ids(query: str) -> tuple[str, ...]:
 
 
 def code_definition_gold_pattern(identifiers: Sequence[str]) -> re.Pattern[str] | None:
-    """Build a passage regex for ``def`` / ``class`` of named identifiers.
+    """Build a passage regex for ``def`` / ``@tool def`` of named identifiers.
 
-    Snake_case / lowercase names match ``def`` / ``@tool def``. PascalCase
-    names match ``class Name``.
+    Keeps snake_case / lowercase def targets only.
 
     Args:
-        identifiers: Function, tool, or type names extracted from the query.
+        identifiers: Function or tool names extracted from the query.
 
     Returns:
         Compiled pattern, or ``None`` when ``identifiers`` is empty.
     """
 
-    snake = [
+    names = [
         item
         for item in identifiers
         if item.strip() and (item[:1].islower() or "_" in item)
     ]
-    pascal = [
-        item
-        for item in identifiers
-        if item.strip() and item[:1].isupper() and "_" not in item
-    ]
-    parts: list[str] = []
-    if snake:
-        alt = "|".join(re.escape(item) for item in snake)
-        parts.append(rf"(?:@tool\s+)?(?:async\s+)?def\s+(?:{alt})\s*\(")
-    if pascal:
-        alt = "|".join(re.escape(item) for item in pascal)
-        parts.append(rf"class\s+(?:{alt})\s*[:\(]")
-    if not parts:
+    if not names:
         return None
-    return re.compile(rf"(?i)(?:{'|'.join(parts)})")
+    alt = "|".join(re.escape(item) for item in names)
+    return re.compile(
+        rf"(?i)(?:@tool\s+)?(?:async\s+)?def\s+(?:{alt})\s*\(",
+    )
 
 
 def hybrid_seed_terms(query: str) -> tuple[str, ...]:

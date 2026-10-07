@@ -22,7 +22,6 @@ from smart_rag_core.query_answer.paragraphs import (
     join_paragraph_text,
     with_derived_answer_text,
 )
-from smart_rag_core.query_answer.format_shape import requested_answer_shape
 from smart_rag_core.query_answer.release import bind_company_atomic_links
 from smart_rag_core.query_answer.sanitize import empty_no_retrieval, filter_invented_ids
 from smart_rag_core.query_answer.versions import (
@@ -36,7 +35,6 @@ from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.retrieval.rerank import (
     code_definition_gold_pattern,
     named_code_definition_ids,
-    named_pascal_type_ids,
     named_table_captions,
     table_caption_gold_pattern,
 )
@@ -653,217 +651,6 @@ def _extractive_block_already_released(
     return True
 
 
-_INCLUDE_CLAUSE = re.compile(
-    r"(?i)\bincluding\s+(?:the\s+)?(.+?)(?:\s+rows?\b|\s+row\b|(?=\s+as\s+a\b)|\.|$)"
-)
-_THAT_SAYS_CLAUSE = re.compile(
-    r"(?i)\b(?:that\s+says|framing\s+that\s+says)\s+(.+?)"
-    r"(?:\s+Instruction\b|\s+as\s+a\s+fenced|\.|$)"
-)
-_QUOTED_IN_QUERY = re.compile(r'"([^"]{4,120})"|\'([^\']{4,120})\'')
-_ENV_OR_CONST = re.compile(r"\b([A-Z][A-Z0-9_]{4,})\b")
-_PATH_LIKE = re.compile(r"(?i)(/\.well-known/[A-Za-z0-9._/-]+)")
-_INCLUDE_SPLIT = re.compile(r"\s+and\s+(?:the\s+)?", re.IGNORECASE)
-
-
-def quote_shaped_anchors(user_query: str) -> tuple[str, ...]:
-    """Return evidence anchors a quote-shaped ask needs copied verbatim.
-
-    Pulls named code/table identifiers, quoted strings, env-style constants,
-    well-known paths, and ``including …`` / ``that says …`` clauses from the
-    user question. Every returned string occurs in ``user_query``.
-
-    Args:
-        user_query: Original user text. Untrusted.
-
-    Returns:
-        Deduplicated anchors in first-seen order. Empty when none qualify.
-    """
-
-    query = user_query or ""
-    found: list[str] = []
-    seen: set[str] = set()
-
-    def _add(token: str) -> None:
-        cleaned = re.sub(r"\s+", " ", token).strip(" ,.;:")
-        if len(cleaned) < 4:
-            return
-        key = cleaned.casefold()
-        if key in seen or key in _STOP_LITERALS or key in _BOOK_TITLE_NAME_STOP:
-            return
-        seen.add(key)
-        found.append(cleaned)
-
-    for token in (
-        *named_code_definition_ids(query),
-        *named_pascal_type_ids(query),
-        *named_table_captions(query),
-    ):
-        _add(token)
-    for match in _QUOTED_IN_QUERY.finditer(query):
-        _add(match.group(1) or match.group(2) or "")
-    for match in _ENV_OR_CONST.finditer(query):
-        _add(match.group(1))
-    for match in _PATH_LIKE.finditer(query):
-        _add(match.group(1))
-    for match in _INCLUDE_CLAUSE.finditer(query):
-        clause = match.group(1) or ""
-        for part in _INCLUDE_SPLIT.split(clause):
-            _add(part)
-    for match in _THAT_SAYS_CLAUSE.finditer(query):
-        clause = match.group(1) or ""
-        for part in _INCLUDE_SPLIT.split(clause):
-            _add(part)
-    return tuple(found)
-
-
-def _anchor_hit_ranges(text: str, anchors: tuple[str, ...]) -> list[tuple[int, int, str]]:
-    """Locate case-insensitive occurrences of ``anchors`` in ``text``.
-
-    Args:
-        text: Passage citation text.
-        anchors: Anchors that must appear as substrings.
-
-    Returns:
-        ``(start, end, anchor)`` triples in encounter order.
-    """
-
-    hits: list[tuple[int, int, str]] = []
-    for anchor in anchors:
-        if len(anchor) < 4:
-            continue
-        for match in re.finditer(re.escape(anchor), text, flags=re.IGNORECASE):
-            hits.append((match.start(), match.end(), anchor))
-    return hits
-
-
-def _span_covering_anchors(
-    text: str,
-    anchors: tuple[str, ...],
-    *,
-    max_chars: int = MAX_CITATION_SPAN_CHARS,
-) -> str | None:
-    """Return the best exact substring covering as many anchors as possible.
-
-    Args:
-        text: Passage citation text.
-        anchors: Anchors to cover.
-        max_chars: Hard cap on the returned span length.
-
-    Returns:
-        Exact substring of ``text``, or ``None`` when no anchor hits.
-    """
-
-    hits = _anchor_hit_ranges(text, anchors)
-    if not hits:
-        return None
-    best: tuple[int, int, int, int] | None = None
-    # (score, -length, -start, end) lexicographic max
-    starts = sorted({start for start, _end, _anchor in hits})
-    for start in starts:
-        end = min(len(text), start + max_chars)
-        covered: set[str] = set()
-        for hit_start, hit_end, anchor in hits:
-            if hit_start >= start and hit_end <= end:
-                covered.add(anchor.casefold())
-        # Extend end to the last fully covered hit when room remains.
-        last_end = start
-        for hit_start, hit_end, anchor in hits:
-            if hit_start >= start and hit_end <= end and anchor.casefold() in covered:
-                last_end = max(last_end, hit_end)
-        end = min(len(text), max(end, last_end))
-        if end - start > max_chars:
-            end = start + max_chars
-        score = len(covered)
-        key = (score, -(end - start), -start, end)
-        if best is None or key > best:
-            best = key
-    if best is None or best[0] < 1:
-        return None
-    _score, _neg_len, neg_start, end = best
-    start = -neg_start
-    # Snap back to the line start so ``class`` / ``def`` keywords stay in
-    # the released span when the first hit is only the identifier.
-    line_start = text.rfind("\n", 0, start) + 1
-    if 0 <= start - line_start <= 48 and end - line_start <= max_chars:
-        start = line_start
-    block = text[start:end].strip()
-    if not block or block not in text:
-        return None
-    return block[:max_chars]
-
-
-def salvage_quote_shaped_cover(
-    payload: AnswerPayload,
-    fusion: FusionResult,
-    *,
-    user_query: str,
-) -> AnswerPayload:
-    """Copy one evidence span that covers quote-shaped ask anchors.
-
-    Runs only when the user explicitly asks for a code fence or pipe table
-    (or names a ``Table N-M`` / code definition). Prefers the fusion passage
-    whose text holds the most query anchors, then releases the shortest
-    covering window up to ``MAX_CITATION_SPAN_CHARS``. Conceptual prose asks
-    (shape ``none``) are left to the model.
-
-    Args:
-        payload: Company answer after named code/table salvages.
-        fusion: Fitted canonical evidence.
-        user_query: Original user text. Untrusted.
-
-    Returns:
-        Payload citing the covering span, or unchanged when unmatched.
-    """
-
-    shape = requested_answer_shape(user_query)
-    named_code = named_code_definition_ids(user_query)
-    named_tables = named_table_captions(user_query)
-    if shape == "none" and not named_code and not named_tables:
-        return payload
-    anchors = quote_shaped_anchors(user_query)
-    if not anchors:
-        return payload
-    ranked: list[tuple[int, int, ScoredPassage, str]] = []
-    for item in fusion.evidence:
-        text = item.citation_text or ""
-        span = _span_covering_anchors(text, anchors)
-        if not span:
-            continue
-        hits = _anchor_hit_ranges(span, anchors)
-        covered = {anchor.casefold() for _s, _e, anchor in hits}
-        # Require majority coverage when the ask names several anchors.
-        need = 1 if len(anchors) == 1 else min(len(anchors), max(2, (len(anchors) + 1) // 2))
-        if len(covered) < need:
-            continue
-        ranked.append(
-            (
-                len(covered),
-                -(item.hybrid_rank or 10_000),
-                item,
-                span,
-            )
-        )
-    if not ranked:
-        return payload
-    ranked.sort(key=lambda row: (-row[0], -row[1], row[2].chunk_id))
-    _score, _rank, item, span = ranked[0]
-    if _extractive_block_already_released(payload, span):
-        # Still replace when the released text covers fewer anchors than
-        # this span (paraphrase kept one literal but dropped siblings).
-        released = re.sub(r"\s+", " ", _claim_text_corpus(payload)).casefold()
-        released_hits = sum(1 for anchor in anchors if anchor.casefold() in released)
-        span_hits = len({a.casefold() for _s, _e, a in _anchor_hit_ranges(span, anchors)})
-        if released_hits >= span_hits:
-            return payload
-    return _replace_with_extractive_block(
-        payload,
-        chunk_id=item.chunk_id,
-        span=span,
-        link_id="quote-cover-1",
-    )
-
-
 def salvage_named_code_definition(
     payload: AnswerPayload,
     fusion: FusionResult,
@@ -1080,11 +867,7 @@ def generate_grounded_answer(
         user_query=user_query,
     )
     derived = with_derived_answer_text(filtered)
-    for salvage_fn in (
-        salvage_named_code_definition,
-        salvage_named_table_block,
-        salvage_quote_shaped_cover,
-    ):
+    for salvage_fn in (salvage_named_code_definition, salvage_named_table_block):
         salvaged = salvage_fn(derived, fusion, user_query=user_query)
         if salvaged is derived:
             continue

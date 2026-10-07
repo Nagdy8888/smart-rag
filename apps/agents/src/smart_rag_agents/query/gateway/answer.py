@@ -14,7 +14,6 @@ from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.generate_grounded import (
     salvage_named_code_definition,
     salvage_named_table_block,
-    salvage_quote_shaped_cover,
 )
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
@@ -44,9 +43,8 @@ def _apply_code_table_salvages(
 ) -> AnswerPayload:
     """Run the named code-definition and table-block salvages, then re-bind.
 
-    Named ``def`` / ``Table N-M`` repairs run first. Quote-shaped asks then
-    copy one evidence window that covers as many query anchors as possible
-    (code fence / pipe table only; prose asks stay model-authored).
+    Both repairs apply only when the query names a ``def`` identifier or a
+    numbered table caption and canonical evidence holds that block.
 
     Args:
         payload: Provider answer after invented-id filtering.
@@ -59,11 +57,7 @@ def _apply_code_table_salvages(
     """
 
     working = payload
-    for salvage_fn in (
-        salvage_named_code_definition,
-        salvage_named_table_block,
-        salvage_quote_shaped_cover,
-    ):
+    for salvage_fn in (salvage_named_code_definition, salvage_named_table_block):
         salvaged = salvage_fn(working, fusion, user_query=query)
         if salvaged is working:
             continue
