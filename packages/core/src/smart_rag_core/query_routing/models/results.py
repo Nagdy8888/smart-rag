@@ -15,6 +15,7 @@ from smart_rag_core.query_fusion.models import (
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.models.plan import BranchKind, CorrectionKind
 from smart_rag_core.retrieval.profiles import (
+    HYBRID_CHANNEL_NAMES,
     HYBRID_STAGE_TIMING_KEYS,
     RERANK_INVALID_SUBCODES,
     RERANK_POOL_SIZE,
@@ -85,6 +86,10 @@ class HybridBranchDiagnostics(BaseModel):
             pool and the server appended the rest in fused order.
         rerank_ranked_count: Candidates the model ranked.
         rerank_appended_count: Candidates appended by the server.
+        channel_timed_out: Channels that missed the channel-phase deadline,
+            from ``HYBRID_CHANNEL_NAMES``. Distinguishes a cut-short
+            retrieve from one where every channel finished with zero rows.
+            Empty for older checkpoints.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -113,6 +118,27 @@ class HybridBranchDiagnostics(BaseModel):
     rerank_partial: bool = False
     rerank_ranked_count: int = Field(default=0, ge=0, le=RERANK_POOL_SIZE)
     rerank_appended_count: int = Field(default=0, ge=0, le=RERANK_POOL_SIZE)
+    channel_timed_out: tuple[str, ...] = Field(default=(), max_length=3)
+
+    @field_validator("channel_timed_out")
+    @classmethod
+    def channels_are_known(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        """Reject channel names outside the Hybrid channel allow-list.
+
+        Args:
+            value: Timed-out channel names.
+
+        Returns:
+            The same tuple when every name is allow-listed.
+
+        Raises:
+            ValueError: ``channel_name_invalid``.
+        """
+
+        for item in value:
+            if item not in HYBRID_CHANNEL_NAMES:
+                raise ValueError("channel_name_invalid")
+        return value
 
     @field_validator(
         "dense_ids",

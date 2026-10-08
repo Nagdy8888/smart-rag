@@ -28,6 +28,7 @@ from smart_rag_core.retrieval.cache_store import RetrievalCacheMode
 from smart_rag_core.retrieval.context import ContextFn
 from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.retrieval.profiles import (
+    HYBRID_CHANNEL_NAMES,
     HYBRID_STAGE_TIMING_KEYS,
     RERANK_INVALID_SUBCODES,
     RERANK_POOL_SIZE,
@@ -247,6 +248,7 @@ def hybrid_diagnostics_from_outcome(
         rerank_appended_count=_bounded_count(
             getattr(outcome, "rerank_appended_count", 0)
         ),
+        channel_timed_out=_channel_names(getattr(outcome, "channel_timed_out", ())),
     )
 
 
@@ -315,6 +317,24 @@ def _invalid_subcode(value: object) -> str:
     if isinstance(value, str) and value in RERANK_INVALID_SUBCODES:
         return value
     return ""
+
+
+def _channel_names(value: object) -> tuple[str, ...]:
+    """Keep allow-listed, deduplicated, sorted channel names.
+
+    Args:
+        value: ``channel_timed_out`` from the retrieve outcome, or anything.
+
+    Returns:
+        Sorted names from ``HYBRID_CHANNEL_NAMES``. Other items are dropped,
+        so a bad value never fails the branch.
+    """
+
+    if not isinstance(value, list | tuple):
+        return ()
+    items = cast(list[object] | tuple[object, ...], value)
+    names = {item for item in items if isinstance(item, str)}
+    return tuple(sorted(names & HYBRID_CHANNEL_NAMES))
 
 
 def _bounded_count(value: object) -> int:

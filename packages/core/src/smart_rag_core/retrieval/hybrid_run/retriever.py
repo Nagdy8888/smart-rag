@@ -595,4 +595,5 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             rerank_invalid_subcode=rerank_invalid_subcode,
             rerank_ranked_count=rerank_ranked_count,
             rerank_appended_count=rerank_appended_count,
+            channel_timed_out=tuple(sorted(timed)),
         )

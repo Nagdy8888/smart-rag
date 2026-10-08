@@ -179,6 +179,9 @@ class HybridRunResult:
         rerank_ranked_count: Candidates the model ranked (``rerank_v2``).
         rerank_appended_count: Candidates the server appended after a
             partial ranking.
+        channel_timed_out: Sorted names of channels that missed the
+            channel-phase deadline. A channel that finished with zero rows
+            is not listed. Empty on cache hits and fail-closed returns.
     """
 
     ranked_ids: tuple[UUID, ...]
@@ -204,3 +207,4 @@ class HybridRunResult:
     rerank_invalid_subcode: str = ""
     rerank_ranked_count: int = 0
     rerank_appended_count: int = 0
+    channel_timed_out: tuple[str, ...] = ()

@@ -82,6 +82,8 @@ HYBRID_STAGE_TIMING_KEYS = frozenset(
     }
 )
 """Allowed ``stage_timings_ms`` keys on Hybrid diagnostics (integer ms)."""
+HYBRID_CHANNEL_NAMES = frozenset({"dense", "bm25", "term"})
+"""Channel names allowed in ``channel_timed_out`` on Hybrid diagnostics."""
 CHANNEL_WEIGHT_DENSE = 1.0
 CHANNEL_WEIGHT_BM25 = 1.0
 CHANNEL_WEIGHT_TERM = 1.0

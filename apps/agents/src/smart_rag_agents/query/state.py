@@ -66,6 +66,8 @@ class QueryGraphState(TypedDict):
         web_sources: Persisted Web source mappings for the verify excerpt
             store. Empty on company routes.
         answer_context_fit: ID-only source-fit diagnostics, or null.
+        run_timings: ID-free measured timings (see
+            ``smart_rag_agents.query.run_timings``), or null.
     """
 
     status: Literal[
@@ -137,6 +139,7 @@ class QueryGraphState(TypedDict):
     cost_usd: float | None
     web_sources: list[dict[str, object]]
     answer_context_fit: dict[str, object] | None
+    run_timings: dict[str, object] | None
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -224,4 +227,5 @@ def pending_query_state(
         "cost_usd": None,
         "web_sources": [],
         "answer_context_fit": None,
+        "run_timings": None,
     }
