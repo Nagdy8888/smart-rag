@@ -192,7 +192,8 @@ def test_code_claim_keeps_line_breaks_and_prose_stays_one_line() -> None:
     )
     assert failures == ()
     assert checked.status == "complete"
-    assert len(checked.paragraphs) == 2
+    assert len(checked.paragraphs) == 1
+    assert checked.paragraphs[0].text == snippet
 
 
 def test_unknown_source_drops_only_that_claim() -> None:

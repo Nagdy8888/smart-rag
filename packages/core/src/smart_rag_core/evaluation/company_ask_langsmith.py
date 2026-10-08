@@ -460,10 +460,7 @@ def publish_company_ask_experiment(
         usage=usage_by_id,
     )
 
-    try:
-        from langsmith import traceable as _langsmith_traceable
-    except ImportError:
-        _langsmith_traceable = None
+    _langsmith_traceable = _load_langsmith_traceable()
 
     def _target_body(inputs: dict[str, Any]) -> dict[str, Any]:
         """Return the precomputed Ask output for one dataset example.
@@ -557,7 +554,7 @@ def publish_company_ask_experiment(
         deadline_failures=aggregates["deadline_failures"],
         dry_run=False,
         total_cost_usd=usage_totals["total_cost_usd"],
-        total_tokens=usage_totals["total_tokens"],
+        total_tokens=int(usage_totals["total_tokens"]),
     )
 
 
@@ -891,6 +888,55 @@ def _usage_number_evaluator(key: str) -> Callable[..., dict[str, Any]]:
     return _run
 
 
+_TraceTarget = Callable[[dict[str, Any]], dict[str, Any]]
+_Traceable = Callable[..., Callable[[_TraceTarget], _TraceTarget]]
+_USAGE_INT_KEYS = frozenset({"input_tokens", "output_tokens", "total_tokens"})
+_USAGE_FLOAT_KEYS = frozenset({"input_cost", "output_cost", "total_cost"})
+
+
+def _load_langsmith_traceable() -> _Traceable | None:
+    """Return LangSmith's decorator factory when the package is installed.
+
+    Returns:
+        A callable that wraps a target function, or None when LangSmith
+        cannot be imported. The raw ``traceable`` annotation is not used
+        because its stub contains unparameterized containers.
+    """
+
+    try:
+        import langsmith
+    except ImportError:
+        return None
+    # ``traceable`` is a lazy export. Its published overload uses bare
+    # ``Sequence``/``dict``, which strict Pyright treats as unknown.
+    factory = getattr(langsmith, "traceable", None)
+    if not callable(factory):
+        return None
+    return cast(_Traceable, factory)
+
+
+def _extracted_usage(metadata: Mapping[object, object]) -> dict[str, int | float]:
+    """Keep the token and cost fields LangSmith accepts on a run.
+
+    Args:
+        metadata: Raw ``usage_metadata`` mapping from a target payload.
+
+    Returns:
+        Recognized integer token counts and float costs. Other keys are
+        dropped. The mapping is shaped for ``ExtractedUsageMetadata``.
+    """
+
+    extracted: dict[str, int | float] = {}
+    for key, value in metadata.items():
+        if not isinstance(key, str) or isinstance(value, bool):
+            continue
+        if key in _USAGE_INT_KEYS and isinstance(value, int):
+            extracted[key] = value
+        elif key in _USAGE_FLOAT_KEYS and isinstance(value, (int, float)):
+            extracted[key] = float(value)
+    return extracted
+
+
 def _attach_usage_to_current_run(payload: Mapping[str, Any]) -> None:
     """Attach LangSmith-recognized usage/cost metadata to the active run.
 
@@ -916,14 +962,12 @@ def _attach_usage_to_current_run(payload: Mapping[str, Any]) -> None:
     model = str(usage.get("model_id") or "gpt-4o-mini")
     run.metadata["ls_provider"] = "openai"
     run.metadata["ls_model_name"] = model
-    typed_usage = {
-        str(key): value
-        for key, value in cast(Mapping[object, object], metadata).items()
-        if isinstance(value, (int, float)) and not isinstance(value, bool)
-    }
+    typed_usage = _extracted_usage(cast(Mapping[object, object], metadata))
     if not typed_usage:
         return
-    run.set(usage_metadata=typed_usage)
+    from langsmith.schemas import ExtractedUsageMetadata
+
+    run.set(usage_metadata=cast(ExtractedUsageMetadata, typed_usage))
 
 
 def _aggregate_usage(usage: Mapping[str, RunUsageTotals]) -> dict[str, float | int]:

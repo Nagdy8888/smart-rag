@@ -106,7 +106,7 @@ guides users toward answerable phrasings.
 
 Repeat/near-repeat questions re-run the full paid pipeline. `hybrid_run/cache_lookup.py`
 already has a cache path for hybrid runs — extend it to key on normalized query
-+ authorization_version + corpus generation, and add embedding-similarity lookup
+and authorization_version and corpus generation, and add embedding-similarity lookup
 (cosine ≥ 0.97 with profile-class match) for near-repeats. Cached answers must
 re-check ACL/current-version (the batch recheck already exists for BM25 IDs) and
 carry a "cached" transparency flag in SSE progress. Saves cost and turns

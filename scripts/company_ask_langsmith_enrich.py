@@ -9,7 +9,7 @@ and Cost/Usage metadata.
 from __future__ import annotations
 
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, LiteralString, cast
 from uuid import UUID
@@ -35,9 +35,6 @@ from smart_rag_core.evaluation.dual_metric import (  # noqa: E402
 )
 
 from scripts.eval_ask_stage_export import operator_url  # noqa: E402
-from scripts.run_company_ask import (  # noqa: E402
-    _checkpoint_diagnosis,
-)
 
 _CITATION_PAGES_SQL: LiteralString = """
 SELECT c.run_id::text, dc.page_number
@@ -59,6 +56,33 @@ WHERE run_id = ANY(%s::uuid[])
 """
 
 
+def checkpoint_diagnosis(
+    answers: Mapping[str, Mapping[str, object]],
+) -> dict[str, dict[str, object]]:
+    """Load fusion pages and citation failure codes for each conversation.
+
+    Args:
+        answers: Live rows containing ``conversation_id``.
+
+    Returns:
+        Question id to fusion pages, fused and pool pages, citation
+        failures, and coverage. Empty when the operator database cannot
+        be read. The loader lives on the company-ask runner; this wrapper
+        is the public entry used by enrichment.
+    """
+
+    from scripts import run_company_ask
+
+    loader = cast(
+        Callable[
+            [Mapping[str, Mapping[str, object]]],
+            dict[str, dict[str, object]],
+        ],
+        vars(run_company_ask)["_checkpoint_diagnosis"],
+    )
+    return loader(answers)
+
+
 def enrich_diagnosis_signals(
     questions: Sequence[CompanyAskQuestion],
     *,
@@ -78,7 +102,7 @@ def enrich_diagnosis_signals(
     """
 
     by_result = {item.question_id: item for item in results}
-    checkpoints = _checkpoint_diagnosis(
+    checkpoints = checkpoint_diagnosis(
         cast(Mapping[str, Mapping[str, object]], answer_rows)
     )
     cited_by_run = _citation_pages_by_run(answer_rows)

@@ -386,6 +386,7 @@ def test_sync_and_publish_create_experiment_with_dual_metric_feedback(
     )
     assert summary2.total_cost_usd == pytest.approx(0.0025)
     assert summary2.total_tokens == 210
+    assert client2.last_evaluate is not None
     by_key: dict[str, list[Any]] = {}
     for item in cast(list[dict[str, Any]], client2.last_evaluate["scores"]):
         by_key.setdefault(str(item["key"]), []).append(item)

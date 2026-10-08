@@ -14,6 +14,7 @@ from smart_rag_core.query_answer.models import (
     AtomicLink,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+
 from tests.support.answer_verifier import verifier_fusion, verifier_passage
 
 
@@ -41,9 +42,7 @@ def _payload(text: str, *, chunk: str) -> AnswerPayload:
                 atomic_link_id="claim-1",
             ),
         ),
-        atomic_links=(
-            AtomicLink(link_id="claim-1", claim=text, chunk_ids=(chunk,)),
-        ),
+        atomic_links=(AtomicLink(link_id="claim-1", claim=text, chunk_ids=(chunk,)),),
         status="complete",
         answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     )
@@ -143,7 +142,7 @@ def test_anchor_claim_fill_skips_after_structural_salvage() -> None:
 
     code = (
         "def cancel_order(order_id: str) -> None:\n"
-        "    \"\"\"Cancel one open order.\"\"\"\n"
+        '    """Cancel one open order."""\n'
         "    return None\n"
     )
     passage = verifier_passage(5, text=code)

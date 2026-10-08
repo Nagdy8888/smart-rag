@@ -753,9 +753,7 @@ def test_synthesize_web_answer_drops_invented_ids() -> None:
                         {
                             "link_id": "l2",
                             "claim": "invented claim",
-                            "web_source_ids": [
-                                "99999999-9999-4999-8999-999999999999"
-                            ],
+                            "web_source_ids": ["99999999-9999-4999-8999-999999999999"],
                         },
                     ],
                 },
@@ -840,9 +838,7 @@ def test_run_web_research_uses_injected_synthesize() -> None:
     search = FakeSearch()
     called: list[int] = []
 
-    def _synthesize(
-        query: str, sources: tuple[WebSourceRecord, ...]
-    ) -> AnswerPayload:
+    def _synthesize(query: str, sources: tuple[WebSourceRecord, ...]) -> AnswerPayload:
         """Record invocation and return a grounded Web draft.
 
         Args:
@@ -860,9 +856,7 @@ def test_run_web_research_uses_injected_synthesize() -> None:
         return AnswerPayload(
             answer_text="Synthesized public web answer.",
             citations=(),
-            web_citations=(
-                WebCitation(web_source_id=source.web_source_id, span=span),
-            ),
+            web_citations=(WebCitation(web_source_id=source.web_source_id, span=span),),
             atomic_links=(
                 AtomicLink(
                     link_id="web-1",

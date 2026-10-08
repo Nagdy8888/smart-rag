@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from types import SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 import psycopg
@@ -54,7 +56,7 @@ class _FakeConnection:
 
 
 @pytest.fixture(autouse=True)
-def _reset_pools() -> object:
+def _reset_pools() -> Iterator[None]:
     """Drop process pools so tests do not share sessions.
 
     Yields:
@@ -63,6 +65,21 @@ def _reset_pools() -> object:
     close_api_postgres_pools()
     yield
     close_api_postgres_pools()
+
+
+# Pytest discovers the autouse fixture by name. This reference keeps the
+# symbol live for strict type checking.
+_ = _reset_pools
+
+
+def _ignore_rate_limit(**kwargs: object) -> None:
+    """Skip the auth rate-limit database call.
+
+    Args:
+        **kwargs: Unused rate-limit arguments.
+    """
+
+    del kwargs
 
 
 def _caller() -> CallerContext:
@@ -131,7 +148,7 @@ def test_submit_reuses_one_connection_for_admit_append_and_next_ask(
     )
     monkeypatch.setattr(
         "smart_rag_api.services.query_admission.check_auth_rate_limit",
-        lambda **kwargs: None,
+        _ignore_rate_limit,
     )
     monkeypatch.setattr(
         "smart_rag_api.services.query_admission.admit_query_run",
@@ -186,8 +203,9 @@ def test_message_persist_failure_marks_the_run_on_the_same_connection(
     )
     monkeypatch.setattr(
         "smart_rag_api.services.query_admission.check_auth_rate_limit",
-        lambda **kwargs: None,
+        _ignore_rate_limit,
     )
+
     def _admit(connection: object, **kwargs: object) -> SimpleNamespace:
         """Return a fake admitted run.
 
@@ -222,9 +240,21 @@ def test_message_persist_failure_marks_the_run_on_the_same_connection(
         "smart_rag_api.services.query_runs.append_query_message",
         _append,
     )
+
+    def _record_failure(connection: object, **kwargs: object) -> None:
+        """Record the connection used to fail the run.
+
+        Args:
+            connection: Session under test.
+            **kwargs: Unused failure arguments.
+        """
+
+        del kwargs
+        failed.append(connection)
+
     monkeypatch.setattr(
         "smart_rag_api.services.query_runs.fail_query_run",
-        lambda connection, **kwargs: failed.append(connection),
+        _record_failure,
     )
     service = QueryRunService(_DSN)
     with pytest.raises(QueryAdmissionError, match="message_persist_failed"):
@@ -267,10 +297,12 @@ def test_run_connection_is_reused_after_release(
     release_run_app_api_connection(first)
     second = open_run_app_api_connection(_DSN)
     release_run_app_api_connection(second)
-    assert opened == [first]
-    assert second is first
-    assert first.sql == ["SET ROLE app_api", "SET ROLE app_api"]
-    assert first.closed is False
+    first_fake = cast(_FakeConnection, first)
+    second_fake = cast(_FakeConnection, second)
+    assert opened == [first_fake]
+    assert second_fake is first_fake
+    assert first_fake.sql == ["SET ROLE app_api", "SET ROLE app_api"]
+    assert first_fake.closed is False
 
 
 def test_busy_admission_pool_opens_a_direct_connection(

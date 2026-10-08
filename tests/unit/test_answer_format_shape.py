@@ -18,6 +18,7 @@ from smart_rag_core.query_answer.models import (
     AtomicLink,
 )
 from smart_rag_core.query_answer.release import drop_ungrounded_literals
+
 from tests.support.answer_verifier import (
     verifier_fusion,
     verifier_passage,
@@ -155,7 +156,7 @@ def test_fenced_claim_survives_drop_ungrounded_literals() -> None:
     """Fence wrappers must not make grounded code literals fail the guard."""
 
     source = (
-        'def track_shipments(origin: str = None, **kwargs) -> str:\n'
+        "def track_shipments(origin: str = None, **kwargs) -> str:\n"
         '    return "shipment_tracking_updated"'
     )
     claim = (

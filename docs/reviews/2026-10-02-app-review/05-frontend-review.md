@@ -35,7 +35,7 @@ performance.
 | Auth group | `src/app/(auth)/*` | login, signup, reset, callback (PKCE), invitation accept |
 | Console group | `src/app/(console)/*` | `/` chat, `/documents`, `/tables`, `/graph`, `/admin`, `/account` |
 | Route gate | `src/proxy.ts` | Supabase cookie refresh + redirects (explicitly **not** the security boundary) |
-| Redirect pages | `team`, `tools`, `curation`, `usage`, `profile` → `/admin?tab=…` or `/account` |
+| Redirect pages | `team`, `tools`, `curation`, `usage`, `profile` | Redirect to `/admin?tab=…` or `/account` |
 
 Chat/SSE pipeline:
 

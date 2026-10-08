@@ -295,9 +295,7 @@ class Bm25Retriever:
             scores_by_id=scores,
         )
         capped = survivors[:BM25_AUTHORIZED_SURVIVOR_CAP]
-        if not bm25_scores_discriminate(
-            tuple(item.channel_score for item in capped)
-        ):
+        if not bm25_scores_discriminate(tuple(item.channel_score for item in capped)):
             return Bm25RetrievalResult(
                 scanned_ids=scanned_ids,
                 candidates=(),
@@ -595,9 +593,7 @@ class Bm25Retriever:
                     continue
                 seen_final.add(item.chunk_id)
                 combined.append(item)
-        if not bm25_scores_discriminate(
-            tuple(item.channel_score for item in combined)
-        ):
+        if not bm25_scores_discriminate(tuple(item.channel_score for item in combined)):
             return Bm25RetrievalResult(
                 scanned_ids=tuple(scanned),
                 candidates=(),

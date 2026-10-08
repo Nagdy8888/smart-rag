@@ -34,7 +34,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -144,7 +144,7 @@ def uuid_ids(stage: Mapping[str, object], keys: Iterable[str]) -> frozenset[str]
         value = stage.get(key)
         if not isinstance(value, list):
             continue
-        for item in value:
+        for item in cast(list[object], value):
             text = str(item).strip().lower()
             if _UUID.match(text):
                 found.add(text)
@@ -216,7 +216,11 @@ def _links(payload: Mapping[str, Any] | None) -> list[Mapping[str, Any]]:
     raw = payload.get("atomic_links") if payload else None
     if not isinstance(raw, list):
         return []
-    return [item for item in raw if isinstance(item, dict)]
+    return [
+        cast(Mapping[str, Any], item)
+        for item in cast(list[object], raw)
+        if isinstance(item, dict)
+    ]
 
 
 def view_from_payloads(
@@ -431,16 +435,19 @@ def load_stage_rows(
     exported: Mapping[str, Any] = {}
     stages_path = run_dir / "stages.json"
     if stages_path.is_file():
-        raw = json.loads(stages_path.read_text(encoding="utf-8"))
-        runs = raw.get("runs") if isinstance(raw, dict) else None
-        exported = runs if isinstance(runs, dict) else {}
+        loaded: object = json.loads(stages_path.read_text(encoding="utf-8"))
+        root = cast(dict[str, object], loaded) if isinstance(loaded, dict) else {}
+        runs = root.get("runs")
+        if isinstance(runs, dict):
+            exported = cast(dict[str, object], runs)
     result: dict[str, StageIds] = {}
     for qid, row in answers.items():
         stage = row.get("stages")
-        ids = stage_ids(stage if isinstance(stage, dict) else {})
+        stage_map = cast(dict[str, object], stage) if isinstance(stage, dict) else {}
+        ids = stage_ids(stage_map)
         fallback = exported.get(qid)
         if not ids.selected and isinstance(fallback, dict):
-            ids = stage_ids(fallback)
+            ids = stage_ids(cast(dict[str, object], fallback))
         result[qid] = ids
     return result
 
@@ -500,14 +507,15 @@ def load_database_facts(
             ).fetchall():
                 if blob is None:
                     continue
-                value = serde.loads_typed((kind, bytes(blob)))
-                if not isinstance(value, dict):
+                decoded: object = serde.loads_typed((kind, bytes(blob)))
+                if not isinstance(decoded, dict):
                     continue
+                payload = cast(dict[str, Any], decoded)
                 node = str(task_path).split(",")[-1].strip()
                 if node == "generate_answer":
-                    draft = value
+                    draft = payload
                 elif node == "verify_answer":
-                    final = value
+                    final = payload
         views[qid] = view_from_payloads(draft, final)
     return text_by_id, corpus_ids, views
 
@@ -555,7 +563,13 @@ def print_report(report: Mapping[str, Any], *, aggregate_only: bool) -> None:
     for stage in STAGES:
         if stage == "ok":
             continue
-        ids = report["question_ids_by_stage"].get(stage) or []
+        id_map = cast(Mapping[str, object], report["question_ids_by_stage"])
+        raw_ids = id_map.get(stage)
+        ids = (
+            [str(item) for item in cast(list[object], raw_ids)]
+            if isinstance(raw_ids, list)
+            else []
+        )
         print(f"ids {stage} {','.join(ids) if ids else '-'}")
 
 

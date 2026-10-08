@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from collections.abc import Mapping, Sequence
@@ -32,6 +31,7 @@ from smart_rag_core.evaluation.company_ask_diagnosis import (  # noqa: E402
 )
 from smart_rag_core.evaluation.company_ask_langsmith import (  # noqa: E402
     DEFAULT_COMPANY_ASK_LANGSMITH_PROJECT,
+    CompanyAskLangSmithClient,
     CompanyAskLangSmithError,
     publish_company_ask_experiment,
 )
@@ -47,6 +47,11 @@ from smart_rag_core.evaluation.company_ask_regression import (  # noqa: E402
 from smart_rag_core.evaluation.dual_metric import (  # noqa: E402
     RetrievalStageAttribution,
     SourceResolutionStage,
+)
+from smart_rag_core.settings import (  # noqa: E402
+    get_process_environ,
+    set_process_environ,
+    setdefault_process_environ,
 )
 from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES  # noqa: E402
 
@@ -331,20 +336,17 @@ def main(argv: list[str] | None = None) -> int:
         try:
             from langsmith import Client
 
-            os.environ["LANGSMITH_PROJECT"] = args.langsmith_project
-            os.environ["LANGCHAIN_PROJECT"] = args.langsmith_project
+            set_process_environ("LANGSMITH_PROJECT", args.langsmith_project)
+            set_process_environ("LANGCHAIN_PROJECT", args.langsmith_project)
             from company_ask_langsmith_enrich import (
                 enrich_diagnosis_signals,
                 enrich_run_usage,
             )
 
-            os.environ.setdefault("LANGSMITH_TRACING", "true")
-            os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+            setdefault_process_environ("LANGSMITH_TRACING", "true")
+            setdefault_process_environ("LANGCHAIN_TRACING_V2", "true")
             answer_rows = {
-                question_id: {
-                    str(field): value
-                    for field, value in cast(dict[str, object], row).items()
-                }
+                question_id: {str(field): value for field, value in row.items()}
                 for question_id, row in answers.items()
             }
             diagnosis = enrich_diagnosis_signals(
@@ -354,10 +356,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             usage = enrich_run_usage(answer_rows)
             published = publish_company_ask_experiment(
-                Client(),
+                cast(CompanyAskLangSmithClient, Client()),
                 questions=questions,
                 answer_rows=answer_rows,
-                app_env=os.environ.get("APP_ENV", "").strip() or "local",
+                app_env=(get_process_environ("APP_ENV") or "").strip() or "local",
                 project_name=args.langsmith_project,
                 upload_private_content=args.upload_private_content,
                 experiment_prefix=args.langsmith_experiment_prefix,

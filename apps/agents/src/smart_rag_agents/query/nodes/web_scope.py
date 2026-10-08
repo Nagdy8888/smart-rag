@@ -337,9 +337,7 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         run_id=context.run_id,
     )
 
-    def _synthesize(
-        query: str, sources: tuple[WebSourceRecord, ...]
-    ) -> AnswerPayload:
+    def _synthesize(query: str, sources: tuple[WebSourceRecord, ...]) -> AnswerPayload:
         """Build the Web draft via gateway or extractive fallback.
 
         Args:

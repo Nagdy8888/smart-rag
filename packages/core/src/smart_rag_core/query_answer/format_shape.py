@@ -46,9 +46,7 @@ _EXACT_PHRASE_SHAPE_ASK = re.compile(
 _FENCE_BLOCK = re.compile(
     r"^\s*```([a-zA-Z0-9_+-]*)[ \t]*\n([\s\S]*?)\n[ \t]*```[ \t]*\s*$"
 )
-_FENCE_ANY = re.compile(
-    r"```([a-zA-Z0-9_+-]*)[ \t]*\n([\s\S]*?)\n[ \t]*```"
-)
+_FENCE_ANY = re.compile(r"```([a-zA-Z0-9_+-]*)[ \t]*\n([\s\S]*?)\n[ \t]*```")
 _MD_TABLE_ROW = re.compile(r"(?m)^\s*\|.+\|.+\|")
 _MD_TABLE_SEP = re.compile(r"(?m)^\s*\|?\s*:?-{3,}")
 _CODE_LOOKS = re.compile(
@@ -254,8 +252,7 @@ def format_requested_answer_shape(
         link_ids=link_ids or (),
     )
     citations = tuple(
-        item.model_copy(update={"paragraph_index": 0})
-        for item in payload.citations
+        item.model_copy(update={"paragraph_index": 0}) for item in payload.citations
     )
     links: list[AtomicLink] = []
     for index, link in enumerate(payload.atomic_links):

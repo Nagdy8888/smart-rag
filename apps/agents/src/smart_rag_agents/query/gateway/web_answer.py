@@ -185,7 +185,9 @@ def gateway_web_answer(
         raise
     except Exception as exc:
         raise AnswerError("web_answer_provider_error") from exc
-    payload = _parse_web_answer_payload(getattr(response, "payload", None), sources=sources)
+    payload = _parse_web_answer_payload(
+        getattr(response, "payload", None), sources=sources
+    )
     prompt_tokens, completion_tokens = tokens_from_gateway_response(response)
     return payload, prompt_tokens, completion_tokens
 

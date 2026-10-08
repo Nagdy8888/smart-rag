@@ -120,7 +120,7 @@ flowchart TD
 ```
 
 LangSmith baseline compare URL:
-https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=0b5ae5ad-15c5-4b50-93eb-66598183bf41
+<https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=0b5ae5ad-15c5-4b50-93eb-66598183bf41>
 
 Private artifacts: `.private-eval/runs/fresh50-2026-10-04-baseline/`.
 
@@ -170,7 +170,7 @@ unchanged by this salvage.
 Post-fix LangSmith experiment: `company-ask-dual-fresh50-postfix-ac142237`
 
 Baseline vs postfix compare URL:
-https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=0b5ae5ad-15c5-4b50-93eb-66598183bf41,b5f7e990-da70-4905-abc3-b40cba24e62a
+<https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=0b5ae5ad-15c5-4b50-93eb-66598183bf41,b5f7e990-da70-4905-abc3-b40cba24e62a>
 
 Private artifacts:
 `.private-eval/runs/fresh50-2026-10-04-postfix-fails/` (19-question re-ask),
@@ -225,7 +225,7 @@ not heading-only phrasing on selected gold evidence.
 Post-fix 2 LangSmith experiment: `company-ask-dual-fresh50-postfix2-379d1c68`
 
 Baseline vs postfix vs postfix2 compare URL:
-https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=0b5ae5ad-15c5-4b50-93eb-66598183bf41,b5f7e990-da70-4905-abc3-b40cba24e62a,409d7241-7125-4c7e-a202-b852f8d40db4
+<https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=0b5ae5ad-15c5-4b50-93eb-66598183bf41,b5f7e990-da70-4905-abc3-b40cba24e62a,409d7241-7125-4c7e-a202-b852f8d40db4>
 
 Private artifacts:
 `.private-eval/runs/fresh50-2026-10-04-remain18-reask/`,
@@ -264,7 +264,7 @@ scored **50 / 50**.
 Post-fix 3 LangSmith experiment: `company-ask-dual-fresh50-postfix3-ebcd2679`
 
 Compare URL:
-https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=f541cdb1-8a34-4ca2-8597-9aecc6cab1cf
+<https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/datasets/8aa06985-17e3-4d96-9aa0-df0ce0833d9d/compare?selectedSessions=f541cdb1-8a34-4ca2-8597-9aecc6cab1cf>
 
 Private artifacts: `.private-eval/runs/fresh50-2026-10-04-remain5/`,
 `.private-eval/runs/fresh50-2026-10-04-postfix3/`.

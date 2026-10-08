@@ -98,7 +98,7 @@ _PASCAL_TYPE_STOP = frozenset({"typeddict", "python", "markdown"})
 # ``this page`` without a number is ignored so content-free asks stay closed.
 _PAGE_NUMBER_FROM_QUERY = re.compile(
     r"(?i)\b(?:on\s+)?(?:pages?|pp?\.?)\s*(\d{1,4})"
-    r"(?:\s*(?:-|–|—|to)\s*(\d{1,4}))?\b"
+    r"(?:\s*(?:-|\u2013|\u2014|to)\s*(\d{1,4}))?\b"
 )
 _PAGE_NUMBER_CAP = 5
 _PAGE_NUMBER_MAX = 9999
@@ -371,9 +371,7 @@ def promote_named_page_passages(
         return trimmed
     pinned = matches[0]
     rest = [
-        item
-        for item in trimmed
-        if item.candidate.chunk_id != pinned.candidate.chunk_id
+        item for item in trimmed if item.candidate.chunk_id != pinned.candidate.chunk_id
     ]
     return (pinned, *rest)[:limit]
 

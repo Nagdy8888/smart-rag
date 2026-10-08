@@ -7,10 +7,10 @@ bodies or gold phrases.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,7 +154,8 @@ def page_in_pages(gold_page: int | None, pages: object) -> bool | None:
     if gold_page is None:
         return None
     if isinstance(pages, (list, tuple, set, frozenset)):
-        typed = {int(item) for item in pages if isinstance(item, int)}
+        values = cast(Iterable[object], pages)
+        typed = {item for item in values if isinstance(item, int)}
         return gold_page in typed
     return None
 

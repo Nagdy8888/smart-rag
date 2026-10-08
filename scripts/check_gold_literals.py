@@ -30,6 +30,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -97,20 +98,30 @@ def load_gold_phrases(private_dir: Path) -> dict[str, tuple[str, str]]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        rows = data if isinstance(data, list) else []
+        rows: list[object] = cast(list[object], data) if isinstance(data, list) else []
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            for fact in row.get("facts") or []:
+            record = cast(dict[str, object], row)
+            fact_rows = record.get("facts")
+            facts: list[object] = (
+                cast(list[object], fact_rows) if isinstance(fact_rows, list) else []
+            )
+            for fact in facts:
                 if not isinstance(fact, dict):
                     continue
-                for raw in [
-                    *(fact.get("canonical") or []),
-                    *(fact.get("aliases") or []),
-                ]:
+                fact_map = cast(dict[str, object], fact)
+                raw_phrases: list[object] = []
+                for field in ("canonical", "aliases"):
+                    values = fact_map.get(field)
+                    if isinstance(values, list):
+                        raw_phrases.extend(cast(list[object], values))
+                for raw in raw_phrases:
                     key = normalize_source(str(raw))
                     if len(key) >= MIN_PHRASE_CHARS:
-                        phrases.setdefault(key, (path.stem, str(row.get("id") or "")))
+                        phrases.setdefault(
+                            key, (path.stem, str(record.get("id") or ""))
+                        )
     return phrases
 
 
@@ -238,11 +249,23 @@ def main(argv: list[str] | None = None) -> int:
     if not phrases:
         print("gold_literals skipped=no_private_gold")
         return 0
-    read = lambda path: (REPO / path).read_text(encoding="utf-8", errors="replace")  # noqa: E731
-    app_texts = {
+
+    def read(path: str) -> str:
+        """Read one tracked file as text.
+
+        Args:
+            path: Repository-relative POSIX path.
+
+        Returns:
+            File text, with undecodable bytes replaced.
+        """
+
+        return (REPO / path).read_text(encoding="utf-8", errors="replace")
+
+    app_texts: dict[str, str] = {
         path: read(path) for path in tracked_files(APP_ROOTS, exclude_tests=True)
     }
-    warn_texts = {
+    warn_texts: dict[str, str] = {
         path: read(path) for path in tracked_files(WARN_ROOTS, exclude_tests=False)
     }
     failing, warnings = scan(app_texts, warn_texts, phrases, load_allowlist(ALLOWLIST))

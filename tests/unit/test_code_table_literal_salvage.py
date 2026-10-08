@@ -220,7 +220,9 @@ def test_salvage_named_code_definition_replaces_partial_body() -> None:
     )
     assert "YOUR_WOLFRAM_ALPHA_APP_ID" in salvaged.answer_text
     assert "\n\n" not in salvaged.paragraphs[0].text
-    assert salvaged.citations[0].span in gold
+    salvaged_span = salvaged.citations[0].span
+    assert salvaged_span is not None
+    assert salvaged_span in gold
 
 
 def test_promote_named_table_prefers_caption_with_rows() -> None:

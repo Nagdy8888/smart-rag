@@ -56,7 +56,9 @@ def main() -> None:
             start + 40 + heading_match.start(),
         )
     langfuse_at = text.find("Langfuse", start)
-    print("langfuse_offset_from_title", langfuse_at - start if langfuse_at >= 0 else None)
+    print(
+        "langfuse_offset_from_title", langfuse_at - start if langfuse_at >= 0 else None
+    )
 
 
 if __name__ == "__main__":

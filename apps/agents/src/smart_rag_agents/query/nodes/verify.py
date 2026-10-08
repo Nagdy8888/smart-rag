@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import psycopg
 from pydantic import ValidationError
@@ -444,6 +444,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     if terminal in {"verified", "verified_partial"}:
                         terminal = "verified_partial"
                         detail = "citation_leaf_unresolved"
+    verification_dump: dict[str, Any]
+    answer_dump: dict[str, Any]
     try:
         result = VerificationResult(
             answer=checked,
@@ -464,20 +466,18 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         # ``run_failed`` after a successful salvage/release path.
         terminal = "verified_partial"
         detail = "payload_schema_invalid"
+        failure_rows: list[object] = []
+        omitted_ids: list[str] = []
         verification_dump = {
             "answer": raw_answer,
-            "deterministic_failures": [],
+            "deterministic_failures": failure_rows,
             "verifier_call_count": 0,
-            "omitted_link_ids": [],
+            "omitted_link_ids": omitted_ids,
             "verifier_skipped_reason": None,
             "skipped_citation_count": 0,
             "status": terminal,
         }
-        answer_dump = (
-            checked.model_dump(mode="json")
-            if isinstance(checked, AnswerPayload)
-            else raw_answer
-        )
+        answer_dump = checked.model_dump(mode="json")
     return cast(
         QueryGraphState,
         {

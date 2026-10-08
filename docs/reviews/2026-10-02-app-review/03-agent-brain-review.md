@@ -226,7 +226,7 @@ asking one clarifying question or running both scoped retrievals.
 (`preparation.py:118-119`), so "who owns it?" after a topic switch relies on
 deterministic extraction alone. Follow-up resolution then depends on whether
 the memory loader's company-signal regex fires. Consider treating "short query
-+ memory" as always-model (the call is cheap and already reserved).
+and memory" as always-model (the call is cheap and already reserved).
 
 ### W4e — No multilingual answer policy in the prompts (Low)
 

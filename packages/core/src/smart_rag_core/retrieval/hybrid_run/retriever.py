@@ -20,7 +20,6 @@ from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
 )
-from smart_rag_core.retrieval.pages import load_chunk_page_numbers
 from smart_rag_core.retrieval.coverage_score import (
     attach_numeric_coverage,
     exclude_source_selector_terms,
@@ -77,6 +76,7 @@ from smart_rag_core.retrieval.hybrid_run.types import (
     EvidenceUnit,
     HybridRunResult,
 )
+from smart_rag_core.retrieval.pages import load_chunk_page_numbers
 from smart_rag_core.retrieval.profiles import (
     FINAL_EVIDENCE_MAX,
     HYBRID_DEFAULT_PROFILE_ID,
@@ -434,9 +434,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         if cited_pages and fused_ids and self._supabase_dsn:
             try:
                 with self._channel_supabase() as page_conn:
-                    page_by_id = load_chunk_page_numbers(
-                        page_conn, chunk_ids=fused_ids
-                    )
+                    page_by_id = load_chunk_page_numbers(page_conn, chunk_ids=fused_ids)
                 page_pins = page_head_pins(
                     fused_ids=fused_ids,
                     page_by_id=page_by_id,

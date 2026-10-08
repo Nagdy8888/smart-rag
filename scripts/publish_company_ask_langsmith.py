@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
+from typing import cast
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -27,6 +27,7 @@ from company_ask_langsmith_enrich import (  # noqa: E402
 )
 from smart_rag_core.evaluation.company_ask_langsmith import (  # noqa: E402
     DEFAULT_COMPANY_ASK_LANGSMITH_PROJECT,
+    CompanyAskLangSmithClient,
     CompanyAskLangSmithError,
     load_gold_and_answers,
     plan_company_ask_langsmith_publish,
@@ -35,7 +36,11 @@ from smart_rag_core.evaluation.company_ask_langsmith import (  # noqa: E402
 from smart_rag_core.evaluation.company_ask_regression import (  # noqa: E402
     AskRegressionConfigError,
 )
-from smart_rag_core.settings import setdefault_process_environ  # noqa: E402
+from smart_rag_core.settings import (  # noqa: E402
+    get_process_environ,
+    set_process_environ,
+    setdefault_process_environ,
+)
 
 
 def _load_repo_env() -> None:
@@ -147,12 +152,12 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(asdict(plan), indent=2, sort_keys=True))
         return 0
 
-    app_env = os.environ.get("APP_ENV", "").strip() or "local"
+    app_env = (get_process_environ("APP_ENV") or "").strip() or "local"
     # Experiments land in the project named here, not the Ask-trace project.
-    os.environ["LANGSMITH_PROJECT"] = args.project
-    os.environ["LANGCHAIN_PROJECT"] = args.project
-    os.environ.setdefault("LANGSMITH_TRACING", "true")
-    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+    set_process_environ("LANGSMITH_PROJECT", args.project)
+    set_process_environ("LANGCHAIN_PROJECT", args.project)
+    setdefault_process_environ("LANGSMITH_TRACING", "true")
+    setdefault_process_environ("LANGCHAIN_TRACING_V2", "true")
     try:
         from langsmith import Client
 
@@ -163,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
             results=scored,
         )
         usage = enrich_run_usage(answer_rows)
-        client = Client()
+        client = cast(CompanyAskLangSmithClient, Client())
         summary = publish_company_ask_experiment(
             client,
             questions=questions,

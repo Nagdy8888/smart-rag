@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from scripts.check_gold_literals import load_allowlist, normalize_source, scan
 
 
@@ -58,7 +60,7 @@ def test_warn_roots_never_fail() -> None:
     assert len(warnings["tests/unit/t.py"]) == 2
 
 
-def test_allowlist_parsing(tmp_path) -> None:
+def test_allowlist_parsing(tmp_path: Path) -> None:
     """Comments and blank lines are ignored."""
 
     path = tmp_path / "allow.txt"

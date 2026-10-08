@@ -72,11 +72,11 @@ def test_maybe_persist_delegates_once_when_bound() -> None:
 
     with (
         patch(
-            "smart_rag_core.query_answer.citations.list_run_citations",
+            "smart_rag_core.query_answer.citations_persist.list_run_citations",
             side_effect=[(), (MagicMock(),)],
         ) as list_existing,
         patch(
-            "smart_rag_core.query_answer.citations.persist_answer_citations",
+            "smart_rag_core.query_answer.citations_persist.persist_answer_citations",
             return_value=CitationPersistResult(ids=inserted),
         ) as persist,
     ):
@@ -112,11 +112,11 @@ def test_maybe_persist_reraises_bound_failure() -> None:
     )
     with (
         patch(
-            "smart_rag_core.query_answer.citations.list_run_citations",
+            "smart_rag_core.query_answer.citations_persist.list_run_citations",
             return_value=(),
         ),
         patch(
-            "smart_rag_core.query_answer.citations.persist_answer_citations",
+            "smart_rag_core.query_answer.citations_persist.persist_answer_citations",
             side_effect=QueryAdmissionError("span_not_contained"),
         ),
     ):
@@ -405,8 +405,10 @@ def test_repair_leaf_citations_uses_claim_local_unique_span() -> None:
     )
     repaired = repair_leaf_citations(answer, fusion, skipped)
     assert repaired.citations[0].chunk_id == leaf_id
-    assert "PSI > 0.25" in repaired.citations[0].span
-    assert "48 hours" in repaired.citations[0].span
+    repaired_span = repaired.citations[0].span
+    assert repaired_span is not None
+    assert "PSI > 0.25" in repaired_span
+    assert "48 hours" in repaired_span
 
 
 def test_verify_partial_after_leaf_citation_repair(
@@ -443,6 +445,7 @@ def test_verify_partial_after_leaf_citation_repair(
     fusion = verifier_fusion(parent, leaf)
     parent_id = str(fusion.evidence[0].chunk_id)
     leaf_id = str(fusion.evidence[1].chunk_id)
+    assert leaf_id != parent_id
     claim = (
         "Computing a SHA-256 hash of incoming data upon receipt is "
         "recommended for maintaining data integrity in MAESTRO layer 2, "
@@ -497,13 +500,38 @@ def test_verify_partial_after_leaf_citation_repair(
         )
         return CitationPersistResult(ids=(uuid4(),), skipped=())
 
+    def _runtime(_state: object) -> MagicMock:
+        """Return the fake runtime for any graph state.
+
+        Args:
+            _state: Unused graph state.
+
+        Returns:
+            The test runtime.
+        """
+
+        return runtime
+
+    def _render(answer: object, **_kwargs: object) -> object:
+        """Return the answer unchanged.
+
+        Args:
+            answer: Verified answer payload.
+            **_kwargs: Unused render options.
+
+        Returns:
+            The same answer object.
+        """
+
+        return answer
+
     monkeypatch.setattr(
         "smart_rag_agents.query.nodes.verify.runtime_from_state",
-        lambda _state: runtime,
+        _runtime,
     )
     monkeypatch.setattr(
         "smart_rag_agents.query.nodes.verify.render_verified_company_answer",
-        lambda answer, **_kwargs: answer,
+        _render,
     )
     monkeypatch.setattr(
         "smart_rag_agents.query.nodes.verify.summarize_run_usage",
@@ -513,15 +541,15 @@ def test_verify_partial_after_leaf_citation_repair(
         "smart_rag_agents.query.nodes.verify.maybe_persist_verified_citations",
         _persist,
     )
-    state = pending_query_state(user_query="What hashing example does MAESTRO recommend?")
+    state = pending_query_state(
+        user_query="What hashing example does MAESTRO recommend?"
+    )
     state["status"] = "answered"
     state["remaining_model_calls"] = 8
     state["fusion"] = fusion.model_dump(mode="json")
     state["answer"] = AnswerPayload(
         answer_text=claim,
-        paragraphs=(
-            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),
-        ),
+        paragraphs=(AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),),
         citations=(
             AnswerCitation(
                 chunk_id=parent_id,
@@ -530,9 +558,7 @@ def test_verify_partial_after_leaf_citation_repair(
                 atomic_link_id="l1",
             ),
         ),
-        atomic_links=(
-            AtomicLink(link_id="l1", claim=claim, chunk_ids=(parent_id,)),
-        ),
+        atomic_links=(AtomicLink(link_id="l1", claim=claim, chunk_ids=(parent_id,)),),
         status="complete",
         answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     ).model_dump(mode="json")

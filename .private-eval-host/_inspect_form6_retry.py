@@ -34,8 +34,7 @@ def main() -> None:
         text = html.unescape(str(row.get("answer_text") or ""))
         print("=" * 72)
         print(
-            f"{qid} status={row.get('status')} len={len(text)} "
-            f"pipes={text.count('|')}"
+            f"{qid} status={row.get('status')} len={len(text)} pipes={text.count('|')}"
         )
         for needle in needles:
             if needle in text:

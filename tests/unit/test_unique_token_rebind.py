@@ -25,9 +25,7 @@ _GOLD = (
     "The helper persists conversation state through update_memory before "
     "the next agent turn begins."
 )
-_CLAIM = (
-    "The helper function name used for memory updates is update_memory."
-)
+_CLAIM = "The helper function name used for memory updates is update_memory."
 
 
 def _payload(cited: str) -> AnswerPayload:
@@ -78,7 +76,9 @@ def test_miscited_unique_token_rebinds_to_gold_chunk() -> None:
     link = bound.atomic_links[0]
     assert link.chunk_ids[0] == gold_id
     assert bound.citations[0].chunk_id == gold_id
-    assert "update_memory" in bound.citations[0].span
+    memory_span = bound.citations[0].span
+    assert memory_span is not None
+    assert "update_memory" in memory_span
 
 
 def test_prose_and_def_token_holders_multicite_gold_prose() -> None:
@@ -92,7 +92,9 @@ def test_prose_and_def_token_holders_multicite_gold_prose() -> None:
         "def update_memory(trial_log_path: str, env_configs: List[Dict[str, Any]]):\n"
         "    pass\n"
     )
-    call_site = "reflections.append(result)\nupdate_memory(trial_log_path, env_configs)\n"
+    call_site = (
+        "reflections.append(result)\nupdate_memory(trial_log_path, env_configs)\n"
+    )
     fusion = verifier_fusion(
         verifier_passage(1, text=definition, rank=1),
         verifier_passage(2, text=prose, rank=2),
@@ -187,7 +189,9 @@ def test_hyphen_model_token_rebinds_to_holder() -> None:
     )
     bound = bind_company_atomic_links(payload, fusion=fusion)
     assert bound.citations[0].chunk_id == verifier_uid(2)
-    assert "gpt-4o" in bound.citations[0].span
+    model_span = bound.citations[0].span
+    assert model_span is not None
+    assert "gpt-4o" in model_span
 
 
 def test_host_path_token_rebinds_to_holder() -> None:
@@ -225,14 +229,16 @@ def test_host_path_token_rebinds_to_holder() -> None:
     )
     bound = bind_company_atomic_links(payload, fusion=fusion)
     assert bound.citations[0].chunk_id == verifier_uid(2)
-    assert "localhost:8000/mcp" in bound.citations[0].span.lower()
+    host_span = bound.citations[0].span
+    assert host_span is not None
+    assert "localhost:8000/mcp" in host_span.lower()
 
 
 def test_query_overlap_prefers_gold_holder_for_shared_token() -> None:
     """Multi-holder gpt-4o cites the passage that overlaps the ask most."""
 
     weak = (
-        "Later chapters also initialize ChatOpenAI(model_name=\"gpt-4o\") "
+        'Later chapters also initialize ChatOpenAI(model_name="gpt-4o") '
         "for unrelated demos."
     )
     gold = (

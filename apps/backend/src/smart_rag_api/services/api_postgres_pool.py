@@ -217,9 +217,7 @@ def _pool(postgres_url: str, kind: str) -> BoundedConnectionPool:
     """
     with _LOCK:
         pools = _ADMISSION_POOLS if kind == "admission" else _RUN_POOLS
-        max_size = (
-            ADMISSION_POOL_MAX_SIZE if kind == "admission" else RUN_POOL_MAX_SIZE
-        )
+        max_size = ADMISSION_POOL_MAX_SIZE if kind == "admission" else RUN_POOL_MAX_SIZE
         pool = pools.get(postgres_url)
         if pool is None:
             pool = BoundedConnectionPool(

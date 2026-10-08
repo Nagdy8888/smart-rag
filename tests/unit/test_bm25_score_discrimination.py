@@ -20,9 +20,7 @@ def test_multi_token_prefers_conjunction_before_disjunction() -> None:
     )
     assert bm25_query_token_count(query) >= 2
     assert prefer_bm25_conjunction(query) is True
-    assert resolve_bm25_operators(
-        query, requested=Bm25Operator.MATCH_DISJUNCTION
-    ) == (
+    assert resolve_bm25_operators(query, requested=Bm25Operator.MATCH_DISJUNCTION) == (
         Bm25Operator.MATCH_CONJUNCTION,
         Bm25Operator.MATCH_DISJUNCTION,
     )

@@ -66,9 +66,7 @@ def _promote_query_anchor_passages(
     promoted = promote_named_table_passages(
         promoted, query=query, pool=search, limit=limit
     )
-    return promote_named_page_passages(
-        promoted, query=query, pool=search, limit=limit
-    )
+    return promote_named_page_passages(promoted, query=query, pool=search, limit=limit)
 
 
 def passages_from_context(

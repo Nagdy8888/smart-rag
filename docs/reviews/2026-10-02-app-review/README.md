@@ -47,21 +47,21 @@ recommendations only.
 
 **High-value improvements:**
 
-3. **Replace eval-set scaffolding with a general extractive-answer mode** —
+1. **Replace eval-set scaffolding with a general extractive-answer mode** —
    question-specific salvages/promotions/prompt rules exist in four layers;
    they inflate the benchmark and do not generalize. [W1, 03; S1, 04]
-4. **Wire optional tools into the answer** — tools execute but their results
+2. **Wire optional tools into the answer** — tools execute but their results
    never reach `generate_answer`. [W4b, 03]
-5. **Collapse the duplicate chat data hook and isolate the streaming subtree** —
+3. **Collapse the duplicate chat data hook and isolate the streaming subtree** —
    the Ask page polls duplicate queries and re-renders the full stage per token
    batch. [FE-3/4, 05]
-6. **Add App Router `error`/`loading`/`not-found` boundaries** — none exist.
+4. **Add App Router `error`/`loading`/`not-found` boundaries** — none exist.
    [FE-1, 05]
 
 **Decisions needed:**
 
-7. **MFA/AAL policy** — assurance level is captured but not enforced. [SEC-1, 01]
-8. **Multi-API execution pattern** — sticky sessions vs lease-based claim.
+1. **MFA/AAL policy** — assurance level is captured but not enforced. [SEC-1, 01]
+2. **Multi-API execution pattern** — sticky sessions vs lease-based claim.
    [SYS-2, 02]
 
 ## Method

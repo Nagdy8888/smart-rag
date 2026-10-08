@@ -80,7 +80,7 @@ Verified strengths:
   authorization input.
 - Broad RLS enablement on app/evidence tables
   (`supabase/migrations/20260812135115_indexes_rls_grants_v1.sql:64-110`); creator-private
-  + owner/admin audit policies on documents, ACL, conversations, runs
+  and owner/admin audit policies on documents, ACL, conversations, runs
   (`20260812135916_roles_rls_identity_v1.sql:507-666`).
 - `anon`/`authenticated` fully revoked from `app`, `private`, `langgraph`,
   `lightrag` schemas and their tables (`20260812135916_roles_rls_identity_v1.sql:830-846`).

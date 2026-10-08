@@ -254,8 +254,8 @@
       "success_state": "232px or 72px rail",
       "failure_state": "none",
       "idempotency": "localStorage",
-      "disposition": "keep",
-      "test_id": "src/components/ui/app-shell.test.tsx"
+      "disposition": "removed_target",
+      "test_id": "removed-shell-nav-toggle"
     },
     {
       "action_id": "nav.team",
@@ -382,6 +382,20 @@
       "idempotency": "presentation only",
       "disposition": "keep",
       "test_id": "src/components/chat/verified-answer-reveal.test.tsx"
+    },
+    {
+      "action_id": "ask.format_sample",
+      "route": "/",
+      "label": "Answer format sample",
+      "control_kind": "button",
+      "contract_owner": "frontend-presentation",
+      "contract": "local sample tab",
+      "role": "authenticated",
+      "success_state": "selected sample preview",
+      "failure_state": "none",
+      "idempotency": "local state",
+      "disposition": "keep",
+      "test_id": "src/components/chat/answer-format-gallery.test.tsx"
     },
     {
       "action_id": "ask.expand_timeline",
