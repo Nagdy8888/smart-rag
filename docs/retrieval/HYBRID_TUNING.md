@@ -59,3 +59,12 @@ holdout-blind and refuses to run when holdout access is enabled.
 
 [PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md)
 [docs index](../README.md)
+
+## Probe15 pool and search text
+
+`hybrid_long_document_v4` keeps `rerank_pool_size` at 20. It pins 10 dense
+heads and 5 BM25 heads, then fills the remaining slots in fused order.
+`hybrid_long_document_v3` remains the rollback. Retrieval embeds the
+question sentences in the same batch as the full message and merges those
+dense lists by reciprocal rank. BM25 scans the question sentence first.
+See [ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md).

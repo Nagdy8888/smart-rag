@@ -194,6 +194,10 @@ flowchart TD
   terminal -->|none| refuse[refused or insufficient_evidence]
 ```
 
+Replacing a near-quote claim with the full cited sentence was measured on
+stored drafts and dropped: it did not clear the pass bar without breaking
+current passes. Released claims stay the model's wording.
+
 ```mermaid
 flowchart TD
   webScope[web_scope search critique contents persist]

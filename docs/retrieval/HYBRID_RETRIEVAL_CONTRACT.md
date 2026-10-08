@@ -442,6 +442,15 @@ uv run python scripts/ci/check_migrations.py
 
 ## Rollback
 
+## Probe15 channel rerun and pool
+
+A channel pass that returns no IDs only because at least one channel timed
+out may run once more when 18 seconds of run time remain. The second pass
+reuses the embedding vectors. Long-document asks use
+`hybrid_long_document_v4`: 10 dense pins, 5 BM25 pins, fused fill, pool
+size 20. See
+[ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md).
+
 Drop forward via later expand/contract migrations
 `20260814130000_hybrid_retrieval_v1.sql`,
 `20260814140000_hybrid_rerank_context_v1.sql`, and

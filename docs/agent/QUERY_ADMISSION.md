@@ -119,6 +119,13 @@ and `GET /runs/{run_id}` reload the stored value and never mutate it.
 
 See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 
+## Start at admission
+
+The graph executor starts when the message is admitted, for both the JSON
+202 response and the SSE response. A later attach replays the same run.
+`_start_once` remains idempotent. See
+[ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md).
+
 ## Related
 
 - [QUERY_BUDGETS.md](./QUERY_BUDGETS.md)

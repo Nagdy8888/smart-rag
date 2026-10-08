@@ -129,6 +129,15 @@ authorized evidence is a counted refusal on the company path; it does
 not spend a second general-knowledge call. Duplicate idempotency keys
 and SSE reconnect reuse the existing paid run.
 
+## Answer attempt cap
+
+Each answer or verifier call is limited to 10 seconds or the time left on
+the run, whichever is smaller. The answer may be sent once more after a
+timeout, connection error, or 5xx, and only when at least 8 seconds and
+one model call remain. A 429 or an authentication failure is not retried.
+A timeout after the provider request was sent still writes `llm_usage`.
+See [ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md).
+
 ## Related
 
 - [QUERY_ADMISSION.md](./QUERY_ADMISSION.md)
