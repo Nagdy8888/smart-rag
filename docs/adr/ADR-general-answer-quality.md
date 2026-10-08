@@ -51,6 +51,29 @@ pool 5, ingestion 1.
    baseline 11 on `dev40-g1b`; total strict 9 vs 11).
 5. Fixed measurement loop with dev40 and sealed holdout40 and a stop
    rule (see the runbook).
+6. Cycle 7 evidence-substring release (`normalize_fact_claims_to_cited_spans`)
+   was tried on 2026-10-07 and **reverted by keep bar** (`spot30` 5a
+   7→24, strict 23→13). Anchor claim-fill remains the omit backstop.
+   Counts are in `docs/evaluation/GENERAL_ANSWER_QUALITY_2026-10.md`.
+7. Cycle 8 (2026-10-07): tried allowing `salvage_anchor_claim_fill`
+   after structural salvage; **reverted by keep bar** (`spot30` 5a
+   improved, `dev40` 5a flat). Cycle 5 skip-after-structural restored.
+   Counts in `docs/evaluation/GENERAL_ANSWER_QUALITY_2026-10.md`.
+8. Cycle 9 (2026-10-07): multi-part second anchor fill, table-shaped
+   span preference, and empty-refusal evidence fill. Fail-cohort only;
+   **reverted by keep bar** (`spot30` 5a 7→9; `dev40` 5a 12→11 alone).
+   Cycle 5 single-fill claim-fill restored. Counts in
+   `docs/evaluation/GENERAL_ANSWER_QUALITY_2026-10.md`.
+9. Cycle 10 (2026-10-08): tried restoring draft facts that already pass
+   the literal guard when the release has no links. **Reverted by keep
+   bar.** On `s15`/`s18`, `5b` cleared and one former `5b` fact became
+   `5a` (set `5a` 7→8). On `d03`/`d11`/`d23`, `d03` timed out and the
+   other facts stayed `5b`. Counts in
+   `docs/evaluation/GENERAL_ANSWER_QUALITY_2026-10.md`.
+10. Cycle 11 (2026-10-08): tried requiring fact claims to be copied from
+    the cited passage. **Reverted by keep bar** (`spot30` 5a 7→10;
+    `dev40` 5a 12→19, strict 21→14). Prompt text and hashes restored.
+    Counts in `docs/evaluation/GENERAL_ANSWER_QUALITY_2026-10.md`.
 
 ## Alternatives considered
 
@@ -59,6 +82,10 @@ pool 5, ingestion 1.
 - A second verifier call (rejected: `MAX_VERIFIER_CALLS = 1` contract).
 - A new `usage_kind` for locate (rejected: needs a migration of
   `app.llm_usage.llm_usage_kind_allowed`).
+- Cycle 6 extract-then-compose that retired claim-fill (rejected:
+  full-set keep bar failed; restored Cycle 5 claim-fill).
+- Cycle 7 rewrite of paraphrased fact claims to citation spans
+  (rejected: raised `5a_draft_missing` and cut strict on full spot30).
 
 ## Acceptance targets
 

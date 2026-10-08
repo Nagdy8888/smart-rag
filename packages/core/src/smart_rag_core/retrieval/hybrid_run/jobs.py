@@ -227,7 +227,11 @@ class HybridChannelJobsMixin:
                 # Ask-gated listed/code seeds as extra term needles so
                 # TOC/preface literals (CrewAI, Table of Contents) are not
                 # dense/BM25-only.
-                from smart_rag_core.retrieval.rerank import hybrid_seed_terms
+                from smart_rag_core.retrieval.pages import retrieve_page_candidates
+                from smart_rag_core.retrieval.rerank import (
+                    hybrid_seed_terms,
+                    named_page_numbers,
+                )
 
                 term_texts = texts if texts else (query,)
                 seed_extras: list[str] = []
@@ -236,16 +240,58 @@ class HybridChannelJobsMixin:
                         seed_extras.append(seed)
                 if seed_extras:
                     term_texts = (*seed_extras, *term_texts)[:8]
+                pages = named_page_numbers(query)
+
+                def _merge_page_hits(
+                    connection: psycopg.Connection,
+                    lists: VariantLists,
+                ) -> VariantLists:
+                    """Prepend authorized page-scoped hits when the ask cites pages.
+
+                    Args:
+                        connection: Canonical connection for page fetch/recheck.
+                        lists: Per-variant term candidate lists.
+
+                    Returns:
+                        Lists with page hits merged into the first variant.
+                    """
+
+                    if not pages:
+                        return lists
+                    try:
+                        page_hits = retrieve_page_candidates(
+                            connection,
+                            caller=caller,
+                            pages=pages,
+                            version_id=version_id,
+                        )
+                    except Exception:
+                        return lists
+                    if not page_hits:
+                        return lists
+                    if not lists:
+                        return (page_hits,)
+                    head = lists[0]
+                    seen = {item.chunk_id for item in head}
+                    merged = list(page_hits)
+                    for item in head:
+                        if item.chunk_id in seen:
+                            continue
+                        seen.add(item.chunk_id)
+                        merged.append(item)
+                    return (tuple(merged), *lists[1:])
+
                 if self._supabase_dsn:
                     from smart_rag_core.retrieval.terms import TermRetriever
 
                     with self._channel_supabase() as connection:
                         try:
-                            return collect_term_lists(
+                            lists = collect_term_lists(
                                 TermRetriever(connection).retrieve,
                                 caller=caller,
                                 texts=term_texts,
                             )
+                            return _merge_page_hits(connection, lists)
                         except Exception:
                             return TermRetrievalResult(
                                 candidates=(),
@@ -254,11 +300,14 @@ class HybridChannelJobsMixin:
                                 fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
                             )
                 try:
-                    return collect_term_lists(
+                    lists = collect_term_lists(
                         term_retriever.retrieve,
                         caller=caller,
                         texts=term_texts,
                     )
+                    if self._supabase is not None:
+                        return _merge_page_hits(self._supabase, lists)
+                    return lists
                 except Exception:
                     return TermRetrievalResult(
                         candidates=(),

@@ -385,7 +385,7 @@ def prepare_query(
             negation_confidence=profile.negation_scope.confidence,
             document_scope=profile_str(profile.document_scope, "none"),
             section_scope="none",
-            page_scope="none",
+            page_scope=_page_scope_from_query(original),
             media_intent=profile_bool(profile.media_dependence),
             historical_relationship=is_historical_relationship(original, extract),
             low_confidence_relationship=is_low_confidence_relationship(
@@ -458,6 +458,24 @@ def _prep_value_error(exc: ValueError) -> str:
     if "original_query_loss" in text:
         return "original_query_loss"
     return "profile_schema_omission"
+
+
+def _page_scope_from_query(query: str) -> str:
+    """Serialize explicit page cites for ``QueryPreparation.page_scope``.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        Comma-separated page numbers, or ``none`` when the ask cites none.
+    """
+
+    from smart_rag_core.retrieval.rerank import named_page_numbers
+
+    pages = named_page_numbers(query)
+    if not pages:
+        return "none"
+    return ",".join(str(page) for page in pages)
 
 
 def caller_from_runtime(runtime: AuthorizedRuntimeContext) -> CallerContext:

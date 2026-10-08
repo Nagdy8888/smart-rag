@@ -16,11 +16,11 @@ from smart_rag_core.retrieval.cache_store import (
     RetrievalCacheStore,
 )
 from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
-from smart_rag_core.retrieval.rerank import hybrid_seed_terms
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
 )
+from smart_rag_core.retrieval.pages import load_chunk_page_numbers
 from smart_rag_core.retrieval.coverage_score import (
     attach_numeric_coverage,
     exclude_source_selector_terms,
@@ -90,6 +90,10 @@ from smart_rag_core.retrieval.rerank import (
     CHANNEL_HEAD_PIN,
     RerankFallbackReason,
     channel_head_pins,
+    hybrid_seed_terms,
+    merge_rerank_pins,
+    named_page_numbers,
+    page_head_pins,
     rerank_preload_ids,
 )
 from smart_rag_core.retrieval.types import Bm25RetrievalResult
@@ -419,12 +423,29 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             pool_size = RERANK_POOL_SIZE
             max_per_document = RERANK_MAX_PER_DOCUMENT
             dense_head = CHANNEL_HEAD_PIN
-        pinned_ids = channel_head_pins(
+        channel_pins = channel_head_pins(
             dense_ids=dense_ids,
             bm25_ids=bm25_ids,
             fused_ids=fused_ids,
             dense_head=dense_head,
         )
+        cited_pages = named_page_numbers(query)
+        page_pins: tuple[UUID, ...] = ()
+        if cited_pages and fused_ids and self._supabase_dsn:
+            try:
+                with self._channel_supabase() as page_conn:
+                    page_by_id = load_chunk_page_numbers(
+                        page_conn, chunk_ids=fused_ids
+                    )
+                page_pins = page_head_pins(
+                    fused_ids=fused_ids,
+                    page_by_id=page_by_id,
+                    pages=cited_pages,
+                    head=CHANNEL_HEAD_PIN,
+                )
+            except Exception:
+                page_pins = ()
+        pinned_ids = merge_rerank_pins(page_pins, channel_pins)
         preload_ids = rerank_preload_ids(
             assembled.fused,
             pool_size=pool_size,

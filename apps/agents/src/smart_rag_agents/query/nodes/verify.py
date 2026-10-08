@@ -22,6 +22,7 @@ from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
 from smart_rag_core.query_answer.generate_grounded import (
+    salvage_anchor_claim_fill,
     salvage_named_code_definition,
     salvage_named_table_block,
 )
@@ -257,6 +258,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             for salvage_fn in (
                 salvage_named_code_definition,
                 salvage_named_table_block,
+                salvage_anchor_claim_fill,
             ):
                 try:
                     salvaged = salvage_fn(checked, fusion, user_query=user_query)

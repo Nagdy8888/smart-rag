@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -94,6 +94,54 @@ _TABLE_REPRO_ASK = re.compile(
 )
 _TABLE_CAPTION_FROM_QUERY = re.compile(r"(?i)\bTable\s+(\d+-\d+)\b")
 _PASCAL_TYPE_STOP = frozenset({"typeddict", "python", "markdown"})
+# Explicit page cites only (``page 27``, ``pages 10-12``, ``p. 3``). Bare
+# ``this page`` without a number is ignored so content-free asks stay closed.
+_PAGE_NUMBER_FROM_QUERY = re.compile(
+    r"(?i)\b(?:on\s+)?(?:pages?|pp?\.?)\s*(\d{1,4})"
+    r"(?:\s*(?:-|–|—|to)\s*(\d{1,4}))?\b"
+)
+_PAGE_NUMBER_CAP = 5
+_PAGE_NUMBER_MAX = 9999
+
+
+def named_page_numbers(query: str) -> tuple[int, ...]:
+    """Extract explicit 1-based page numbers the user typed.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        At most five distinct page numbers in first-seen order. Empty when
+        the query never cites a numeric page.
+    """
+
+    found: list[int] = []
+    seen: set[int] = set()
+    for match in _PAGE_NUMBER_FROM_QUERY.finditer(query):
+        start_raw = match.group(1)
+        end_raw = match.group(2)
+        try:
+            start = int(start_raw)
+        except (TypeError, ValueError):
+            continue
+        end = start
+        if end_raw is not None:
+            try:
+                end = int(end_raw)
+            except (TypeError, ValueError):
+                end = start
+        lo = min(start, end)
+        hi = max(start, end)
+        if lo < 1 or hi > _PAGE_NUMBER_MAX:
+            continue
+        for page in range(lo, min(hi, lo + _PAGE_NUMBER_CAP - 1) + 1):
+            if page in seen:
+                continue
+            seen.add(page)
+            found.append(page)
+            if len(found) >= _PAGE_NUMBER_CAP:
+                return tuple(found)
+    return tuple(found)
 
 
 def named_pascal_type_ids(query: str) -> tuple[str, ...]:
@@ -288,6 +336,46 @@ def promote_named_code_definition_passages(
         gold_pattern=gold,
         prefer_early_match=True,
     )
+
+
+def promote_named_page_passages(
+    trimmed: tuple[RerankPassage, ...],
+    *,
+    query: str,
+    pool: tuple[RerankPassage, ...],
+    limit: int,
+) -> tuple[RerankPassage, ...]:
+    """Pin passages whose ``page_number`` matches an explicit page cite.
+
+    Args:
+        trimmed: Final evidence after MMR and token trim.
+        query: Original user query. Untrusted.
+        pool: Rerank pool or fused passages.
+        limit: Maximum passages to retain.
+
+    Returns:
+        Trimmed passages with matching page passages prepended when present.
+        Unchanged when the query cites no numeric page or no pool passage
+        carries that page.
+    """
+
+    pages = set(named_page_numbers(query))
+    if not pages or limit < 1:
+        return trimmed
+    matches = [
+        item
+        for item in pool
+        if item.page_number is not None and int(item.page_number) in pages
+    ]
+    if not matches:
+        return trimmed
+    pinned = matches[0]
+    rest = [
+        item
+        for item in trimmed
+        if item.candidate.chunk_id != pinned.candidate.chunk_id
+    ]
+    return (pinned, *rest)[:limit]
 
 
 def promote_named_table_passages(
@@ -854,6 +942,75 @@ def _query_aware_window(raw_text: str, *, query: str, limit: int) -> str:
         start = max(0, len(raw_text) - limit)
         end = len(raw_text)
     return raw_text[start:end]
+
+
+def page_head_pins(
+    *,
+    fused_ids: Sequence[UUID],
+    page_by_id: Mapping[UUID, int | None],
+    pages: Sequence[int],
+    head: int = CHANNEL_HEAD_PIN,
+) -> tuple[UUID, ...]:
+    """Return fused IDs on explicitly cited pages that must enter the pool.
+
+    Page inject can place the right chunks in the fused candidate set while
+    RRF still ranks them below the pool cut. Pinning a bounded head of
+    page-matched fused IDs (fusion order) keeps them visible to rerank the
+    same way dense/BM25 channel heads are pinned. IDs outside ``fused_ids``
+    cannot be invented.
+
+    Args:
+        fused_ids: Authorized fused IDs in fusion-rank order.
+        page_by_id: ``chunk_id`` to ``page_number`` (None when unknown).
+        pages: Explicit page numbers from the user query.
+        head: Maximum page pins to reserve.
+
+    Returns:
+        Distinct fused IDs whose page matches ``pages``, at most ``head``.
+        Empty when ``pages`` is empty or no fused ID matches.
+    """
+
+    wanted = {int(page) for page in pages if int(page) >= 1}
+    if not wanted or head < 1:
+        return ()
+    pins: list[UUID] = []
+    seen: set[UUID] = set()
+    for chunk_id in fused_ids:
+        page = page_by_id.get(chunk_id)
+        if page is None:
+            continue
+        try:
+            page_int = int(page)
+        except (TypeError, ValueError):
+            continue
+        if page_int not in wanted or chunk_id in seen:
+            continue
+        seen.add(chunk_id)
+        pins.append(chunk_id)
+        if len(pins) >= head:
+            break
+    return tuple(pins)
+
+
+def merge_rerank_pins(*pin_groups: Sequence[UUID]) -> tuple[UUID, ...]:
+    """Deduplicate pin groups while preserving first-seen order.
+
+    Args:
+        pin_groups: Pin sequences, typically page pins then channel heads.
+
+    Returns:
+        Distinct UUIDs in the order they first appear across ``pin_groups``.
+    """
+
+    merged: list[UUID] = []
+    seen: set[UUID] = set()
+    for group in pin_groups:
+        for chunk_id in group:
+            if chunk_id in seen:
+                continue
+            seen.add(chunk_id)
+            merged.append(chunk_id)
+    return tuple(merged)
 
 
 def channel_head_pins(

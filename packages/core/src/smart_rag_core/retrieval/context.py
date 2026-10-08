@@ -20,6 +20,7 @@ from smart_rag_core.retrieval.rerank import (
     literal_anchor_ask,
     literal_gold_already_loaded,
     promote_named_code_definition_passages,
+    promote_named_page_passages,
     promote_named_table_passages,
     should_skip_trivial_exact,
     trim_token_budget,
@@ -62,7 +63,12 @@ def _promote_query_anchor_passages(
     promoted = promote_named_code_definition_passages(
         trimmed, query=query, pool=search, limit=limit
     )
-    return promote_named_table_passages(promoted, query=query, pool=search, limit=limit)
+    promoted = promote_named_table_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
+    return promote_named_page_passages(
+        promoted, query=query, pool=search, limit=limit
+    )
 
 
 def passages_from_context(
