@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
-  it("exposes a skip link, Field top nav, and plate main landmark", () => {
+  it("exposes a skip link, top nav, and main landmark", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });

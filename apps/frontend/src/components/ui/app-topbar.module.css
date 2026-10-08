@@ -1,11 +1,12 @@
 /**
- * Field topbar tools: menu, readiness, command, account.
+ * Topbar tools: menu, readiness, command, account.
  */
 
 .topbarStart,
 .topbarEnd {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: calc(var(--space) * 2);
   min-width: 0;
 }
@@ -17,7 +18,7 @@
 .menuButton,
 .commandButton {
   display: inline-flex;
-  color: var(--color-field-fg, #f4f1ea);
+  color: var(--color-text);
 }
 
 .topbarBrand,
@@ -32,7 +33,7 @@
 
 .readiness {
   margin: 0;
-  color: var(--color-field-fg, #f4f1ea);
+  color: var(--color-text);
   font-size: 0.8125rem;
   opacity: 0.8;
 }
@@ -40,6 +41,7 @@
 .readinessControl {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .avatarMark {
@@ -50,8 +52,8 @@
   height: 36px;
   border-radius: 50%;
   background: transparent;
-  color: var(--color-field-fg, #f4f1ea);
-  border: 1px solid rgb(244 241 234 / 0.35);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
   font-size: 12px;
   font-weight: 600;
 }

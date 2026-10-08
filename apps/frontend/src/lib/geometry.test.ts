@@ -77,8 +77,9 @@ describe("primitive geometry source lock", () => {
     expect(ui).toMatch(/\.pill\s*\{[\s\S]*?height:\s*24px/);
     expect(ui).toMatch(/\.confirmPanel\s*\{[\s\S]*?border-radius:\s*var\(--radius-lg\)/);
     expect(ui).toMatch(/\.table th,\s*\n\.table td\s*\{[\s\S]*?height:\s*var\(--row-height\)/);
-    expect(shell).toMatch(/width:\s*var\(--nav-width\)/);
-    expect(shell).toMatch(/min-height:\s*var\(--topbar-height\)/);
+    expect(shell).toMatch(/\.topbar\s*\{[\s\S]*?min-height:\s*var\(--topbar-height\)/);
+    expect(shell).toMatch(/\.topbar\s*\{[\s\S]*?border-bottom:\s*1px solid var\(--color-border\)/);
+    expect(shell).toMatch(/\.plate\s*\{[\s\S]*?border-radius:\s*0/);
     expect(ui).toMatch(/text-transform:\s*none/);
     expect(globals).toMatch(/"IBM Plex Sans"/);
     expect(globals).not.toMatch(/backdrop-filter/i);
@@ -119,7 +120,7 @@ describe("primitive geometry source lock", () => {
 describe("Ask independent scroll source lock", () => {
   it("bounds the shell and splits Sessions list from conversation overflow", () => {
     expect(shell).toMatch(/\.shell\s*\{[\s\S]*?height:\s*100dvh/);
-    expect(shell).toMatch(/\.main\s*\{[\s\S]*?overflow-y:\s*auto/);
+    expect(shell).toMatch(/\.main\s*\{[\s\S]*?overflow:\s*hidden/);
     expect(chat).toMatch(/\.page\s*\{[\s\S]*?overflow:\s*hidden/);
     expect(chat).toMatch(/\.railList\s*\{[\s\S]*?overflow-y:\s*auto/);
     expect(chat).toMatch(/\.conversation\s*\{[\s\S]*?overflow-y:\s*auto/);
@@ -130,14 +131,10 @@ describe("Ask independent scroll source lock", () => {
     expect(chat).toMatch(/\.composerSend\s*\{[\s\S]*?width:\s*36px/);
     expect(chat).toMatch(/\.composerSend\[aria-busy="true"\]/);
     expect(chat).toMatch(/\.railBody\[hidden\]\s*\{[\s\S]*?display:\s*none/);
-    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?280px/);
+    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?200px/);
     expect(ui).toMatch(/\.fieldFull\s*\{[\s\S]*?max-width:\s*none/);
-    expect(shell).toMatch(/\.navIsCollapsed\s*\{[\s\S]*?width:\s*var\(--nav-width-collapsed\)/);
-    expect(readCss("../components/ui/app-nav.module.css")).not.toMatch(
-      /@media \(min-width: 1280px\)/,
-    );
-    expect(shell).toMatch(
-      /@media \(min-width: 1280px\)\s*\{\s*\.main\s*\{\s*padding:\s*calc\(var\(--space\) \* 6\)/,
+    expect(readCss("../components/ui/app-nav.module.css")).toMatch(
+      /@media \(max-width: 1023px\)\s*\{\s*\.nav\s*\{\s*display:\s*none/,
     );
   });
 });

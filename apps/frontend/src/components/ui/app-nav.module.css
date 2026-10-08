@@ -1,5 +1,5 @@
 /**
- * Field top navigation: word links on the ink field.
+ * Top navigation: word links on the light bar.
  */
 
 .nav {
@@ -7,7 +7,7 @@
   flex: 1 1 auto;
   align-items: center;
   min-width: 0;
-  color: var(--color-field-fg, #f4f1ea);
+  color: var(--color-text);
   background: transparent;
   border: 0;
   padding: 0;
@@ -52,7 +52,7 @@
 
 .navRow a,
 .profileLink {
-  color: var(--color-field-fg, #f4f1ea);
+  color: var(--color-text);
   text-decoration: none;
   min-height: 40px;
   height: auto;
@@ -65,7 +65,7 @@
   border-radius: 0;
   font-size: 18px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   background: transparent;
   box-shadow: none;
   transition: opacity var(--motion-fast);
@@ -74,16 +74,17 @@
 .navRow a:hover,
 .profileLink:hover {
   background: transparent;
-  color: var(--color-field-fg, #f4f1ea);
+  color: var(--color-text);
   opacity: 0.85;
 }
 
 .navRow a[aria-current="page"] {
   font-weight: 600;
-  color: var(--color-field-fg, #f4f1ea);
+  color: var(--color-accent);
   background: transparent;
   box-shadow: none;
   text-decoration: underline;
+  text-decoration-color: var(--color-accent);
   text-underline-offset: 10px;
   text-decoration-thickness: 2px;
 }

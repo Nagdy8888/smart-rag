@@ -17,7 +17,7 @@ import {
 } from "./design-tokens";
 
 describe("WCAG AA token contrast", () => {
-  it("meets 4.5:1 for Field plate and field pairs", () => {
+  it("meets 4.5:1 for canvas, surface, accent, and evidence pairs", () => {
     const pairs: Array<[string, string, string]> = [
       ["field text on field", COLOR_FIELD_FG, COLOR_FIELD],
       ["text on plate", COLOR_TEXT, COLOR_SURFACE],
@@ -36,8 +36,8 @@ describe("WCAG AA token contrast", () => {
     expect(relativeLuminance(COLOR_SURFACE)).toBeGreaterThan(
       relativeLuminance(COLOR_TEXT),
     );
-    expect(relativeLuminance(COLOR_FIELD_FG)).toBeGreaterThan(
-      relativeLuminance(COLOR_FIELD),
+    expect(relativeLuminance(COLOR_FIELD)).toBeGreaterThan(
+      relativeLuminance(COLOR_FIELD_FG),
     );
   });
 

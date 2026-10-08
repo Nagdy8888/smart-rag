@@ -1,5 +1,5 @@
 /**
- * Field shell: ink top bar, bone plate main.
+ * Light console shell: top bar and full-bleed work area.
  */
 
 .shell {
@@ -10,8 +10,8 @@
   min-height: 100vh;
   min-height: 100dvh;
   overflow: hidden;
-  background: var(--color-field, var(--color-bg));
-  color: var(--color-field-fg, #f4f1ea);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: var(--font-sans);
   line-height: var(--line-height-en);
 }
@@ -46,17 +46,18 @@
   flex-shrink: 0;
   align-items: center;
   gap: calc(var(--space) * 4);
-  min-height: 72px;
+  min-height: var(--topbar-height);
   padding: 0 calc(var(--space) * 5);
-  background: var(--color-field, var(--color-bg));
-  color: var(--color-field-fg, #f4f1ea);
-  border-bottom: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .brandName {
@@ -65,8 +66,11 @@
   font-weight: 600;
   font-size: 22px;
   line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--color-field-fg, #f4f1ea);
+  letter-spacing: 0;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbarTools {
@@ -94,10 +98,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-plate, var(--color-surface));
+  background: transparent;
   color: var(--color-text);
-  border-radius: var(--radius-card);
-  padding: calc(var(--space) * 5);
+  border-radius: 0;
+  padding: 0;
 }
 
 .srOnly {
@@ -124,16 +128,15 @@
 
 @media (max-width: 1023px) {
   .topbar {
+    gap: calc(var(--space) * 2);
     padding: 0 calc(var(--space) * 3);
-    min-height: 64px;
+  }
+
+  .brandName {
+    font-size: 16px;
   }
 
   .main {
     padding: 0 calc(var(--space) * 3) calc(var(--space) * 3);
-  }
-
-  .plate {
-    padding: calc(var(--space) * 4);
-    border-radius: var(--radius-md);
   }
 }

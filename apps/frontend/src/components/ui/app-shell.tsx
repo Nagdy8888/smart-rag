@@ -1,5 +1,5 @@
 /**
- * Production console shell: Field top nav, bone-plate main.
+ * Production console shell: light top bar and full-bleed main.
  *
  * Navigation is not an authorization boundary. See `client-authorization.ts`.
  */
@@ -24,7 +24,7 @@ export type AppShellProps = {
 };
 
 /**
- * Render The Field chrome: ink top bar with word links, bone plate main.
+ * Render the console chrome: light top bar with word links and a full-bleed main.
  *
  * @param props - Shell children.
  * @returns Landmark structure with English LTR chrome.

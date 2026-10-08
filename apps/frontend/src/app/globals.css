@@ -48,36 +48,36 @@
   src: url("/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2");
 }
 
-/* Canonical tokens: The Field (ink field, bone plate, electric citation). CSS variables here plus src/lib/design-tokens.ts are the source of truth. No gradients, no blur. */
+/* Canonical tokens: light work canvas, ink actions, green accent, cyan evidence. CSS variables here plus src/lib/design-tokens.ts are the source of truth. No gradients, no blur. */
 :root {
-  --color-bg: #0e1c24;
-  --color-surface: #f4f1ea;
-  --color-surface-muted: #ebe6db;
-  --color-surface-hover: #e3ddd0;
-  --color-surface-selected: #d8f82133;
-  --color-text: #121417;
-  --color-text-secondary: #3a3f44;
-  --color-text-muted: #5c646b;
-  --color-text-disabled: #8a9298;
-  --color-border: #cfc8bb;
-  --color-border-strong: #121417;
-  --color-primary: #121417;
-  --color-primary-hover: #2a2e33;
-  --color-primary-pressed: #3d4349;
-  --color-primary-fg: #f4f1ea;
-  --color-accent: #d8f821;
-  --color-accent-hover: #c6e41a;
-  --color-accent-pressed: #b0cc12;
-  --color-accent-fg: #121417;
-  --color-accent-muted: #d8f82133;
-  --color-accent-soft: #d8f82122;
-  --color-accent-border: #d8f821;
-  --color-evidence: #d8f821;
-  --color-evidence-hover: #c6e41a;
-  --color-evidence-muted: #d8f82133;
-  --color-field: #0e1c24;
-  --color-field-fg: #f4f1ea;
-  --color-plate: #f4f1ea;
+  --color-bg: #F6F7F8;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #EEF0F2;
+  --color-surface-hover: #E4E7EB;
+  --color-surface-selected: #E6F3EE;
+  --color-text: #1A1D21;
+  --color-text-secondary: #3E454C;
+  --color-text-muted: #5C656E;
+  --color-text-disabled: #8B939C;
+  --color-border: #D8DCE1;
+  --color-border-strong: #B4BBC3;
+  --color-primary: #1A1D21;
+  --color-primary-hover: #2C3138;
+  --color-primary-pressed: #3A4048;
+  --color-primary-fg: #FFFFFF;
+  --color-accent: #0F6E56;
+  --color-accent-hover: #0C5C48;
+  --color-accent-pressed: #094A3A;
+  --color-accent-fg: #FFFFFF;
+  --color-accent-muted: #E6F3EE;
+  --color-accent-soft: #F3FAF7;
+  --color-accent-border: #8FCBB6;
+  --color-evidence: #155E75;
+  --color-evidence-hover: #114E62;
+  --color-evidence-muted: #E6F2F5;
+  --color-field: #F6F7F8;
+  --color-field-fg: #1A1D21;
+  --color-plate: #FFFFFF;
   --color-success: #166534;
   --color-success-bg: #F0FDF4;
   --color-success-border: #BBF7D0;
@@ -91,17 +91,17 @@
   --color-info: #1D4ED8;
   --color-info-bg: #EFF6FF;
   --color-info-border: #BFDBFE;
-  --color-focus: #d8f821;
-  --color-overlay: rgb(14 28 36 / 0.55);
-  --radius-control: 12px;
-  --radius-card: 24px;
-  --radius-sm: 12px;
-  --radius-md: 24px;
-  --radius-lg: 28px;
+  --color-focus: #0F6E56;
+  --color-overlay: rgb(26 29 33 / 0.4);
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
   --radius-pill: 999px;
   --space: 4px;
   --shadow-1: none;
-  --shadow-2: 0 16px 40px rgb(8 23 39 / 0.35);
+  --shadow-2: 0 8px 24px rgb(26 29 33 / 0.12);
   --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", "Segoe UI", "Noto Naskh Arabic", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   --line-height-ar: 1.75;
@@ -172,7 +172,8 @@
 
 html {
   height: 100%;
-  color-scheme: dark;
+  color-scheme: light;
+  letter-spacing: 0;
   overflow-x: clip;
   accent-color: var(--color-accent);
   scrollbar-width: thin;
@@ -249,7 +250,7 @@ select:-webkit-autofill {
 }
 
 ::selection {
-  background: #d8f82166;
+  background: #0F6E5633;
   color: var(--color-text);
 }
 
@@ -284,7 +285,7 @@ a {
   font-size: var(--text-hero-size);
   line-height: var(--text-hero-height);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .type-page-title {
@@ -292,7 +293,7 @@ a {
   font-size: var(--text-page-title-size);
   line-height: var(--text-page-title-height);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .type-section {

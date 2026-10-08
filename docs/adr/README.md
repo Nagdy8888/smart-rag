@@ -34,7 +34,8 @@ audience: engineering
 | Verified-answer paced reveal and custom progress | accepted | 6/8 amendment | [ADR-verified-answer-paced-reveal.md](./ADR-verified-answer-paced-reveal.md) |
 | SSE ordered background event writer | accepted | latency L3 | [ADR-sse-ordered-background-writer.md](./ADR-sse-ordered-background-writer.md) |
 | Ink & Indigo visual refresh | superseded | 8 UX | [ADR-ink-indigo-visual-refresh.md](./ADR-ink-indigo-visual-refresh.md) |
-| Quiet work-tool visual refresh | accepted | 8 UX | [ADR-quiet-tool-visual-refresh.md](./ADR-quiet-tool-visual-refresh.md) |
+| Quiet work-tool visual refresh | superseded | 8 UX | [ADR-quiet-tool-visual-refresh.md](./ADR-quiet-tool-visual-refresh.md) |
+| Quiet console restyle | accepted | 8 UX | [ADR-quiet-console-restyle.md](./ADR-quiet-console-restyle.md) |
 | General-chat strict split | accepted | 6/8 amendment | [ADR-general-chat-strict-split.md](./ADR-general-chat-strict-split.md) |
 | Local PDF evaluation workspace | superseded | 6 overlay | [ADR-local-pdf-evaluation-workspace.md](./ADR-local-pdf-evaluation-workspace.md) |
 | Hosted webapp evaluation workspace | accepted | 6 overlay | [ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md) |

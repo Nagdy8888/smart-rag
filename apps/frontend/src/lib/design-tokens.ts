@@ -1,98 +1,97 @@
 /**
  * Canonical design tokens for the production console.
  *
- * Values match The Field (ink field, bone plate, electric citation) and
- * `globals.css` `:root`. CSS variables plus this module are the
- * implementation source of truth.
+ * Values match the light work canvas in `globals.css` `:root`.
+ * CSS variables plus this module are the implementation source of truth.
  *
  * @remarks
  * Do not load Google Fonts or Tailwind from a CDN. Motion honors
  * `prefers-reduced-motion`.
  */
 
-/** Ink field behind every console surface. */
-export const COLOR_BG = "#0e1c24";
+/** Light canvas behind the console. */
+export const COLOR_BG = "#F6F7F8";
 
-/** Bone plate for work content. */
-export const COLOR_SURFACE = "#f4f1ea";
+/** Work surface for content, inputs, and framed tools. */
+export const COLOR_SURFACE = "#FFFFFF";
 
-/** Secondary panels on the plate. */
-export const COLOR_SURFACE_MUTED = "#ebe6db";
+/** Secondary panels and muted bands. */
+export const COLOR_SURFACE_MUTED = "#EEF0F2";
 
 /** Neutral hover fill. */
-export const COLOR_SURFACE_HOVER = "#e3ddd0";
+export const COLOR_SURFACE_HOVER = "#E4E7EB";
 
 /** Selected navigation or list row. */
-export const COLOR_SURFACE_SELECTED = "#d8f82133";
+export const COLOR_SURFACE_SELECTED = "#E6F3EE";
 
-/** Primary body text on the plate. */
-export const COLOR_TEXT = "#121417";
+/** Primary body text. */
+export const COLOR_TEXT = "#1A1D21";
 
 /** Secondary body text. */
-export const COLOR_TEXT_SECONDARY = "#3a3f44";
+export const COLOR_TEXT_SECONDARY = "#3E454C";
 
 /** Metadata and helper text. */
-export const COLOR_TEXT_MUTED = "#5c646b";
+export const COLOR_TEXT_MUTED = "#5C656E";
 
 /** Disabled text only. */
-export const COLOR_TEXT_DISABLED = "#8a9298";
+export const COLOR_TEXT_DISABLED = "#8B939C";
 
 /** Default borders. */
-export const COLOR_BORDER = "#cfc8bb";
+export const COLOR_BORDER = "#D8DCE1";
 
 /** Emphasized separators and input hover. */
-export const COLOR_BORDER_STRONG = "#121417";
+export const COLOR_BORDER_STRONG = "#B4BBC3";
 
 /** Primary action fill. */
-export const COLOR_PRIMARY = "#121417";
+export const COLOR_PRIMARY = "#1A1D21";
 
 /** Primary hover fill. */
-export const COLOR_PRIMARY_HOVER = "#2a2e33";
+export const COLOR_PRIMARY_HOVER = "#2C3138";
 
 /** Primary pressed fill. */
-export const COLOR_PRIMARY_PRESSED = "#3d4349";
+export const COLOR_PRIMARY_PRESSED = "#3A4048";
 
 /** Text on primary fills. */
-export const COLOR_PRIMARY_FG = "#f4f1ea";
+export const COLOR_PRIMARY_FG = "#FFFFFF";
 
-/** Electric mark for live state and citations. */
-export const COLOR_ACCENT = "#d8f821";
+/** Green accent for selection, focus, and active navigation. */
+export const COLOR_ACCENT = "#0F6E56";
 
-/** Primary hover. */
-export const COLOR_ACCENT_HOVER = "#c6e41a";
+/** Accent hover. */
+export const COLOR_ACCENT_HOVER = "#0C5C48";
 
-/** Primary pressed. */
-export const COLOR_ACCENT_PRESSED = "#b0cc12";
+/** Accent pressed. */
+export const COLOR_ACCENT_PRESSED = "#094A3A";
 
 /** Text on accent fills. */
-export const COLOR_ACCENT_FG = "#121417";
+export const COLOR_ACCENT_FG = "#FFFFFF";
 
 /** Selected / muted accent fill. */
-export const COLOR_ACCENT_MUTED = "#d8f82133";
+export const COLOR_ACCENT_MUTED = "#E6F3EE";
 
-/** Alias of muted accent for existing callers. */
-export const COLOR_ACCENT_SOFT = "#d8f82122";
+/** Softer accent fill for existing callers. */
+export const COLOR_ACCENT_SOFT = "#F3FAF7";
 
 /** Selected outline. */
-export const COLOR_ACCENT_BORDER = "#d8f821";
+export const COLOR_ACCENT_BORDER = "#8FCBB6";
 
 /** Citations and provenance only. */
-export const COLOR_EVIDENCE = "#d8f821";
+export const COLOR_EVIDENCE = "#155E75";
 
 /** Evidence hover. */
-export const COLOR_EVIDENCE_HOVER = "#c6e41a";
+export const COLOR_EVIDENCE_HOVER = "#114E62";
 
 /** Evidence muted fill. */
-export const COLOR_EVIDENCE_MUTED = "#d8f82133";
+export const COLOR_EVIDENCE_MUTED = "#E6F2F5";
 
-/** Ink field behind the plate. */
-export const COLOR_FIELD = "#0e1c24";
+/** Canvas alias for chrome that still reads the field token. */
+export const COLOR_FIELD = "#F6F7F8";
 
-/** Text and links on the ink field. */
-export const COLOR_FIELD_FG = "#f4f1ea";
+/** Text on the light chrome. */
+export const COLOR_FIELD_FG = "#1A1D21";
 
-/** Bone plate surface alias. */
-export const COLOR_PLATE = "#f4f1ea";
+/** Surface alias for chrome that still reads the plate token. */
+export const COLOR_PLATE = "#FFFFFF";
 
 /** Success text. */
 export const COLOR_SUCCESS = "#166534";
@@ -134,25 +133,25 @@ export const COLOR_INFO_BG = "#EFF6FF";
 export const COLOR_INFO_BORDER = "#BFDBFE";
 
 /** Keyboard focus ring. */
-export const COLOR_FOCUS = "#d8f821";
+export const COLOR_FOCUS = "#0F6E56";
 
 /** Modal overlay. No blur. */
-export const COLOR_OVERLAY = "rgb(14 28 36 / 0.55)";
+export const COLOR_OVERLAY = "rgb(26 29 33 / 0.4)";
 
 /** Control radius (buttons, inputs). */
-export const RADIUS_CONTROL = "12px";
+export const RADIUS_CONTROL = "6px";
 
 /** Card and panel radius. */
-export const RADIUS_CARD = "24px";
+export const RADIUS_CARD = "8px";
 
 /** Control radius alias used by existing CSS. */
-export const RADIUS_SM = "12px";
+export const RADIUS_SM = "6px";
 
 /** Card radius alias used by existing CSS. */
-export const RADIUS_MD = "24px";
+export const RADIUS_MD = "8px";
 
-/** Overlay radius. */
-export const RADIUS_LG = "28px";
+/** Overlay radius. Cards and overlays stay at 8px. */
+export const RADIUS_LG = "8px";
 
 /** Status pill radius. */
 export const RADIUS_PILL = "999px";
@@ -164,7 +163,7 @@ export const SPACE = "4px";
 export const SHADOW_1 = "none";
 
 /** Dialog and drawer elevation. */
-export const SHADOW_2 = "0 16px 40px rgb(8 23 39 / 0.35)";
+export const SHADOW_2 = "0 8px 24px rgb(26 29 33 / 0.12)";
 
 /** Self-hosted IBM Plex Sans plus Arabic companion. */
 export const FONT_SANS =

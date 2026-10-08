@@ -1,0 +1,38 @@
+laptop_ingest_worker=host
+paradedb_host=127.0.0.1:54329
+clamav_host=127.0.0.1:13310
+storage_admin_present=true
+supabase_db_url_set=true
+docker_cli_present=true
+langsmith_tracing=true
+langsmith_export_io=false
+subprocessor_matrix_verified=true
+mock_model_mode=false
+openai_key_present=true
+worker_concurrency=1
+job_lease_seconds=1800
+lightrag_db_url_set=false
+worker_graph_enabled=false
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=42b985a0-3abf-497f-8528-1c97e263066f stage=bm25","service":"worker","timestamp":"2026-10-06T18:26:25.013235+00:00"}
+{"environment":"local","event":"bm25 job %s failed: %s","exception_message":"[REDACTED]","exception_type":"ConnectionTimeout","level":"ERROR","message":"bm25 job 42b985a0-3abf-497f-8528-1c97e263066f failed: connection timeout expired","service":"worker","timestamp":"2026-10-06T18:28:35.506450+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=42b985a0-3abf-497f-8528-1c97e263066f stage=bm25_failed error_category=transient reason_code=job_failed","service":"worker","timestamp":"2026-10-06T18:28:35.508957+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote","service":"worker","timestamp":"2026-10-06T18:28:41.371362+00:00"}
+{"environment":"local","event":"%s","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan","service":"worker","timestamp":"2026-10-06T18:28:43.276391+00:00"}
+{"environment":"local","event":"HTTP Request: %s %s \"%s %d %s\"","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"HTTP Request: GET https://qsjivtwtmlmtksufqjik.supabase.co/storage/v1/object/documents-quarantine/1fad2199-251a-44cc-b93b-976bc570c4ab/0bc65e35-32d1-4e10-8a8c-fcff49fc1523/private-pdf-72cdfc0f74bb.pdf \"HTTP/1.1 200 OK\"","service":"worker","timestamp":"2026-10-06T18:28:44.150527+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote_failed error_category=validation reason_code=job_failed","service":"worker","timestamp":"2026-10-06T18:28:49.267448+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote","service":"worker","timestamp":"2026-10-06T18:29:21.523190+00:00"}
+{"environment":"local","event":"%s","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan","service":"worker","timestamp":"2026-10-06T18:29:22.969151+00:00"}
+{"environment":"local","event":"HTTP Request: %s %s \"%s %d %s\"","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"HTTP Request: GET https://qsjivtwtmlmtksufqjik.supabase.co/storage/v1/object/documents-quarantine/1fad2199-251a-44cc-b93b-976bc570c4ab/0bc65e35-32d1-4e10-8a8c-fcff49fc1523/private-pdf-72cdfc0f74bb.pdf \"HTTP/1.1 200 OK\"","service":"worker","timestamp":"2026-10-06T18:29:23.188144+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote_failed error_category=validation reason_code=job_failed","service":"worker","timestamp":"2026-10-06T18:29:28.043027+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote","service":"worker","timestamp":"2026-10-06T18:30:30.479417+00:00"}
+{"environment":"local","event":"%s","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan","service":"worker","timestamp":"2026-10-06T18:30:31.935975+00:00"}
+{"environment":"local","event":"HTTP Request: %s %s \"%s %d %s\"","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"HTTP Request: GET https://qsjivtwtmlmtksufqjik.supabase.co/storage/v1/object/documents-quarantine/1fad2199-251a-44cc-b93b-976bc570c4ab/0bc65e35-32d1-4e10-8a8c-fcff49fc1523/private-pdf-72cdfc0f74bb.pdf \"HTTP/1.1 200 OK\"","service":"worker","timestamp":"2026-10-06T18:30:32.177942+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote_failed error_category=validation reason_code=job_failed","service":"worker","timestamp":"2026-10-06T18:30:37.027700+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote","service":"worker","timestamp":"2026-10-06T18:32:25.165443+00:00"}
+{"environment":"local","event":"%s","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan","service":"worker","timestamp":"2026-10-06T18:32:26.591998+00:00"}
+{"environment":"local","event":"HTTP Request: %s %s \"%s %d %s\"","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"HTTP Request: GET https://qsjivtwtmlmtksufqjik.supabase.co/storage/v1/object/documents-quarantine/1fad2199-251a-44cc-b93b-976bc570c4ab/0bc65e35-32d1-4e10-8a8c-fcff49fc1523/private-pdf-72cdfc0f74bb.pdf \"HTTP/1.1 200 OK\"","service":"worker","timestamp":"2026-10-06T18:32:26.910556+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote_failed error_category=validation reason_code=job_failed","service":"worker","timestamp":"2026-10-06T18:32:31.697474+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote","service":"worker","timestamp":"2026-10-06T18:36:53.150422+00:00"}
+{"environment":"local","event":"%s","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan","service":"worker","timestamp":"2026-10-06T18:36:54.726305+00:00"}
+{"environment":"local","event":"HTTP Request: %s %s \"%s %d %s\"","job_id":"e00bceef-c9d2-4f30-977f-7b0c6be1279b","level":"INFO","message":"HTTP Request: GET https://qsjivtwtmlmtksufqjik.supabase.co/storage/v1/object/documents-quarantine/1fad2199-251a-44cc-b93b-976bc570c4ab/0bc65e35-32d1-4e10-8a8c-fcff49fc1523/private-pdf-72cdfc0f74bb.pdf \"HTTP/1.1 200 OK\"","service":"worker","timestamp":"2026-10-06T18:36:54.980000+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=e00bceef-c9d2-4f30-977f-7b0c6be1279b stage=scan_promote_failed error_category=validation reason_code=job_failed","service":"worker","timestamp":"2026-10-06T18:36:59.892040+00:00"}

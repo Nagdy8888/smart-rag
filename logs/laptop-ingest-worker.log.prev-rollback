@@ -1,0 +1,19 @@
+laptop_ingest_worker=host
+paradedb_host=127.0.0.1:55432
+clamav_host=127.0.0.1:13310
+storage_admin_present=true
+supabase_db_url_set=true
+docker_cli_present=true
+langsmith_tracing=true
+langsmith_export_io=false
+subprocessor_matrix_verified=true
+mock_model_mode=false
+openai_key_present=true
+worker_concurrency=1
+job_lease_seconds=1800
+lightrag_db_url_set=false
+worker_graph_enabled=false
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=d0dec60e-fae7-4264-b748-79b99ce9f4b5 stage=bm25","service":"worker","timestamp":"2026-10-06T19:07:58.100247+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=d0dec60e-fae7-4264-b748-79b99ce9f4b5 stage=hybrid_ready","service":"worker","timestamp":"2026-10-06T19:08:02.863527+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=42b985a0-3abf-497f-8528-1c97e263066f stage=bm25","service":"worker","timestamp":"2026-10-06T19:36:30.638616+00:00"}
+{"environment":"local","event":"%s","level":"INFO","message":"[hybrid] job=42b985a0-3abf-497f-8528-1c97e263066f stage=bm25_delete_done","service":"worker","timestamp":"2026-10-06T19:36:31.846092+00:00"}

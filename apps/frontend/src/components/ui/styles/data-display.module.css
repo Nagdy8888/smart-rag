@@ -17,6 +17,8 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .pill::before {

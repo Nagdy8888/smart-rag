@@ -1,8 +1,8 @@
 # Design tokens and primitives
 
-Canonical live values are the quiet work-tool refresh in
-[ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md)
-(accepted 2026-09-25). That ADR supersedes Ink & Indigo and the Precision Workspace
+Canonical live values are the quiet console restyle in
+[ADR-quiet-console-restyle.md](../adr/ADR-quiet-console-restyle.md)
+(accepted 2026-10-08). That ADR supersedes the Field theme, the slate quiet-work-tool values, Ink & Indigo, and the Precision Workspace
 hex table in
 [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md).
 `:root` in `apps/frontend/src/app/globals.css` and
@@ -27,30 +27,33 @@ Primitives live under `apps/frontend/src/components/ui/` (`Button` /
 
 Set or retain these exact CSS variables:
 
-- `--color-bg: #F7F7F5` — application canvas.
-- `--color-surface: #FFFFFF` — content column, top bar, inputs.
-- `--color-surface-muted: #F2F2EF` — nav rail, secondary panels.
-- `--color-surface-hover: #EDEDEA` — neutral hover.
-- `--color-surface-selected: #E9EEF5` — selected list item.
-- `--color-text: #1D1D1B` — primary text.
-- `--color-text-secondary: #4A4A46` — secondary body text.
-- `--color-text-muted: #6B6B66` — metadata and helper text.
-- `--color-text-disabled: #A3A39E` — disabled text only.
-- `--color-border: #E3E3DF` — normal borders.
-- `--color-border-strong: #CBCBC5` — emphasized separators and input hover.
-- `--color-primary: #1D1D1B` — ink primary button.
-- `--color-primary-hover: #2E2E2B`.
-- `--color-primary-pressed: #3A3A36`.
+- `--color-bg: #F6F7F8` — application canvas and top bar.
+- `--color-surface: #FFFFFF` — inputs and framed tools.
+- `--color-surface-muted: #EEF0F2` — secondary panels.
+- `--color-surface-hover: #E4E7EB` — neutral hover.
+- `--color-surface-selected: #E6F3EE` — selected list item.
+- `--color-text: #1A1D21` — primary text.
+- `--color-text-secondary: #3E454C` — secondary body text.
+- `--color-text-muted: #5C656E` — metadata and helper text.
+- `--color-text-disabled: #8B939C` — disabled text only.
+- `--color-border: #D8DCE1` — normal borders.
+- `--color-border-strong: #B4BBC3` — emphasized separators and input hover.
+- `--color-primary: #1A1D21` — ink primary button.
+- `--color-primary-hover: #2C3138`.
+- `--color-primary-pressed: #3A4048`.
 - `--color-primary-fg: #FFFFFF` — text on the ink button.
-- `--color-accent: #3B5B8C` — slate-blue accent, not the primary button.
-- `--color-accent-hover: #324E7A`.
-- `--color-accent-pressed: #2A4167`.
+- `--color-accent: #0F6E56` — green accent for selection, focus, and active nav. Not the primary button.
+- `--color-accent-hover: #0C5C48`.
+- `--color-accent-pressed: #094A3A`.
 - `--color-accent-fg: #FFFFFF`.
-- `--color-accent-muted: #E9EEF5`.
-- `--color-accent-border: #C3CEDF`.
-- `--color-evidence: #0A6F6E` — citations only.
-- `--color-evidence-hover: #085958`.
-- `--color-evidence-muted: #E8F4F3`.
+- `--color-accent-muted: #E6F3EE`.
+- `--color-accent-soft: #F3FAF7`.
+- `--color-accent-border: #8FCBB6`.
+- `--color-evidence: #155E75` — citations only.
+- `--color-evidence-hover: #114E62`.
+- `--color-evidence-muted: #E6F2F5`.
+- `--color-field: #F6F7F8` and `--color-field-fg: #1A1D21` — aliases of the canvas and ink text.
+- `--color-plate: #FFFFFF` — alias of the surface.
 - `--color-success: #166534`.
 - `--color-success-bg: #F0FDF4`.
 - `--color-success-border: #BBF7D0`.
@@ -64,8 +67,8 @@ Set or retain these exact CSS variables:
 - `--color-info: #1D4ED8`.
 - `--color-info-bg: #EFF6FF`.
 - `--color-info-border: #BFDBFE`.
-- `--color-focus: #3B5B8C`.
-- `--color-overlay: rgb(29 29 27 / 0.4)` — modal/sheet overlay, with no blur.
+- `--color-focus: #0F6E56`.
+- `--color-overlay: rgb(26 29 33 / 0.4)` — modal/sheet overlay, with no blur.
 
 Rules:
 
@@ -73,7 +76,7 @@ Rules:
 - No glass, transparency-based cards, or `backdrop-filter`.
 - No pure black text.
 - White text is used only on accent/danger fills that pass WCAG AA.
-- Evidence teal is reserved for citations/provenance, not ordinary buttons.
+- Evidence cyan is reserved for citations/provenance, not ordinary buttons.
 - Success, warning, and danger are never the only status signal; include text and an icon.
 
 ### Exact typography
@@ -85,10 +88,10 @@ Font families:
 - Monospace: `ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace`.
 - Do not download fonts at runtime.
 
-Type scale (size/line-height, weight, letter-spacing):
+Type scale (size/line-height, weight). Letter-spacing is 0.
 
-- Hero: 28/36, 600, `-0.01em`.
-- Page title: 20/28, 600, `-0.01em` (IBM Plex Sans).
+- Hero: 28/36, 600.
+- Page title: 20/28, 600 (IBM Plex Sans).
 - Auth title: 24/32, 600 (IBM Plex Sans).
 - Section: 18/26, 600.
 - Card title: 15/22, 600.
@@ -101,7 +104,7 @@ Type scale (size/line-height, weight, letter-spacing):
 Rules:
 
 - Do not use uppercase for sentences, buttons, or navigation.
-- Eyebrows may use uppercase only for short categories, with `0.04em` letter spacing.
+- Eyebrows may use uppercase only for short categories. Letter-spacing stays 0.
 - Limit ordinary paragraph width to 72 characters where possible.
 - Use sentence case everywhere: “Import source,” not “IMPORT SOURCE” or “Import Source.”
 - Truncate only metadata in constrained rows. Never truncate an answer, error, filename in a detail view, or citation locator without an accessible full-value affordance.
@@ -138,9 +141,7 @@ Geometry:
 
 Radius:
 
-- Citation markers: 4px. Controls: 6px (`--radius-control`). Panels and cards: 8px (`--radius-md`). Overlays: 10px (`--radius-lg`). Pills: 999px.
-- Dialogs and drawers: 14px.
-- Composer card: 16px.
+- Citation markers: 4px. Controls: 6px (`--radius-control`). Panels, cards, dialogs, drawers, and the composer: 8px or less (`--radius-md` and `--radius-lg` are 8px). Pills: 999px.
 - Avatar: 50% circle.
 - Status pills and small filter chips: 999px.
 - Do not make ordinary buttons pill-shaped.

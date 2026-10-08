@@ -2,7 +2,7 @@
 title: Production console design system
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-25
+last-reviewed: 2026-10-08
 audience: frontend, reviewers
 packet: P08-01
 ---
@@ -10,9 +10,9 @@ packet: P08-01
 # Design system (Phase 8 packet 1)
 
 Build-time tokens and typed primitives for the production console shell.
-Canonical hex, type, radius, and motion values are the quiet work-tool refresh
-in [ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md)
-(accepted 2026-09-25). Motion is documented in [motion.md](./motion.md). That ADR supersedes Ink & Indigo and the Precision Workspace
+Canonical hex, type, radius, and motion values are the quiet console restyle
+in [ADR-quiet-console-restyle.md](../adr/ADR-quiet-console-restyle.md)
+(accepted 2026-10-08). Motion is documented in [motion.md](./motion.md). That ADR supersedes the Field theme, the slate quiet-work-tool values, Ink & Indigo, and the Precision Workspace
 table in [STITCH_BRIEF.md](./STITCH_BRIEF.md). Stitch `screen.png` files
 are historical references, not the live composition target. The Stitch
 export remains a **template, not a layout**: there is no `frame_00` route
@@ -20,7 +20,8 @@ and no design-system gallery page. See
 [VISUAL_MAP.md](./VISUAL_MAP.md) and
 [ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md).
 
-Related: [ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md) ·
+Related: [ADR-quiet-console-restyle.md](../adr/ADR-quiet-console-restyle.md) ·
+[ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh.md) ·
 [motion.md](./motion.md) ·
 [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
@@ -35,7 +36,7 @@ Related: [ADR-quiet-tool-visual-refresh.md](../adr/ADR-quiet-tool-visual-refresh
 
 | Layer | Role |
 | --- | --- |
-| `ADR-quiet-tool-visual-refresh.md` | Accepted visual system. Ink & Indigo is superseded |
+| `ADR-quiet-console-restyle.md` | Accepted visual system. Field and the slate quiet-work-tool values are superseded |
 | `apps/frontend/src/app/globals.css` `:root` | CSS implementation |
 | `apps/frontend/src/lib/design-tokens.ts` | TypeScript copy for tests |
 | Tailwind `@theme` | Maps variables to utilities (`bg-page`, `text-brand`) without a second hex table. Do not add a second ink or brand hex here. |
@@ -48,25 +49,24 @@ reintroduce them.
 
 | Token | Value |
 | --- | --- |
-| `--color-bg` | `#F7F7F5` |
+| `--color-bg` | `#F6F7F8` |
 | `--color-surface` | `#FFFFFF` |
-| `--color-surface-muted` | `#F2F2EF` |
-| `--color-text` | `#1D1D1B` |
-| `--color-text-muted` | `#6B6B66` |
-| `--color-border` | `#E3E3DF` |
-| `--color-primary` | `#1D1D1B` (ink primary button) |
-| `--color-accent` | `#3B5B8C` (slate blue) |
-| `--color-evidence` | `#0A6F6E` (citations only) |
+| `--color-surface-muted` | `#EEF0F2` |
+| `--color-text` | `#1A1D21` |
+| `--color-text-muted` | `#5C656E` |
+| `--color-border` | `#D8DCE1` |
+| `--color-primary` | `#1A1D21` (ink primary button) |
+| `--color-accent` | `#0F6E56` (selection, focus, active nav) |
+| `--color-evidence` | `#155E75` (citations only) |
 | `--color-danger` | `#B91C1C` |
 | `--color-warning` | `#A16207` |
 | `--color-success` | `#166534` |
-| `--color-focus` | `#3B5B8C` (2px solid ring, offset 1px) |
+| `--color-focus` | `#0F6E56` (2px solid ring, offset 2px) |
 | `--radius-control` / `--radius-sm` | `6px` |
-| `--radius-card` / `--radius-md` | `8px` |
-| `--radius-lg` | `10px` |
+| `--radius-card` / `--radius-md` / `--radius-lg` | `8px` |
 | `--space` | `4px` grid |
 | `--shadow-1` | `none` |
-| `--shadow-2` | `0 8px 24px rgb(29 29 27 / 0.12)` |
+| `--shadow-2` | `0 8px 24px rgb(26 29 33 / 0.12)` |
 | `--font-sans` | `"IBM Plex Sans", "IBM Plex Sans Arabic", "Segoe UI", "Noto Naskh Arabic", sans-serif` |
 | `--font-mono` | `ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace` |
 | `--line-height-ar` | `1.75` |
@@ -76,17 +76,15 @@ reintroduce them.
 | `--motion-fast` | `150ms cubic-bezier(0.22, 1, 0.36, 1)` |
 | `--motion-drawer` | `200ms ease-out` |
 
-Light scheme only. `html` sets `color-scheme: only light` so Windows and
-Microsoft Edge do not restyle native controls, scrollbars, or autofill
-when the OS is in dark mode. Do not set `-webkit-font-smoothing:
+Light scheme. `html` sets `color-scheme: light`. Buttons and fields set `color-scheme: only light` so Windows and
+Microsoft Edge do not restyle native controls when the OS is in dark mode. Do not set `-webkit-font-smoothing:
 antialiased` on `body`: DirectWrite already hints IBM Plex, and antialiased
 thins glyphs. Buttons and text fields use `appearance: none` and inherit
-IBM Plex Sans. The shell and the centered auth form use `100vh` then `100dvh`. Scrollbars stay
+IBM Plex Sans. Letter-spacing is 0. The shell and the centered auth form use `100vh` then `100dvh`. Scrollbars stay
 thin and light. Motion honors `prefers-reduced-motion`. Fonts are
 self-hosted IBM Plex Sans and IBM Plex Sans Arabic under
 `apps/frontend/public/fonts`. No Google Fonts CDN and no `next/font/google`.
-There are no gradients. Primary buttons use the ink fill. The nav rail is
-tinted `--color-surface-muted`. Empty states are left-aligned and borderless.
+There are no gradients. Primary buttons use the ink fill. The top bar uses the canvas with a 1px bottom border, and the main area is full-bleed rather than a floating plate. Empty states are left-aligned and borderless.
 
 ## Shell metrics
 

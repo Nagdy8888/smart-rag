@@ -1,7 +1,8 @@
 ---
 title: "ADR: Quiet work-tool visual refresh supersedes Ink & Indigo theme values"
 adr_id: ADR-quiet-tool-visual-refresh
-status: accepted
+status: superseded
+superseded_by: ADR-quiet-console-restyle
 owner: engineering-lead
 last-reviewed: 2026-09-25
 approver: "user (Cursor chat; no legal name provided)"
@@ -14,7 +15,7 @@ supersedes: ADR-ink-indigo-visual-refresh
 
 ## Status
 
-`accepted` on 2026-09-25. The user approved the quiet work-tool direction in Cursor chat on 2026-09-25.
+`superseded` by [ADR-quiet-console-restyle](./ADR-quiet-console-restyle.md) on 2026-10-08. The user approved the quiet work-tool direction in Cursor chat on 2026-09-25. Color, radius, and chrome from that decision are replaced by the light canvas, green accent, and full-bleed top bar.
 
 ## Context
 
