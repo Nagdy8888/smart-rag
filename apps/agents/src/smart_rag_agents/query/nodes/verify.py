@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, cast
 
 import psycopg
@@ -60,6 +61,7 @@ from smart_rag_agents.query.nodes.state_codec import (
     fusion_from_state,
     tables_from_state,
 )
+from smart_rag_agents.query.run_timings import with_verifier_timing
 from smart_rag_agents.query.state import QueryGraphState
 
 
@@ -195,7 +197,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     added_completion_tokens = 0
     verifier_skipped_reason: str | None = None
     pre_verifier = checked
-    if checked.atomic_links and not is_web:
+    verifier_started = time.perf_counter()
+    verifier_timed = bool(checked.atomic_links) and not is_web
+    if verifier_timed:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
 
@@ -242,6 +246,15 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         except (AnswerError, QueryCeilingError) as exc:
             reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
             verifier_skipped_reason = str(reason)[:64]
+    verifier_timing = (
+        with_verifier_timing(
+            state,
+            duration_ms=max(0, int((time.perf_counter() - verifier_started) * 1000)),
+            skipped_reason=verifier_skipped_reason,
+        )
+        if verifier_timed
+        else {}
+    )
     if company_release_applies(checked, is_web=is_web):
         user_query = state["user_query"] or ""
         try:
@@ -493,5 +506,6 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "prompt_tokens": billed_prompt,
             "completion_tokens": billed_completion,
             "cost_usd": billed_cost_usd,
+            **verifier_timing,
         },
     )

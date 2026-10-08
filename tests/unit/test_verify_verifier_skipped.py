@@ -149,7 +149,47 @@ def test_verifier_deadline_releases_checked_answer(
     assert isinstance(verification, dict)
     assert verification["verifier_skipped_reason"] == "deadline_exhausted"
     assert verification["status"] == "verified_partial"
+    timings = verified["run_timings"]
+    assert isinstance(timings, dict)
+    assert timings["verifier_outcome"] == "skipped"
+    assert timings["verifier_reason"] == "deadline_exhausted"
+    assert isinstance(timings["verifier_ms"], int)
     persist.assert_called_once()
+
+
+def test_verifier_success_records_ok_timing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A completed verifier batch records an ok timing."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.verify import verify_answer_node
+
+    state = _verified_state()
+
+    def _batch(checked: object, **_kwargs: object) -> tuple[object, int, tuple[str, ...]]:
+        """Return the checked answer as if the verifier agreed."""
+
+        return checked, 1, ()
+
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.run_verifier_batch",
+        _batch,
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.maybe_persist_verified_citations",
+        MagicMock(return_value=CitationPersistResult()),
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.summarize_run_usage",
+        MagicMock(side_effect=QueryAdmissionError("database_rejected")),
+    )
+    verified = verify_answer_node(
+        state,
+        QueryGraphDeps(connection=None, model_gateway=None, verifier_prompt_text=""),
+    )
+    timings = verified["run_timings"]
+    assert isinstance(timings, dict)
+    assert timings["verifier_outcome"] == "ok"
+    assert "verifier_reason" not in timings
 
 
 def test_verifier_gateway_failure_uses_the_same_prefix(

@@ -16,7 +16,10 @@ from uuid import UUID
 
 import psycopg
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
-from smart_rag_core.retrieval.profiles import RERANK_INVALID_SUBCODES
+from smart_rag_core.retrieval.profiles import (
+    HYBRID_CHANNEL_NAMES,
+    RERANK_INVALID_SUBCODES,
+)
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -114,7 +117,15 @@ def export_ask_stages(
                 conversation_id=conversation_id,
             )
             usage = _usage_kinds(connection, run_id)
-            record = stage_record(diagnostics, usage)
+            record = stage_record(
+                diagnostics,
+                usage,
+                run_timings=_run_timings(
+                    connection,
+                    serde=serde,
+                    conversation_id=conversation_id,
+                ),
+            )
             unknown = [name for name in REQUIRED_FIELDS if record[name] == "unknown"]
             record["unknown_fields"] = unknown
             unknown_total += len(unknown)
@@ -217,19 +228,25 @@ def _usage_kinds(connection: psycopg.Connection, run_id: str) -> set[str]:
 def stage_record(
     diagnostics: Mapping[str, object] | None,
     usage: set[str],
+    *,
+    run_timings: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Build one run's measured-or-unknown stage fields.
 
     Args:
         diagnostics: Checkpoint Hybrid diagnostics.
         usage: ``embedding`` / ``rerank`` kinds present for the run.
+        run_timings: Checkpoint ``run_timings`` channel, or ``None``.
 
     Returns:
         Stage mapping. Missing values are ``unknown``.
     """
 
     if diagnostics is None:
-        return {name: "unknown" for name in REQUIRED_FIELDS}
+        missing = {name: "unknown" for name in REQUIRED_FIELDS}
+        missing["channel_timed_out"] = "unknown"
+        missing["run_timings"] = "unknown"
+        return missing
     raw_fallback = str(diagnostics.get("fallback_reason") or "").strip()
     fallback = raw_fallback or "unknown"
     rerank_fallback = str(diagnostics.get("rerank_fallback") or "").strip() or "unknown"
@@ -282,7 +299,112 @@ def stage_record(
         "rerank_appended_count": _int_or_unknown(
             diagnostics.get("rerank_appended_count")
         ),
+        "channel_timed_out": _channel_timed_out(diagnostics.get("channel_timed_out")),
+        "run_timings": _safe_run_timings(run_timings),
     }
+
+
+_RUN_TIMING_INT_KEYS = ("remaining_ms_at_start", "attach_delay_ms", "verifier_ms")
+_ATTEMPT_FIELDS = ("duration_ms", "outcome", "reason")
+
+
+def _channel_timed_out(value: object) -> list[str]:
+    """Return allow-listed timed-out channel names.
+
+    Args:
+        value: Diagnostic ``channel_timed_out`` value.
+
+    Returns:
+        Sorted known channel names. Non-lists become an empty list.
+    """
+
+    if not isinstance(value, list | tuple):
+        return []
+    items = cast(list[object] | tuple[object, ...], value)
+    names = {
+        item for item in items if isinstance(item, str) and item in HYBRID_CHANNEL_NAMES
+    }
+    return sorted(names)
+
+
+def _safe_run_timings(value: Mapping[str, object] | None) -> dict[str, object] | str:
+    """Copy ID-free timing fields, or ``unknown`` when the channel is missing.
+
+    Args:
+        value: Checkpoint ``run_timings`` mapping.
+
+    Returns:
+        Integers, outcome codes, and short reason strings only.
+    """
+
+    if value is None:
+        return "unknown"
+    kept: dict[str, object] = {}
+    for key in _RUN_TIMING_INT_KEYS:
+        raw = value.get(key)
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            continue
+        kept[key] = max(0, raw)
+    outcome = value.get("verifier_outcome")
+    if outcome in {"ok", "skipped"}:
+        kept["verifier_outcome"] = outcome
+    reason = value.get("verifier_reason")
+    if isinstance(reason, str) and reason:
+        kept["verifier_reason"] = reason[:64]
+    attempts = value.get("answer_attempts")
+    if isinstance(attempts, list):
+        kept["answer_attempts"] = [
+            {
+                field: (
+                    max(0, item[field])
+                    if field == "duration_ms" and isinstance(item.get(field), int)
+                    else str(item.get(field) or "")[:64]
+                )
+                for field in _ATTEMPT_FIELDS
+            }
+            for item in cast(list[object], attempts)
+            if isinstance(item, Mapping)
+        ][:4]
+    return kept
+
+
+def _run_timings(
+    connection: psycopg.Connection,
+    *,
+    serde: JsonPlusSerializer,
+    conversation_id: str,
+) -> Mapping[str, object] | None:
+    """Load the latest ``run_timings`` checkpoint channel.
+
+    Args:
+        connection: Operator session.
+        serde: LangGraph JSON/msgpack serializer.
+        conversation_id: Checkpoint ``thread_id``.
+
+    Returns:
+        Timing mapping, or ``None`` when the channel is missing.
+    """
+
+    if not conversation_id:
+        return None
+    row = connection.execute(
+        """
+        SELECT DISTINCT ON (b.thread_id)
+          b.type,
+          b.blob
+        FROM langgraph.checkpoint_blobs AS b
+        WHERE b.channel = 'run_timings'
+          AND b.thread_id = %s
+        ORDER BY b.thread_id, b.version DESC
+        """,
+        (conversation_id,),
+    ).fetchone()
+    if row is None or row[1] is None:
+        return None
+    payload = serde.loads_typed((str(row[0]), bytes(row[1])))
+    if isinstance(payload, Mapping):
+        return cast(Mapping[str, object], payload)
+    return None
 
 
 def bm25_explicit_flag(raw_fallback: str) -> bool | str:

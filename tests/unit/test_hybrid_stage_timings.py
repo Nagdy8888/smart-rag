@@ -503,6 +503,38 @@ def test_stage_record_exports_new_fields_and_fixed_bm25_flag() -> None:
     assert bm25_record_keeps_aggregate(unknown) is False
 
 
+def test_timed_out_channel_is_exported_and_unknown_names_drop() -> None:
+    """BM25 timeout is kept; a name outside the channel list is dropped."""
+
+    outcome = SimpleNamespace(
+        source_resolution="unscoped",
+        retrieval_profile_id=HYBRID_DEFAULT_PROFILE_ID,
+        channel_timed_out=("bm25", "not-a-channel"),
+    )
+    row = hybrid_diagnostics_from_outcome(
+        outcome,
+        effective_route=Phase6RouteFamily.HYBRID.value,
+        fallback_reason="none",
+    )
+    assert row is not None
+    assert row.channel_timed_out == ("bm25",)
+    record = stage_record(
+        {**row.model_dump(mode="json"), "channel_timed_out": ["bm25", "nope"]},
+        {"embedding"},
+        run_timings={
+            "remaining_ms_at_start": 12000,
+            "attach_delay_ms": 3000,
+            "answer_attempts": [{"duration_ms": 40, "outcome": "ok", "reason": ""}],
+            "query_text": "must not export",
+        },
+    )
+    assert record["channel_timed_out"] == ["bm25"]
+    timings = record["run_timings"]
+    assert isinstance(timings, dict)
+    assert timings["attach_delay_ms"] == 3000
+    assert "query_text" not in timings
+
+
 def test_run_channels_parallel_measures_only_finished_channels() -> None:
     """Finished channels get a duration; timed-out channels get none."""
 

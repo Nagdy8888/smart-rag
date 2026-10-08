@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast
@@ -52,6 +53,10 @@ from smart_rag_agents.query.nodes.state_codec import (
     tables_from_state,
 )
 from smart_rag_agents.query.nodes.tokens import accumulated_tokens
+from smart_rag_agents.query.run_timings import (
+    classify_attempt_outcome,
+    with_answer_attempt,
+)
 from smart_rag_agents.query.state import QueryGraphState
 
 
@@ -273,6 +278,7 @@ def generate_answer_node(
 
             return result[1], result[2], None
 
+        started = time.perf_counter()
         try:
             if deps.connection is not None and context is not None:
                 counted, consumed, _usage_id = execute_counted_model_call(
@@ -295,6 +301,12 @@ def generate_answer_node(
                 answer, added_prompt_tokens, added_completion_tokens = _send()
         except (AnswerError, QueryBudgetError, QueryCeilingError) as exc:
             reason = exc.reason
+            attempt = with_answer_attempt(
+                state,
+                duration_ms=_elapsed_ms(started),
+                outcome=classify_attempt_outcome(reason),
+                reason=reason,
+            )
             if needs_rag_model:
                 payload = company_input_bound_payload()
                 status = "insufficient_evidence"
@@ -318,6 +330,7 @@ def generate_answer_node(
                         "detail": reason,
                         "answer": payload.model_dump(mode="json"),
                         **fit_update,
+                        **attempt,
                     },
                 )
             return {
@@ -328,7 +341,19 @@ def generate_answer_node(
                     answer_text="Verified partial: answer generation stopped.",
                     status="partial",
                 ).model_dump(mode="json"),
+                **attempt,
             }
+        state = cast(
+            QueryGraphState,
+            {
+                **state,
+                **with_answer_attempt(
+                    state,
+                    duration_ms=_elapsed_ms(started),
+                    outcome="ok",
+                ),
+            },
+        )
         answer = apply_degraded_scope_framing(
             answer, scope_degradation_reason=degradation
         )
@@ -415,3 +440,16 @@ def generate_answer_node(
             **fit_update,
         },
     )
+
+
+def _elapsed_ms(started: float) -> int:
+    """Return whole milliseconds since ``started``.
+
+    Args:
+        started: ``time.perf_counter`` value from the attempt start.
+
+    Returns:
+        Non-negative elapsed milliseconds.
+    """
+
+    return max(0, int((time.perf_counter() - started) * 1000))

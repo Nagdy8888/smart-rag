@@ -37,6 +37,10 @@ MAX_RECORDED_ATTEMPTS = 4
 MAX_REASON_CHARS = 64
 """Reason codes are truncated to this length."""
 
+_ATTEMPT_OUTCOMES = frozenset(
+    {"ok", "timeout_after_send", "deadline_exhausted", "error"}
+)
+
 
 def start_run_timings(
     context: AuthorizedRuntimeContext,
@@ -81,8 +85,14 @@ def with_answer_attempt(
     Returns:
         ``{"run_timings": merged}``. Attempts past
         ``MAX_RECORDED_ATTEMPTS`` are dropped.
+
+    Raises:
+        ValueError: ``attempt_outcome_invalid`` when ``outcome`` is not an
+            allow-listed code.
     """
 
+    if outcome not in _ATTEMPT_OUTCOMES:
+        raise ValueError("attempt_outcome_invalid")
     merged = _current(state)
     attempts = list(cast(list[object], merged.get("answer_attempts") or []))
     if len(attempts) < MAX_RECORDED_ATTEMPTS:
@@ -122,6 +132,24 @@ def with_verifier_timing(
     if skipped_reason is not None:
         merged["verifier_reason"] = skipped_reason[:MAX_REASON_CHARS]
     return {"run_timings": merged}
+
+
+def classify_attempt_outcome(reason: str) -> AttemptOutcome:
+    """Map a model-call failure reason onto an attempt outcome.
+
+    Args:
+        reason: Exception reason code. Empty maps to ``error``.
+
+    Returns:
+        ``timeout_after_send`` or ``deadline_exhausted`` for those reasons,
+        otherwise ``error``.
+    """
+
+    if reason == "timeout_after_send":
+        return "timeout_after_send"
+    if reason in {"deadline_exhausted", "answer_deadline_reserve_exhausted"}:
+        return "deadline_exhausted"
+    return "error"
 
 
 def _current(state: Mapping[str, object]) -> dict[str, object]:

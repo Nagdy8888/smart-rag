@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Protocol, cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from smart_rag_agents.query.run_timings import start_run_timings
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.settings import SharedSettings
 
@@ -283,6 +284,7 @@ async def open_langgraph_astream(
         authorized_runtime=context.model_dump(mode="json"),
         user_query=message,
     )
+    state["run_timings"] = start_run_timings(context)
     config: dict[str, object] = {
         "recursion_limit": context.recursion_limit,
         "configurable": {"thread_id": str(context.conversation_id)},
