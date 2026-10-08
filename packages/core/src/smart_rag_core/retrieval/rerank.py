@@ -1018,6 +1018,7 @@ def channel_head_pins(
     fused_ids: Sequence[UUID],
     head: int = CHANNEL_HEAD_PIN,
     dense_head: int | None = None,
+    bm25_head: int | None = None,
 ) -> tuple[UUID, ...]:
     """Return the channel-head IDs that must enter the rerank pool.
 
@@ -1035,6 +1036,8 @@ def channel_head_pins(
             is ``None``.
         dense_head: Dense pin count from the frozen profile
             (``dense_head_pin``). ``None`` uses ``head``.
+        bm25_head: BM25 pin count from the frozen profile
+            (``bm25_head_pin``). ``None`` uses ``head``.
 
     Returns:
         Distinct pins, dense first then BM25, each within ``fused_ids``.
@@ -1042,8 +1045,9 @@ def channel_head_pins(
 
     authorized = set(fused_ids)
     dense_limit = head if dense_head is None else dense_head
+    bm25_limit = head if bm25_head is None else bm25_head
     pins: list[UUID] = []
-    for channel, limit in ((dense_ids, dense_limit), (bm25_ids, head)):
+    for channel, limit in ((dense_ids, dense_limit), (bm25_ids, bm25_limit)):
         for chunk_id in tuple(channel)[: max(0, limit)]:
             if chunk_id in authorized and chunk_id not in pins:
                 pins.append(chunk_id)

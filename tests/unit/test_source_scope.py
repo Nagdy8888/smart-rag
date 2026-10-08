@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from smart_rag_core.retrieval.frozen_profile import LONG_DOCUMENT_V3_PROFILE_ID
+from smart_rag_core.retrieval.frozen_profile import LONG_DOCUMENT_V4_PROFILE_ID
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.source_scope import (
     SourceResolution,
@@ -250,5 +250,5 @@ def test_unscoped_small_corpus_selects_long_document(
     assert scope.selector_texts == ()
     assert scope.authorized_document_count == 4
     assert scope.representative_count == 1015
-    assert scope.candidate_profile_id == LONG_DOCUMENT_V3_PROFILE_ID
+    assert scope.candidate_profile_id == LONG_DOCUMENT_V4_PROFILE_ID
     assert scope.eligibility_reason == "small_corpus_long_document"

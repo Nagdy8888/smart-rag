@@ -35,7 +35,7 @@ from smart_rag_core.evaluation.private_pdf import (
 )
 from smart_rag_core.retrieval.frozen_profile import (
     LONG_DOCUMENT_PROFILE_ID,
-    LONG_DOCUMENT_V3_PROFILE_ID,
+    LONG_DOCUMENT_V4_PROFILE_ID,
     PRIOR_LONG_DOCUMENT_PROFILE_ID,
     UnknownRetrievalProfileError,
     load_frozen_profile,
@@ -670,7 +670,7 @@ def test_select_runtime_profile_uses_pinned_long_document() -> None:
         representative_count=40,
         query_class="factual_definition",
     )
-    assert profile_id == LONG_DOCUMENT_V3_PROFILE_ID
+    assert profile_id == LONG_DOCUMENT_V4_PROFILE_ID
     assert reason == "long_document_eligible"
 
 

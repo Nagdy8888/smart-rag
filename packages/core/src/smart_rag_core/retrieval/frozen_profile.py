@@ -24,6 +24,8 @@ PRIOR_LONG_DOCUMENT_PROFILE_PATH = (
 )
 LONG_DOCUMENT_V3_PROFILE_ID = "hybrid_long_document_v3"
 LONG_DOCUMENT_V3_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_V3_PROFILE_ID}.json"
+LONG_DOCUMENT_V4_PROFILE_ID = "hybrid_long_document_v4"
+LONG_DOCUMENT_V4_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_V4_PROFILE_ID}.json"
 COVERAGE_SCORE_BASELINE = 0.65
 FROZEN_HYBRID_PROFILE_SHA256 = (
     "37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0"
@@ -36,6 +38,10 @@ FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256 = (
     "54bf7e76f5eb9e77bbc853296c29c57470f937feb5a5da5be1f4d95f02fea254"
 )
 """Pinned in answer-loss repair A4. Rollback is ``hybrid_long_document_v2``."""
+FROZEN_LONG_DOCUMENT_V4_PROFILE_SHA256 = (
+    "385f22245b951080558e42387a8f540f9cb5b7f35020733248c3150b44fbd1b3"
+)
+"""Balanced dense and BM25 pins. Rollback is ``hybrid_long_document_v3``."""
 
 
 class UnknownRetrievalProfileError(ValueError):
@@ -69,7 +75,10 @@ class FrozenHybridProfile(BaseModel):
         dense_mode_when_version_scoped: ``exact`` for a resolved version on
             the long-document candidate; default profile stays ``ann``.
         dense_head_pin: Dense channel-head IDs pinned into the rerank pool.
-            Default 5 equals ``CHANNEL_HEAD_PIN``; the BM25 pin stays 5.
+            Default 5 equals ``CHANNEL_HEAD_PIN``.
+        bm25_head_pin: BM25 channel-head IDs pinned into the rerank pool.
+            Default 5 equals ``CHANNEL_HEAD_PIN``, so profiles that omit the
+            field keep today's BM25 pin.
         fallback_order: Pool order when rerank does not complete. ``rrf``
             keeps fused order; ``dense_first`` puts dense hits first in
             dense-rank order, then the rest in fused order.
@@ -99,6 +108,7 @@ class FrozenHybridProfile(BaseModel):
     excerpt_strategy: Literal["prefix", "query_aware"] = "prefix"
     dense_mode_when_version_scoped: Literal["ann", "exact"] = "ann"
     dense_head_pin: int = Field(default=5, ge=0, le=20)
+    bm25_head_pin: int = Field(default=5, ge=0, le=20)
     fallback_order: Literal["rrf", "dense_first"] = "rrf"
 
 
@@ -130,8 +140,8 @@ def runtime_profile_ids() -> frozenset[str]:
     """Return profile ids that retrieve may cache and execute.
 
     Returns:
-        Default, plus the pinned long-document ids when enabled: v2 (the
-        rollback) and v3 (the routed profile).
+        Default, plus the pinned long-document ids when enabled: v2 and v3
+        (rollbacks) and v4 (the routed profile).
     """
 
     ids = {HYBRID_DEFAULT_PROFILE_ID}
@@ -139,6 +149,8 @@ def runtime_profile_ids() -> frozenset[str]:
         ids.add(LONG_DOCUMENT_PROFILE_ID)
     if FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256:
         ids.add(LONG_DOCUMENT_V3_PROFILE_ID)
+    if FROZEN_LONG_DOCUMENT_V4_PROFILE_SHA256:
+        ids.add(LONG_DOCUMENT_V4_PROFILE_ID)
     return frozenset(ids)
 
 
@@ -152,6 +164,8 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
             stays unfrozen. ``hybrid_packet5_v1`` is documented rollback,
             not a second live default. ``hybrid_long_document_v3`` is
             executable after answer-loss repair A4 pins its digest.
+            ``hybrid_long_document_v4`` is the routed profile. v3 remains
+            the rollback.
 
     Returns:
         Validated frozen profile.
@@ -183,6 +197,12 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
             profile_id,
             LONG_DOCUMENT_V3_PROFILE_PATH,
             FROZEN_LONG_DOCUMENT_V3_PROFILE_SHA256,
+        )
+    if profile_id == LONG_DOCUMENT_V4_PROFILE_ID:
+        return _load_pinned_profile(
+            profile_id,
+            LONG_DOCUMENT_V4_PROFILE_PATH,
+            FROZEN_LONG_DOCUMENT_V4_PROFILE_SHA256,
         )
     raise UnknownRetrievalProfileError(profile_id)
 

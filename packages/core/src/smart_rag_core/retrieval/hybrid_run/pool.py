@@ -58,15 +58,18 @@ def build_pool_ids(
         pool_size = retrieval_profile.rerank_pool_size
         max_per_document = retrieval_profile.rerank_max_per_document
         dense_head = retrieval_profile.dense_head_pin
+        bm25_head = retrieval_profile.bm25_head_pin
     else:
         pool_size = RERANK_POOL_SIZE
         max_per_document = RERANK_MAX_PER_DOCUMENT
         dense_head = CHANNEL_HEAD_PIN
+        bm25_head = None
     channel_pins = channel_head_pins(
         dense_ids=dense_ids,
         bm25_ids=bm25_ids,
         fused_ids=fused_ids,
         dense_head=dense_head,
+        bm25_head=bm25_head,
     )
     cited_pages = named_page_numbers(query)
     page_pins: tuple[UUID, ...] = ()

@@ -11,7 +11,7 @@ from uuid import UUID
 import psycopg
 
 from smart_rag_core.retrieval.frozen_profile import (
-    LONG_DOCUMENT_V3_PROFILE_ID,
+    LONG_DOCUMENT_V4_PROFILE_ID,
     long_document_runtime_enabled,
 )
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
@@ -83,8 +83,8 @@ def select_runtime_profile(
     if query_class in TRIVIAL_DEFAULT_QUERY_CLASSES:
         return HYBRID_DEFAULT_PROFILE_ID, "trivial_exact_default_profile"
     if scoped_long:
-        return LONG_DOCUMENT_V3_PROFILE_ID, "long_document_eligible"
-    return LONG_DOCUMENT_V3_PROFILE_ID, "small_corpus_long_document"
+        return LONG_DOCUMENT_V4_PROFILE_ID, "long_document_eligible"
+    return LONG_DOCUMENT_V4_PROFILE_ID, "small_corpus_long_document"
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +99,7 @@ class ResolvedRetrievalScope:
             resolved version, or the largest authorized document's count
             when the small-corpus rule applied, else 0.
         query_class: Optional evaluation class id.
-        candidate_profile_id: Frozen default, or ``hybrid_long_document_v3``
+        candidate_profile_id: Frozen default, or ``hybrid_long_document_v4``
             when the exact-one or small-corpus long-document rule applies.
         eligibility_reason: Why the long-document candidate was or was not
             eligible.
@@ -203,7 +203,7 @@ def resolve_retrieval_scope(
     ``ambiguous``. Unauthorized IDs are indistinguishable from missing.
     An unscoped question on a small authorized corpus whose largest
     document exceeds the legacy per-document cap uses
-    ``hybrid_long_document_v3`` without applying a version filter.
+    ``hybrid_long_document_v4`` without applying a version filter.
 
     Args:
         caller: Server-derived identity.
