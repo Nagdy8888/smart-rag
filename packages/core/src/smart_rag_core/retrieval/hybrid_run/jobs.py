@@ -148,14 +148,6 @@ class HybridChannelJobsMixin:
                 extras: list[str] = []
                 if seed_text and seed_text not in variant_texts:
                     extras.append(seed_text)
-                # Solo high-signal phrases (Table of Contents, CrewAI) as
-                # their own BM25 scans when ask-shape seeding added them.
-                for solo in seed_terms:
-                    if solo in {"CrewAI", "Table of Contents"} and solo not in (
-                        *variant_texts,
-                        *extras,
-                    ):
-                        extras.append(solo)
                 if extras:
                     variant_texts = (*extras, *variant_texts)
                 from smart_rag_core.retrieval.hybrid_run.search_text import (
