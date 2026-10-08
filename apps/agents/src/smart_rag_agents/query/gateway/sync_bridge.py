@@ -10,7 +10,9 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from smart_rag_core.gateways.model_types import ModelInputBoundError
+from smart_rag_core.gateways.openai_answer import OpenAIAnswerError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_answer.exceptions import AnswerError
 
 
@@ -30,6 +32,26 @@ def gateway_timeout_seconds(
         return 20.0
     remaining = (context.deadline_at - datetime.now(UTC)).total_seconds()
     return max(0.1, min(45.0, remaining))
+
+
+def attempt_timeout_seconds(
+    context: AuthorizedRuntimeContext | None,
+    cap_seconds: float,
+) -> float:
+    """Bound one attempt to the cap or the time still left, whichever is smaller.
+
+    Args:
+        context: Admitted run context, or None in isolated unit tests.
+        cap_seconds: Per-attempt ceiling in seconds.
+
+    Returns:
+        Timeout seconds clipped to at least ``0.1``.
+    """
+
+    if context is None:
+        return max(0.1, cap_seconds)
+    remaining = (context.deadline_at - datetime.now(UTC)).total_seconds()
+    return max(0.1, min(cap_seconds, remaining))
 
 
 def run_coro(
@@ -84,7 +106,9 @@ def run_coro(
             except ModelInputBoundError as exc:
                 raise AnswerError("input_bound_exceeded") from exc
             except TimeoutError as exc:
-                raise AnswerError("deadline_exhausted") from exc
+                raise TimeoutAfterSendError("timeout_after_send") from exc
+            except OpenAIAnswerError as exc:
+                raise AnswerError(exc.reason) from exc
             except Exception as exc:
                 raise AnswerError("gateway_failed") from exc
         return produced
@@ -121,11 +145,13 @@ def run_coro(
             raise AnswerError("cancelled")
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise AnswerError("deadline_exhausted")
+            raise TimeoutAfterSendError("timeout_after_send")
         thread.join(timeout=min(0.05, remaining))
     if "exc" in errors:
         raised = errors["exc"]
-        if isinstance(raised, AnswerError):
+        if isinstance(raised, AnswerError | TimeoutAfterSendError | OpenAIAnswerError):
+            if isinstance(raised, OpenAIAnswerError):
+                raise AnswerError(raised.reason) from raised
             raise raised
         if isinstance(raised, ModelInputBoundError):
             raise AnswerError("input_bound_exceeded") from raised

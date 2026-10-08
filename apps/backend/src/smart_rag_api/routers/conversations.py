@@ -445,7 +445,7 @@ def delete_conversation_route(
         },
     },
 )
-def submit_message_route(
+async def submit_message_route(
     request: Request,
     conversation_id: UUID,
     body: SubmitMessageRequest,
@@ -513,6 +513,7 @@ def submit_message_route(
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
     sse.remember_admitted(caller, context, message=body.message)
+    await sse.start_admitted(caller, context)
     if wants_event_stream(request.headers.get("accept")):
         return sse_streaming_response(
             sse.iter_frames(

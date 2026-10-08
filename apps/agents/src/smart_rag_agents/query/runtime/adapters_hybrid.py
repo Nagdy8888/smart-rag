@@ -165,6 +165,7 @@ class ProcessHybridRetriever:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        remaining_run_seconds: float | None = None,
         query_budget: object | None = None,
         cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
     ) -> object:
@@ -175,6 +176,8 @@ class ProcessHybridRetriever:
             caller: Server-derived caller.
             profile: Typed query profile when present.
             deadline_seconds: Remaining retrieval slice.
+            remaining_run_seconds: Seconds left on the admitted run. Forwarded
+                so a timed-out empty channel pass can rerun once.
             query_budget: Optional per-run retrieve ledger. Copied onto the
                 inner retriever so concurrent SSE runs do not share it.
             cache_mode: Exam retrieve passes ``cold_bypass`` so ranking
@@ -260,6 +263,7 @@ class ProcessHybridRetriever:
                 caller=caller,
                 profile=typed_profile,
                 deadline_seconds=deadline_seconds,
+                remaining_run_seconds=remaining_run_seconds,
                 restrict_version_id=restrict_version_id,
                 cache_mode=cache_mode,
                 source_selectors=scope.selector_texts if scope is not None else (),
@@ -376,6 +380,7 @@ class RunScopedHybrid:
         profile: object | None = None,
         deadline_seconds: float | None = None,
         cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
+        remaining_run_seconds: float | None = None,
     ) -> object:
         """Forward retrieve with this run's budget.
 
@@ -385,6 +390,7 @@ class RunScopedHybrid:
             profile: Typed query profile when present.
             deadline_seconds: Remaining retrieval slice.
             cache_mode: Forwarded to the process Hybrid retrieve.
+            remaining_run_seconds: Seconds left on the admitted run.
 
         Returns:
             ``HybridRunResult``.
@@ -397,6 +403,7 @@ class RunScopedHybrid:
             deadline_seconds=deadline_seconds,
             query_budget=self.query_budget,
             cache_mode=cache_mode,
+            remaining_run_seconds=remaining_run_seconds,
         )
 
     def authorized_chunk_loader(self, caller: CallerContext) -> object:

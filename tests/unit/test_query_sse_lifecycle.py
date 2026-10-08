@@ -735,6 +735,44 @@ def test_attach_wakes_on_append_not_idle_poll(monkeypatch: Any) -> None:
     assert elapsed < 1.5
 
 
+def test_admission_starts_the_executor_before_attach() -> None:
+    """The executor starts with no attach, and a later attach does not start it again."""
+
+    store = MemoryRunEventStore()
+    executor = FixtureQueryRunExecutor(hold_seconds=None, emit_completed=True)
+    service = SseStreamService(
+        store=store,
+        registry=QueryRunRegistry(),
+        executor=executor,
+        sse_schema_version="1",
+    )
+    caller = make_caller()
+    runtime = make_runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _start_then_attach() -> list[str]:
+        """Start twice on one loop, then attach.
+
+        Returns:
+            Frames from the attach.
+        """
+
+        await service.start_admitted(caller, runtime)
+        await service.start_admitted(caller, runtime)
+        await asyncio.sleep(0.05)
+        assert executor.start_count == 1
+        return [
+            frame
+            async for frame in service.iter_frames(
+                caller, run_id=runtime.run_id, after=0, context=runtime
+            )
+        ]
+
+    frames = asyncio.run(_start_then_attach())
+    assert executor.start_count == 1
+    assert any("completed" in frame for frame in frames), frames
+
+
 def test_start_once_is_single_under_concurrent_attach() -> None:
     """Two attaches racing on one pending run start one executor."""
 

@@ -29,9 +29,10 @@ from smart_rag_core.query_routing.models import TableEvidenceRecord
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.sync_bridge import (
-    gateway_timeout_seconds,
+    attempt_timeout_seconds,
     run_coro,
 )
+from smart_rag_agents.query.nodes.answer_attempts import ANSWER_ATTEMPT_CAP_SECONDS
 from smart_rag_agents.query.nodes.tokens import tokens_from_gateway_response
 
 
@@ -128,7 +129,7 @@ def gateway_answer(
     records = fit.records
     fusion = fit.fusion
     typed_tables = fit.tables
-    timeout_seconds = gateway_timeout_seconds(context)
+    timeout_seconds = attempt_timeout_seconds(context, ANSWER_ATTEMPT_CAP_SECONDS)
     request = AnswerModelRequest(
         query=query or "query",
         prompt_version=ANSWER_PROMPT_VERSION,

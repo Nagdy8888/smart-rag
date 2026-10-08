@@ -123,6 +123,7 @@ def run_hybrid(
                 profile=prep.profile,
                 deadline_seconds=deadline_seconds,
                 cache_mode=RetrievalCacheMode.COLD_BYPASS,
+                remaining_run_seconds=remaining,
             )
         except TypeError:
             outcome = hybrid_retriever.retrieve(
@@ -130,6 +131,7 @@ def run_hybrid(
                 caller=caller,
                 profile=prep.profile,
                 deadline_seconds=deadline_seconds,
+                remaining_run_seconds=remaining,
             )
     else:
         outcome = hybrid_retriever.retrieve(
@@ -137,6 +139,7 @@ def run_hybrid(
             caller=caller,
             profile=prep.profile,
             deadline_seconds=deadline_seconds,
+            remaining_run_seconds=remaining,
         )
     ranked = ranked_ids(outcome)
     coverage_score, ratio, uncovered = coverage_bits(outcome, whole_document)

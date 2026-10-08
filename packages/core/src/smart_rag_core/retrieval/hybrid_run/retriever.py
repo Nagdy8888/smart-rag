@@ -43,6 +43,7 @@ from smart_rag_core.retrieval.hybrid_run.budget import (
     timed_rerank,
 )
 from smart_rag_core.retrieval.hybrid_run.cache_lookup import HybridCacheLookupMixin
+from smart_rag_core.retrieval.hybrid_run.channel_rerun import should_rerun_channels
 from smart_rag_core.retrieval.hybrid_run.channels import (
     compose_fallback,
     flatten_channel_candidates,
@@ -58,6 +59,7 @@ from smart_rag_core.retrieval.hybrid_run.evidence import (
     evidence_units,
 )
 from smart_rag_core.retrieval.hybrid_run.jobs import HybridChannelJobsMixin
+from smart_rag_core.retrieval.hybrid_run.pool import build_pool_ids
 from smart_rag_core.retrieval.hybrid_run.profile_fields import (
     bool_field,
     query_type_field,
@@ -76,25 +78,16 @@ from smart_rag_core.retrieval.hybrid_run.types import (
     EvidenceUnit,
     HybridRunResult,
 )
-from smart_rag_core.retrieval.pages import load_chunk_page_numbers
 from smart_rag_core.retrieval.profiles import (
     FINAL_EVIDENCE_MAX,
     HYBRID_DEFAULT_PROFILE_ID,
     MAX_NORMALIZED_QUERY_CHARS,
-    RERANK_MAX_PER_DOCUMENT,
-    RERANK_POOL_SIZE,
     RETRIEVAL_SLICE_SECONDS,
     RetrievalFallbackReason,
 )
 from smart_rag_core.retrieval.rerank import (
-    CHANNEL_HEAD_PIN,
     RerankFallbackReason,
-    channel_head_pins,
     hybrid_seed_terms,
-    merge_rerank_pins,
-    named_page_numbers,
-    page_head_pins,
-    rerank_preload_ids,
 )
 from smart_rag_core.retrieval.types import Bm25RetrievalResult
 from smart_rag_core.security.identity import CallerContext
@@ -194,6 +187,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         restrict_version_id: UUID | None = None,
         cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
         source_selectors: tuple[str, ...] = (),
+        remaining_run_seconds: float | None = None,
     ) -> HybridRunResult:
         """Run one Hybrid retrieve and return ranked IDs plus locators.
 
@@ -213,6 +207,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 changing ranking. Exam retrieve must pass ``cold_bypass``.
             source_selectors: Authorized titles excluded from coverage
                 required terms.
+            remaining_run_seconds: Seconds left on the admitted run. Used
+                only to decide one channel rerun. ``None`` never reruns.
 
         Returns:
             Ranked authorized IDs, ?12 evidence units, coverage, fallback,
@@ -283,11 +279,22 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             )
         channel_started = time.perf_counter()
         channel_ms: dict[str, int] = {}
-        completed, timed_out, exhausted = run_channels_parallel(
-            jobs,
-            deadline_seconds=channel_phase_deadline_seconds(slice_seconds),
-            durations_ms=channel_ms,
-        )
+        reran = False
+        while True:
+            completed, timed_out, exhausted = run_channels_parallel(
+                jobs,
+                deadline_seconds=channel_phase_deadline_seconds(slice_seconds),
+                durations_ms=channel_ms,
+            )
+            if reran or not _channel_pass_is_empty(completed):
+                break
+            if not should_rerun_channels(
+                True,
+                bool(timed_out),
+                0.0 if remaining_run_seconds is None else remaining_run_seconds,
+            ):
+                break
+            reran = True
         post_channel_started = time.perf_counter()
         timings["channels_ms"] = int(elapsed_ms(channel_started))
         for name in ("dense", "bm25", "term"):
@@ -415,40 +422,15 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         )
         timings["rerank_gate_remaining_ms"] = int(remaining * 1000)
         preload_started = time.perf_counter()
-        if self._retrieval_profile is not None:
-            pool_size = self._retrieval_profile.rerank_pool_size
-            max_per_document = self._retrieval_profile.rerank_max_per_document
-            dense_head = self._retrieval_profile.dense_head_pin
-        else:
-            pool_size = RERANK_POOL_SIZE
-            max_per_document = RERANK_MAX_PER_DOCUMENT
-            dense_head = CHANNEL_HEAD_PIN
-        channel_pins = channel_head_pins(
+        preload_ids, pinned_ids = build_pool_ids(
+            query=query,
+            fused=assembled.fused,
+            fused_ids=fused_ids,
             dense_ids=dense_ids,
             bm25_ids=bm25_ids,
-            fused_ids=fused_ids,
-            dense_head=dense_head,
-        )
-        cited_pages = named_page_numbers(query)
-        page_pins: tuple[UUID, ...] = ()
-        if cited_pages and fused_ids and self._supabase_dsn:
-            try:
-                with self._channel_supabase() as page_conn:
-                    page_by_id = load_chunk_page_numbers(page_conn, chunk_ids=fused_ids)
-                page_pins = page_head_pins(
-                    fused_ids=fused_ids,
-                    page_by_id=page_by_id,
-                    pages=cited_pages,
-                    head=CHANNEL_HEAD_PIN,
-                )
-            except Exception:
-                page_pins = ()
-        pinned_ids = merge_rerank_pins(page_pins, channel_pins)
-        preload_ids = rerank_preload_ids(
-            assembled.fused,
-            pool_size=pool_size,
-            max_per_document=max_per_document,
-            pinned_ids=pinned_ids,
+            retrieval_profile=self._retrieval_profile,
+            supabase_dsn=self._supabase_dsn,
+            open_supabase=self._channel_supabase,
         )
         contexts = loader(preload_ids) if preload_ids else ()
         timings["pool_preload_ms"] = int(elapsed_ms(preload_started))
@@ -597,3 +579,19 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             rerank_appended_count=rerank_appended_count,
             channel_timed_out=tuple(sorted(timed)),
         )
+
+
+def _channel_pass_is_empty(completed: dict[str, object]) -> bool:
+    """Return whether a channel pass produced no candidate IDs.
+
+    Args:
+        completed: Channel name to job result for one parallel pass.
+
+    Returns:
+        True when dense, BM25, and term are all missing or empty.
+    """
+
+    dense_lists, _dense_reason = unpack_dense(completed.get("dense"))
+    bm25_result = unpack_bm25(completed.get("bm25"))
+    term_lists, _term_reason = unpack_term(completed.get("term"))
+    return not any(dense_lists) and not bm25_result.candidates and not any(term_lists)

@@ -6,7 +6,6 @@ import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast
-from uuid import uuid4
 
 from smart_rag_core.query_admission.ceilings import (
     ANSWER_STAGE_MIN_SECONDS,
@@ -16,8 +15,8 @@ from smart_rag_core.query_admission.ceilings import (
 from smart_rag_core.query_admission.exceptions import (
     QueryBudgetError,
     QueryCeilingError,
+    TimeoutAfterSendError,
 )
-from smart_rag_core.query_admission.usage import execute_counted_model_call
 from smart_rag_core.query_answer.assembly import (
     company_deadline_reserve_payload,
     company_input_bound_payload,
@@ -41,6 +40,7 @@ from smart_rag_core.query_routing.serde import plan_from_state
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.answer import gateway_answer
 from smart_rag_agents.query.gateway.general_chat import gateway_general_chat
+from smart_rag_agents.query.nodes.answer_attempts import run_answer_attempts
 from smart_rag_agents.query.nodes.shared import (
     route_needs_retrieval,
     runtime_after_consume,
@@ -281,17 +281,18 @@ def generate_answer_node(
         started = time.perf_counter()
         try:
             if deps.connection is not None and context is not None:
-                counted, consumed, _usage_id = execute_counted_model_call(
-                    deps.connection,
+                counted, consumed, _usage_id, remaining = run_answer_attempts(
+                    state,
+                    connection=deps.connection,
                     caller=caller_from_runtime(context),
                     run_id=context.run_id,
                     reservation_id=context.reservation_id,
                     expected_version=context.optimistic_version,
-                    usage_kind="answer",
                     model_id=ANSWER_MODEL_ID,
-                    provider_attempt_id=str(uuid4()),
                     send=_send,
                     usage_from_result=_usage_from_result,
+                    context=context,
+                    remaining_model_calls=remaining,
                 )
                 answer, added_prompt_tokens, added_completion_tokens = counted
                 runtime_update["authorized_runtime"] = runtime_after_consume(
@@ -299,13 +300,27 @@ def generate_answer_node(
                 ).model_dump(mode="json")
             else:
                 answer, added_prompt_tokens, added_completion_tokens = _send()
-        except (AnswerError, QueryBudgetError, QueryCeilingError) as exc:
-            reason = exc.reason
-            attempt = with_answer_attempt(
-                state,
-                duration_ms=_elapsed_ms(started),
-                outcome=classify_attempt_outcome(reason),
-                reason=reason,
+                state["run_timings"] = with_answer_attempt(
+                    state,
+                    duration_ms=_elapsed_ms(started),
+                    outcome="ok",
+                )["run_timings"]
+        except (
+            AnswerError,
+            QueryBudgetError,
+            QueryCeilingError,
+            TimeoutAfterSendError,
+        ) as exc:
+            reason = getattr(exc, "reason", None) or "timeout_after_send"
+            attempt = (
+                {}
+                if deps.connection is not None and context is not None
+                else with_answer_attempt(
+                    state,
+                    duration_ms=_elapsed_ms(started),
+                    outcome=classify_attempt_outcome(str(reason)),
+                    reason=str(reason),
+                )
             )
             if needs_rag_model:
                 payload = company_input_bound_payload()
@@ -343,17 +358,6 @@ def generate_answer_node(
                 ).model_dump(mode="json"),
                 **attempt,
             }
-        state = cast(
-            QueryGraphState,
-            {
-                **state,
-                **with_answer_attempt(
-                    state,
-                    duration_ms=_elapsed_ms(started),
-                    outcome="ok",
-                ),
-            },
-        )
         answer = apply_degraded_scope_framing(
             answer, scope_degradation_reason=degradation
         )

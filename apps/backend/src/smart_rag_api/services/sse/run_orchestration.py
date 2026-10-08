@@ -66,6 +66,32 @@ class RunOrchestrationMixin(RunHeartbeatMixin):
 
             ...
 
+    async def start_admitted(
+        self,
+        caller: CallerContext,
+        context: AuthorizedRuntimeContext,
+    ) -> None:
+        """Start the graph at admission, before a client attaches.
+
+        ``remember_admitted`` has already stored the message. A later attach
+        only replays events because ``_start_once`` is idempotent.
+
+        Args:
+            caller: Owner.
+            context: Fresh admission context.
+        """
+
+        record = QueryRunRecord(
+            run_id=context.run_id,
+            conversation_id=context.conversation_id,
+            creator_user_id=context.user_id,
+            status=context.status,
+            reservation_id=context.reservation_id,
+            created_at=None,
+        )
+        live = self._registry.get_or_create(context.run_id)
+        await self._start_once(caller, record, live, context)
+
     async def _start_once(
         self,
         caller: CallerContext,

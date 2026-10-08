@@ -19,9 +19,10 @@ from smart_rag_core.query_routing.models import TableEvidenceRecord
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.sync_bridge import (
-    gateway_timeout_seconds,
+    attempt_timeout_seconds,
     run_coro,
 )
+from smart_rag_agents.query.nodes.answer_attempts import ANSWER_ATTEMPT_CAP_SECONDS
 from smart_rag_agents.query.nodes.tokens import tokens_from_gateway_response
 
 _VERIFIER_REASON_MAX = 128
@@ -119,7 +120,7 @@ def gateway_verifier(
     except ValidationError as exc:
         raise AnswerError("verifier_schema_invalid") from exc
     records = assemble_source_records(fusion, typed_tables)
-    timeout_seconds = gateway_timeout_seconds(context)
+    timeout_seconds = attempt_timeout_seconds(context, ANSWER_ATTEMPT_CAP_SECONDS)
     request = VerifierModelRequest(
         prompt_version=VERIFIER_PROMPT_VERSION,
         prompt_sha256=VERIFIER_PROMPT_SHA256,

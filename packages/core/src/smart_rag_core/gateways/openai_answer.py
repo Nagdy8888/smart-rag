@@ -112,7 +112,7 @@ def execute_openai_answer(
     except APITimeoutError as error:
         raise OpenAIAnswerError("answer_timeout") from error
     except AuthenticationError as error:
-        raise OpenAIAnswerError("answer_provider_error") from error
+        raise OpenAIAnswerError("answer_unauthorized") from error
     except APIStatusError as error:
         if error.status_code == 429:
             raise OpenAIAnswerError("answer_budget_denied") from error

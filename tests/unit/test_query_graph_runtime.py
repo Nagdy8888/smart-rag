@@ -37,6 +37,7 @@ from smart_rag_api.services.query_graph_runtime import (
 from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 from smart_rag_api.services.sse_stream import LangGraphQueryRunExecutor
 from smart_rag_core.gateways.model import AnswerModelResponse, create_model_gateway
+from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import mock_answer_payload
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -596,10 +597,10 @@ def test_run_coro_times_out_without_a_running_loop() -> None:
 
     try:
         run_coro(lambda: _slow(), timeout_seconds=0.01)
-    except AnswerError as exc:
-        assert exc.reason == "deadline_exhausted"
+    except TimeoutAfterSendError:
+        pass
     else:
-        raise AssertionError("expected deadline_exhausted")
+        raise AssertionError("expected timeout_after_send")
 
 
 def test_mock_answer_is_not_used_as_verified_success() -> None:
