@@ -33,7 +33,7 @@ dropped: it saved 2 of 11 answer-side misses and broke 3 current passes.
 ```mermaid
 flowchart TD
   admit[Admit and start graph]
-  search[Embed full message and question sentence]
+  search[Embed the full message]
   channels[Dense BM25 and term]
   rerun{Empty only because a channel timed out and 18s remain}
   pool[v4 pool: 10 dense pins, 5 BM25 pins, fused fill]
@@ -58,10 +58,10 @@ flowchart TD
 4. Route long documents to `hybrid_long_document_v4`. The pool stays 20.
    Pins are the dense top 10 and the BM25 top 5. The rest follow fused
    order. `hybrid_long_document_v3` stays pinned as the rollback.
-5. Retrieval also embeds the question sentences (authorized titles
-   removed) in the same embedding batch and merges the dense lists by
-   reciprocal rank. BM25 scans that search text first. The answer prompt
-   still receives the full message.
+5. Do not add a second embedding of the question sentence. The live
+   probe rerun kept BM25 gold hits at 4 of 30, the same count as the
+   prior run, so that search was removed. The answer prompt still
+   receives the full message.
 6. Do not release the cited sentence in place of the model's claim. The
    offline check failed its pass bar.
 7. Do not move the temporal-record load. On the stored probe exports its
@@ -89,7 +89,7 @@ flowchart TD
 
 ## Verification
 
-`uv run pytest tests/unit/test_run_timings.py tests/unit/test_answer_attempts.py tests/unit/test_channel_rerun.py tests/unit/test_long_document_v4_profile.py tests/unit/test_search_text.py`
+`uv run pytest tests/unit/test_run_timings.py tests/unit/test_answer_attempts.py tests/unit/test_channel_rerun.py tests/unit/test_long_document_v4_profile.py`
 
 Live acceptance is a fresh probe15-a and probe15-b run, plus one
 sentence-aligned probe15-c run that is not used for tuning.
