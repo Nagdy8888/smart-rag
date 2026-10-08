@@ -322,7 +322,7 @@ def packet8_paradedb_url() -> str | None:
     """Return the host-side ParadeDB writer URL for Packet 8 localhost overlay.
 
     Returns:
-        ``PARADEDB_URL`` when set, otherwise a loopback URL on port ``54329``
+        ``PARADEDB_URL`` when set, otherwise a loopback URL on port ``55432``
         built from ``.env.compose`` writer credentials. ``None`` when credentials
         are unavailable.
     """
@@ -337,7 +337,7 @@ def packet8_paradedb_url() -> str | None:
     user = env.get("PARADEDB_WRITER_USER", "paradedb_writer")
     database = env.get("PARADEDB_DB", "paradedb")
     host = read_process_env("PARADEDB_HOST") or "127.0.0.1"
-    port = read_process_env("PARADEDB_PORT") or "54329"
+    port = read_process_env("PARADEDB_PORT") or "55432"
     return (
         f"postgresql://{quote(user, safe='')}:"
         f"{quote(password, safe='')}@{host}:{port}/{database}"

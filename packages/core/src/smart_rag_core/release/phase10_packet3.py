@@ -320,7 +320,7 @@ def scan_rows(live_state: LiveProofState) -> tuple[dict[str, object], ...]:
         ("tcp/8080", "crawl-proxy/provider-egress host publish"),
         ("tcp/9621", "lightrag"),
         ("tcp/9624", "lightrag"),
-        ("tcp/54329", "packet8 paradedb overlay"),
+        ("tcp/55432", "packet8 paradedb overlay"),
         ("udp/161", "management"),
         ("http://169.254.169.254/", "instance metadata"),
     )

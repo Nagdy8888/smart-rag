@@ -440,7 +440,7 @@ def test_packet8_overlay_binds_loopback_only() -> None:
     )
     services = _mapping(packet8["services"])
     expected = {
-        "paradedb": "127.0.0.1:54329:5432",
+        "paradedb": "127.0.0.1:55432:5432",
         "clamav": "127.0.0.1:13310:3310",
         "crawl-proxy": "127.0.0.1:18080:8080",
     }

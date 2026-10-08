@@ -32,7 +32,7 @@ Validation errors list field paths and categories but omit source values.
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 32,768 | public | Deployable gateway input bound |
 | `VALKEY_LIMITS_URL` | optional URL | secret | Rate-limit Valkey. Packet 5 connects per command at request time, never at import. Unset falls back to Postgres for mutations |
 | `VALKEY_CACHE_URL` | optional URL | secret | Cache Valkey. Never authority; retrieval hits recheck Postgres |
-| `PARADEDB_URL` | optional URL | secret | Worker/API ParadeDB DSN. Packet 8 host pytest uses `docker-compose.packet8.yml` loopback `:54329` |
+| `PARADEDB_URL` | optional URL | secret | Worker/API ParadeDB DSN. Packet 8 host pytest uses `docker-compose.packet8.yml` loopback `:55432` |
 | `CRAWL_PROXY_URL` | optional HTTP URL | internal | Private deny-by-default proxy endpoint. Packet 8 overlay publishes `http://127.0.0.1:18080` |
 | `CLAMAV_HOST` / `CLAMAV_PORT` | hostname / Packet 8 overlay `13310` | internal | Worker uses Compose DNS `clamav:3310`. Packet 8 overlay publishes host `13310` |
 | `SMART_RAG_REQUIRE_CLAMAV` | `1` fails closed | public | Contract tests fail instead of skip when ClamAV is down |

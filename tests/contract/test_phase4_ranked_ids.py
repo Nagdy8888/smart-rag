@@ -1,6 +1,6 @@
 """Optional live ranked-ID wiring for Phase 4 Packet 9 Wave 2.
 
-Skips cleanly when local Supabase, Packet 8 ParadeDB (localhost:54329), or
+Skips cleanly when local Supabase, Packet 8 ParadeDB (localhost:55432), or
 mapped sidecar UUIDs are missing. Does not open sealed labels.
 """
 
@@ -76,7 +76,7 @@ def _require_stack_and_mapped_sidecar() -> tuple[str, str]:
             pytest.fail("Phase 4 ranked-ID contract requires local Compose overlay")
         pytest.skip(
             "local Supabase or Packet 8 ParadeDB overlay "
-            "(localhost:54329) is unavailable"
+            "(localhost:55432) is unavailable"
         )
     connection.close()
     if not SIDECAR_PATH.is_file():

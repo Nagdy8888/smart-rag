@@ -252,7 +252,7 @@ STAGING_PRIVATE_NO_HOST_PORT_SERVICES: tuple[str, ...] = (
 STAGING_ORIGIN_SERVICES: tuple[str, ...] = ("caddy",)
 
 LIGHTRAG_PUBLIC_PORTS: frozenset[int] = frozenset({9621, 9624})
-PACKET8_HOST_PORTS: frozenset[int] = frozenset({54329, 13310, 18080})
+PACKET8_HOST_PORTS: frozenset[int] = frozenset({55432, 13310, 18080})
 
 REGION_FREEZE_NOTE = "Packet 1 intended freeze, not a prior client-signed region"
 

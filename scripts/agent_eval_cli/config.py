@@ -18,7 +18,7 @@ DEFAULT_SIDECAR = (
     / "runtime"
     / "gold_id_map.json"
 )
-DEFAULT_PARADE_PORT = "54329"
+DEFAULT_PARADE_PORT = "55432"
 EXPERIMENT_NAMESPACE = uuid5(NAMESPACE_URL, "smart-rag-agent-eval")
 
 

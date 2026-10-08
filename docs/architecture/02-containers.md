@@ -56,7 +56,7 @@ flowchart TD
   builder --> runtime
 ```
 
-Packet 8 local proof uses the optional overlay [`docker-compose.packet8.yml`](../../docker-compose.packet8.yml). It attaches ClamAV and ParadeDB to a non-internal `packet8-host` bridge and publishes ClamAV `127.0.0.1:13310`, ParadeDB `127.0.0.1:54329`, and crawl-proxy `127.0.0.1:18080` so the host worker and host pytest can reach them. The default `private` network stays `internal: true`. Do not apply that overlay in staging or production.
+Packet 8 local proof uses the optional overlay [`docker-compose.packet8.yml`](../../docker-compose.packet8.yml). It attaches ClamAV and ParadeDB to a non-internal `packet8-host` bridge and publishes ClamAV `127.0.0.1:13310`, ParadeDB `127.0.0.1:55432`, and crawl-proxy `127.0.0.1:18080` so the host worker and host pytest can reach them. The default `private` network stays `internal: true`. Do not apply that overlay in staging or production.
 
 ## Staging / production (Packet 1 IaC)
 
