@@ -68,6 +68,7 @@ from smart_rag_core.retrieval.hybrid_run.profile_fields import (
     target_date_field,
     temporal_intent_field,
 )
+from smart_rag_core.retrieval.hybrid_run.search_text import merge_variant_ranks
 from smart_rag_core.retrieval.hybrid_run.terms import (
     matched_terms_from_units,
     supported_subquestion_count,
@@ -252,7 +253,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             if cached is not None:
                 return cached
 
-        texts = query_texts(query, profile)
+        texts = query_texts(query, profile, source_selectors)
         embed_started = time.perf_counter()
         embed_response, embed_error = embed_query_texts(
             self._embedding_gateway, texts, budget=self.query_budget
@@ -276,6 +277,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 vectors=vectors[:FUSION_LIST_CAP],
                 version_id=restrict_version_id,
                 remaining_slice_seconds=slice_seconds,
+                source_selectors=source_selectors,
             )
         channel_started = time.perf_counter()
         channel_ms: dict[str, int] = {}
@@ -324,8 +326,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             term_lists,
             restrict_version_id,
         )
-        dense_ids = unique_chunk_ids(
-            tuple(item for variant in dense_lists for item in variant)
+        dense_ids = merge_variant_ranks(
+            tuple(tuple(item.chunk_id for item in variant) for variant in dense_lists)
         )
         bm25_ids = unique_chunk_ids(bm25_result.candidates)
         term_ids = unique_chunk_ids(

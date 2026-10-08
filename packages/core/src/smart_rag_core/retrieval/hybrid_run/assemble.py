@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Sequence
 from datetime import date
 from uuid import UUID
 
@@ -144,19 +145,31 @@ def fail_closed_query(query: str) -> RetrievalFallbackReason | None:
     return None
 
 
-def query_texts(query: str, profile: ExpectedProfile | None) -> tuple[str, ...]:
-    """Build unique embed texts: original plus at most three variants.
+def query_texts(
+    query: str,
+    profile: ExpectedProfile | None,
+    selectors: Sequence[str] = (),
+) -> tuple[str, ...]:
+    """Build unique embed texts: original, question sentence, then variants.
 
     Args:
         query: Original query.
         profile: Optional profile whose ``variants`` field is a string list.
+        selectors: Authorized titles removed from the question sentence.
 
     Returns:
-        At most four unique strings, original first.
+        At most four unique strings. The original stays first. The question
+        sentence uses one slot, so a profile keeps at most two extra variants.
     """
+
+    from smart_rag_core.retrieval.hybrid_run.search_text import question_search_text
 
     ordered = [query]
     seen = {query.strip()}
+    search = question_search_text(query, selectors).strip()
+    if search and search not in seen:
+        seen.add(search)
+        ordered.append(search)
     for variant in str_list_field(profile, "variants"):
         key = variant.strip()
         if key == "" or key in seen:

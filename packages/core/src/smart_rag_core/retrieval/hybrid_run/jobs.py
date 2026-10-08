@@ -66,6 +66,7 @@ class HybridChannelJobsMixin:
         vectors: tuple[tuple[float, ...], ...],
         version_id: UUID | None = None,
         remaining_slice_seconds: float | None = None,
+        source_selectors: tuple[str, ...] = (),
     ) -> dict[str, ChannelJob]:
         """Build parallel dense/BM25/term jobs from bound retrievers.
 
@@ -77,6 +78,7 @@ class HybridChannelJobsMixin:
             version_id: Optional current-version filter pushed inside ranking.
             remaining_slice_seconds: Channel-plus-rerank remainder used to
                 admit or refuse exact dense.
+            source_selectors: Authorized titles removed from the BM25 search text.
 
         Returns:
             Zero-argument jobs for ``run_channels_parallel``.
@@ -155,7 +157,14 @@ class HybridChannelJobsMixin:
                     ):
                         extras.append(solo)
                 if extras:
-                    variant_texts = (*extras, *variant_texts)[:4]
+                    variant_texts = (*extras, *variant_texts)
+                from smart_rag_core.retrieval.hybrid_run.search_text import (
+                    question_search_text,
+                )
+
+                search = question_search_text(query, source_selectors)
+                rest = tuple(item for item in variant_texts if item != search)
+                variant_texts = (search, *rest)[:4]
                 try:
                     retrieve_variants = getattr(
                         bm25_retriever, "retrieve_variants", None
