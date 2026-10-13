@@ -297,6 +297,139 @@ def test_verifier_omits_unsupported_verdicts() -> None:
     assert updated.status == "partial"
 
 
+def test_contained_fact_survives_unsupported_verdict() -> None:
+    """A fact already in its cited passage stays when the verifier rejects it."""
+
+    passage = "The ledger records a final balance\nbefore any later note."
+    claim = "The ledger records a final balance before any later note."
+    fusion = verifier_fusion(verifier_passage(1, text=passage))
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text=claim,
+                link_ids=("anchor-claim-1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=verifier_uid(1),
+                span=passage,
+                atomic_link_id="anchor-claim-1",
+                paragraph_index=0,
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="anchor-claim-1",
+                claim=claim,
+                chunk_ids=(verifier_uid(1),),
+                kind="fact",
+                priority=10,
+            ),
+        ),
+        status="complete",
+    )
+
+    def _caller(batch: tuple[AtomicLink, ...]) -> VerifierPayload:
+        """Mark every link unsupported.
+
+        Args:
+            batch: Selected links.
+
+        Returns:
+            Unsupported verdicts.
+        """
+
+        return VerifierPayload(
+            link_verdicts=tuple(
+                VerifierLinkVerdict(
+                    link_id=item.link_id,
+                    supported=False,
+                    reason="unsupported_link",
+                )
+                for item in batch
+            )
+        )
+
+    updated, call_count, _omitted = run_verifier_batch(
+        payload,
+        caller=_caller,
+        already_called=0,
+        fusion=fusion,
+    )
+    assert call_count == 1
+    assert [item.link_id for item in updated.atomic_links] == ["anchor-claim-1"]
+    assert "final balance" in updated.answer_text
+    assert "anchor-claim-1" not in updated.refused_links
+
+
+def test_paraphrase_still_dropped_when_verifier_rejects_it() -> None:
+    """A claim that is not in the passage is still removed."""
+
+    passage = "The ledger records a final balance before any later note."
+    fusion = verifier_fusion(verifier_passage(1, text=passage))
+    payload = AnswerPayload(
+        answer_text="Setup is required.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="Setup is required.",
+                link_ids=("claim-1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=verifier_uid(1),
+                span=passage,
+                atomic_link_id="claim-1",
+                paragraph_index=0,
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="claim-1",
+                claim="Setup is required.",
+                chunk_ids=(verifier_uid(1),),
+                kind="fact",
+            ),
+        ),
+        status="complete",
+    )
+
+    def _caller(batch: tuple[AtomicLink, ...]) -> VerifierPayload:
+        """Mark the paraphrase unsupported.
+
+        Args:
+            batch: Selected links.
+
+        Returns:
+            Unsupported verdicts.
+        """
+
+        return VerifierPayload(
+            link_verdicts=tuple(
+                VerifierLinkVerdict(
+                    link_id=item.link_id,
+                    supported=False,
+                    reason="unsupported_link",
+                )
+                for item in batch
+            )
+        )
+
+    updated, call_count, _omitted = run_verifier_batch(
+        payload,
+        caller=_caller,
+        already_called=0,
+        fusion=fusion,
+    )
+    assert call_count == 1
+    assert updated.atomic_links == ()
+    assert updated.status == "refused"
+
+
 def test_citation_span_and_table_range_mismatch_fail() -> None:
     """Deterministic checks require span/range alignment with canonical sources."""
 

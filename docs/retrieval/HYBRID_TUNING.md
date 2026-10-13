@@ -64,7 +64,11 @@ holdout-blind and refuses to run when holdout access is enabled.
 
 `hybrid_long_document_v4` keeps `rerank_pool_size` at 20. It pins 10 dense
 heads and 5 BM25 heads, then fills the remaining slots in fused order.
-`hybrid_long_document_v3` remains the rollback. A second embedding of the
+`hybrid_long_document_v5` raises that pool to 60 and is not routed: the
+rerank request still allows 20 candidates, and the probe15 trial was
+strict 0/15 on every set. `hybrid_long_document_v3` remains the v4
+rollback. A second embedding of the
 question sentence was tried and removed after the live probe rerun left
 BM25 gold hits at 4 of 30.
-See [ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md).
+See [ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md)
+and [ADR-hybrid-long-document-v5-pool.md](../adr/ADR-hybrid-long-document-v5-pool.md).

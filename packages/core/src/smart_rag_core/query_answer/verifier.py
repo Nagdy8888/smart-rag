@@ -13,6 +13,7 @@ from smart_rag_core.query_answer.models import (
 )
 from smart_rag_core.query_answer.paragraphs import drop_unsupported_paragraphs
 from smart_rag_core.query_answer.versions import MAX_VERIFIER_CALLS, MAX_VERIFIER_LINKS
+from smart_rag_core.query_fusion.models import FusionResult
 
 VerifierCaller = Callable[[tuple[AtomicLink, ...]], VerifierPayload]
 
@@ -50,12 +51,20 @@ def select_material_links(
 def apply_verifier_payload(
     payload: AnswerPayload,
     verdicts: VerifierPayload,
+    *,
+    fusion: FusionResult | None = None,
 ) -> AnswerPayload:
     """Remove unsupported links and any paragraph that depends on them.
+
+    A fact link stays when its whitespace-collapsed claim is already
+    contained in a passage it cites. A model ``supported=false`` does
+    not remove that link. Callers that omit ``fusion`` keep every
+    unsupported verdict.
 
     Args:
         payload: Answer after deterministic checks.
         verdicts: One structured verifier batch.
+        fusion: Fitted canonical evidence. None skips the extractive keep.
 
     Returns:
         Answer with unsupported links omitted. Paragraphs that named a
@@ -67,7 +76,40 @@ def apply_verifier_payload(
     unsupported = {
         item.link_id for item in verdicts.link_verdicts if not item.supported
     }
+    unsupported -= _extractive_fact_link_ids(payload, fusion)
     return drop_unsupported_paragraphs(payload, frozenset(unsupported))
+
+
+def _extractive_fact_link_ids(
+    payload: AnswerPayload,
+    fusion: FusionResult | None,
+) -> frozenset[str]:
+    """Return fact links whose claim text is already in a cited passage.
+
+    Args:
+        payload: Answer that holds the candidate links.
+        fusion: Fitted canonical evidence. None keeps no links.
+
+    Returns:
+        Link IDs whose collapsed claim is a substring of a cited passage.
+    """
+
+    if fusion is None:
+        return frozenset()
+    passages = {item.chunk_id: item.citation_text for item in fusion.evidence}
+    kept: set[str] = set()
+    for link in payload.atomic_links:
+        if link.kind != "fact":
+            continue
+        claim = " ".join(link.claim.split())
+        if not claim:
+            continue
+        for chunk_id in link.chunk_ids:
+            source = " ".join(passages.get(chunk_id, "").split())
+            if claim in source:
+                kept.add(link.link_id)
+                break
+    return frozenset(kept)
 
 
 def run_verifier_batch(
@@ -75,6 +117,7 @@ def run_verifier_batch(
     *,
     caller: VerifierCaller | None,
     already_called: int,
+    fusion: FusionResult | None = None,
 ) -> tuple[AnswerPayload, int, tuple[str, ...]]:
     """Issue at most one verifier call for up to six links.
 
@@ -82,6 +125,9 @@ def run_verifier_batch(
         payload: Deterministically checked answer.
         caller: Structured verifier adapter. None skips the model call.
         already_called: Existing verifier call count. A second call fails.
+        fusion: Fitted canonical evidence. When set, a fact whose
+            collapsed claim is already in a cited passage survives an
+            unsupported verdict.
 
     Returns:
         Updated answer, resulting call count (0 or 1), and omitted link IDs.
@@ -101,7 +147,7 @@ def run_verifier_batch(
     verdicts = caller(selected)
     if len(verdicts.link_verdicts) > MAX_VERIFIER_LINKS:
         raise AnswerError("verifier_batch_cap")
-    updated = apply_verifier_payload(payload, verdicts)
+    updated = apply_verifier_payload(payload, verdicts, fusion=fusion)
     if updated.paragraphs:
         updated = drop_unsupported_paragraphs(updated, frozenset(omitted))
     return _force_partial_if_omitted(updated, omitted), 1, omitted

@@ -27,8 +27,12 @@ from smart_rag_core.query_answer.generate import (
     apply_degraded_scope_framing,
     generate_answer,
 )
+from smart_rag_core.query_answer.generate_anchor_salvage import (
+    salvage_anchor_claim_fill,
+)
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.versions import ANSWER_MODEL_ID
+from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.constants import FALLBACK_RETRIEVERS_UNBOUND
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
@@ -89,7 +93,9 @@ def generate_answer_node(
     Failure/fallback route:
         Empty evidence, NoRetrieval, and graph inspection refuse without a
         fake success. Missing ``model_gateway`` or unbound Hybrid when the
-        route needs retrieval never terminates ``verified``.
+        route needs retrieval never terminates ``verified``. A company
+        model failure that still has fitted page evidence releases the
+        cited-page openings instead of the empty refusal.
 
     Args:
         state: State after table composition.
@@ -323,20 +329,11 @@ def generate_answer_node(
                 )
             )
             if needs_rag_model:
-                payload = company_input_bound_payload()
-                status = "insufficient_evidence"
-                if reason == "answer_deadline_reserve_exhausted":
-                    payload = company_deadline_reserve_payload()
-                    status = "verified_partial"
-                elif reason != "input_bound_exceeded":
-                    payload = AnswerPayload(
-                        answer_text=(
-                            "The available company evidence could not support "
-                            "this answer."
-                        ),
-                        status="refused",
-                        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
-                    )
+                payload, status = _company_model_failure_payload(
+                    working_fusion,
+                    user_query=str(state.get("user_query") or ""),
+                    reason=str(reason),
+                )
                 return cast(
                     QueryGraphState,
                     {
@@ -380,23 +377,16 @@ def generate_answer_node(
         except AnswerError as exc:
             reason = exc.reason
             if needs_rag_model:
-                payload = (
-                    company_input_bound_payload()
-                    if reason == "input_bound_exceeded"
-                    else AnswerPayload(
-                        answer_text=(
-                            "The available company evidence could not support "
-                            "this answer."
-                        ),
-                        status="refused",
-                        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
-                    )
+                payload, status = _company_model_failure_payload(
+                    working_fusion,
+                    user_query=str(state.get("user_query") or ""),
+                    reason=reason,
                 )
                 return cast(
                     QueryGraphState,
                     {
                         **state,
-                        "status": "insufficient_evidence",
+                        "status": status,
                         "detail": reason,
                         "answer": payload.model_dump(mode="json"),
                         **fit_update,
@@ -444,6 +434,48 @@ def generate_answer_node(
             **fit_update,
         },
     )
+
+
+def _company_model_failure_payload(
+    fusion: FusionResult,
+    *,
+    user_query: str,
+    reason: str,
+) -> tuple[AnswerPayload, str]:
+    """Choose the company payload stored when answer generation fails.
+
+    A source-word ask that names a page keeps the fitted openings when
+    they are already in ``fusion``. Deadline and input-bound failures
+    keep their existing payloads.
+
+    Args:
+        fusion: Fitted canonical evidence for this run.
+        user_query: Original user text. Untrusted.
+        reason: Model or budget failure reason.
+
+    Returns:
+        Payload and graph status. Openings use ``answered`` so verify
+        still runs. Other failures stay ``insufficient_evidence`` or
+        ``verified_partial``.
+    """
+
+    if reason == "answer_deadline_reserve_exhausted":
+        return company_deadline_reserve_payload(), "verified_partial"
+    if reason == "input_bound_exceeded":
+        return company_input_bound_payload(), "insufficient_evidence"
+    refusal = AnswerPayload(
+        answer_text=("The available company evidence could not support this answer."),
+        status="refused",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    filled = salvage_anchor_claim_fill(
+        refusal,
+        fusion,
+        user_query=user_query,
+    )
+    if filled.atomic_links:
+        return filled, "answered"
+    return refusal, "insufficient_evidence"
 
 
 def _elapsed_ms(started: float) -> int:

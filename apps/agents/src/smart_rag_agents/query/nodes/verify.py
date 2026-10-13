@@ -93,7 +93,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     Failure/fallback route:
         After release rendering, only the named code-definition and named
         table-block extractive repairs may replace the claims.
-        Unsupported links are removed or refused. A rejected fact whose
+        Unsupported links are removed or refused. A fact whose
+        whitespace-collapsed claim is already in a cited passage stays
+        even when the verifier marks it unsupported. A rejected fact whose
         quoted literals and identifiers already occur in the cited passage
         is kept as a verbatim excerpt of that passage. Unsupported chains
         drop the composed conclusion.
@@ -233,6 +235,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 checked,
                 caller=caller,
                 already_called=verifier_calls,
+                fusion=fusion,
             )
             try:
                 checked = align_split_source_identifiers(

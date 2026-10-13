@@ -25,7 +25,9 @@ from smart_rag_core.query_answer.paragraphs import (
     with_derived_answer_text,
 )
 from smart_rag_core.query_answer.versions import (
+    MAX_ANSWER_PARAGRAPHS,
     MAX_CITATION_SPAN_CHARS,
+    MAX_VERIFIER_LINKS,
 )
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.retrieval.rerank import (
@@ -38,6 +40,11 @@ _ANCHOR_CLAIM_LINK_ID = "anchor-claim-1"
 
 _ANCHOR_CLAIM_LINK_IDS = frozenset({_ANCHOR_CLAIM_LINK_ID, "page-claim-1"})
 
+_SOURCE_WORD_ASK = re.compile(
+    r"\b(?:exact wording|verbatim|quote)\b",
+    re.IGNORECASE,
+)
+
 
 def salvage_anchor_claim_fill(
     payload: AnswerPayload,
@@ -45,12 +52,15 @@ def salvage_anchor_claim_fill(
     *,
     user_query: str,
 ) -> AnswerPayload:
-    """Inject one omitted fitted evidence span (anchor-gated).
+    """Inject omitted fitted evidence spans (anchor-gated).
 
     Skips when structural code/table salvages already replaced the payload.
-    Appends at most one contiguous span that clears the anchor gate:
-    two distinct anchor hits in the chosen passage, or one distinctive
-    literal/name of length ≥4.
+    When the ask wants the source's own words and names a page, appends
+    the opening of every fitted passage on that page, up to the paragraph
+    cap. An existing anchor claim does not block the other page openings.
+    Otherwise appends at most one contiguous span that clears the anchor
+    gate: two distinct anchor hits in the chosen passage, or one
+    distinctive literal/name of length ≥4.
 
     Args:
         payload: Company answer after code/table salvages.
@@ -58,13 +68,16 @@ def salvage_anchor_claim_fill(
         user_query: Original user text. Untrusted.
 
     Returns:
-        Payload with one added anchor claim, or unchanged.
+        Payload with added page openings or one anchor claim, or unchanged.
     """
 
     if any(
         link.link_id in _STRUCTURAL_SALVAGE_LINK_IDS for link in payload.atomic_links
     ):
         return payload
+    opened = _fill_cited_page_opening(payload, fusion, user_query=user_query)
+    if opened is not None:
+        return opened
     if any(link.link_id in _ANCHOR_CLAIM_LINK_IDS for link in payload.atomic_links):
         return payload
     anchors = _page_claim_anchors(user_query)
@@ -137,6 +150,235 @@ def _contiguous_anchor_span(text: str, anchors: tuple[str, ...]) -> str:
     if not span:
         return ""
     return span[:MAX_CITATION_SPAN_CHARS]
+
+
+def _asks_for_source_words(user_query: str) -> bool:
+    """Return whether the ask wants the source's own words.
+
+    Args:
+        user_query: Original user text. Untrusted.
+
+    Returns:
+        True for exact-wording, verbatim, or quote asks.
+    """
+
+    return _SOURCE_WORD_ASK.search(user_query) is not None
+
+
+def _opening_exact_span(text: str) -> str:
+    """Copy the opening of a passage as an exact evidence substring.
+
+    The window is capped at ``MAX_CITATION_SPAN_CHARS`` and ends on a
+    sentence boundary when one falls inside the cap. The result stays a
+    substring of ``text`` so citation alignment still succeeds.
+
+    Args:
+        text: Passage citation text.
+
+    Returns:
+        Exact opening substring, or empty when ``text`` is blank.
+    """
+
+    if not text or not text.strip():
+        return ""
+    start = len(text) - len(text.lstrip())
+    end_limit = min(len(text), start + MAX_CITATION_SPAN_CHARS)
+    window_end = end_limit
+    if end_limit < len(text):
+        last_sentence = -1
+        for index, char in enumerate(text[start:end_limit]):
+            if char in ".!?":
+                last_sentence = index
+        if last_sentence >= 0:
+            window_end = start + last_sentence + 1
+    span = text[start:window_end].strip()
+    if not span or span not in text:
+        return ""
+    return span[:MAX_CITATION_SPAN_CHARS]
+
+
+def _fill_cited_page_opening(
+    payload: AnswerPayload,
+    fusion: FusionResult,
+    *,
+    user_query: str,
+) -> AnswerPayload | None:
+    """Append the opening of every cited-page passage for a source-word ask.
+
+    Page openings take the paragraph and verifier slots first. When more
+    than six fitted passages share the named pages, six are kept in page,
+    hybrid-rank, then chunk-id order. An opening already present in the
+    answer is not copied again.
+
+    Args:
+        payload: Company answer after code/table salvages.
+        fusion: Fitted canonical evidence.
+        user_query: Original user text. Untrusted.
+
+    Returns:
+        Updated payload, the original when every opening is already
+        released, or None when this ask is not a cited-page source-word
+        ask or no cited-page passage has text.
+    """
+
+    pages = set(named_page_numbers(user_query))
+    if not pages or not _asks_for_source_words(user_query):
+        return None
+    matched = [
+        item
+        for item in fusion.evidence
+        if item.page_number is not None and int(item.page_number) in pages
+    ]
+    matched.sort(
+        key=lambda item: (
+            int(item.page_number or 0),
+            item.hybrid_rank if item.hybrid_rank is not None else 10_000,
+            item.chunk_id,
+        )
+    )
+    chosen: list[tuple[str, str]] = []
+    for item in matched:
+        span = _opening_exact_span(item.citation_text or "")
+        if not span:
+            continue
+        chosen.append((item.chunk_id, span))
+        if len(chosen) >= MAX_ANSWER_PARAGRAPHS:
+            break
+    if not chosen:
+        return None
+    missing = [
+        (chunk_id, span)
+        for chunk_id, span in chosen
+        if not _opening_already_released(payload, span)
+    ]
+    if not missing:
+        return payload
+    return _append_page_openings(payload, missing)
+
+
+def _opening_already_released(payload: AnswerPayload, span: str) -> bool:
+    """Return whether a paragraph already contains the collapsed opening.
+
+    Args:
+        payload: Current company answer.
+        span: Exact opening substring.
+
+    Returns:
+        True when the collapsed opening is already paragraph text.
+    """
+
+    compact = " ".join(span.split()).casefold()
+    if not compact:
+        return True
+    return any(
+        compact in " ".join(paragraph.text.split()).casefold()
+        for paragraph in payload.paragraphs
+    )
+
+
+def _append_page_openings(
+    payload: AnswerPayload,
+    openings: list[tuple[str, str]],
+) -> AnswerPayload:
+    """Append cited-page openings, dropping later claims that do not fit.
+
+    Args:
+        payload: Prior company answer.
+        openings: ``(chunk_id, exact span)`` pairs not already released.
+            At most ``MAX_ANSWER_PARAGRAPHS`` items.
+
+    Returns:
+        Payload whose page openings occupy slots ahead of later claims.
+        Paragraph indexes stay contiguous.
+    """
+
+    if not openings:
+        return payload
+    slot_cap = min(MAX_ANSWER_PARAGRAPHS, MAX_VERIFIER_LINKS)
+    room = max(0, slot_cap - len(openings))
+    kept: list[AnswerParagraph] = []
+    kept_link_count = 0
+    for paragraph in sorted(payload.paragraphs, key=lambda item: item.paragraph_index):
+        if len(kept) >= room:
+            break
+        added_links = len(paragraph.link_ids)
+        if kept_link_count + added_links + len(openings) > slot_cap:
+            break
+        kept.append(paragraph)
+        kept_link_count += added_links
+    kept_indexes = {item.paragraph_index for item in kept}
+    kept_link_ids = {link_id for item in kept for link_id in item.link_ids}
+    index_of = {
+        paragraph.paragraph_index: new_index for new_index, paragraph in enumerate(kept)
+    }
+    paragraphs = [
+        paragraph.model_copy(
+            update={"paragraph_index": index_of[paragraph.paragraph_index]}
+        )
+        for paragraph in kept
+    ]
+    citations = [
+        citation.model_copy(
+            update={"paragraph_index": index_of[citation.paragraph_index]}
+        )
+        for citation in payload.citations
+        if citation.paragraph_index in index_of
+        and (
+            citation.atomic_link_id is None or citation.atomic_link_id in kept_link_ids
+        )
+    ]
+    table_citations = [
+        citation.model_copy(
+            update={"paragraph_index": index_of[citation.paragraph_index]}
+        )
+        for citation in payload.table_citations
+        if citation.paragraph_index in kept_indexes
+        and citation.paragraph_index in index_of
+    ]
+    links = [link for link in payload.atomic_links if link.link_id in kept_link_ids]
+    used_ids = {link.link_id for link in links}
+    next_number = 1
+    for chunk_id, span in openings:
+        while f"page-opening-{next_number}" in used_ids:
+            next_number += 1
+        link_id = f"page-opening-{next_number}"
+        used_ids.add(link_id)
+        next_number += 1
+        drafted = _append_anchor_claim(
+            payload.model_copy(
+                update={
+                    "paragraphs": tuple(paragraphs),
+                    "citations": tuple(citations),
+                    "table_citations": tuple(table_citations),
+                    "atomic_links": tuple(links),
+                    "status": payload.status,
+                }
+            ),
+            chunk_id=chunk_id,
+            span=span,
+            link_id=link_id,
+            collapse_whitespace=True,
+            priority=0,
+        )
+        paragraphs = list(drafted.paragraphs)
+        citations = list(drafted.citations)
+        links = list(drafted.atomic_links)
+        table_citations = list(drafted.table_citations)
+    updated = payload.model_copy(
+        update={
+            "paragraphs": tuple(paragraphs),
+            "citations": tuple(citations),
+            "table_citations": tuple(table_citations),
+            "atomic_links": tuple(links),
+            "status": "complete",
+            "refused_links": tuple(
+                item
+                for item in payload.refused_links
+                if item not in {link.link_id for link in links}
+            ),
+        }
+    )
+    return with_derived_answer_text(updated)
 
 
 def _strong_anchor_keys(user_query: str) -> frozenset[str]:
@@ -261,12 +503,30 @@ def salvage_named_page_claim_fill(
     return salvage_anchor_claim_fill(payload, fusion, user_query=user_query)
 
 
+def _allows_fill_link_id(link_id: str) -> bool:
+    """Return whether salvage may assign ``link_id``.
+
+    Args:
+        link_id: Proposed atomic link id.
+
+    Returns:
+        True for the anchor claim ids and ``page-opening-N``.
+    """
+
+    if link_id in _ANCHOR_CLAIM_LINK_IDS:
+        return True
+    head, sep, tail = link_id.rpartition("-")
+    return bool(sep) and head == "page-opening" and tail.isdigit() and int(tail) >= 1
+
+
 def _append_anchor_claim(
     payload: AnswerPayload,
     *,
     chunk_id: str,
     span: str,
     link_id: str = _ANCHOR_CLAIM_LINK_ID,
+    collapse_whitespace: bool = False,
+    priority: int = 10,
 ) -> AnswerPayload:
     """Append one extractive claim without wiping prior company claims.
 
@@ -274,7 +534,10 @@ def _append_anchor_claim(
         payload: Prior company answer.
         chunk_id: Fusion chunk that holds ``span``.
         span: Exact citation span from evidence.
-        link_id: Anchor claim id to assign.
+        link_id: Anchor or page-opening claim id to assign.
+        collapse_whitespace: When True, the visible claim joins wrapped
+            lines into spaces. The citation span stays exact.
+        priority: Verifier rank. Lower is kept ahead of ordinary facts.
 
     Returns:
         Payload with one added anchor claim, or unchanged when empty.
@@ -283,16 +546,19 @@ def _append_anchor_claim(
     exact = span.strip()[:MAX_CITATION_SPAN_CHARS]
     if not exact:
         return payload
-    display = re.sub(
-        r"\n{2,}",
-        "\n",
-        exact.replace("\r\n", "\n").replace("\r", "\n"),
-    ).strip()
+    if collapse_whitespace:
+        display = " ".join(exact.split())
+    else:
+        display = re.sub(
+            r"\n{2,}",
+            "\n",
+            exact.replace("\r\n", "\n").replace("\r", "\n"),
+        ).strip()
     if not display:
         return payload
     if any(link.link_id == link_id for link in payload.atomic_links):
         return payload
-    if link_id not in _ANCHOR_CLAIM_LINK_IDS:
+    if not _allows_fill_link_id(link_id):
         return payload
     next_index = (
         max((item.paragraph_index for item in payload.paragraphs), default=-1) + 1
@@ -315,7 +581,7 @@ def _append_anchor_claim(
         claim=display[:2000],
         chunk_ids=(chunk_id,),
         kind="fact",
-        priority=10,
+        priority=priority,
     )
     updated = payload.model_copy(
         update={

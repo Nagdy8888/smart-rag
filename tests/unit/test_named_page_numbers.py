@@ -15,12 +15,18 @@ from smart_rag_core.retrieval.rerank import (
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
 
-def _passage(*, page: int | None, text: str = "body") -> RerankPassage:
+def _passage(
+    *,
+    page: int | None,
+    text: str = "body",
+    chunk_index: int = 0,
+) -> RerankPassage:
     """Build a minimal passage for promotion tests.
 
     Args:
         page: Optional page number on the passage.
         text: Passage body.
+        chunk_index: Order within the version.
 
     Returns:
         RerankPassage with a fresh chunk id.
@@ -37,6 +43,7 @@ def _passage(*, page: int | None, text: str = "body") -> RerankPassage:
         ),
         raw_text=text,
         page_number=page,
+        chunk_index=chunk_index,
         token_count=max(1, len(text.split())),
         channels=frozenset({"term"}),
         excerpt=text,
@@ -66,6 +73,38 @@ def test_promote_named_page_pins_matching_passage() -> None:
     )
     assert promoted[0].page_number == 27
     assert promoted[0].raw_text == "target"
+
+
+def test_source_word_ask_pins_every_cited_page_passage() -> None:
+    """Exact wording pins both page passages, earlier chunk index first."""
+
+    other = _passage(page=3, text="other page")
+    later = _passage(page=12, text="later section", chunk_index=8)
+    earlier = _passage(page=12, text="earlier section", chunk_index=2)
+    promoted = promote_named_page_passages(
+        (other,),
+        query="What exact wording does page 12 use? Use only that document.",
+        pool=(later, earlier, other),
+        limit=3,
+    )
+    assert [item.chunk_index for item in promoted] == [2, 8, 0]
+    assert [item.page_number for item in promoted] == [12, 12, 3]
+
+
+def test_ordinary_page_ask_pins_only_the_first_match() -> None:
+    """A page ask that is not a source-word ask still pins one passage."""
+
+    other = _passage(page=3, text="other page")
+    first = _passage(page=12, text="first pool match", chunk_index=8)
+    second = _passage(page=12, text="later chunk", chunk_index=2)
+    promoted = promote_named_page_passages(
+        (other,),
+        query="On page 12, what does the protocol require? Use only that document.",
+        pool=(first, second, other),
+        limit=3,
+    )
+    assert promoted[0].raw_text == "first pool match"
+    assert all(item.raw_text != "later chunk" for item in promoted)
 
 
 def test_page_head_pins_keeps_matching_fused_ids() -> None:

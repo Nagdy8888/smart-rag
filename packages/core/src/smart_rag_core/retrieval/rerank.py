@@ -338,6 +338,12 @@ def promote_named_code_definition_passages(
     )
 
 
+_SOURCE_WORD_ASK = re.compile(
+    r"\b(?:exact wording|verbatim|quote)\b",
+    re.IGNORECASE,
+)
+
+
 def promote_named_page_passages(
     trimmed: tuple[RerankPassage, ...],
     *,
@@ -346,6 +352,11 @@ def promote_named_page_passages(
     limit: int,
 ) -> tuple[RerankPassage, ...]:
     """Pin passages whose ``page_number`` matches an explicit page cite.
+
+    A source-word ask (exact wording, verbatim, or quote) pins every
+    matching passage, ordered by page, chunk index, then chunk id.
+    Any other page cite pins only the first pool match. The result stays
+    inside ``limit`` and does not duplicate a passage.
 
     Args:
         trimmed: Final evidence after MMR and token trim.
@@ -369,11 +380,20 @@ def promote_named_page_passages(
     ]
     if not matches:
         return trimmed
-    pinned = matches[0]
-    rest = [
-        item for item in trimmed if item.candidate.chunk_id != pinned.candidate.chunk_id
-    ]
-    return (pinned, *rest)[:limit]
+    if _SOURCE_WORD_ASK.search(query):
+        pinned_list = sorted(
+            matches,
+            key=lambda item: (
+                int(item.page_number or 0),
+                item.chunk_index,
+                str(item.candidate.chunk_id),
+            ),
+        )
+    else:
+        pinned_list = [matches[0]]
+    pinned_ids = {item.candidate.chunk_id for item in pinned_list}
+    rest = [item for item in trimmed if item.candidate.chunk_id not in pinned_ids]
+    return (*pinned_list, *rest)[:limit]
 
 
 def promote_named_table_passages(

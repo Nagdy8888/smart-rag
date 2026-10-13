@@ -104,7 +104,7 @@ def test_anchor_claim_fill_prefers_named_page_passage() -> None:
     )
     assert salvaged is not payload
     claim = next(
-        link for link in salvaged.atomic_links if link.link_id == "anchor-claim-1"
+        link for link in salvaged.atomic_links if link.link_id == "page-opening-1"
     )
     assert target.chunk_id in claim.chunk_ids
 
@@ -176,6 +176,66 @@ def test_anchor_claim_fill_skips_after_structural_salvage() -> None:
     assert again is structural
 
 
+def test_exact_wording_page_ask_appends_passage_opening() -> None:
+    """A cited-page exact-wording ask copies the passage opening."""
+
+    passage = verifier_passage(
+        7,
+        text=(
+            "The ledger records a final balance before any later note.\n"
+            "A handshake token appears only in this later sentence."
+        ),
+    )
+    passage = passage.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(passage)
+    payload = _payload("Setup is required.", chunk=passage.chunk_id)
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "What exact wording does page 12 use for the main claim "
+            "about the handshake token? Use only that document."
+        ),
+    )
+    claim = next(
+        link for link in salvaged.atomic_links if link.link_id == "page-opening-1"
+    )
+    assert "final balance" in claim.claim.casefold()
+    assert "\n" not in claim.claim
+    citation = next(
+        item for item in salvaged.citations if item.atomic_link_id == "page-opening-1"
+    )
+    assert citation.span is not None
+    assert citation.span in passage.citation_text
+
+
+def test_ordinary_page_ask_keeps_anchor_neighborhood() -> None:
+    """A page ask that is not a source-word ask still uses topic anchors."""
+
+    passage = verifier_passage(
+        8,
+        text=(
+            "The ledger records a final balance before any later note. "
+            "A handshake token appears only in this later sentence."
+        ),
+    )
+    passage = passage.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(passage)
+    payload = _payload("Setup is required.", chunk=passage.chunk_id)
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "On page 12, what does the handshake token require? Use only that document."
+        ),
+    )
+    claim = next(
+        link for link in salvaged.atomic_links if link.link_id == "anchor-claim-1"
+    )
+    assert "handshake token" in claim.claim.casefold()
+    assert "final balance" not in claim.claim.casefold()
+
+
 def test_anchor_claim_fill_noop_when_span_already_present() -> None:
     """Draft that already holds the span is left unchanged."""
 
@@ -196,3 +256,113 @@ def test_anchor_claim_fill_noop_when_span_already_present() -> None:
         ),
     )
     assert salvaged is payload
+
+
+def test_exact_wording_page_ask_copies_every_page_opening() -> None:
+    """Both fitted passages on the named page contribute an opening."""
+
+    overlap = verifier_passage(
+        9,
+        text="The catalog lists every handshake token in a later section.",
+        rank=1,
+    )
+    overlap = overlap.model_copy(update={"page_number": 12})
+    holder = verifier_passage(
+        10,
+        text="The ledger records a final balance before any later note.",
+        rank=2,
+    )
+    holder = holder.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(overlap, holder)
+    payload = _payload("Setup is required.", chunk=overlap.chunk_id)
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "What exact wording does page 12 use for the handshake token "
+            "catalog? Use only that document."
+        ),
+    )
+    openings = {
+        link.link_id: link
+        for link in salvaged.atomic_links
+        if link.link_id.startswith("page-opening-")
+    }
+    assert len(openings) == 2
+    by_chunk = {link.chunk_ids[0]: link for link in openings.values()}
+    assert overlap.chunk_id in by_chunk
+    assert holder.chunk_id in by_chunk
+    for passage in (overlap, holder):
+        citation = next(
+            item
+            for item in salvaged.citations
+            if item.chunk_id == passage.chunk_id and item.atomic_link_id in openings
+        )
+        assert citation.span is not None
+        assert citation.span in passage.citation_text
+    assert "final balance" in salvaged.answer_text.casefold()
+
+
+def test_existing_anchor_claim_still_gains_the_other_opening() -> None:
+    """An anchor claim on one page chunk does not block the other opening."""
+
+    overlap = verifier_passage(
+        11,
+        text="The catalog lists every handshake token in a later section.",
+        rank=1,
+    )
+    overlap = overlap.model_copy(update={"page_number": 12})
+    holder = verifier_passage(
+        12,
+        text="The ledger records a final balance before any later note.",
+        rank=2,
+    )
+    holder = holder.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(overlap, holder)
+    opening = overlap.citation_text
+    payload = AnswerPayload(
+        answer_text=opening,
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text=opening,
+                link_ids=("anchor-claim-1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=overlap.chunk_id,
+                span=opening,
+                paragraph_index=0,
+                atomic_link_id="anchor-claim-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="anchor-claim-1",
+                claim=opening,
+                chunk_ids=(overlap.chunk_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "What exact wording does page 12 use for the handshake token "
+            "catalog? Use only that document."
+        ),
+    )
+    assert any(link.link_id == "anchor-claim-1" for link in salvaged.atomic_links)
+    gained = next(
+        link for link in salvaged.atomic_links if link.link_id == "page-opening-1"
+    )
+    assert gained.chunk_ids == (holder.chunk_id,)
+    citation = next(
+        item for item in salvaged.citations if item.atomic_link_id == "page-opening-1"
+    )
+    assert citation.span is not None
+    assert citation.span in holder.citation_text
+    assert "final balance" in salvaged.answer_text.casefold()

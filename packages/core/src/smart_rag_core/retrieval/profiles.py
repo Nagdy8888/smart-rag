@@ -129,6 +129,7 @@ class RetrievalFallbackReason(StrEnum):
     TIMEOUT = "retrieval_timeout"
     DENSE_UNAVAILABLE = "dense_unavailable"
     TERM_UNAVAILABLE = "term_unavailable"
+    PAGE_SCOPE_UNAVAILABLE = "page_scope_unavailable"
     AUTH_CONTEXT_INVALID = "auth_context_invalid"
     RETRIEVAL_EMPTY = "retrieval_empty"
 

@@ -46,6 +46,7 @@ audience: engineering
 | Honest RAG accuracy repair | accepted | 6 overlay | [ADR-honest-rag-accuracy.md](./ADR-honest-rag-accuracy.md) |
 | Repair answers lost after retrieval | accepted | 6 overlay | [ADR-retrieved-answer-loss-repair.md](./ADR-retrieved-answer-loss-repair.md) |
 | Probe15 retrieval timing and pool repair | proposed | 6 overlay | [ADR-probe15-retrieval-and-release-repair.md](./ADR-probe15-retrieval-and-release-repair.md) |
+| Long-document rerank pool of 60 | rejected | answer quality | [ADR-hybrid-long-document-v5-pool.md](./ADR-hybrid-long-document-v5-pool.md) |
 | General answer-quality repair | proposed | answer quality | [ADR-general-answer-quality.md](./ADR-general-answer-quality.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |

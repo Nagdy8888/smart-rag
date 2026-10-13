@@ -151,6 +151,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-sse-ordered-background-writer.md](./adr/ADR-sse-ordered-background-writer.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
 | [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-25 | eng, reviewers, security |
 | [adr/ADR-probe15-retrieval-and-release-repair.md](./adr/ADR-probe15-retrieval-and-release-repair.md) | engineering-lead | proposed | 2026-10-08 | eng, reviewers |
+| [adr/ADR-hybrid-long-document-v5-pool.md](./adr/ADR-hybrid-long-document-v5-pool.md) | engineering-lead | rejected | 2026-10-13 | eng, reviewers |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-small-corpus-long-document-and-channel-pins.md](./adr/ADR-small-corpus-long-document-and-channel-pins.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
@@ -164,7 +165,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-vision-captioning.md](./adr/ADR-vision-captioning.md) | product-owner | proposed | 2026-08-12 | client, eng |
 | [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
+| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-10-13 | eng, reviewers |
 | [retrieval/BM25_PROJECTION_CONTRACT.md](./retrieval/BM25_PROJECTION_CONTRACT.md) | engineering-lead | draft | 2026-09-09 | eng |
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-09-22 | eng |
@@ -206,7 +207,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md](./evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, frontend, reviewers |
 | [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
-| [evaluation/GENERAL_ANSWER_QUALITY_2026-10.md](./evaluation/GENERAL_ANSWER_QUALITY_2026-10.md) | engineering-lead | draft | 2026-10-06 | eng, reviewers |
+| [evaluation/GENERAL_ANSWER_QUALITY_2026-10.md](./evaluation/GENERAL_ANSWER_QUALITY_2026-10.md) | engineering-lead | draft | 2026-10-13 | eng, reviewers |
 | [evaluation/HYBRID_STAGE_TIMINGS_2026-09.md](./evaluation/HYBRID_STAGE_TIMINGS_2026-09.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |

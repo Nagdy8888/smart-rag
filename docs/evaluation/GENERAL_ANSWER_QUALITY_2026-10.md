@@ -2,7 +2,7 @@
 title: General answer-quality repair evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-10-07
+last-reviewed: 2026-10-13
 audience: eng, reviewers
 ---
 
@@ -505,6 +505,142 @@ drop >1.
 
 **Full revert** of the `answer_v6` and `verifier_v2` paraphrase ban and
 the pinned prompt hashes. No fix-forward. Kept baseline remains draft-3.
+
+## Probe15 finals (2026-10-08)
+
+Three private 15-question probes on `hybrid_long_document_v4`. Counts only. Question ids and channel traces stay in `.private-eval/runs/probe15-failure-causes.md`.
+
+| Set | Strict | ok | 2_retrieval | 3_fusion_pool | 4_rerank_select | 5a | 5b |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `probe15-a-final` | 4/15 | 4 | 2 | 2 | 0 | 6 | 1 |
+| `probe15-b-final` | 5/15 | 5 | 2 | 3 | 1 | 4 | 0 |
+| `probe15-c-final` | 8/15 | 8 | 1 | 2 | 2 | 2 | 0 |
+
+Of 28 misses, 26 committed `verify_answer`. Two runs stopped early: one timeout with zero checkpoints, one `run_failed` after `generate_answer`. The repeated losses are inside `company_scope` (pool cut of the fused 100 down to the rerank pool of 20, then rerank select) and `generate_answer` (selected evidence holds the fact, the draft does not). `fuse_evidence` did not drop these facts. The checkpoint repair below measured both repeated losses and kept neither change.
+
+## Probe15 checkpoint repair (2026-10-13)
+
+All 11 draft omissions on the finals above had the supporting chunk in `answer_context_fit.included_chunk_ids`. `answer_v7` added one instruction to use the supplied record that states the ask. Compared with the finals:
+
+| Set | Strict before | Strict after | 5a before | 5a after | Decision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| probe15-a | 4/15 | 4/15 | 6 | 7 | fail |
+| probe15-b | 5/15 | 5/15 | 4 | 4 | fail |
+| probe15-c | 8/15 | 8/15 | 2 | 3 | fail |
+
+`5a_draft_missing` did not fall on two sets. The pin returned to `answer_v6`. `answer_v7` was not kept.
+
+`hybrid_long_document_v5` copies v4 with `rerank_pool_size` 60. Routed for one probe15 rerun, then unrouted. Strict was 0/15 on all three sets. Every question stopped in `company_scope` with insufficient evidence because the rerank request allows 20 candidate ids and the pool had 29. `3_fusion_pool` is not a usable comparison: stage export recorded `1_ingestion` for every fact. Selector stays on `hybrid_long_document_v4`. The v5 file remains pinned and unrouted. See [ADR-hybrid-long-document-v5-pool.md](../adr/ADR-hybrid-long-document-v5-pool.md).
+
+## dev40-v2 baseline (2026-10-13)
+
+Fresh private set `.private-eval/dev40-2026-10-v2.json`. Validator `failures=0`. The unused pages had no code listings or table captions, so the set is 40 text questions. Live ask on the current api image, no image rebuild.
+
+| Metric | Count |
+| --- | ---: |
+| strict passes | 8/40 |
+| ok | 8 |
+| 1_ingestion | 0 |
+| 2_retrieval | 16 |
+| 3_fusion_pool | 1 |
+| 4_rerank_select | 0 |
+| 5a_draft_missing | 15 |
+| 5b_removed_after_draft | 0 |
+| 5_unknown_no_checkpoint | 0 |
+
+All 15 draft omissions had the supporting chunk in `answer_context_fit.included_chunk_ids` (`in_prompt=15`, `trimmed=0`). Question ids and the channel table stay in `.private-eval/runs/dev40-v2-baseline/failure-causes.md`.
+
+Decision: `2_retrieval` is the largest stage (16). That set is not the checkpoint-repair measurement. The probe15 repair is recorded above.
+
+## dev40-v2 cited-page chunks (2026-10-13)
+
+Kept. The 16 recall misses had the fact on the cited page in a chunk with `is_search_representative` false, so page inject's recheck dropped it. Cited-page fetch now returns those chunks after the same ACL, deletion, current-version, and ready-status checks, prepends them under the term cap, and logs `page_scope_unavailable` without clearing the lexical term list. Image rebuilt. Probe: `retrieve_page_candidates present`, `cited_page_sql present`. `check_gold_literals` exit 0.
+
+| Metric | Baseline | After page scope |
+| --- | ---: | ---: |
+| strict passes | 8/40 | 9/40 |
+| ok | 8 | 9 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 16 | 0 |
+| 3_fusion_pool | 1 | 0 |
+| 4_rerank_select | 0 | 1 |
+| 5a_draft_missing | 15 | 30 |
+| 5b_removed_after_draft | 0 | 0 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`2_retrieval` 16→0. Strict +1, inside the drop limit of 3. The former recall misses moved into `5a_draft_missing` (`d30` is the one `4_rerank_select`). Draft omission is now the largest stage. No `generate_answer` change in this packet.
+
+## dev40-v2 cited-page opening (2026-10-13)
+
+Kept. For an exact-wording, verbatim, or quote ask that names a page, `salvage_anchor_claim_fill` appends the opening of the fitted passage on that page instead of the topic-word neighborhood. The visible claim collapses wrapped lines to spaces. The citation span stays an exact substring. Other asks still use the anchor neighborhood. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `opening present`. `check_gold_literals` exit 0.
+
+| Metric | After page scope | After opening fill |
+| --- | ---: | ---: |
+| strict passes | 9/40 | 19/40 |
+| ok | 9 | 19 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 1 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 1 | 3 |
+| 5a_draft_missing | 30 | 10 |
+| 5b_removed_after_draft | 0 | 7 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5a` 30→10. Strict +10, inside the drop limit of 3. The runner summary line printed `strict_pass=18`; the stage report is 19. All 7 `5b` removals are `trimmed_or_rewritten`. Question ids stay in `.private-eval/runs/dev40-v2-opening/stage-loss.json`.
+
+## dev40-v2 extractive verifier keep (2026-10-13)
+
+Reverted. A fact link whose whitespace-collapsed claim was already in a cited passage was kept even when the verifier marked it unsupported. Image rebuilt. Probe: `extractive present`. `check_gold_literals` exit 0.
+
+| Metric | After opening fill | After extractive keep |
+| --- | ---: | ---: |
+| strict passes | 19/40 | 18/40 |
+| ok | 19 | 18 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 1 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 3 | 1 |
+| 5a_draft_missing | 10 | 12 |
+| 5b_removed_after_draft | 7 | 9 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5b` 7→9, so the target stage did not fall. Strict −1. Full revert of the verifier exemption. The kept code remains the cited-page opening fill. Question ids stay in `.private-eval/runs/dev40-v2-extractive/stage-loss.json`.
+
+## dev40-v2 claim-passage retarget (2026-10-13)
+
+Kept. After token rebind, a fact whose whitespace-collapsed claim is already inside a fitted passage is cited on the shortest such passage. The citation span is the exact raw slice of that claim, capped at 1000 characters. The visible claim stays collapsed. Claims that are not inside any passage still follow token rebind. The verifier then keeps that fact when the collapsed claim is inside the cited passage, and still drops a paraphrase that is not. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `retarget present`, `extractive present`, `opening present`. `check_gold_literals` exit 0.
+
+| Metric | After opening fill | After claim retarget |
+| --- | ---: | ---: |
+| strict passes | 19/40 | 23/40 |
+| ok | 19 | 23 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 1 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 3 | 2 |
+| 5a_draft_missing | 10 | 13 |
+| 5b_removed_after_draft | 7 | 2 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5b` 7→2 (`refused_after_draft` 1, `trimmed_or_rewritten` 1). Strict +4, inside the drop limit of 3. The runner summary line printed `strict_pass=23`. `5a` rose 10→13. Two asks ended `run_failed` during verify (`d15`, `d20`); both were already misses on the opening run. Question ids stay in `.private-eval/runs/dev40-v2-retarget/stage-loss.json`.
+
+## dev40-v2 every cited-page opening (2026-10-13)
+
+Kept. A source-word ask that names a page now appends the opening of every fitted passage on that page, up to six, instead of only the highest-overlap chunk. Link ids are `page-opening-N`. An existing anchor claim does not block the other openings. When company generation fails and those openings are already in the fitted evidence, that payload is stored instead of the empty refusal. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `page_openings present`. `check_gold_literals` exit 0.
+
+| Metric | After claim retarget | After every page opening |
+| --- | ---: | ---: |
+| strict passes | 23/40 | 35/40 |
+| ok | 23 | 35 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 2 | 2 |
+| 5a_draft_missing | 13 | 2 |
+| 5b_removed_after_draft | 2 | 1 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5a` 13→2. Strict +12 on the stage report, inside the drop limit of 3. The runner summary line printed `strict_pass=31`; the stage report is 35. The remaining draft misses are `d09` and `d20`. The one post-draft removal is `trimmed_or_rewritten` (`d26`). Question ids stay in `.private-eval/runs/dev40-v2-openings/stage-loss.json`.
 
 ## Approvals recorded
 

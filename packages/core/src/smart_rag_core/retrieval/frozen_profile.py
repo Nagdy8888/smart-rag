@@ -26,6 +26,8 @@ LONG_DOCUMENT_V3_PROFILE_ID = "hybrid_long_document_v3"
 LONG_DOCUMENT_V3_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_V3_PROFILE_ID}.json"
 LONG_DOCUMENT_V4_PROFILE_ID = "hybrid_long_document_v4"
 LONG_DOCUMENT_V4_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_V4_PROFILE_ID}.json"
+LONG_DOCUMENT_V5_PROFILE_ID = "hybrid_long_document_v5"
+LONG_DOCUMENT_V5_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_V5_PROFILE_ID}.json"
 COVERAGE_SCORE_BASELINE = 0.65
 FROZEN_HYBRID_PROFILE_SHA256 = (
     "37343b15449600a4e756e7f72b9282cf709713019e033fe470a9b91fa21f0ec0"
@@ -42,6 +44,10 @@ FROZEN_LONG_DOCUMENT_V4_PROFILE_SHA256 = (
     "385f22245b951080558e42387a8f540f9cb5b7f35020733248c3150b44fbd1b3"
 )
 """Balanced dense and BM25 pins. Rollback is ``hybrid_long_document_v3``."""
+FROZEN_LONG_DOCUMENT_V5_PROFILE_SHA256 = (
+    "d5766186fdacd49b6bcf88aab1679485cdad627bf0cb1f4a3a105dcbbdf049f8"
+)
+"""Rerank pool 60, still at most the fused cap. Rollback is v4."""
 
 
 class UnknownRetrievalProfileError(ValueError):
@@ -141,7 +147,7 @@ def runtime_profile_ids() -> frozenset[str]:
 
     Returns:
         Default, plus the pinned long-document ids when enabled: v2 and v3
-        (rollbacks) and v4 (the routed profile).
+        (rollbacks), v4 (the routed profile), and v5 (pinned, not routed).
     """
 
     ids = {HYBRID_DEFAULT_PROFILE_ID}
@@ -151,6 +157,8 @@ def runtime_profile_ids() -> frozenset[str]:
         ids.add(LONG_DOCUMENT_V3_PROFILE_ID)
     if FROZEN_LONG_DOCUMENT_V4_PROFILE_SHA256:
         ids.add(LONG_DOCUMENT_V4_PROFILE_ID)
+    if FROZEN_LONG_DOCUMENT_V5_PROFILE_SHA256:
+        ids.add(LONG_DOCUMENT_V5_PROFILE_ID)
     return frozenset(ids)
 
 
@@ -164,8 +172,8 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
             stays unfrozen. ``hybrid_packet5_v1`` is documented rollback,
             not a second live default. ``hybrid_long_document_v3`` is
             executable after answer-loss repair A4 pins its digest.
-            ``hybrid_long_document_v4`` is the routed profile. v3 remains
-            the rollback.
+            ``hybrid_long_document_v4`` is the routed profile. v5 is pinned
+            and not selected. v3 remains an older rollback.
 
     Returns:
         Validated frozen profile.
@@ -203,6 +211,12 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
             profile_id,
             LONG_DOCUMENT_V4_PROFILE_PATH,
             FROZEN_LONG_DOCUMENT_V4_PROFILE_SHA256,
+        )
+    if profile_id == LONG_DOCUMENT_V5_PROFILE_ID:
+        return _load_pinned_profile(
+            profile_id,
+            LONG_DOCUMENT_V5_PROFILE_PATH,
+            FROZEN_LONG_DOCUMENT_V5_PROFILE_SHA256,
         )
     raise UnknownRetrievalProfileError(profile_id)
 

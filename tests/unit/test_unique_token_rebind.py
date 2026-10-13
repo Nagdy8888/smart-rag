@@ -110,8 +110,8 @@ def test_prose_and_def_token_holders_multicite_gold_prose() -> None:
     assert def_id in bound.atomic_links[0].chunk_ids or def_id in cited_ids
 
 
-def test_multi_page_token_cites_both_holders() -> None:
-    """When two fused chunks share a fact phrase, both may be cited."""
+def test_contained_claim_cites_only_the_holding_passage() -> None:
+    """A claim that is one whole passage does not also cite a shared number."""
 
     page_a = "The rollout reached 50 engineers in the first month."
     page_b = "Later the team grew beyond 50 engineers on the same product."
@@ -146,12 +146,10 @@ def test_multi_page_token_cites_both_holders() -> None:
     )
     bound = bind_company_atomic_links(payload, fusion=fusion)
     cited_ids = {item.chunk_id for item in bound.citations}
-    assert verifier_uid(1) in cited_ids
-    assert verifier_uid(2) in cited_ids
-    assert set(bound.atomic_links[0].chunk_ids) == {
-        verifier_uid(1),
-        verifier_uid(2),
-    }
+    assert cited_ids == {verifier_uid(1)}
+    assert bound.atomic_links[0].chunk_ids == (verifier_uid(1),)
+    assert bound.citations[0].span is not None
+    assert bound.citations[0].span in page_a
 
 
 def test_hyphen_model_token_rebinds_to_holder() -> None:
@@ -328,4 +326,60 @@ def test_query_overlap_prefers_a2a_acronym_holder() -> None:
         answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     )
     bound = bind_company_atomic_links(payload, fusion=fusion, user_query=query)
+    assert bound.citations[0].chunk_id == verifier_uid(2)
+
+
+def test_contained_claim_cites_the_passage_that_holds_it() -> None:
+    """A collapsed claim leaves a short span and cites the holding passage."""
+
+    other = "A handshake token appears only in this later sentence."
+    holder = "The ledger records a final balance\nbefore any later note."
+    claim = "The ledger records a final balance before any later note."
+    fusion = verifier_fusion(
+        verifier_passage(1, text=other, rank=1),
+        verifier_passage(2, text=holder, rank=2),
+    )
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("claim-1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=verifier_uid(1),
+                span="A handshake token",
+                paragraph_index=0,
+                atomic_link_id="claim-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="claim-1",
+                claim=claim,
+                chunk_ids=(verifier_uid(1),),
+                kind="fact",
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    bound = bind_company_atomic_links(payload, fusion=fusion)
+    link = bound.atomic_links[0]
+    citation = bound.citations[0]
+    assert link.claim == claim
+    assert link.chunk_ids == (verifier_uid(2),)
+    assert citation.chunk_id == verifier_uid(2)
+    assert citation.span is not None
+    assert citation.span in holder
+
+
+def test_paraphrase_still_follows_token_rebind() -> None:
+    """A claim that is not contained in a passage still uses token rebind."""
+
+    fusion = verifier_fusion(
+        verifier_passage(1, text=_WRONG, rank=1),
+        verifier_passage(2, text=_GOLD, rank=2),
+    )
+    bound = bind_company_atomic_links(_payload(verifier_uid(1)), fusion=fusion)
+    assert bound.atomic_links[0].chunk_ids[0] == verifier_uid(2)
     assert bound.citations[0].chunk_id == verifier_uid(2)

@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-24
+last-reviewed: 2026-10-13
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -31,6 +31,12 @@ collapsed after ACL and current-version recheck; documents are never deleted
 automatically. The term channel searches the ranking sentence plus bounded
 extracted codes, acronyms, entities, and aliases. BM25 unique capping
 round-robins variants so one variant cannot consume the survivor cap.
+When the ask cites numeric pages, those pages' stored chunks are prepended
+to the term channel, including chunks search ranking skips because they
+are not representatives. ACL, deletion, current version, and ready status
+still apply. The term cap keeps the cited page ahead of lexical hits. A
+failed page fetch is logged as `page_scope_unavailable` and leaves the
+lexical term list in place.
 
 ## Long-document runtime profile (P06-62)
 
@@ -448,8 +454,11 @@ A channel pass that returns no IDs only because at least one channel timed
 out may run once more when 18 seconds of run time remain. The second pass
 reuses the embedding vectors. Long-document asks use
 `hybrid_long_document_v4`: 10 dense pins, 5 BM25 pins, fused fill, pool
-size 20. See
-[ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md).
+size 20. `hybrid_long_document_v5` (pool 60) is pinned and not routed.
+See
+[ADR-probe15-retrieval-and-release-repair.md](../adr/ADR-probe15-retrieval-and-release-repair.md)
+and
+[ADR-hybrid-long-document-v5-pool.md](../adr/ADR-hybrid-long-document-v5-pool.md).
 
 Drop forward via later expand/contract migrations
 `20260814130000_hybrid_retrieval_v1.sql`,

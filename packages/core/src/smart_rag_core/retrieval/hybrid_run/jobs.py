@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
@@ -32,6 +33,8 @@ from smart_rag_core.retrieval.types import (
 )
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings.postgres_connect import connect_postgres
+
+logger = logging.getLogger(__name__)
 
 
 class HybridChannelJobsMixin:
@@ -219,7 +222,11 @@ class HybridChannelJobsMixin:
                 # Ask-gated listed/code seeds as extra term needles so
                 # TOC/preface literals (CrewAI, Table of Contents) are not
                 # dense/BM25-only.
-                from smart_rag_core.retrieval.pages import retrieve_page_candidates
+                from smart_rag_core.retrieval.pages import (
+                    idle_page_connection,
+                    merge_cited_page_candidates,
+                    retrieve_page_candidates,
+                )
                 from smart_rag_core.retrieval.rerank import (
                     hybrid_seed_terms,
                     named_page_numbers,
@@ -241,7 +248,7 @@ class HybridChannelJobsMixin:
                     """Prepend authorized page-scoped hits when the ask cites pages.
 
                     Args:
-                        connection: Canonical connection for page fetch/recheck.
+                        connection: Canonical connection for the page fetch.
                         lists: Per-variant term candidate lists.
 
                     Returns:
@@ -250,28 +257,46 @@ class HybridChannelJobsMixin:
 
                     if not pages:
                         return lists
+
+                    def _open_page_connection() -> psycopg.Connection:
+                        """Open a second idle connection for the page fetch.
+
+                        Returns:
+                            A new Postgres connection from the channel DSN.
+
+                        Raises:
+                            RuntimeError: If no channel DSN is configured.
+                        """
+
+                        dsn = self._supabase_dsn
+                        if not dsn:
+                            raise RuntimeError("hybrid_channel_requires_supabase_dsn")
+                        return connect_postgres(dsn)
+
+                    page_connection = connection
+                    close_page = False
                     try:
-                        page_hits = retrieve_page_candidates(
+                        page_connection, close_page = idle_page_connection(
                             connection,
+                            _open_page_connection,
+                        )
+                        page_hits = retrieve_page_candidates(
+                            page_connection,
                             caller=caller,
                             pages=pages,
                             version_id=version_id,
                         )
-                    except Exception:
+                    except Exception as exc:
+                        logger.warning(
+                            "%s error=%s",
+                            RetrievalFallbackReason.PAGE_SCOPE_UNAVAILABLE,
+                            type(exc).__name__,
+                        )
                         return lists
-                    if not page_hits:
-                        return lists
-                    if not lists:
-                        return (page_hits,)
-                    head = lists[0]
-                    seen = {item.chunk_id for item in head}
-                    merged = list(page_hits)
-                    for item in head:
-                        if item.chunk_id in seen:
-                            continue
-                        seen.add(item.chunk_id)
-                        merged.append(item)
-                    return (tuple(merged), *lists[1:])
+                    finally:
+                        if close_page:
+                            page_connection.close()
+                    return merge_cited_page_candidates(lists, page_hits)
 
                 if self._supabase_dsn:
                     from smart_rag_core.retrieval.terms import TermRetriever

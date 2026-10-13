@@ -17,6 +17,7 @@ from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_ANSWER_PARAGRAPHS,
+    MAX_CITATION_SPAN_CHARS,
 )
 from smart_rag_core.query_fusion.models import FusionResult
 
@@ -42,6 +43,9 @@ def bind_company_atomic_links(
       phrase sits in fused evidence is retargeted onto up to two holding
       chunks (prose naming first for identifiers) when the current
       citation misses the preferred holder.
+    - A fact whose whitespace-collapsed claim is already contained in a
+      fitted passage is cited on the shortest such passage, with an exact
+      raw slice of that passage. That replaces a shorter token span.
     - Each atomic link's ``chunk_ids`` gains the chunks its citations
       already cite, capped at 12.
 
@@ -88,7 +92,150 @@ def bind_company_atomic_links(
     aligned = _align_citation_spans(working, fusion)
     rebound = rebind_named_definitions(aligned, fusion, user_query=user_query)
     token_bound = rebind_unique_claim_tokens(rebound, fusion, user_query=user_query)
-    return _repair_link_chunk_ids(token_bound)
+    contained = rebind_contained_claims(token_bound, fusion)
+    return _repair_link_chunk_ids(contained)
+
+
+def _collapse_bounds(text: str) -> tuple[str, list[int]]:
+    """Collapse whitespace and record the raw index of each kept character.
+
+    Args:
+        text: Passage or claim text.
+
+    Returns:
+        Collapsed text and the raw index of each character in it. A
+        joining space uses the index of the whitespace run it replaced.
+    """
+
+    collapsed: list[str] = []
+    raw_of: list[int] = []
+    gap_start: int | None = None
+    for index, char in enumerate(text):
+        if char.isspace():
+            if collapsed and gap_start is None:
+                gap_start = index
+            continue
+        if gap_start is not None:
+            collapsed.append(" ")
+            raw_of.append(gap_start)
+            gap_start = None
+        collapsed.append(char)
+        raw_of.append(index)
+    return "".join(collapsed), raw_of
+
+
+def _exact_claim_slice(text: str, claim: str) -> str:
+    """Return the raw passage slice whose collapsed text is ``claim``.
+
+    Args:
+        text: Canonical passage text.
+        claim: Whitespace-collapsed fact claim.
+
+    Returns:
+        Exact substring of ``text``, capped at ``MAX_CITATION_SPAN_CHARS``.
+        Empty when ``claim`` is not in the collapsed passage.
+    """
+
+    collapsed, raw_of = _collapse_bounds(text)
+    start = collapsed.find(claim)
+    if start < 0 or not claim:
+        return ""
+    end = start + len(claim) - 1
+    raw_start = raw_of[start]
+    raw_end = raw_of[end] + 1
+    return text[raw_start:raw_end][:MAX_CITATION_SPAN_CHARS]
+
+
+def rebind_contained_claims(
+    payload: AnswerPayload,
+    fusion: FusionResult,
+) -> AnswerPayload:
+    """Cite the fitted passage that already contains a fact claim.
+
+    Token rebind can leave a long claim attached to a short span in a
+    different chunk. When the collapsed claim sits in a fitted passage,
+    the link and its passage citation move to the shortest such passage.
+    The visible claim text stays as written.
+
+    Args:
+        payload: Company answer after token rebind.
+        fusion: Fitted canonical evidence.
+
+    Returns:
+        Payload with contained facts retargeted, or ``payload`` when no
+        fact claim is contained in a fitted passage.
+    """
+
+    holders: dict[str, tuple[str, str]] = {}
+    for link in payload.atomic_links:
+        if link.kind != "fact":
+            continue
+        claim = " ".join(link.claim.split())
+        if not claim:
+            continue
+        matches: list[tuple[int, str, str]] = []
+        for passage in fusion.evidence:
+            span = _exact_claim_slice(passage.citation_text, claim)
+            if not span:
+                continue
+            matches.append((len(passage.citation_text), passage.chunk_id, span))
+        if not matches:
+            continue
+        matches.sort()
+        _length, chunk_id, span = matches[0]
+        already = tuple(link.chunk_ids) == (chunk_id,) and any(
+            citation.atomic_link_id == link.link_id
+            and citation.chunk_id == chunk_id
+            and citation.span == span
+            for citation in payload.citations
+        )
+        if already:
+            continue
+        holders[link.link_id] = (chunk_id, span)
+    if not holders:
+        return payload
+    links = tuple(
+        link.model_copy(update={"chunk_ids": (holders[link.link_id][0],)})
+        if link.link_id in holders
+        else link
+        for link in payload.atomic_links
+    )
+    citations: list[AnswerCitation] = []
+    placed: set[str] = set()
+    for citation in payload.citations:
+        link_id = citation.atomic_link_id
+        if link_id in holders and citation.chunk_id:
+            if link_id in placed:
+                continue
+            chunk_id, span = holders[link_id]
+            citations.append(
+                citation.model_copy(update={"chunk_id": chunk_id, "span": span})
+            )
+            placed.add(link_id)
+            continue
+        citations.append(citation)
+    for link_id, (chunk_id, span) in holders.items():
+        if link_id in placed:
+            continue
+        paragraph_index = next(
+            (
+                item.paragraph_index
+                for item in payload.paragraphs
+                if link_id in item.link_ids
+            ),
+            0,
+        )
+        citations.append(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=span,
+                atomic_link_id=link_id,
+                paragraph_index=paragraph_index,
+            )
+        )
+    return payload.model_copy(
+        update={"atomic_links": links, "citations": tuple(citations)}
+    )
 
 
 def _links_from_paragraphs(payload: AnswerPayload) -> tuple[AtomicLink, ...]:
