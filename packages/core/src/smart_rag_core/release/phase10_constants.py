@@ -378,6 +378,7 @@ REQUIRED_STORAGE_BUCKETS: tuple[str, ...] = (
     "documents-originals",
     "web-snapshots",
     "table-artifacts",
+    "figure-artifacts",
 )
 RECONCILE_RUNBOOK_REQUIRED_TOKENS: tuple[str, ...] = (
     "missing object",

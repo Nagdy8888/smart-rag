@@ -38,6 +38,9 @@ class ChunkContext:
         sheet_name: Workbook sheet from provenance locators, if any.
         range_ref: Sheet/cell range from provenance locators, if any.
         source_url: Crawl/HTML URL from provenance locators, if any.
+        content_kind: ``code``, ``table``, or ``figure`` when the chunk
+            was stored as that modality.
+        figure_id: Stable figure id when ``content_kind`` is ``figure``.
     """
 
     chunk_id: UUID
@@ -53,6 +56,28 @@ class ChunkContext:
     sheet_name: str | None = None
     range_ref: str | None = None
     source_url: str | None = None
+    content_kind: str | None = None
+    figure_id: str | None = None
+
+
+def modality_from_provenance(provenance: object) -> tuple[str | None, str | None]:
+    """Read content kind and figure id from chunk provenance JSON.
+
+    Args:
+        provenance: JSON object stored on ``app.document_chunks.provenance``.
+
+    Returns:
+        ``(content_kind, figure_id)``. Missing keys are ``None``.
+    """
+
+    payload = _as_mapping(provenance)
+    kind = payload.get("content_kind")
+    figure = payload.get("figure_id")
+    content_kind = (
+        kind if isinstance(kind, str) and kind in {"code", "table", "figure"} else None
+    )
+    figure_id = figure if isinstance(figure, str) and figure else None
+    return content_kind, figure_id
 
 
 def locators_from_provenance(
@@ -246,9 +271,9 @@ def _fetch_context_rpc_batch(
             if section
             else ()
         )
-        sheet_name, range_ref, source_url = locators_from_provenance(
-            row[10] if len(row) > 10 else None
-        )
+        provenance = row[10] if len(row) > 10 else None
+        sheet_name, range_ref, source_url = locators_from_provenance(provenance)
+        content_kind, figure_id = modality_from_provenance(provenance)
         results.append(
             ChunkContext(
                 chunk_id=UUID(str(row[0])),
@@ -264,6 +289,8 @@ def _fetch_context_rpc_batch(
                 sheet_name=sheet_name,
                 range_ref=range_ref,
                 source_url=source_url,
+                content_kind=content_kind,
+                figure_id=figure_id,
             )
         )
     return tuple(results)

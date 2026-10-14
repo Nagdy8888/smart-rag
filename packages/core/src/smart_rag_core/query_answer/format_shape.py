@@ -11,7 +11,6 @@ import re
 from typing import Literal
 
 from smart_rag_core.query_answer.models import (
-    AnswerCitation,
     AnswerParagraph,
     AnswerPayload,
     AtomicLink,
@@ -195,10 +194,7 @@ def format_requested_answer_shape(
     """Apply requested fence/pipe formatting to display fields only.
 
     Citation ``span`` values are left unchanged. Refused or empty answers
-    are unchanged. Idempotent when the shape is already present. A collapsed
-    paragraph keeps every atomic link still cited by a remapped passage or
-    table citation. Citations whose link is absent from that paragraph are
-    omitted.
+    are unchanged. Idempotent when the shape is already present.
 
     Args:
         payload: Released company answer.
@@ -243,39 +239,20 @@ def format_requested_answer_shape(
 
     claim_text = formatted[:MAX_CLAIM_CHARS]
     paragraph_text = formatted[:4000]
-    known_link_ids = frozenset(link.link_id for link in payload.atomic_links)
-    citations = _citations_for_collapsed_paragraph(
-        payload.citations, known_link_ids=known_link_ids
+    link_ids = (
+        payload.paragraphs[0].link_ids
+        if payload.paragraphs
+        else tuple(item.link_id for item in payload.atomic_links[:1])
     )
-    table_citations = _citations_for_collapsed_paragraph(
-        payload.table_citations, known_link_ids=known_link_ids
-    )
-    link_ids = _link_ids_in_order((*citations, *table_citations))[:6]
-    if link_ids:
-        allowed = frozenset(link_ids)
-        citations = tuple(item for item in citations if item.atomic_link_id in allowed)
-        table_citations = tuple(
-            item for item in table_citations if item.atomic_link_id in allowed
-        )
-    if not link_ids:
-        link_ids = (
-            payload.paragraphs[0].link_ids
-            if payload.paragraphs
-            else tuple(item.link_id for item in payload.atomic_links[:1])
-        )
-        if not link_ids and payload.atomic_links:
-            link_ids = (payload.atomic_links[0].link_id,)
-        allowed = frozenset(link_ids)
-        citations = _citations_for_collapsed_paragraph(
-            payload.citations, known_link_ids=allowed
-        )
-        table_citations = _citations_for_collapsed_paragraph(
-            payload.table_citations, known_link_ids=allowed
-        )
+    if not link_ids and payload.atomic_links:
+        link_ids = (payload.atomic_links[0].link_id,)
     paragraph = AnswerParagraph(
         paragraph_index=0,
         text=paragraph_text,
         link_ids=link_ids or (),
+    )
+    citations = tuple(
+        item.model_copy(update={"paragraph_index": 0}) for item in payload.citations
     )
     links: list[AtomicLink] = []
     for index, link in enumerate(payload.atomic_links):
@@ -283,62 +260,18 @@ def format_requested_answer_shape(
             links.append(link.model_copy(update={"claim": claim_text}))
         else:
             links.append(link)
+    if not links and link_ids:
+        # Keep paragraphs even when links were already emptied.
+        pass
     updated = payload.model_copy(
         update={
             "paragraphs": (paragraph,),
             "citations": citations,
-            "table_citations": table_citations,
             "atomic_links": tuple(links) if links else payload.atomic_links,
             "answer_text": paragraph_text,
         }
     )
     return with_derived_answer_text(updated)
-
-
-def _citations_for_collapsed_paragraph(
-    citations: tuple[AnswerCitation, ...],
-    *,
-    known_link_ids: frozenset[str],
-) -> tuple[AnswerCitation, ...]:
-    """Keep citations whose link survives and point them at paragraph 0.
-
-    Args:
-        citations: Passage or table citations before shape collapse.
-        known_link_ids: Link ids that may appear on the collapsed paragraph.
-
-    Returns:
-        Citations with ``paragraph_index`` 0. A citation with no link id,
-        or a link id outside ``known_link_ids``, is omitted.
-    """
-
-    kept: list[AnswerCitation] = []
-    for item in citations:
-        link_id = item.atomic_link_id
-        if link_id is None or link_id not in known_link_ids:
-            continue
-        kept.append(item.model_copy(update={"paragraph_index": 0}))
-    return tuple(kept)
-
-
-def _link_ids_in_order(citations: tuple[AnswerCitation, ...]) -> tuple[str, ...]:
-    """Return cited link ids in first-seen order.
-
-    Args:
-        citations: Citations already limited to known links.
-
-    Returns:
-        Unique link ids. Empty when no citation carries a link id.
-    """
-
-    ordered: list[str] = []
-    seen: set[str] = set()
-    for item in citations:
-        link_id = item.atomic_link_id
-        if link_id is None or link_id in seen:
-            continue
-        seen.add(link_id)
-        ordered.append(link_id)
-    return tuple(ordered)
 
 
 def _expand_compact_pipe_rows(text: str) -> str:

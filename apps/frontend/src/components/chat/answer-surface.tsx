@@ -38,6 +38,7 @@ import {
   formatCodeSnippetModel,
   isCodeSnippet,
 } from "../../lib/code-snippet";
+import { AnswerFigure, splitFigureMark } from "./answer-figure";
 import { displayText } from "../../lib/safe-text";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -290,6 +291,10 @@ export function visibleParagraphSlice(
  */
 function renderAnswerParagraphBody(text: string, complete: boolean): ReactNode {
   const decoded = displayText(text);
+  const figure = splitFigureMark(decoded);
+  if (complete && figure.figureId !== null) {
+    return <AnswerFigure figureId={figure.figureId} caption={figure.prose} />;
+  }
   // Lone fence markers left after a bad split stay out of the transcript.
   if (/^\s*```[a-zA-Z0-9_+-]*\s*$/.test(decoded.trim())) {
     return null;

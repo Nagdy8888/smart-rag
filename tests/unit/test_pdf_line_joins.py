@@ -128,4 +128,4 @@ def test_inline_u2010_compound_is_untouched() -> None:
 def test_pdf_parser_version_is_reflow_v4() -> None:
     """The line-join change carries a new PDF parser version identity."""
 
-    assert PDF_PARSER_VERSION == "parser_v1_pdf_reflow_v4"
+    assert PDF_PARSER_VERSION == "parser_v1_pdf_reflow_v5"

@@ -315,6 +315,8 @@ def score_resolved_path_fusion(
                     else None
                 ),
                 statement_ids=strength_tuple[2] if strength_tuple is not None else (),
+                content_kind=hybrid_item.content_kind if hybrid_item is not None else None,
+                figure_id=hybrid_item.figure_id if hybrid_item is not None else None,
             )
         )
     scored.sort(key=lambda item: (-item.combined_score, item.chunk_id))

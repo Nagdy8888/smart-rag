@@ -752,6 +752,24 @@ Kept. A verified answer is now split so each HTML-escaped `token_delta` stays wi
 
 `5b` 1→0. Strict +1 on the stage report, inside the drop limit of 3. The runner summary line printed `strict_pass=35`; the stage report is 36. `5a` stays 3: `d07`, `d13`, and `d21`. The rerank miss stays `d18`. By kind, code is 11/14, table is 7/8, and text is 18/18. Question ids stay in `.private-eval/runs/dev40-v3-sse-chunks/stage-loss.json`.
 
+## dev40-v3 release shape and span windows (2026-10-14)
+
+Rejected. Collapsing a requested code fence or pipe table kept every remapped citation link, a code definition waited for its signature parenthesis to close, and a short table block appended one same-passage continuation. On the 25-question subset, `citation_link_mismatch` left the code answers and `d05` was no longer a verifier refusal. Strict 22→23. `5a_draft_missing` stayed 2 (`d07`, `d13`), so the keep bar (below 2) failed. The full set then confirmed the stop rule: `5a_draft_missing` rose 3→4. Strict stage 36→35, inside the drop limit of 3. Full revert of the shape and span change. Prompt pin stays `answer_v6`. Image rebuilt from the reverted tree. Probe before the revert: `shape_links present`, `signature_close present`, `table_continuation present`. `check_gold_literals` still fails only on `packages/core/src/smart_rag_core/observability/error_telemetry.py` (`failing_files=1`), a file this packet does not change.
+
+| Metric | After escaped chunks | After release shape and span |
+| --- | ---: | ---: |
+| strict passes | 36/40 | 35/40 |
+| ok | 36 | 35 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 1 | 1 |
+| 5a_draft_missing | 3 | 4 |
+| 5b_removed_after_draft | 0 | 0 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+The runner summary line printed `strict_pass=35`. The rerank miss stays `d18`. Draft misses are `d06`, `d07`, `d13`, and `d22`. By kind, code is 11/14, table is 6/8, and text is 18/18. Question ids stay in `.private-eval/runs/dev40-v3-release-fix/stage-loss.json`.
+
 ## Approvals recorded
 
 - 2026-10-06 - G4b re-ingest pre-approved: "no need for my approval make g4b".
@@ -768,3 +786,4 @@ Kept. A verified answer is now split so each HTML-escaped `token_delta` stays wi
 - 2026-10-14 - Page passage windows on dev40-v3; keep bar failed; full revert.
 - 2026-10-14 - Page continuation on dev40-v3; `5a` 6→3; kept.
 - 2026-10-14 - Escaped token chunks on dev40-v3; `5b` 1→0; kept.
+- 2026-10-14 - Release shape and same-chunk span windows on dev40-v3; `5a` 3→4; full revert.

@@ -48,6 +48,8 @@ class ChunkProvenance(BaseModel):
     dedup_mode: str = "exact_and_near"
     normalized_content_hash: str
     search_exclusion_reason: str | None = None
+    content_kind: str | None = None
+    figure_id: str | None = None
 
 
 class CanonicalChunk(BaseModel):

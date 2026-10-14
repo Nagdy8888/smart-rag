@@ -15,6 +15,7 @@ from smart_rag_core.query_answer.generate_grounded import (
     salvage_named_table_block,
 )
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.query_answer.native_blocks import attach_native_evidence
 from smart_rag_core.query_answer.release import render_verified_company_answer
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.models import TableEvidenceRecord
@@ -78,6 +79,10 @@ def company_release_payload(
             except (ValidationError, ValueError, AnswerError):
                 # Keep the extractive salvage rather than dropping it.
                 checked = salvaged
+    try:
+        checked = attach_native_evidence(checked, fusion)
+    except (ValidationError, ValueError, AnswerError):
+        pass
     try:
         checked = format_requested_answer_shape(checked, user_query=user_query)
     except (ValidationError, ValueError, AnswerError):

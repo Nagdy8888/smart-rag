@@ -59,6 +59,7 @@ def test_all_smart_rag_buckets_are_private(db_connection: psycopg.Connection) ->
         "documents-originals",
         "web-snapshots",
         "table-artifacts",
+        "figure-artifacts",
         "exports",
     }
     with db_connection.cursor() as cursor:

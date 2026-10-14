@@ -112,8 +112,8 @@ def test_media_refusal_cannot_answer() -> None:
     """Unsupported media cannot become an answer family."""
 
     plan = routing_plan("Describe the unlabeled chart in the figure")
-    assert plan.effective_route is Phase6RouteFamily.SCOPED_REFUSAL
-    assert plan.media_answer_forbidden is True
+    assert plan.effective_route is Phase6RouteFamily.HYBRID
+    assert plan.media_answer_forbidden is False
 
 
 def test_no_retrieval_forbids_company_claim() -> None:

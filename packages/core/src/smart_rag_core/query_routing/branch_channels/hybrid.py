@@ -486,6 +486,8 @@ def hybrid_evidence(
                         if record is not None
                         else getattr(locator, "source_url", None)
                     ),
+                    content_kind=_content_kind(record.content_kind) if record else None,
+                    figure_id=record.figure_id if record is not None else None,
                 )
             )
         return tuple(records)
@@ -510,6 +512,16 @@ def hybrid_evidence(
                 sheet_name=record.sheet_name,
                 range_ref=record.range_ref,
                 source_url=record.source_url,
+                content_kind=_content_kind(record.content_kind),
+                figure_id=record.figure_id,
             )
         )
     return tuple(records)
+
+
+def _content_kind(value: str | None) -> Literal["code", "table", "figure"] | None:
+    """Keep only the three stored modalities."""
+
+    if value in {"code", "table", "figure"}:
+        return value
+    return None

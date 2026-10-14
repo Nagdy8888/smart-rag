@@ -48,6 +48,8 @@ class HybridPassage(BaseModel):
         deleted: True when the source was deleted. Fusion discards it.
         unauthorized: True when ACL forbids the caller. Fusion discards it.
         bm25_snippet: Forbidden evidence flag. Must stay false.
+        content_kind: ``code``, ``table``, or ``figure`` when stored that way.
+        figure_id: Stable figure id for an authorized image route.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -66,6 +68,8 @@ class HybridPassage(BaseModel):
     deleted: bool = False
     unauthorized: bool = False
     bm25_snippet: Literal[False] = False
+    content_kind: Literal["code", "table", "figure"] | None = None
+    figure_id: str | None = None
 
 
 class GraphPathInput(BaseModel):
@@ -237,6 +241,8 @@ class ScoredPassage(BaseModel):
         range_ref: Cell or range.
         source_url: Source URL.
         statement_ids: Supporting path statement IDs.
+        content_kind: ``code``, ``table``, or ``figure`` when stored that way.
+        figure_id: Stable figure id for an authorized image route.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -258,6 +264,8 @@ class ScoredPassage(BaseModel):
     range_ref: str | None = None
     source_url: str | None = None
     statement_ids: tuple[str, ...] = ()
+    content_kind: Literal["code", "table", "figure"] | None = None
+    figure_id: str | None = None
 
 
 class FusionResult(BaseModel):

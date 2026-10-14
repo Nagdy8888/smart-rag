@@ -10,6 +10,8 @@ from smart_rag_core.ingestion.parser.types import (
     CsvLocator,
     ElementKind,
     ParseResult,
+    PdfLocator,
+    TypedElement,
     XlsxLocator,
 )
 from smart_rag_core.ingestion.provenance import locator_to_dict
@@ -54,7 +56,7 @@ def build_table_artifacts(
         Tuple of in-memory table artifact bundles with manifests.
     """
 
-    if parse_result.format not in {"csv", "xlsx"}:
+    if parse_result.format not in {"csv", "xlsx", "pdf"}:
         return ()
 
     grouped = _group_rows(parse_result)
@@ -129,8 +131,8 @@ def _collect_headers(parse_result: ParseResult) -> dict[str | None, dict[int, st
     for element in parse_result.elements:
         if element.kind is not ElementKind.TABLE_HEADER:
             continue
-        sheet = _sheet_name(element.locator)
-        headers.setdefault(sheet, {})[_column_index(element.locator)] = (
+        sheet = _sheet_name(element)
+        headers.setdefault(sheet, {})[_column_index(element)] = (
             element.text or ""
         )
     return headers
@@ -143,9 +145,9 @@ def _group_rows(parse_result: ParseResult) -> dict[str | None, list[dict[int, An
     for element in parse_result.elements:
         if element.kind is not ElementKind.TABLE_CELL:
             continue
-        sheet = _sheet_name(element.locator)
-        row_index = _row_index(element.locator)
-        col_index = _column_index(element.locator)
+        sheet = _sheet_name(element)
+        row_index = _row_index(element)
+        col_index = _column_index(element)
         grouped.setdefault(sheet, {}).setdefault(row_index, {})[col_index] = element
     normalized: dict[str | None, list[dict[int, Any]]] = {}
     for sheet, rows in grouped.items():
@@ -268,34 +270,42 @@ def _typed_value(cell: Any) -> Any:
     return text
 
 
-def _sheet_name(locator: Any) -> str | None:
-    """Extract sheet name from spreadsheet locators."""
+def _sheet_name(element: TypedElement) -> str | None:
+    """Extract the table or sheet name for one cell."""
 
+    locator = element.locator
     if isinstance(locator, XlsxLocator):
         return locator.sheet_name
     if isinstance(locator, CsvLocator):
         return "csv"
+    if isinstance(locator, PdfLocator):
+        name = element.metadata.get("table_name")
+        return str(name) if name else "pdf-table"
     return None
 
 
-def _row_index(locator: Any) -> int:
-    """Extract row index from spreadsheet locators."""
+def _row_index(element: TypedElement) -> int:
+    """Extract the row index for one cell."""
 
+    locator = element.locator
     if isinstance(locator, XlsxLocator):
         return locator.row
     if isinstance(locator, CsvLocator):
         return locator.record_index
-    return 0
+    raw = element.metadata.get("row_index")
+    return raw if isinstance(raw, int) else 0
 
 
-def _column_index(locator: Any) -> int:
-    """Extract column index from spreadsheet locators."""
+def _column_index(element: TypedElement) -> int:
+    """Extract the zero-based column index for one cell."""
 
+    locator = element.locator
     if isinstance(locator, XlsxLocator):
         return locator.col - 1
     if isinstance(locator, CsvLocator):
         return locator.column_index
-    return 0
+    raw = element.metadata.get("column_index")
+    return raw if isinstance(raw, int) else 0
 
 
 def _header_text(cell: Any) -> str:

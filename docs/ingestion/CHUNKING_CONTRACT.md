@@ -2,14 +2,14 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-25
+last-reviewed: 2026-10-14
 owning_phase: 3
 audience: engineering
 ---
 
 # Chunking contract
 
-**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v2` (new ingest). Historical rows may still carry `chunking_v1`; readers must remain compatible. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
+**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v3` (new ingest). Historical rows may still carry `chunking_v1` or `chunking_v2`; readers must remain compatible. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
 
 ## Hierarchy
 
@@ -60,9 +60,19 @@ word. Hyphens inside a line are untouched. Any change to this rule
 changes `PDF_PARSER_VERSION`, the parser config hash, and every PDF
 chunk ID, so the stored document needs a re-ingest.
 
+PDF `parser_v1_pdf_reflow_v5` keeps monospace runs as `code` elements with
+newlines and indentation, captioned row-band tables as header and cell
+elements, and image blocks above 80×80 pixels as `figure` locators.
+`chunking_v3` stores one GitHub-flavored pipe table per table (split only
+on row boundaries under the 600-token cap, repeating the header) and keeps
+line-structured code whole up to 536 tokens. Figure pixels are stored
+later, outside the parser sandbox, in the private `figure-artifacts`
+bucket. A vision description is copied into the figure passage when the
+call succeeds. Existing documents stay prose until they are re-ingested.
+
 ## Atomicity
 
-- **Tables:** split only between rows; repeat header row on each row-chunk.
+- **Tables:** split only between rows; repeat header row on each row-chunk. PDF tables are one pipe-table passage when they fit.
 - **Lists:** split only between top-level items; retain list introduction on each item-chunk.
 - **Code/captions:** never split silently. Oversized atomics use a documented fragment fallback sharing one `atomic_element_id`, full locators, order, `fragment_ordinal`, and `is_atomic_exception`.
 

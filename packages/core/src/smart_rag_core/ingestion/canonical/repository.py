@@ -19,6 +19,8 @@ from smart_rag_core.ingestion.embeddings.service import (
     EmbeddedChunk,
     EmbeddingBatchResult,
 )
+from smart_rag_core.ingestion.figures.limits import FIGURE_ARTIFACT_BUCKET
+from smart_rag_core.ingestion.figures.materialize import FigureAsset
 from smart_rag_core.ingestion.tables.bundle import TableArtifactBundle
 
 
@@ -200,6 +202,69 @@ class CanonicalRepository:
             if row is None or row[0] is None:
                 raise CanonicalWriteError("bm25_outbox_enqueue_failed")
             return UUID(str(row[0]))
+
+    def persist_figures(
+        self,
+        *,
+        document_id: UUID,
+        version_id: UUID,
+        figures: tuple[FigureAsset, ...],
+        paths: dict[str, str],
+        model_id: str | None,
+    ) -> None:
+        """Upsert figure rows for PNGs already stored under figure-artifacts.
+
+        Args:
+            document_id: Parent document identifier.
+            version_id: Canonical version that owns the figures.
+            figures: Cropped assets. Empty is a no-op.
+            paths: Storage object path keyed by figure id.
+            model_id: Vision model id, or None when no description was made.
+
+        Side Effects:
+            Inserts or updates ``app.document_figures`` on the open transaction.
+        """
+
+        for figure in figures:
+            path = paths.get(figure.figure_id)
+            if not path:
+                continue
+            figure_uuid = uuid5(
+                NAMESPACE_URL, f"{version_id}:{figure.figure_id}"
+            )
+            with self._connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO app.document_figures (
+                      id, document_id, version_id, figure_key, page_index,
+                      storage_bucket, storage_path, content_hash, byte_size,
+                      caption, description, model_id
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (version_id, figure_key) DO UPDATE
+                    SET
+                      storage_path = EXCLUDED.storage_path,
+                      content_hash = EXCLUDED.content_hash,
+                      byte_size = EXCLUDED.byte_size,
+                      caption = EXCLUDED.caption,
+                      description = EXCLUDED.description,
+                      model_id = EXCLUDED.model_id
+                    """,
+                    (
+                        figure_uuid,
+                        document_id,
+                        version_id,
+                        figure.figure_id,
+                        figure.page_index,
+                        FIGURE_ARTIFACT_BUCKET,
+                        path,
+                        figure.content_hash,
+                        len(figure.png),
+                        figure.caption,
+                        figure.description,
+                        model_id if figure.description else None,
+                    ),
+                )
 
     def _persist_table_artifact(
         self,

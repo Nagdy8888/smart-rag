@@ -32,11 +32,21 @@ from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchResult,
     EmbeddingService,
 )
+from smart_rag_core.ingestion.figures.describe import figure_describer
+from smart_rag_core.ingestion.figures.materialize import (
+    FigureAsset,
+    materialize_pdf_figures,
+)
+from smart_rag_core.ingestion.figures.storage import upload_figure_png
 from smart_rag_core.ingestion.governance import ExtractionGovernanceInput
 from smart_rag_core.ingestion.limits import EXTERNAL_PROCESSING_POLICY_VERSION
 from smart_rag_core.ingestion.parser.exceptions import ParserSandboxError
 from smart_rag_core.ingestion.parser.service import ParserInvocation, ParserService
-from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult
+from smart_rag_core.ingestion.parser.types import (
+    ElementKind,
+    ParseDisposition,
+    ParseResult,
+)
 from smart_rag_core.ingestion.parser.website import merge_website_parse_results
 from smart_rag_core.ingestion.tables.storage import upload_table_artifact
 from smart_rag_core.jobs.exceptions import JobLeaseError
@@ -46,6 +56,7 @@ from smart_rag_core.jobs.ingestion_repository import (
     configurable_lease_lost,
 )
 from smart_rag_core.jobs.ledger import JobOperationLedger
+from smart_rag_core.models.env_pins import ANSWER_MODEL_ID
 from smart_rag_core.observability.ingest_progress import log_ingest_progress
 from smart_rag_core.observability.ingest_trace import (
     INGEST_RUN_PARSE,
@@ -492,6 +503,7 @@ def index_hybrid_content(
         parse_detail = parse_result.detail
         governed_parse = parse_result
         extraction_outcomes = detector_outcomes
+        source_bytes: bytes | None = None
     else:
         payload = storage.download_object(
             bucket=str(state["storage_bucket"]),
@@ -526,6 +538,7 @@ def index_hybrid_content(
                 "status": "index_failed",
                 "detail": f"parser_sandbox:{exc.detail}"[:500],
             }
+        source_bytes = payload
         governed_parse = outcome.parse_result
         outcome_disposition = outcome.parse_result.disposition.value
         promotion_ok = outcome.promotion_allowed
@@ -559,6 +572,34 @@ def index_hybrid_content(
 
     document_id = UUID(str(state["document_id"]))
     version_id = UUID(str(state["version_id"]))
+    figure_assets: tuple[FigureAsset, ...] = ()
+    figure_paths: dict[str, str] = {}
+    if (
+        source_bytes
+        and governed_parse.format == "pdf"
+        and any(element.kind is ElementKind.FIGURE for element in governed_parse.elements)
+    ):
+        governed_parse, figure_assets = materialize_pdf_figures(
+            governed_parse,
+            source_bytes,
+            figure_describer(mock_model_mode=bool(mock_model_mode)),
+        )
+        for asset in figure_assets:
+            try:
+                path, _digest = upload_figure_png(
+                    storage,
+                    document_id=document_id,
+                    version_id=version_id,
+                    figure_id=asset.figure_id,
+                    png=asset.png,
+                )
+            except Exception as exc:
+                return {
+                    **state,
+                    "status": "index_failed",
+                    "detail": f"figure upload failed: {exc}"[:500],
+                }
+            figure_paths[asset.figure_id] = path
     chunking = chunk_parse_result(
         governed_parse,
         document_id=document_id,
@@ -709,6 +750,17 @@ def index_hybrid_content(
                 embedded=embedding.embedded,
                 table_artifacts=chunking.table_artifacts,
                 is_current=not state["graph_eligible"],
+            )
+            repository.persist_figures(
+                document_id=document_id,
+                version_id=version_id,
+                figures=figure_assets,
+                paths=figure_paths,
+                model_id=(
+                    ANSWER_MODEL_ID
+                    if any(asset.description for asset in figure_assets)
+                    else None
+                ),
             )
             ledger.record_completed(
                 job_table="ingestion_jobs",

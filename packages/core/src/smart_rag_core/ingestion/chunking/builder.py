@@ -13,6 +13,7 @@ from smart_rag_core.ingestion.chunking.dedup import (
 )
 from smart_rag_core.ingestion.chunking.limits import (
     CHUNKING_POLICY_VERSION,
+    LINE_STRUCTURED_MAX_TOKENS,
     PARENT_MAX_TOKENS,
     PASSAGE_HARD_MAX_TOKENS,
     TOKENIZER_VERSION,
@@ -53,6 +54,8 @@ class _DraftChunk:
     is_fragment: bool = False
     is_atomic_exception: bool = False
     child_chunk_ids: tuple[str, ...] = field(default_factory=tuple)
+    content_kind: str | None = None
+    figure_id: str | None = None
 
 
 def build_hierarchical_chunks(
@@ -81,7 +84,7 @@ def build_hierarchical_chunks(
     heading_stack: list[str] = []
     prose_buffer: list[ProseSegment] = []
     table_rows: dict[int, list[TypedElement]] = {}
-    table_headers: list[str] = []
+    table_headers: list[TypedElement] = []
     list_intro: str | None = None
     list_items: list[TypedElement] = []
 
@@ -105,26 +108,63 @@ def build_hierarchical_chunks(
         prose_buffer = []
 
     def flush_table() -> None:
-        """Emit one passage draft per buffered table row, then clear the table."""
+        """Emit one pipe-table passage, splitting only on row boundaries."""
 
         nonlocal table_rows, table_headers
-        if not table_rows:
+        if not table_rows and not table_headers:
             return
-        header_line = " | ".join(table_headers) if table_headers else ""
-        for row_index in sorted(table_rows):
-            cells = table_rows[row_index]
-            row_text = " | ".join(cell.text or "" for cell in cells)
-            body = f"{header_line}\n{row_text}" if header_line else row_text
-            element_ids = tuple(cell.element_id for cell in cells)
-            locators = tuple(locator_to_dict(cell.locator) for cell in cells)
+        structured = bool(table_headers) or any(
+            isinstance(cell.metadata.get("row_index"), int)
+            for cells in table_rows.values()
+            for cell in cells
+        )
+        if not structured:
+            for row_index in sorted(table_rows):
+                cells = table_rows[row_index]
+                row_text = " | ".join(cell.text or "" for cell in cells)
+                element_ids = tuple(cell.element_id for cell in cells)
+                locators = tuple(locator_to_dict(cell.locator) for cell in cells)
+                drafts.append(
+                    _DraftChunk(
+                        kind=ChunkKind.PASSAGE,
+                        raw_text=row_text,
+                        element_ids=element_ids,
+                        locators=locators,
+                        heading_ancestry=tuple(heading_stack),
+                        page_number=_page_from_locators(locators),
+                    )
+                )
+            table_rows = {}
+            table_headers = []
+            return
+        ordered = [table_rows[index] for index in sorted(table_rows)]
+        header_cells = table_headers or (ordered[0] if ordered else [])
+        body_rows = ordered if table_headers else ordered[1:]
+        if not header_cells:
+            table_rows = {}
+            table_headers = []
+            return
+        header = _pipe_row([cell.text or "" for cell in _sorted_cells(header_cells)])
+        separator = _pipe_row(["---"] * max(1, len(_sorted_cells(header_cells))))
+        body = [
+            _pipe_row([cell.text or "" for cell in _sorted_cells(cells)])
+            for cells in body_rows
+        ]
+        pieces = [header, separator, *body] if body else [header, separator]
+        groups = _split_pipe_rows(pieces)
+        all_cells = [*header_cells, *[cell for row in body_rows for cell in row]]
+        element_ids = tuple(cell.element_id for cell in all_cells)
+        locators = tuple(locator_to_dict(cell.locator) for cell in all_cells)
+        for text in groups:
             drafts.append(
                 _DraftChunk(
                     kind=ChunkKind.PASSAGE,
-                    raw_text=body,
+                    raw_text=text,
                     element_ids=element_ids,
                     locators=locators,
                     heading_ancestry=tuple(heading_stack),
                     page_number=_page_from_locators(locators),
+                    content_kind="table",
                 )
             )
         table_rows = {}
@@ -183,6 +223,21 @@ def build_hierarchical_chunks(
                 _atomic_chunks(
                     element,
                     heading_stack=tuple(heading_stack),
+                    content_kind="code",
+                )
+            )
+            continue
+        if kind is ElementKind.FIGURE and element.text:
+            flush_prose()
+            flush_table()
+            flush_list()
+            figure_id = element.metadata.get("figure_id")
+            drafts.extend(
+                _atomic_chunks(
+                    element,
+                    heading_stack=tuple(heading_stack),
+                    content_kind="figure",
+                    figure_id=str(figure_id) if figure_id else element.element_id,
                 )
             )
             continue
@@ -204,8 +259,8 @@ def build_hierarchical_chunks(
         }:
             flush_prose()
             flush_list()
-            if kind is ElementKind.TABLE_HEADER and element.text:
-                table_headers.append(element.text)
+            if kind is ElementKind.TABLE_HEADER:
+                table_headers.append(element)
                 continue
             row_index = _table_row_index(element)
             table_rows.setdefault(row_index, []).append(element)
@@ -213,6 +268,7 @@ def build_hierarchical_chunks(
         if kind is ElementKind.TABLE:
             flush_prose()
             flush_list()
+            flush_table()
             continue
         if kind is ElementKind.LIST:
             flush_prose()
@@ -270,12 +326,19 @@ def _atomic_chunks(
     element: TypedElement,
     *,
     heading_stack: tuple[str, ...],
+    content_kind: str | None = None,
+    figure_id: str | None = None,
 ) -> list[_DraftChunk]:
-    """Build one or more atomic drafts for code/caption elements."""
+    """Build one or more atomic drafts for code, caption, or figure elements.
+
+    Line-structured text stays whole up to ``LINE_STRUCTURED_MAX_TOKENS``
+    and then splits only at line ends.
+    """
 
     text = element.text or ""
     token_count = tokenizer.count_tokens(text)
-    if token_count <= PASSAGE_HARD_MAX_TOKENS:
+    ceiling = LINE_STRUCTURED_MAX_TOKENS if "\n" in text else PASSAGE_HARD_MAX_TOKENS
+    if token_count <= ceiling:
         return [
             _DraftChunk(
                 kind=ChunkKind.PASSAGE,
@@ -285,6 +348,8 @@ def _atomic_chunks(
                 heading_ancestry=heading_stack,
                 page_number=_page_from_locators((locator_to_dict(element.locator),)),
                 atomic_element_id=element.element_id,
+                content_kind=content_kind,
+                figure_id=figure_id,
             )
         ]
     fragments = split_oversized_atomic(text)
@@ -300,6 +365,8 @@ def _atomic_chunks(
             fragment_ordinal=index,
             is_fragment=True,
             is_atomic_exception=True,
+            content_kind=content_kind,
+            figure_id=figure_id,
         )
         for index, fragment in enumerate(fragments)
     ]
@@ -350,6 +417,8 @@ def _materialize_passages(
                     tokenizer_version=TOKENIZER_VERSION,
                     dedup_policy_version=dedup_policy_version(),
                     normalized_content_hash=normalized,
+                    content_kind=draft.content_kind,
+                    figure_id=draft.figure_id,
                 ),
             )
         )
@@ -436,9 +505,63 @@ def _update_heading_stack(stack: list[str], heading: str) -> list[str]:
     return [heading]
 
 
+def _sorted_cells(cells: list[TypedElement]) -> list[TypedElement]:
+    """Order cells by column index, then reading order."""
+
+    def key(cell: TypedElement) -> tuple[int, int]:
+        column = cell.metadata.get("column_index")
+        return (
+            column if isinstance(column, int) else cell.reading_order,
+            cell.reading_order,
+        )
+
+    return sorted(cells, key=key)
+
+
+def _pipe_row(cells: list[str]) -> str:
+    """Render one Markdown pipe-table row with pipes escaped."""
+
+    escaped = [cell.replace("|", "\\|") for cell in cells]
+    return "| " + " | ".join(escaped) + " |"
+
+
+def _split_pipe_rows(lines: list[str]) -> list[str]:
+    """Keep a pipe table whole under the hard cap, else split on body rows.
+
+    Args:
+        lines: Header, separator, and body rows.
+
+    Returns:
+        One or more Markdown tables. Each fragment repeats the header.
+    """
+
+    text = "\n".join(lines)
+    if tokenizer.count_tokens(text) <= PASSAGE_HARD_MAX_TOKENS or len(lines) <= 2:
+        return [text]
+    header, separator, *body = lines
+    groups: list[str] = []
+    current = [header, separator]
+    for row in body:
+        candidate = "\n".join([*current, row])
+        if (
+            len(current) > 2
+            and tokenizer.count_tokens(candidate) > PASSAGE_HARD_MAX_TOKENS
+        ):
+            groups.append("\n".join(current))
+            current = [header, separator, row]
+        else:
+            current.append(row)
+    if len(current) > 2:
+        groups.append("\n".join(current))
+    return groups or [text]
+
+
 def _table_row_index(element: TypedElement) -> int:
     """Extract a stable row index from one table cell locator."""
 
+    raw_row = element.metadata.get("row_index")
+    if isinstance(raw_row, int):
+        return raw_row
     locator = element.locator
     if isinstance(locator, DocxLocator) and len(locator.block_path) >= 2:
         return int(locator.block_path[-2])

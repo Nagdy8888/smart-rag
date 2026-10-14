@@ -20,6 +20,7 @@ from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
 )
+from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
 from smart_rag_core.retrieval.coverage_score import (
     attach_numeric_coverage,
     exclude_source_selector_terms,
@@ -516,8 +517,12 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 kwargs=assemble_kwargs,
             )
             selected_cands = tuple(item.candidate for item in selection.passages)
+            base_coverage = assembled.coverage
+            if any(row.content_kind == "figure" for row in locator_rows):
+                if base_coverage.signal is CoverageSignal.MEDIA_LIMITATION:
+                    base_coverage = HybridCoverage(signal=CoverageSignal.FULL_COVERAGE)
             coverage = attach_numeric_coverage(
-                assembled.coverage,
+                base_coverage,
                 fused=selected_cands,
                 channel_hits=assembled.channel_hits or {},
                 query_type=query_type,

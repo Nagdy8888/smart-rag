@@ -151,6 +151,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-ask-evidence-budget-repair.md](./adr/ADR-ask-evidence-budget-repair.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
 | [adr/ADR-sse-ordered-background-writer.md](./adr/ADR-sse-ordered-background-writer.md) | engineering-lead | accepted | 2026-09-24 | eng, reviewers |
 | [adr/ADR-retrieved-answer-loss-repair.md](./adr/ADR-retrieved-answer-loss-repair.md) | engineering-lead | accepted | 2026-09-25 | eng, reviewers, security |
+| [adr/ADR-pdf-native-types.md](./adr/ADR-pdf-native-types.md) | engineering-lead | accepted | 2026-10-14 | eng, reviewers, security |
 | [adr/ADR-probe15-retrieval-and-release-repair.md](./adr/ADR-probe15-retrieval-and-release-repair.md) | engineering-lead | proposed | 2026-10-08 | eng, reviewers |
 | [adr/ADR-hybrid-long-document-v5-pool.md](./adr/ADR-hybrid-long-document-v5-pool.md) | engineering-lead | rejected | 2026-10-13 | eng, reviewers |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |

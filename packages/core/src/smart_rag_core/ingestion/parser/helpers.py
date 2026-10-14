@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from collections.abc import Iterable
 from typing import NamedTuple, cast
@@ -17,6 +18,23 @@ from smart_rag_core.text_constants import PARAGRAPH_DELIMITER
 
 # PyMuPDF 1.25.5 span ``flags`` bit 4 (``TEXT_FONT_BOLD``).
 PDF_TEXT_FONT_BOLD = 1 << 4
+# PyMuPDF 1.25.5 span ``flags`` bit 3 (``TEXT_FONT_MONOSPACED``).
+PDF_TEXT_FONT_MONOSPACED = 1 << 3
+PDF_MONOSPACE_FONT_NAME = re.compile(
+    r"mono|courier|consol|menlo|inconsolata|code", re.IGNORECASE
+)
+PDF_CODE_MAX_INDENT = 40
+PDF_TABLE_CAPTION = re.compile(
+    r"^(?:Table|TABLE)\s+[A-Z]?\d+(?:[.\-\u2010\u2013]\d+)*\b"
+)
+PDF_TABLE_ROW_TOLERANCE = 2.0
+PDF_TABLE_CELL_OVERLAP = 1.0
+PDF_TABLE_COLUMN_TOLERANCE = 3.0
+PDF_TABLE_CAPTION_DISTANCE = 60.0
+PDF_TABLE_MAX_GAP_RATIO = 2.5
+PDF_TABLE_WRAP_GAP_RATIO = 1.6
+PDF_TABLE_ROW_PITCH_RATIO = 1.25
+PDF_FIGURE_MIN_PIXELS = 80 * 80
 PDF_HEADING_MAX_WORDS = 12
 PDF_HEADING_MAX_CHARS = 80
 PDF_HEADING_SIZE_RATIO = 1.2
@@ -37,11 +55,16 @@ class PdfTextBlock(NamedTuple):
     line keeps short large or bold titles standalone for heading classification.
 
     Attributes:
-        text: Concatenated span text for one line.
+        text: Concatenated span text for one line, without leading or
+            trailing whitespace. Code indentation is added later from
+            ``text_x0``.
         bbox: ``(x0, y0, x1, y1)`` from the vendor line, else the parent block.
         max_size: Largest span size on the line.
         bold: True when any span has ``TEXT_FONT_BOLD``.
         block_index: Position of the parent block in the page ``blocks`` list.
+        monospace: True when every span with text uses a monospace font.
+        text_x0: X of the first visible character on monospace lines.
+        char_width: Average character width of a monospace line.
     """
 
     text: str
@@ -49,6 +72,9 @@ class PdfTextBlock(NamedTuple):
     max_size: float
     bold: bool
     block_index: int
+    monospace: bool = False
+    text_x0: float = 0.0
+    char_width: float = 0.0
 
 
 def _union_pdf_bbox(
@@ -76,6 +102,8 @@ def _union_pdf_bbox(
 def join_pdf_lines(pending: PdfTextBlock, block: PdfTextBlock) -> str:
     """Join two paragraph lines without a mid-word break or a mid-block newline.
 
+    Two monospace lines join with a single newline and keep a line-end
+    hyphen. A switch between code and prose uses ``PARAGRAPH_DELIMITER``.
     A trailing hyphen from ``LINE_END_HYPHENS`` after a letter is removed
     when the next line starts with a lowercase letter, so ``com`` + U+2010 +
     ``plexity`` becomes ``complexity``. A real compound broken at its own
@@ -96,6 +124,10 @@ def join_pdf_lines(pending: PdfTextBlock, block: PdfTextBlock) -> str:
 
     left = pending.text
     right = block.text
+    if pending.monospace and block.monospace:
+        return f"{left}\n{right}"
+    if pending.monospace != block.monospace:
+        return f"{left}{PARAGRAPH_DELIMITER}{right}"
     if (
         len(left) >= 2
         and left.endswith(LINE_END_HYPHENS)
@@ -106,6 +138,55 @@ def join_pdf_lines(pending: PdfTextBlock, block: PdfTextBlock) -> str:
     if pending.block_index == block.block_index:
         return f"{left} {right}"
     return f"{left}{PARAGRAPH_DELIMITER}{right}"
+
+
+def indent_pdf_code_lines(
+    lines: tuple[tuple[ElementKind, PdfTextBlock], ...],
+) -> tuple[tuple[ElementKind, PdfTextBlock], ...]:
+    """Prefix monospace lines with spaces and mark the run as code.
+
+    Each run of consecutive monospace lines is measured against the
+    leftmost line. The column offset is the x distance divided by the
+    run's median character width, capped at ``PDF_CODE_MAX_INDENT``.
+
+    Args:
+        lines: Classified ``(kind, block)`` pairs in reading order.
+
+    Returns:
+        The same order. Monospace paragraph lines become ``CODE`` and
+        carry leading spaces.
+    """
+
+    result = list(lines)
+    index = 0
+    while index < len(result):
+        kind, block = result[index]
+        if kind is not ElementKind.PARAGRAPH or not block.monospace:
+            index += 1
+            continue
+        end = index
+        while (
+            end < len(result)
+            and result[end][0] is ElementKind.PARAGRAPH
+            and result[end][1].monospace
+        ):
+            end += 1
+        run = [item[1] for item in result[index:end]]
+        widths = sorted(item.char_width for item in run if item.char_width > 0)
+        width = widths[len(widths) // 2] if widths else 0.0
+        left = min(item.text_x0 for item in run)
+        for offset, item in enumerate(run):
+            columns = 0
+            if width > 0:
+                columns = min(
+                    PDF_CODE_MAX_INDENT, max(0, round((item.text_x0 - left) / width))
+                )
+            result[index + offset] = (
+                ElementKind.CODE,
+                item._replace(text=" " * columns + item.text),
+            )
+        index = end
+    return tuple(result)
 
 
 def merge_consecutive_pdf_paragraphs(
@@ -128,10 +209,17 @@ def merge_consecutive_pdf_paragraphs(
         return ()
     merged: list[tuple[ElementKind, PdfTextBlock]] = []
     pending: PdfTextBlock | None = None
+    pending_kind = ElementKind.PARAGRAPH
     for kind, block in lines:
-        if kind is ElementKind.PARAGRAPH:
+        if kind in {ElementKind.PARAGRAPH, ElementKind.CODE}:
             if pending is None:
                 pending = block
+                pending_kind = kind
+                continue
+            if pending_kind is not kind:
+                merged.append((pending_kind, pending))
+                pending = block
+                pending_kind = kind
                 continue
             pending = PdfTextBlock(
                 text=join_pdf_lines(pending, block),
@@ -139,14 +227,17 @@ def merge_consecutive_pdf_paragraphs(
                 max_size=max(pending.max_size, block.max_size),
                 bold=pending.bold or block.bold,
                 block_index=block.block_index,
+                monospace=block.monospace,
+                text_x0=block.text_x0,
+                char_width=block.char_width,
             )
             continue
         if pending is not None:
-            merged.append((ElementKind.PARAGRAPH, pending))
+            merged.append((pending_kind, pending))
             pending = None
         merged.append((kind, block))
     if pending is not None:
-        merged.append((ElementKind.PARAGRAPH, pending))
+        merged.append((pending_kind, pending))
     return tuple(merged)
 
 
@@ -412,14 +503,35 @@ def _span_is_bold(flags: object) -> bool:
         return False
 
 
+def _span_is_monospace(span_map: dict[object, object]) -> bool:
+    """Return whether one span uses a monospace font.
+
+    Args:
+        span_map: Vendor span mapping with ``flags`` and ``font``.
+
+    Returns:
+        True when flag bit 3 is set or the font name looks monospace.
+    """
+
+    try:
+        flagged = bool(as_int(span_map.get("flags", 0)) & PDF_TEXT_FONT_MONOSPACED)
+    except (TypeError, ValueError):
+        flagged = False
+    return flagged or bool(
+        PDF_MONOSPACE_FONT_NAME.search(str(span_map.get("font") or ""))
+    )
+
+
 def extract_pdf_text_blocks(
     raw: object,
 ) -> tuple[tuple[PdfTextBlock, ...], tuple[float, ...]]:
     """Walk PyMuPDF ``get_text('dict')`` into per-line text blocks and sizes.
 
-    Image blocks (``type == 1``) are skipped. Unknown dict shapes return
-    empty so the adapter can fall back to ``get_text('blocks')``. Lines are
-    emitted separately so a large title is not absorbed into body copy.
+    Image blocks (``type == 1``) are skipped here; ``extract_pdf_figures``
+    records them. Unknown dict shapes return empty so the adapter can fall
+    back to ``get_text('blocks')``. Lines whose text spans all use a
+    monospace font are flagged ``monospace`` with ``text_x0`` and
+    ``char_width`` so code indentation can be rebuilt.
 
     Args:
         raw: Vendor dictionary from ``page.get_text('dict')``.
@@ -474,6 +586,8 @@ def extract_pdf_text_blocks(
             line_parts: list[str] = []
             max_size = 0.0
             bold = False
+            text_spans = 0
+            mono_spans = 0
             for span in spans:
                 if not isinstance(span, dict):
                     continue
@@ -481,6 +595,10 @@ def extract_pdf_text_blocks(
                 text = str(span_map.get("text") or "")
                 if text:
                     line_parts.append(text)
+                if text.strip():
+                    text_spans += 1
+                    if _span_is_monospace(span_map):
+                        mono_spans += 1
                 size_raw = span_map.get("size")
                 if size_raw is not None:
                     try:
@@ -493,10 +611,18 @@ def extract_pdf_text_blocks(
                             max_size = size
                 if _span_is_bold(span_map.get("flags", 0)):
                     bold = True
-            cleaned = "".join(line_parts).strip()
+            raw_line = "".join(line_parts).rstrip()
+            cleaned = raw_line.strip()
             if not cleaned:
                 continue
             bbox = _pdf_block_bbox(line_map.get("bbox")) or block_bbox
+            monospace = text_spans > 0 and mono_spans == text_spans
+            text_x0 = 0.0
+            char_width = 0.0
+            if monospace and raw_line:
+                char_width = (bbox[2] - bbox[0]) / len(raw_line)
+                leading = len(raw_line) - len(raw_line.lstrip())
+                text_x0 = bbox[0] + leading * char_width
             collected.append(
                 PdfTextBlock(
                     text=cleaned,
@@ -504,6 +630,9 @@ def extract_pdf_text_blocks(
                     max_size=max_size,
                     bold=bold,
                     block_index=block_index,
+                    monospace=monospace,
+                    text_x0=text_x0,
+                    char_width=char_width,
                 )
             )
     return tuple(collected), tuple(sizes)

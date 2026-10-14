@@ -25,6 +25,7 @@ from smart_rag_core.ingestion.parser.helpers import (
     classify_pdf_text_block,
     element_id,
     extract_pdf_text_blocks,
+    indent_pdf_code_lines,
     median_font_size,
     merge_consecutive_pdf_paragraphs,
     pdf_page_label,
@@ -36,6 +37,12 @@ from smart_rag_core.ingestion.parser.limits import (
     CLEANING_POLICY_VERSION,
     PDF_MAX_PAGES,
     PDF_PARSER_VERSION,
+)
+from smart_rag_core.ingestion.parser.pdf_layout import (
+    PdfFigureRef,
+    PdfTable,
+    detect_pdf_tables,
+    extract_pdf_figures,
 )
 from smart_rag_core.ingestion.parser.types import (
     ElementKind,
@@ -80,7 +87,11 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
     page_labels: list[str] = []
     sortable: list[tuple[int, TypedElement]] = []
     ocr_pages = 0
+    previous_table_columns: tuple[float, ...] = ()
+    previous_caption = ""
     for page_index in range(page_count):
+        carried_columns = previous_table_columns
+        previous_table_columns = ()
         page = document.load_page(page_index)
         page_labels.append(pdf_page_label(page))
         text = str(vendor_call(vendor_attr(page, "get_text"), "text"))
@@ -110,23 +121,45 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
             for element in ocr_elements:
                 sortable.append((element.reading_order, element))
             continue
-        dict_blocks, sizes = extract_pdf_text_blocks(
-            vendor_call(vendor_attr(page, "get_text"), "dict")
-        )
+        page_dict = vendor_call(vendor_attr(page, "get_text"), "dict")
+        dict_blocks, sizes = extract_pdf_text_blocks(page_dict)
         median_size = median_font_size(sizes)
         if dict_blocks:
+            tables = detect_pdf_tables(dict_blocks, previous_columns=carried_columns)
+            if tables:
+                previous_table_columns = tables[-1].columns
+            table_at = {min(table.members): table for table in tables}
+            in_table = frozenset(index for table in tables for index in table.members)
             classified: list[tuple[ElementKind, PdfTextBlock]] = []
-            for block in dict_blocks:
+            for index, block in enumerate(dict_blocks):
+                if index in table_at:
+                    _append_pdf_table(
+                        sortable,
+                        content_hash=content_hash,
+                        page_index=page_index,
+                        table=table_at[index],
+                        caption=table_at[index].caption or previous_caption,
+                    )
+                    if table_at[index].caption:
+                        previous_caption = table_at[index].caption
+                    continue
+                if index in in_table:
+                    continue
                 cleaned = block.text.strip()
                 if not cleaned:
                     continue
-                kind = classify_pdf_text_block(
-                    text=cleaned,
-                    max_size=block.max_size,
-                    median_size=median_size,
-                    bold=block.bold,
+                kind = (
+                    ElementKind.PARAGRAPH
+                    if block.monospace
+                    else classify_pdf_text_block(
+                        text=cleaned,
+                        max_size=block.max_size,
+                        median_size=median_size,
+                        bold=block.bold,
+                    )
                 )
                 classified.append((kind, block))
+            classified = list(indent_pdf_code_lines(tuple(classified)))
             for kind, block in merge_consecutive_pdf_paragraphs(tuple(classified)):
                 cleaned = block.text.strip()
                 x0, y0, x1, y1 = block.bbox
@@ -155,6 +188,14 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
                             locator=locator,
                         ),
                     )
+                )
+            for figure in extract_pdf_figures(page_dict):
+                _append_pdf_figure(
+                    sortable,
+                    content_hash=content_hash,
+                    page_index=page_index,
+                    figure=figure,
+                    caption=_nearest_caption(dict_blocks, figure.bbox),
                 )
             continue
         for block in vendor_items(vendor_call(vendor_attr(page, "get_text"), "blocks")):
@@ -254,4 +295,162 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
             ocr_pages=ocr_pages,
         ),
         detail="pdf parsed",
+    )
+
+
+def _typed_kind(text: str) -> str:
+    """Infer a scalar kind for one PDF table cell."""
+
+    stripped = text.strip().replace(",", "")
+    if stripped.startswith("-"):
+        body = stripped[1:]
+    else:
+        body = stripped
+    if body.isdigit():
+        return "integer"
+    try:
+        float(stripped)
+    except ValueError:
+        return "string"
+    if any(mark in stripped for mark in (".", "e", "E")):
+        return "float"
+    return "string"
+
+
+def _locator_for(page_index: int, bbox: tuple[float, float, float, float]) -> PdfLocator:
+    """Build a rounded PDF locator for one box."""
+
+    x0, y0, x1, y1 = bbox
+    return PdfLocator(
+        page_index=page_index,
+        bbox_x0=round(x0, 3),
+        bbox_y0=round(y0, 3),
+        bbox_x1=round(x1, 3),
+        bbox_y1=round(y1, 3),
+    )
+
+
+def _append_pdf_table(
+    sortable: list[tuple[int, TypedElement]],
+    *,
+    content_hash: str,
+    page_index: int,
+    table: PdfTable,
+    caption: str,
+) -> None:
+    """Emit one table wrapper plus header and body cells."""
+
+    table_name = caption.strip() or f"page-{page_index + 1}-table"
+    wrapper_locator = _locator_for(page_index, table.bbox)
+    sort_key = page_index * 10_000 + as_int(table.bbox[1])
+    sortable.append(
+        (
+            sort_key,
+            TypedElement(
+                element_id=element_id(
+                    content_hash,
+                    sort_key,
+                    ElementKind.TABLE,
+                    wrapper_locator,
+                    table_name,
+                ),
+                kind=ElementKind.TABLE,
+                text=table_name,
+                reading_order=sort_key,
+                locator=wrapper_locator,
+                metadata={"table_name": table_name},
+            ),
+        )
+    )
+    for cell in table.cells:
+        locator = _locator_for(page_index, cell.bbox)
+        kind = (
+            ElementKind.TABLE_HEADER if cell.row_index == 0 else ElementKind.TABLE_CELL
+        )
+        cell_key = sort_key + cell.row_index * 20 + cell.column_index
+        sortable.append(
+            (
+                cell_key,
+                TypedElement(
+                    element_id=element_id(
+                        content_hash,
+                        cell_key,
+                        kind,
+                        locator,
+                        cell.text,
+                    ),
+                    kind=kind,
+                    text=cell.text,
+                    reading_order=cell_key,
+                    locator=locator,
+                    metadata={
+                        "table_name": table_name,
+                        "row_index": cell.row_index,
+                        "column_index": cell.column_index,
+                        "typed_value_kind": _typed_kind(cell.text),
+                    },
+                ),
+            )
+        )
+
+
+def _nearest_caption(
+    lines: tuple[PdfTextBlock, ...],
+    bbox: tuple[float, float, float, float],
+) -> str:
+    """Return the closest short line within 60 points of a figure."""
+
+    best = ""
+    best_gap = 60.0
+    for line in lines:
+        if len(line.text) > 160:
+            continue
+        gap_above = bbox[1] - line.bbox[3]
+        gap_below = line.bbox[1] - bbox[3]
+        gap = gap_above if gap_above >= 0 else gap_below
+        if 0.0 <= gap <= best_gap:
+            best = line.text
+            best_gap = gap
+    return best
+
+
+def _append_pdf_figure(
+    sortable: list[tuple[int, TypedElement]],
+    *,
+    content_hash: str,
+    page_index: int,
+    figure: PdfFigureRef,
+    caption: str,
+) -> None:
+    """Emit one figure locator. Pixels are stored later, outside the sandbox."""
+
+    locator = _locator_for(page_index, figure.bbox)
+    sort_key = page_index * 10_000 + as_int(figure.bbox[1])
+    figure_id = element_id(
+        content_hash,
+        sort_key,
+        ElementKind.FIGURE,
+        locator,
+        figure.content_hash,
+    )
+    text = caption.strip() or None
+    sortable.append(
+        (
+            sort_key,
+            TypedElement(
+                element_id=figure_id,
+                kind=ElementKind.FIGURE,
+                text=text,
+                reading_order=sort_key,
+                locator=locator,
+                media_only=text is None,
+                metadata={
+                    "figure_id": figure_id,
+                    "xref": figure.xref,
+                    "width": figure.width,
+                    "height": figure.height,
+                    "content_hash": figure.content_hash,
+                },
+            ),
+        )
     )

@@ -68,11 +68,11 @@ MATRIX_ROUTE_CASES: tuple[
         {"negation_unscoped"},
     ),
     (
-        "refusal-unlabeled-chart",
+        "hybrid-unlabeled-chart",
         "Describe the unlabeled chart in the figure",
-        Phase6RouteFamily.SCOPED_REFUSAL,
-        {BranchKind.SCOPED_REFUSAL},
-        {"media_limitation"},
+        Phase6RouteFamily.HYBRID,
+        {BranchKind.HYBRID},
+        NO_LIMITATIONS,
     ),
     (
         "hybrid-prj-alpha-leave-compare",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PARSER_CONFIG_VERSION = "parser_v1"
-PDF_PARSER_VERSION = "parser_v1_pdf_reflow_v4"  # PDF-only; other formats stay parser_v1
+PDF_PARSER_VERSION = "parser_v1_pdf_reflow_v5"  # PDF-only; other formats stay parser_v1
 CLEANING_POLICY_VERSION = "cleaning_v1"
 OCR_CONFIG_VERSION = "ocr_v1"
 

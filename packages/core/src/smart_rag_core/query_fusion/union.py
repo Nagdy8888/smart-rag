@@ -104,6 +104,8 @@ def _from_hybrid(
         sheet_name=item.sheet_name,
         range_ref=item.range_ref,
         source_url=item.source_url,
+        content_kind=item.content_kind,
+        figure_id=item.figure_id,
     )
 
 

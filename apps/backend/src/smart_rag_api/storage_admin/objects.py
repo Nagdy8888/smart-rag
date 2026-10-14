@@ -106,6 +106,55 @@ def delete_object(
     raise StorageAdminError(f"storage delete failed status={response.status_code}")
 
 
+def download_object(
+    settings: PrivilegedStorageSettings,
+    *,
+    bucket: str,
+    object_path: str,
+    timeout_seconds: float = 30.0,
+) -> bytes:
+    """Download one private object after the caller has passed an ACL check.
+
+    Args:
+        settings: Privileged Storage settings. Never logged.
+        bucket: Private bucket id.
+        object_path: Object key.
+        timeout_seconds: HTTP timeout bound in seconds.
+
+    Returns:
+        Object bytes.
+
+    Raises:
+        StorageAdminError: On transport failure or a non-success status.
+        ValueError: When bucket or path is empty.
+
+    Side Effects:
+        GET ``/storage/v1/object/{bucket}/{path}``.
+    """
+
+    normalized_bucket = bucket.strip()
+    normalized_path = object_path.lstrip("/")
+    if not normalized_bucket or not normalized_path:
+        raise ValueError("bucket and object_path are required")
+    base = str(settings.supabase_url).rstrip("/")
+    encoded_path = "/".join(quote(part, safe="") for part in normalized_path.split("/"))
+    url = f"{base}/storage/v1/object/{quote(normalized_bucket, safe='')}/{encoded_path}"
+    headers = {
+        "Authorization": (
+            f"Bearer {settings.supabase_storage_admin_secret.get_secret_value()}"
+        ),
+        "apikey": settings.supabase_storage_admin_secret.get_secret_value(),
+    }
+    try:
+        with httpx.Client(timeout=timeout_seconds) as client:
+            response = client.get(url, headers=headers)
+    except httpx.HTTPError as exc:
+        raise StorageAdminError(f"storage download transport failure: {exc}") from exc
+    if response.status_code != 200:
+        raise StorageAdminError(f"storage download failed status={response.status_code}")
+    return response.content
+
+
 def delete_objects(
     settings: PrivilegedStorageSettings,
     *,

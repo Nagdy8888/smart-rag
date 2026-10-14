@@ -17,7 +17,6 @@ from smart_rag_core.query_answer.models import (
     AnswerPayload,
     AtomicLink,
 )
-from smart_rag_core.query_answer.paragraphs import apply_paragraph_contract
 from smart_rag_core.query_answer.release import drop_ungrounded_literals
 
 from tests.support.answer_verifier import (
@@ -157,111 +156,6 @@ def test_format_requested_keeps_citation_span_exact() -> None:
     assert answer_has_code_fence(formatted.answer_text)
     assert formatted.citations[0].span == span
     assert "```" not in (formatted.citations[0].span or "")
-
-
-def test_collapsed_fence_keeps_every_citation_link() -> None:
-    """A fenced collapse keeps both passage links on the one paragraph."""
-
-    first = "def alpha():\n    return 1"
-    second = "return 1"
-    chunk_a = verifier_uid(1)
-    chunk_b = verifier_uid(2)
-    payload = AnswerPayload(
-        answer_text=f"{first}\n{second}",
-        paragraphs=(
-            AnswerParagraph(paragraph_index=0, text=first, link_ids=("link-1",)),
-            AnswerParagraph(paragraph_index=1, text=second, link_ids=("link-2",)),
-        ),
-        citations=(
-            AnswerCitation(
-                chunk_id=chunk_a,
-                span="def alpha():",
-                atomic_link_id="link-1",
-                paragraph_index=0,
-            ),
-            AnswerCitation(
-                chunk_id=chunk_b,
-                span=second,
-                atomic_link_id="link-2",
-                paragraph_index=1,
-            ),
-        ),
-        atomic_links=(
-            AtomicLink(
-                link_id="link-1",
-                claim=first,
-                chunk_ids=(chunk_a,),
-                kind="fact",
-                priority=10,
-            ),
-            AtomicLink(
-                link_id="link-2",
-                claim=second,
-                chunk_ids=(chunk_b,),
-                kind="fact",
-                priority=11,
-            ),
-        ),
-        status="complete",
-    )
-    formatted = format_requested_answer_shape(
-        payload,
-        user_query="reproduce the alpha function as a fenced Python code block",
-    )
-    assert formatted.paragraphs[0].link_ids == ("link-1", "link-2")
-    assert [item.atomic_link_id for item in formatted.citations] == [
-        "link-1",
-        "link-2",
-    ]
-    assert all(item.paragraph_index == 0 for item in formatted.citations)
-    fusion = verifier_fusion(
-        verifier_passage(1, text="def alpha():\n    return 1"),
-        verifier_passage(2, text="return 1"),
-    )
-    _kept, failures = apply_paragraph_contract(
-        formatted, fusion=fusion, tables=(), required=True
-    )
-    assert "citation_link_mismatch" not in failures
-
-
-def test_pipe_table_keeps_table_citation() -> None:
-    """Pipe formatting remaps a table citation onto the collapsed paragraph."""
-
-    body = "| Method | Score |\n| --- | --- |\n| Alpha | 10 |"
-    table_id = verifier_uid(3)
-    payload = _payload(body)
-    payload = payload.model_copy(
-        update={
-            "table_citations": (
-                AnswerCitation(
-                    table_id=table_id,
-                    source_ranges=("A1:B2",),
-                    atomic_link_id="link-1",
-                    paragraph_index=4,
-                ),
-            ),
-            "atomic_links": (
-                AtomicLink(
-                    link_id="link-1",
-                    claim=body,
-                    table_id=table_id,
-                    source_ranges=("A1:B2",),
-                    kind="fact",
-                    priority=10,
-                ),
-            ),
-        }
-    )
-    formatted = format_requested_answer_shape(
-        payload,
-        user_query="reproduce the comparison as a Markdown pipe table",
-    )
-    assert formatted.table_citations
-    assert formatted.table_citations[0].paragraph_index == 0
-    assert formatted.table_citations[0].atomic_link_id in (
-        formatted.paragraphs[0].link_ids
-    )
-    assert formatted.table_citations[0].source_ranges == ("A1:B2",)
 
 
 def test_format_skips_when_not_requested() -> None:

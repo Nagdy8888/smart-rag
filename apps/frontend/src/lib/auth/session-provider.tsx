@@ -104,6 +104,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Read the Auth session when a provider is present.
+ *
+ * @returns Session snapshot, or null outside `SessionProvider`.
+ */
+export function useOptionalSession(): SessionSnapshot | null {
+  return useContext(SessionContext);
+}
+
+/**
  * Read the Auth session from context.
  *
  * @returns Session snapshot.

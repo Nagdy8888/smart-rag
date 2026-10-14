@@ -28,7 +28,6 @@ from smart_rag_core.query_routing.signals import (
     comparison_wants_relationship,
     comparison_wants_table,
     is_current_relationship,
-    media_has_caption_or_ocr,
 )
 
 
@@ -182,32 +181,21 @@ def rule_graph_inspection(ctx: MatrixContext) -> MatrixDecision | None:
 
 
 def rule_unsupported_media(ctx: MatrixContext) -> MatrixDecision | None:
-    """Refuse media-only questions without caption or OCR text.
+    """Let figure questions retrieve. Refusal happens after evidence.
+
+    Stored figures are described and shown. A question that needs a
+    figure and retrieves none still receives ``media_limitation`` from
+    hybrid coverage. This rule no longer refuses before search.
 
     Args:
         ctx: Shared matrix context.
 
     Returns:
-        Scoped-refusal decision, or None when this rule does not apply.
+        None. Kept in the matrix so the rule name stays stable.
     """
 
-    if not (ctx.prep.media_intent and not media_has_caption_or_ocr(ctx.prep.original)):
-        return None
-    ctx.flags["media_answer_forbidden"] = True
-    ctx.flags["relationship_signal_retained"] = False
-    return MatrixDecision(
-        Phase6RouteFamily.SCOPED_REFUSAL,
-        ("media_limitation",),
-        (
-            BranchSpec(
-                branch_id="media-0",
-                kind=BranchKind.SCOPED_REFUSAL,
-                family=Phase6RouteFamily.SCOPED_REFUSAL,
-                query_text=ctx.prep.original,
-                parallel_group=0,
-            ),
-        ),
-    )
+    del ctx
+    return None
 
 
 def rule_negation(ctx: MatrixContext) -> MatrixDecision | None:

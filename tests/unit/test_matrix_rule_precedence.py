@@ -73,7 +73,7 @@ def test_named_rules_win_in_isolation() -> None:
         ("search the web for latest news", "web_research"),
         ("Hello", "no_retrieval"),
         ("Inspect the current graph workspace", "graph_inspection"),
-        ("Describe the unlabeled chart in the figure", "unsupported_media"),
+        ("Describe the unlabeled chart in the figure", "ordinary_hybrid"),
         ("What is not allowed for INV-SR-1001?", "negation"),
         (
             "Which team owns the widget after the handoff as of 2020-01-01?",
