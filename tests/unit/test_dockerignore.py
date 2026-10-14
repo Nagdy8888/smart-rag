@@ -22,7 +22,7 @@ def test_dockerignore_excludes_env_local_and_keeps_example() -> None:
     assert "ARG NEXT_PUBLIC_API_BASE_URL" in dockerfile
     assert "ARG NEXT_PUBLIC_SUPABASE_URL" in dockerfile
     assert "ARG NEXT_PUBLIC_SUPABASE_ANON_KEY" in dockerfile
-    assert "NEXT_PUBLIC_API_BASE_URL:" in compose
+    assert "\n  frontend:" not in compose
     assert "LANGGRAPH_CHECKPOINT_URL:" in compose
     assert "LIGHTRAG_DB_URL:" in compose
     assert "COPY" not in dockerfile or ".env.local" not in dockerfile

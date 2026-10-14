@@ -584,11 +584,14 @@ export const AnswerSurface = memo(function AnswerSurface({
       ) : null}
       {messages.map((item) =>
         item.role === "user" ? (
-          <p key={item.message_id} className={styles.userBubble} dir="auto">
-            <UserText value={item.content} />
-          </p>
+          <div key={item.message_id} className={styles.turnUser}>
+            <p className={styles.userBubble} dir="auto">
+              <UserText value={item.content} />
+            </p>
+          </div>
         ) : (
-          <div key={item.message_id} className={styles.assistantBlock}>
+          <div key={item.message_id} className={styles.turnAssistant}>
+            <div className={styles.assistantBlock}>
             <LiveRegion aria-label="Answer" politeness="polite">
               <AnswerParagraphs
                 answerText={item.content}
@@ -620,16 +623,20 @@ export const AnswerSurface = memo(function AnswerSurface({
                 </>
               ) : null}
             </p>
+            </div>
           </div>
         ),
       )}
       {showLiveUser ? (
-        <p className={`${styles.userBubble} ${styles.liveTurn}`} dir="auto">
-          <UserText value={question} />
-        </p>
+        <div className={styles.turnUser}>
+          <p className={`${styles.userBubble} ${styles.liveTurn}`} dir="auto">
+            <UserText value={question} />
+          </p>
+        </div>
       ) : null}
       {showProgress ? (
-        <RunProgressTimeline
+        <div className={styles.turnAssistant}>
+          <RunProgressTimeline
           items={progressItems}
           starting={starting}
           terminal={terminal}
@@ -637,11 +644,13 @@ export const AnswerSurface = memo(function AnswerSurface({
           answerAvailable={answer.trim() !== ""}
           collapsed={verificationCompleted && answer.trim() !== "" && !revealing}
           chat={chat}
-          revealing={revealing}
-        />
+            revealing={revealing}
+          />
+        </div>
       ) : null}
       {showLiveAssistant ? (
-        <div className={styles.liveTurn}>
+        <div className={`${styles.turnAssistant} ${styles.liveTurn}`}>
+          <div className={styles.assistantBlock}>
           {originLabel !== null ? (
             <p className={styles.answerHeader}>
               <Badge label={originLabel} data-testid="answer-origin" />
@@ -692,6 +701,7 @@ export const AnswerSurface = memo(function AnswerSurface({
           {note !== null ? (
             <p className={`${styles.terminalNote} ${terminalClass}`}>{note}</p>
           ) : null}
+          </div>
         </div>
       ) : (
         <LiveRegion aria-label="Answer" politeness="polite">

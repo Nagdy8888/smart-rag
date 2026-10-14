@@ -1,8 +1,7 @@
 /**
  * Safe React-only markdown-lite for verified answer prose paragraphs.
  *
- * Emits element trees with text children. Never HTML strings or
- * dangerouslySetInnerHTML. Hostile markup stays inert text.
+ * Emits element trees with text children. Hostile markup stays inert text.
  */
 
 import { createElement, type ReactNode } from "react";

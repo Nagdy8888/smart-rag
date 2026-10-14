@@ -234,7 +234,9 @@ def test_local_cors_allows_private_network_preflight() -> None:
         )
     assert response.status_code == 204
     assert response.headers.get("access-control-allow-private-network") == "true"
-    assert response.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
+    )
 
 
 def test_test_env_cors_advertises_test_identity_headers(

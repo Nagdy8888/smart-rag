@@ -43,15 +43,32 @@
   gap: calc(var(--space) * 5);
 }
 
+.turnUser,
+.turnAssistant {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.turnUser {
+  justify-content: flex-end;
+}
+
+.turnAssistant {
+  justify-content: flex-start;
+}
+
 .userBubble {
   margin: 0;
-  margin-inline-start: 0;
-  max-width: 40rem;
+  max-width: min(32rem, 78%);
   min-width: 0;
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
+  padding: 0.7rem 0.95rem;
+  background: var(--color-accent-soft);
   color: var(--color-text);
+  border-start-start-radius: 1.1rem;
+  border-start-end-radius: 1.1rem;
+  border-end-start-radius: 1.1rem;
+  border-end-end-radius: 0.35rem;
   font-family: var(--font-sans);
   font-size: 1.0625rem;
   font-weight: 500;
@@ -326,6 +343,15 @@
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 2);
+  max-width: min(40rem, 85%);
+  min-width: 0;
+  padding: 0.75rem 0.95rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-start-start-radius: 1.1rem;
+  border-start-end-radius: 1.1rem;
+  border-end-start-radius: 0.35rem;
+  border-end-end-radius: 1.1rem;
 }
 
 .citationRow {
