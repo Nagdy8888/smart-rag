@@ -168,6 +168,52 @@ describe("answer tables", () => {
     ]);
   });
 
+  it("drops a bare table-id line when the next line titles the same table", () => {
+    const text = [
+      "Table 4-2.",
+      "Table 4-2. Sample records",
+      "Name Summary Outcome Link",
+      "Alpha builds a sample",
+      "Beta keeps the note",
+    ].join("\n");
+    const table = parseAnswerTable(text);
+    expect(table?.caption).toBe("Table 4-2. Sample records");
+    expect(table?.preformatted).not.toMatch(/Table 4-2/);
+  });
+
+  it("builds a grid when stacked cells repeat between URL lines", () => {
+    const text = [
+      "Table 4-2.",
+      "Table 4-2. Sample records",
+      "Name Summary Outcome Link Alpha Widget",
+      "Builds widgets for demos across regions",
+      "continuing the summary on the next line",
+      "Helps teams practice the workflow safely",
+      "https://alpha.example/widget",
+      "Beta Service",
+      "Runs a short exercise with shared notes",
+      "Shows how review catches mistakes",
+      "https://beta.example/service",
+      "Gamma Lab",
+      "Starts a partial record without a link",
+    ].join("\n");
+    const table = parseAnswerTable(text);
+    expect(table?.caption).toBe("Table 4-2. Sample records");
+    expect(table?.preformatted).toBeUndefined();
+    expect(table?.headers).toEqual(["Name", "Summary", "Outcome", "Link"]);
+    expect(table?.rows[0]).toEqual([
+      "Alpha Widget",
+      "Builds widgets for demos across regions continuing the summary on the next line",
+      "Helps teams practice the workflow safely",
+      "https://alpha.example/widget",
+    ]);
+    expect(table?.rows[1]?.[0]).toBe("Beta Service");
+    expect(table?.rows[1]?.[3]).toBe("https://beta.example/service");
+    expect(table?.rows[2]?.[0]).toBe("Gamma Lab");
+    expect(table?.rows[2]?.[1]).toBe("Starts a partial record without a link");
+    expect(table?.rows[2]?.[3]).toBe("");
+  });
+
   it("unwraps a saved Item/Detail grid that labeled lines Row N", () => {
     const text = [
       "Table 4-2. Recorded lines",

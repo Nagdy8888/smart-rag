@@ -46,6 +46,7 @@ export function parseAnswerTable(text: string): AnswerTableModel | null {
     parseColumnTable(source) ??
     parseMetricSpaceTable(source) ??
     parseRaciMatrixTable(source) ??
+    parseStackedRecordTable(source) ??
     parseCaptionBlock(source)
   );
 }
@@ -63,7 +64,39 @@ function normalizeTableSource(source: string): string {
     text = text.slice(title.index);
   }
   text = text.replace(/(?:\n|^)\s*\d+\s*\|\s*Chapter\s+\d+[\s\S]*$/i, "");
+  const lines = text.split("\n");
+  const stubId = captionStubId(lines[0] ?? "");
+  const nextId = captionId(lines[1] ?? "");
+  if (stubId !== null && stubId === nextId) {
+    lines.shift();
+    text = lines.join("\n");
+  }
   return text.trim();
+}
+
+const CAPTION_STUB = /^Table\s+(\d+-\d+)\.?\s*$/i;
+const CAPTION_ID = /^Table\s+(\d+-\d+)\b/i;
+
+/**
+ * Return the table id when a line is only ``Table N-M``.
+ *
+ * @param line - Candidate caption line.
+ * @returns Id such as ``4-2``, or null when the line has a title.
+ */
+function captionStubId(line: string): string | null {
+  const match = line.trim().match(CAPTION_STUB);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Return the table id at the start of a caption line.
+ *
+ * @param line - Candidate caption line.
+ * @returns Id such as ``4-2``, or null.
+ */
+function captionId(line: string): string | null {
+  const match = line.trim().match(CAPTION_ID);
+  return match?.[1] ?? null;
 }
 
 /** Inline GFM separator row, used when pipe tables arrive with newlines stripped. */
@@ -620,6 +653,154 @@ function extractRaciCells(line: string): { metric: string; cells: string[] } {
   }
   const metric = firstIndex > 0 ? line.slice(0, firstIndex).trim() : "";
   return { metric, cells };
+}
+
+const RECORD_URL = /^https?:\/\//i;
+const HEADER_WORD = /^[A-Z][A-Za-z][A-Za-z/-]{0,24}$/;
+
+/**
+ * Parse salvage whose rows are stacked one cell per line and end on a URL.
+ *
+ * The column count is the repeated distance between URL lines. The first
+ * body line contributes that many leading header words; any leftover text
+ * on that line is the first cell. A following line that starts with a
+ * lowercase letter continues the current cell.
+ *
+ * @param source - Normalized paragraph text.
+ * @returns Table model, or null when URL rows do not repeat.
+ */
+function parseStackedRecordTable(source: string): AnswerTableModel | null {
+  const lines = source
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 6) {
+    return null;
+  }
+  let caption: string | undefined;
+  let start = 0;
+  if (TABLE_CAPTION.test(lines[0] ?? "") && !lines[0]?.includes("|")) {
+    caption = lines[0];
+    start = 1;
+  }
+  const body = joinStackedContinuations(lines.slice(start));
+  const width = stackedRowWidth(body);
+  if (width === null) {
+    return null;
+  }
+  const split = splitStackedHeader(body[0] ?? "", width);
+  if (split === null) {
+    return null;
+  }
+  const cells: string[] = [];
+  if (split.firstCell) {
+    cells.push(split.firstCell);
+  }
+  cells.push(...body.slice(1));
+  if (cells.length < width) {
+    return null;
+  }
+  const rows: string[][] = [];
+  for (let index = 0; index < cells.length; index += width) {
+    const row = cells.slice(index, index + width);
+    if (row.some((cell) => cell.trim())) {
+      rows.push(padRow(row, width));
+    }
+  }
+  if (rows.length < 2) {
+    return null;
+  }
+  return {
+    caption,
+    headers: split.headers,
+    rows,
+  };
+}
+
+/**
+ * Join a lowercase continuation onto the previous stacked line.
+ *
+ * URL lines stay separate so a link is not absorbed into the cell above it.
+ *
+ * @param lines - Body lines, caption already removed.
+ * @returns Lines with wrapped fragments merged.
+ */
+function joinStackedContinuations(lines: string[]): string[] {
+  const joined: string[] = [];
+  for (const line of lines) {
+    const previous = joined[joined.length - 1] ?? "";
+    if (
+      previous &&
+      !RECORD_URL.test(previous) &&
+      !RECORD_URL.test(line) &&
+      /^[a-z]/.test(line)
+    ) {
+      joined[joined.length - 1] = `${previous} ${line}`.trim();
+      continue;
+    }
+    joined.push(line);
+  }
+  return joined;
+}
+
+/**
+ * Return the repeated line count from one URL line to the next.
+ *
+ * @param lines - Body lines, caption already removed.
+ * @returns Column count, or null when URL rows do not agree.
+ */
+function stackedRowWidth(lines: string[]): number | null {
+  const indexes = lines
+    .map((line, index) => (RECORD_URL.test(line) ? index : -1))
+    .filter((index) => index >= 0);
+  if (indexes.length < 2) {
+    return null;
+  }
+  const counts = new Map<number, number>();
+  for (let index = 0; index < indexes.length - 1; index += 1) {
+    const gap = (indexes[index + 1] ?? 0) - (indexes[index] ?? 0);
+    if (gap < 2 || gap > 8) {
+      continue;
+    }
+    counts.set(gap, (counts.get(gap) ?? 0) + 1);
+  }
+  let width = 0;
+  let best = 0;
+  for (const [gap, count] of counts) {
+    if (count > best) {
+      width = gap;
+      best = count;
+    }
+  }
+  if (width < 2 || best < 1) {
+    return null;
+  }
+  return width;
+}
+
+/**
+ * Split leading header words from the first stacked body line.
+ *
+ * @param line - First body line.
+ * @param width - Column count inferred from URL spacing.
+ * @returns Headers and an optional first data cell already on that line.
+ */
+function splitStackedHeader(
+  line: string,
+  width: number,
+): { headers: string[]; firstCell: string } | null {
+  const tokens = line.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length < width) {
+    return null;
+  }
+  const headers = tokens.slice(0, width);
+  if (!headers.every((word) => HEADER_WORD.test(word))) {
+    return null;
+  }
+  return {
+    headers,
+    firstCell: tokens.slice(width).join(" ").trim(),
+  };
 }
 
 /**
