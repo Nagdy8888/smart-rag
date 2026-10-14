@@ -168,6 +168,30 @@ describe("answer tables", () => {
     ]);
   });
 
+  it("builds a grid when a blank line separates the short caption from the title", () => {
+    const text = [
+      "Table 4-2.",
+      "",
+      "Table 4-2. Sample records",
+      "Name Summary Outcome Link Alpha Widget",
+      "Builds widgets for demos across regions",
+      "continuing the summary on the next line",
+      "Helps teams practice the workflow safely",
+      "https://alpha.example/widget",
+      "Beta Service",
+      "Runs a short exercise with shared notes",
+      "Shows how review catches mistakes",
+      "https://beta.example/service",
+    ].join("\n");
+    const table = parseAnswerTable(text);
+    expect(table?.caption).toBe("Table 4-2. Sample records");
+    expect(table?.preformatted).toBeUndefined();
+    expect(table?.headers).toEqual(["Name", "Summary", "Outcome", "Link"]);
+    expect(table?.rows[0]?.[0]).toBe("Alpha Widget");
+    expect(table?.rows[0]?.[3]).toBe("https://alpha.example/widget");
+    expect(table?.rows[1]?.[0]).toBe("Beta Service");
+  });
+
   it("drops a bare table-id line when the next line titles the same table", () => {
     const text = [
       "Table 4-2.",

@@ -283,6 +283,56 @@ def test_salvage_named_table_block_replaces_header_only_prose() -> None:
     assert "72.1" in salvaged.answer_text
 
 
+def test_salvage_named_code_definition_keeps_wrapped_signature() -> None:
+    """A sibling marker inside an open signature does not end the block."""
+
+    gold = (
+        "def prepare_batch(\n"
+        "    name: str,\n"
+        "    class Helper,\n"
+        ") -> str:\n"
+        "    return name\n"
+        "def other_task():\n"
+        "    return 0\n"
+    )
+    fusion = verifier_fusion(verifier_passage(1, text=gold, rank=1))
+    payload = _payload("wrong neighbor snippet", chunk=verifier_uid(1))
+    salvaged = salvage_named_code_definition(
+        payload,
+        fusion,
+        user_query=(
+            "reproduce the prepare_batch function as a fenced Python code block"
+        ),
+    )
+    assert ") -> str:" in salvaged.answer_text
+    assert "return name" in salvaged.answer_text
+    assert "other_task" not in salvaged.answer_text
+
+
+def test_salvage_named_table_block_appends_same_chunk_continuation() -> None:
+    """A short table block gains the following text from the same passage."""
+
+    later = "However " + ("the later cell stays in the same passage. " * 6)
+    gold = (
+        "Table 4-2. Sample comparison of methods\nMethod Score\nAlpha 11 22\n" + later
+    )
+    fusion = verifier_fusion(verifier_passage(1, text=gold, rank=1))
+    payload = _payload("header only", chunk=verifier_uid(1))
+    salvaged = salvage_named_table_block(
+        payload,
+        fusion,
+        user_query="reproduce Table 4-2 as a Markdown pipe table",
+    )
+    assert "Table 4-2" in salvaged.answer_text
+    assert "later cell stays" in salvaged.answer_text
+    assert any(
+        item.chunk_id == verifier_uid(1)
+        and item.span is not None
+        and "later cell" in item.span
+        for item in salvaged.citations
+    )
+
+
 def test_salvage_named_code_definition_stops_before_sibling_def() -> None:
     """Flattened evidence with a later def does not trail into the answer."""
 

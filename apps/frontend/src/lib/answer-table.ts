@@ -66,7 +66,11 @@ function normalizeTableSource(source: string): string {
   text = text.replace(/(?:\n|^)\s*\d+\s*\|\s*Chapter\s+\d+[\s\S]*$/i, "");
   const lines = text.split("\n");
   const stubId = captionStubId(lines[0] ?? "");
-  const nextId = captionId(lines[1] ?? "");
+  let nextIndex = 1;
+  while (nextIndex < lines.length && !(lines[nextIndex] ?? "").trim()) {
+    nextIndex += 1;
+  }
+  const nextId = captionId(lines[nextIndex] ?? "");
   if (stubId !== null && stubId === nextId) {
     lines.shift();
     text = lines.join("\n");

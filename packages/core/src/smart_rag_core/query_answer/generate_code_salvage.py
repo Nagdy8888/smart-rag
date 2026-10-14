@@ -409,7 +409,10 @@ def salvage_named_table_block(
     Triggers when the query names ``Table N-M`` (or asks to reproduce a
     table) and fused evidence holds the caption with nearby row content.
     Prefers titled caption+rows passages over prose intros that only
-    mention the table.
+    mention the table. When the extracted block ends before the chosen
+    passage ends, one exact continuation from that same passage is
+    appended. The continuation is capped at the citation span limit.
+    Other passages on the page are not filled.
 
     Args:
         payload: Company answer after code-definition salvage.
@@ -417,7 +420,9 @@ def salvage_named_table_block(
         user_query: Original user text. Untrusted.
 
     Returns:
-        Payload citing the table block, or unchanged when unmatched.
+        Payload citing the table block, plus one same-passage
+        continuation when the block does not consume that passage.
+        Unchanged when unmatched.
     """
 
     captions = named_table_captions(user_query)
@@ -430,16 +435,32 @@ def salvage_named_table_block(
     if gold is None:
         return payload
     item, match = gold
-    span = _extract_table_block(item.citation_text, match)
+    text = item.citation_text or ""
+    span = _extract_table_block(text, match)
     if not span:
         return payload
+    continuation = _continuation_after_span(text, span)
     if extractive_block_already_released(payload, span):
-        return payload
-    return replace_with_extractive_block(
-        payload,
+        released = payload
+    else:
+        released = replace_with_extractive_block(
+            payload,
+            chunk_id=item.chunk_id,
+            span=span,
+            link_id="table-block-1",
+        )
+    if not continuation or extractive_block_already_released(released, continuation):
+        return released
+    from smart_rag_core.query_answer.generate_anchor_salvage import (
+        append_anchor_claim,
+    )
+
+    return append_anchor_claim(
+        released,
         chunk_id=item.chunk_id,
-        span=span,
-        link_id="table-block-1",
+        span=continuation,
+        link_id="page-opening-1",
+        priority=0,
     )
 
 
@@ -542,15 +563,97 @@ def extractive_block_already_released(
     return True
 
 
+def _continuation_after_span(text: str, span: str) -> str:
+    """Copy the passage text that starts where ``span`` ends.
+
+    The window begins at the first non-space character after ``span`` and
+    is capped at ``MAX_CITATION_SPAN_CHARS``. When that cap cuts the
+    passage, the window ends on a sentence boundary inside the cap. The
+    result stays an exact substring of ``text``.
+
+    Args:
+        text: Passage citation text.
+        span: Extracted block already taken from ``text``.
+
+    Returns:
+        Exact continuation, or empty when ``span`` consumes ``text``
+        or the remainder is only a chapter footer.
+    """
+
+    if not text or not span:
+        return ""
+    start = text.find(span)
+    if start < 0:
+        return ""
+    rest_start = start + len(span)
+    while rest_start < len(text) and text[rest_start].isspace():
+        rest_start += 1
+    if rest_start >= len(text):
+        return ""
+    end_limit = min(len(text), rest_start + MAX_CITATION_SPAN_CHARS)
+    window_end = end_limit
+    if end_limit < len(text):
+        last_sentence = -1
+        for index, char in enumerate(text[rest_start:end_limit]):
+            if char in ".!?":
+                last_sentence = index
+        if last_sentence >= 0:
+            window_end = rest_start + last_sentence + 1
+    later = text[rest_start:window_end].strip()
+    if not later or later not in text or later == span:
+        return ""
+    footer = _CHAPTER_FOOTER.search(later)
+    if footer is not None:
+        if footer.start() == 0:
+            return ""
+        later = later[: footer.start()].strip()
+    if not later or later not in text or later == span:
+        return ""
+    return later[:MAX_CITATION_SPAN_CHARS]
+
+
+def _signature_closed_end(text: str, def_start: int) -> int:
+    """Return the index just after the signature's closing parenthesis.
+
+    Args:
+        text: Passage citation text.
+        def_start: Index where the definition match begins.
+
+    Returns:
+        Index after the ``)`` that closes the signature. When the
+        signature has no parenthesis, returns ``def_start``. When the
+        parenthesis never closes, returns the citation-span cap so a
+        sibling definition inside the open signature is not a cut.
+    """
+
+    open_at = text.find("(", def_start)
+    if open_at < 0:
+        return def_start
+    cap = min(len(text), def_start + MAX_CITATION_SPAN_CHARS)
+    depth = 0
+    for index in range(open_at, cap):
+        char = text[index]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return cap
+
+
 def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
     """Copy a bounded ``def`` / ``@tool`` block from ``text``.
 
     Continues through blank lines inside the body so docstring-separated
     assignments (for example ``YOUR_*`` placeholders) stay in the span.
-    Stops before a sibling ``def`` / ``@tool`` / ``class`` even when OCR
-    flattened the page onto one line, and before book section markers
-    like ``# -- 2)``. When the definition is ``call_model``, includes a
-    preceding ``ChatOpenAI(...)`` assignment in the lookback window.
+    Does not end the block until the signature parentheses are closed, so
+    a wrapped parameter list is not cut by a later ``def`` or ``class``.
+    After that closing parenthesis, stops before a sibling ``def`` /
+    ``@tool`` / ``class`` even when OCR flattened the page onto one line,
+    and before book section markers like ``# -- 2)``. When the definition
+    is ``call_model``, includes a preceding ``ChatOpenAI(...)`` assignment
+    in the lookback window.
     ``replace_with_extractive_block`` collapses blank lines for the
     paragraph contract while keeping this exact span for citations.
 
@@ -575,14 +678,15 @@ def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
             llm = candidate
         if llm is not None:
             start = max(0, start - 220) + llm.start()
-    rest = text[match.end() :]
-    end = match.end() + len(rest)
+    closed = _signature_closed_end(text, match.start())
+    rest = text[closed:]
+    end = len(text)
     next_def = _NEXT_CODE_DEF.search(rest)
     if next_def is not None:
-        end = min(end, match.end() + next_def.start())
+        end = min(end, closed + next_def.start())
     section = _CODE_SECTION_BREAK.search(rest)
     if section is not None:
-        end = min(end, match.end() + section.start())
+        end = min(end, closed + section.start())
     block = text[start:end].strip()
     if not block or block not in text:
         block = match.group(0).strip()
