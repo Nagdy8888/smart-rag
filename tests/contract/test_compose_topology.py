@@ -162,7 +162,7 @@ def test_developer_endpoints_are_explicit() -> None:
     """The API is the only Compose service that publishes a developer port."""
 
     assert "ports" in _service("api")
-    assert "frontend" not in _services()
+    assert "frontend" not in _mapping(_load_compose()["services"])
     assert "ports" not in _service("worker")
 
 
@@ -267,7 +267,7 @@ def test_api_and_worker_supabase_url_requires_hosted_auth() -> None:
     worker_url = worker_env["SUPABASE_URL"]
     assert api_url == "${SUPABASE_URL:?set hosted SUPABASE_URL}"
     assert worker_url == "${SUPABASE_URL:?set hosted SUPABASE_URL}"
-    assert "frontend" not in _services()
+    assert "frontend" not in _mapping(_load_compose()["services"])
 
 
 def test_staging_api_uses_session_dsn_for_checkpoint_and_lightrag() -> None:
