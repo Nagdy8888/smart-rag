@@ -22,12 +22,6 @@ from smart_rag_core.query_answer.citations import (
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
-from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
-from smart_rag_core.query_answer.generate_grounded import (
-    salvage_anchor_claim_fill,
-    salvage_named_code_definition,
-    salvage_named_table_block,
-)
 from smart_rag_core.query_answer.models import (
     AnswerPayload,
     AtomicLink,
@@ -41,14 +35,12 @@ from smart_rag_core.query_answer.release import (
     render_verified_company_answer,
 )
 from smart_rag_core.query_answer.verifier import run_verifier_batch
-from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.constants import (
     FALLBACK_RETRIEVERS_UNBOUND,
     LIMITATION_VERIFIER_OMITTED_LINKS,
     VERIFIER_SKIPPED_DETAIL_PREFIX,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
-from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.query_routing.serde import plan_from_state
 from smart_rag_core.web_research.models import WebSourceRecord
@@ -64,75 +56,9 @@ from smart_rag_agents.query.nodes.state_codec import (
     fusion_from_state,
     tables_from_state,
 )
+from smart_rag_agents.query.nodes.verify_release import company_release_payload
 from smart_rag_agents.query.run_timings import with_verifier_timing
 from smart_rag_agents.query.state import QueryGraphState
-
-
-def _company_release_payload(
-    checked: AnswerPayload,
-    *,
-    fusion: FusionResult,
-    tables: tuple[TableEvidenceRecord, ...],
-    user_query: str,
-) -> AnswerPayload:
-    """Render, salvage, and reshape one company answer.
-
-    Validation and answer errors keep the last successful payload.
-    Any other exception propagates so the caller can release the
-    generated draft instead of aborting the graph.
-
-    Args:
-        checked: Answer after deterministic checks and the verifier.
-        fusion: Fitted canonical evidence for this run.
-        tables: Deterministic table snapshots.
-        user_query: Original user text. Untrusted.
-
-    Returns:
-        Released company payload.
-
-    Raises:
-        Exception: Unexpected render or salvage failures.
-    """
-
-    try:
-        checked = render_verified_company_answer(
-            checked,
-            fusion=fusion,
-            tables=tables,
-            user_query=user_query,
-        )
-    except (ValidationError, ValueError, AnswerError):
-        # Keep the pre-render payload; the structural salvages below may still repair.
-        pass
-    if fusion.evidence:
-        for salvage_fn in (
-            salvage_named_code_definition,
-            salvage_named_table_block,
-            salvage_anchor_claim_fill,
-        ):
-            try:
-                salvaged = salvage_fn(checked, fusion, user_query=user_query)
-            except (ValidationError, ValueError, AnswerError):
-                continue
-            if salvaged is checked:
-                continue
-            try:
-                checked = render_verified_company_answer(
-                    salvaged,
-                    fusion=fusion,
-                    tables=tables,
-                    user_query=user_query,
-                )
-            except (ValidationError, ValueError, AnswerError):
-                # Keep the extractive salvage rather than dropping it.
-                checked = salvaged
-    try:
-        checked = format_requested_answer_shape(checked, user_query=user_query)
-    except (ValidationError, ValueError, AnswerError):
-        # Pipe-table / fence reshaping must not fail the verified path
-        # after a successful extractive salvage.
-        pass
-    return checked
 
 
 def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
@@ -343,7 +269,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     if not release_generated_draft and company_release_applies(checked, is_web=is_web):
         user_query = state["user_query"] or ""
         try:
-            checked = _company_release_payload(
+            checked = company_release_payload(
                 checked,
                 fusion=fusion,
                 tables=tables.records,

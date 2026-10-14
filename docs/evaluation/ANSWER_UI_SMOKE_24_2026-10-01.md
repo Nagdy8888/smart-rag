@@ -18,8 +18,8 @@ The private gold below is optional for **live** company/general/web asks
 that exercise the same shapes end-to-end. Prefer the in-app gallery when
 the goal is “does the UI look right?”
 
-Private gold: [`.private-eval/answer-ui-24-v1.json`](../../.private-eval/answer-ui-24-v1.json)
-(gitignored). Expected phrase facts stay private (plan decision D4). Each
+Private gold lives in the gitignored file `.private-eval/answer-ui-24-v1.json`.
+Expected phrase facts stay private (plan decision D4). Each
 item carries `ui_pass` checks meant for live browser review.
 
 Related: [CODE_TABLE_KNOWN_ANSWER_20_2026-09-29.md](./CODE_TABLE_KNOWN_ANSWER_20_2026-09-29.md)

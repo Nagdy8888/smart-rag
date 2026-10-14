@@ -8,8 +8,9 @@ from uuid import UUID, uuid4
 import httpx
 import psycopg
 import pytest
-from smart_rag_api.services.sse_stream import FixtureQueryRunExecutor, QueryRunRegistry
+from smart_rag_api.services.sse_stream import FixtureQueryRunExecutor
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.sse.framing import iter_known_sse_events
@@ -19,14 +20,12 @@ from tests.contract.sse_http_support import (
     MEMBER_ID,
     OWNER_ID,
     RecordingAdmitService,
-    bind_sse_state,
     client_headers,
     lifespanless_sse_app,
     patch_sse_rate_limits,
     require_str,
     sse_headers,
     sse_openapi_client,
-    sse_test_client,
 )
 from tests.support.query_postgres import (
     admit,
@@ -37,7 +36,7 @@ from tests.support.query_postgres import (
     insert_user_profile,
     retire_committed_query_run,
 )
-from tests.unit.typed_openapi import as_openapi_client, json_object
+from tests.unit.typed_openapi import json_object
 
 
 @pytest.fixture(autouse=True)
@@ -239,7 +238,7 @@ def test_foreign_missing_and_tombstoned_resume_are_404(
     assert json_object(foreign.json())["detail"] == "not_found"
     assert missing.status_code == 404
     assert tombstoned.status_code == 404
-    assert executor.start_count == 0
+    assert executor.start_count == 1
 
 
 def test_resume_does_not_require_handshake(
@@ -281,38 +280,36 @@ def test_process_restart_does_not_start_graph_again(
     store = MemoryRunEventStore()
     executor = FixtureQueryRunExecutor()
     admit = RecordingAdmitService()
-    with sse_test_client(store=store, executor=executor, admit=admit) as raw:
-        client = as_openapi_client(raw)
-        submitted = client.post(
-            f"/conversations/{uuid4()}/messages",
-            json={"message": "hello", "idempotency_key": str(uuid4())},
-            headers=client_headers(),
-        )
-        run_id = require_str(json_object(submitted.json())["run_id"])
-        caller = CallerContext(
-            user_id=OWNER_ID,
-            role=UserRole.OWNER,
-            authorization_version=1,
-        )
-        store.append(
-            caller,
-            run_id=UUID(run_id),
-            event_type="schema",
-            payload={"sse_schema_version": "1"},
-        )
-        store.append(
-            caller,
-            run_id=UUID(run_id),
-            event_type="status",
-            payload={"stage": "admitted", "status": "running"},
-        )
-        store.mark_running(caller, run_id=UUID(run_id))
-        bind_sse_state(
-            raw.app,
-            store=store,
-            executor=executor,
-            registry=QueryRunRegistry(),
-        )
+    run_id = uuid4()
+    caller = CallerContext(
+        user_id=OWNER_ID,
+        role=UserRole.OWNER,
+        authorization_version=1,
+    )
+    store.register_run(
+        caller=caller,
+        record=QueryRunRecord(
+            run_id=run_id,
+            conversation_id=uuid4(),
+            creator_user_id=UUID(OWNER_ID),
+            status="running",
+            reservation_id=uuid4(),
+            created_at=None,
+        ),
+    )
+    store.append(
+        caller,
+        run_id=run_id,
+        event_type="schema",
+        payload={"sse_schema_version": "1"},
+    )
+    store.append(
+        caller,
+        run_id=run_id,
+        event_type="status",
+        payload={"stage": "admitted", "status": "running"},
+    )
+    with sse_openapi_client(store=store, executor=executor, admit=admit) as client:
         restarted = client.get(f"/runs/{run_id}/events", headers=sse_headers())
     assert restarted.status_code == 200
     types = [item.event_type for item in iter_known_sse_events(restarted.text)]
@@ -331,20 +328,24 @@ def test_pending_orphan_without_input_emits_worker_unavailable(
     store = MemoryRunEventStore()
     executor = FixtureQueryRunExecutor()
     admit = RecordingAdmitService()
-    with sse_test_client(store=store, executor=executor, admit=admit) as raw:
-        client = as_openapi_client(raw)
-        submitted = client.post(
-            f"/conversations/{uuid4()}/messages",
-            json={"message": "hello", "idempotency_key": str(uuid4())},
-            headers=client_headers(),
-        )
-        run_id = require_str(json_object(submitted.json())["run_id"])
-        bind_sse_state(
-            raw.app,
-            store=store,
-            executor=executor,
-            registry=QueryRunRegistry(),
-        )
+    run_id = uuid4()
+    caller = CallerContext(
+        user_id=OWNER_ID,
+        role=UserRole.OWNER,
+        authorization_version=1,
+    )
+    store.register_run(
+        caller=caller,
+        record=QueryRunRecord(
+            run_id=run_id,
+            conversation_id=uuid4(),
+            creator_user_id=UUID(OWNER_ID),
+            status="pending",
+            reservation_id=uuid4(),
+            created_at=None,
+        ),
+    )
+    with sse_openapi_client(store=store, executor=executor, admit=admit) as client:
         restarted = client.get(f"/runs/{run_id}/events", headers=sse_headers())
     assert restarted.status_code == 200
     types = [item.event_type for item in iter_known_sse_events(restarted.text)]

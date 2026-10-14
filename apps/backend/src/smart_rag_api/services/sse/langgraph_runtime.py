@@ -21,11 +21,7 @@ class StreamCancelFlag(Protocol):
     """Cooperative cancel handle used while opening ``astream``."""
 
     def is_set(self) -> bool:
-        """Return whether cooperative cancel is set.
-
-        Returns:
-            True when deps should observe cancel.
-        """
+        """Return whether cooperative cancel is set."""
         ...
 
 

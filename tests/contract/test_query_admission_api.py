@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from smart_rag_api.dependencies.services import get_postgres_url
+from smart_rag_api.dependencies.services import get_postgres_url, get_sse_stream_service
 from smart_rag_api.main import create_app
 from smart_rag_api.routers.conversations import get_query_run_service
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -24,6 +24,36 @@ from tests.unit.typed_openapi import (
 )
 
 _OWNER = "00000000-0000-4000-8000-000000000001"
+
+
+class _IdleSseService:
+    """SSE double that records admission without opening Postgres."""
+
+    def remember_admitted(self, *_args: object, **_kwargs: object) -> None:
+        """Ignore the admitted message.
+
+        Args:
+            *_args: Caller, context, and message.
+            **_kwargs: Unused keywords.
+        """
+
+    async def start_admitted(self, *_args: object, **_kwargs: object) -> None:
+        """Skip starting the graph.
+
+        Args:
+            *_args: Caller and admission context.
+            **_kwargs: Unused keywords.
+        """
+
+
+def _idle_sse_service() -> _IdleSseService:
+    """Return an SSE double that does not open Postgres.
+
+    Returns:
+        Service that records admission and skips the graph.
+    """
+
+    return _IdleSseService()
 
 
 def _identity() -> dict[str, str]:
@@ -167,6 +197,7 @@ def test_auto_submit_admits_composite_and_returns_stream_path(
     application.dependency_overrides[get_query_run_service] = lambda: _AdmitService(
         context, stream_path
     )
+    application.dependency_overrides[get_sse_stream_service] = _idle_sse_service
     with TestClient(application) as raw:
         client = as_openapi_client(raw)
         response = client.post(
@@ -215,6 +246,7 @@ def _submit_application(
     application.dependency_overrides[get_query_run_service] = lambda: _AdmitService(
         context, stream_path
     )
+    application.dependency_overrides[get_sse_stream_service] = _idle_sse_service
     return application
 
 

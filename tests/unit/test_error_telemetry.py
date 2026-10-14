@@ -164,6 +164,16 @@ def test_disabled_mode_does_not_construct_exporters(
     _clear_telemetry(monkeypatch)
 
     def _forbidden(*_args: object, **_kwargs: object) -> None:
+        """Fail if an exporter constructor runs while telemetry is disabled.
+
+        Args:
+            *_args: Constructor positional arguments.
+            **_kwargs: Constructor keyword arguments.
+
+        Raises:
+            AssertionError: Always.
+        """
+
         raise AssertionError("exporter constructed")
 
     monkeypatch.setattr(error_telemetry.OTLPLogExporter, "__init__", _forbidden)
@@ -197,6 +207,18 @@ def test_enabled_otlp_constructs_exporter_then_stops(
         headers: object = None,
         **_kwargs: object,
     ) -> None:
+        """Record the traces URL, then stop before any network call.
+
+        Args:
+            self: Exporter instance. Unused.
+            endpoint: OTLP endpoint the client would call.
+            headers: Auth headers. Unused and not recorded.
+            **_kwargs: Other exporter options.
+
+        Raises:
+            RuntimeError: Always, after recording the endpoint.
+        """
+
         del self, headers
         if endpoint is not None:
             calls.append(endpoint)
@@ -219,6 +241,12 @@ def test_enabled_glitchtip_inits_without_logging_the_dsn(
     captured: dict[str, object] = {}
 
     def _fake_init(**kwargs: object) -> None:
+        """Store GlitchTip init kwargs without opening a socket.
+
+        Args:
+            **kwargs: Arguments that would be passed to ``sentry_sdk.init``.
+        """
+
         captured.update(kwargs)
 
     monkeypatch.setattr(error_telemetry.sentry_sdk, "init", _fake_init)
