@@ -92,18 +92,34 @@ def test_ensure_fenced_code_idempotent() -> None:
     assert answer_has_code_fence(once)
 
 
-def test_ensure_pipe_table_from_ocr_and_compact() -> None:
-    """OCR dumps and compacted pipes become qualifying Markdown tables."""
+def test_ensure_pipe_table_from_aligned_columns_and_compact() -> None:
+    """Aligned column gaps become a pipe table; unpaired lines stay in order."""
 
-    ocr = (
-        "Table 7-1. Primary methods for fine-tuning language models\n"
-        "Method How it works Best for Supervised fine-tuning (SFT) "
-        "Provide ground truth examples. Classification tasks. "
-        "Vision fine-tuning Supply image-label pairs. Image classification."
+    aligned = (
+        "Table 7-1. Primary methods\n"
+        "Method    How it works\n"
+        "SFT       Ground truth examples\n"
+        "Vision    Image-label pairs"
     )
-    table = ensure_markdown_pipe_table(ocr)
+    table = ensure_markdown_pipe_table(aligned)
     assert answer_has_markdown_pipe_table(table)
     assert "Table 7-1" in table
+    assert "| Method | How it works |" in table
+    assert "| SFT | Ground truth examples |" in table
+    assert "Item" not in table
+    assert "Detail" not in table
+
+    unpaired = (
+        "Table 7-1. Primary methods\n"
+        "First header line without column gaps\n"
+        "Second body line stays on its own\n"
+        "Third body line stays on its own"
+    )
+    kept = ensure_markdown_pipe_table(unpaired)
+    assert kept == unpaired
+    assert "Row 1" not in kept
+    assert "Item" not in kept
+
     compact = (
         "| Strategy | Description | | --- | --- | "
         "| Lean models | Use simpler models | "

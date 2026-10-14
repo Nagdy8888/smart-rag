@@ -302,14 +302,21 @@ def _expand_compact_pipe_rows(text: str) -> str:
     return "\n".join(lines)
 
 
+_COLUMN_GAP = re.compile(r"[ \t]*\t[ \t]*| {2,}")
+
+
 def _ocr_body_to_pipe_table(text: str) -> str:
-    """Build a two-column pipe table from OCR/prose table salvage text.
+    """Build a pipe table when every body line shares one column count.
+
+    A tab or a run of two or more spaces is a column gap. The first aligned
+    line becomes the header. Lines that do not share that structure are
+    returned unchanged so adjacent cells are not zipped into a fake pair.
 
     Args:
         text: Non-pipe table body.
 
     Returns:
-        GFM pipe table, or original text when too thin to convert.
+        GFM pipe table, or the original text when columns are not aligned.
     """
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -319,38 +326,40 @@ def _ocr_body_to_pipe_table(text: str) -> str:
     body_lines = lines
     if re.search(r"(?i)^Table\s+\d+-\d+", lines[0]):
         caption = lines[0]
-        body_lines = lines[1:] or lines
-    rows: list[tuple[str, str]] = []
-    # Pair consecutive lines as label/detail rows.
-    if len(body_lines) >= 2:
-        header_guess = body_lines[0]
-        if re.search(r"(?i)strategy|broker|method|role", header_guess):
-            body_lines = body_lines[1:]
-        index = 0
-        while index < len(body_lines):
-            left = body_lines[index]
-            right = body_lines[index + 1] if index + 1 < len(body_lines) else ""
-            if right and len(left) <= 80:
-                rows.append((_cell(left), _cell(right)))
-                index += 2
-            else:
-                rows.append((_item_label(index), _cell(left)))
-                index += 1
-    else:
-        rows.append(("Content", _cell(body_lines[0][:500])))
-    if not rows:
+        body_lines = lines[1:]
+    if len(body_lines) < 2:
         return text
-    header_left = "Item"
-    header_right = "Detail"
-    if caption:
-        # Keep caption as a leading prose line, then the table.
-        prefix = f"{caption}\n"
-    else:
-        prefix = ""
-    sep = "| --- | --- |"
-    head = f"| {header_left} | {header_right} |"
-    data = "\n".join(f"| {left} | {right} |" for left, right in rows[:12])
-    return f"{prefix}{head}\n{sep}\n{data}"
+    parsed = [_split_aligned_cells(line) for line in body_lines]
+    if any(row is None for row in parsed):
+        return text
+    rows = [row for row in parsed if row is not None]
+    width = len(rows[0])
+    if width < 2 or any(len(row) != width for row in rows):
+        return text
+    prefix = f"{caption}\n" if caption else ""
+    header = rows[0]
+    head = "| " + " | ".join(_cell(value) for value in header) + " |"
+    separator = "| " + " | ".join("---" for _ in range(width)) + " |"
+    data = "\n".join(
+        "| " + " | ".join(_cell(value) for value in row) + " |" for row in rows[1:]
+    )
+    return f"{prefix}{head}\n{separator}\n{data}"
+
+
+def _split_aligned_cells(line: str) -> list[str] | None:
+    """Split one line on tab or multi-space column gaps.
+
+    Args:
+        line: Candidate table row.
+
+    Returns:
+        Cell strings when the line has at least two columns, else None.
+    """
+
+    parts = [part.strip() for part in _COLUMN_GAP.split(line.strip()) if part.strip()]
+    if len(parts) < 2:
+        return None
+    return parts
 
 
 def _cell(value: str) -> str:
@@ -364,19 +373,6 @@ def _cell(value: str) -> str:
     """
 
     return re.sub(r"\s+", " ", value.replace("|", "/")).strip()
-
-
-def _item_label(index: int) -> str:
-    """Return a stable row label for unpaired OCR lines.
-
-    Args:
-        index: Zero-based row index.
-
-    Returns:
-        Short label.
-    """
-
-    return f"Row {index + 1}"
 
 
 __all__ = [

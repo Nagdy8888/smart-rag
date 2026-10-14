@@ -168,6 +168,29 @@ describe("answer tables", () => {
     ]);
   });
 
+  it("unwraps a saved Item/Detail grid that labeled lines Row N", () => {
+    const text = [
+      "Table 4-2. Recorded lines",
+      "| Item | Detail |",
+      "| --- | --- |",
+      "| Row 1 | Header line kept as its own row |",
+      "| First cell | Second cell |",
+      "| Third cell | Fourth cell |",
+    ].join("\n");
+    const table = parseAnswerTable(text);
+    expect(table?.caption).toMatch(/Table 4-2/);
+    expect(table?.headers).toEqual([]);
+    expect(table?.preformatted).toBe(
+      [
+        "Header line kept as its own row",
+        "First cell",
+        "Second cell",
+        "Third cell",
+        "Fourth cell",
+      ].join("\n"),
+    );
+  });
+
   it("keeps hostile markup as plain cell text", () => {
     const text = [
       "| Name | Payload |",

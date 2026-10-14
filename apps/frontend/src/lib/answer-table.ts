@@ -115,10 +115,60 @@ function parsePipeTable(source: string): AnswerTableModel | null {
     return null;
   }
   const normalized = cells.map((row) => padRow(row, width));
-  return {
+  return flattenSavedPairGrid({
     caption,
     headers: normalized[0] ?? [],
     rows: normalized.slice(1),
+  });
+}
+
+const SAVED_PAIR_HEADERS = ["Item", "Detail"] as const;
+const SAVED_ROW_LABEL = /^Row \d+$/;
+
+/**
+ * Unwrap a saved two-column grid that zipped adjacent lines out of order.
+ *
+ * Older answers labeled leftover lines `Row N` under headers Item and Detail.
+ * Those cells are shown again in reading order so the next source line is
+ * not placed in the previous row.
+ *
+ * @param table - Parsed pipe table.
+ * @returns Preformatted lines when the grid is that saved shape, otherwise
+ *   the same table.
+ */
+function flattenSavedPairGrid(table: AnswerTableModel): AnswerTableModel {
+  if (
+    table.headers.length !== 2 ||
+    table.headers[0] !== SAVED_PAIR_HEADERS[0] ||
+    table.headers[1] !== SAVED_PAIR_HEADERS[1]
+  ) {
+    return table;
+  }
+  const hasRowLabel = table.rows.some((row) =>
+    SAVED_ROW_LABEL.test((row[0] ?? "").trim()),
+  );
+  if (!hasRowLabel) {
+    return table;
+  }
+  const lines: string[] = [];
+  for (const row of table.rows) {
+    const left = (row[0] ?? "").trim();
+    const right = (row[1] ?? "").trim();
+    if (!SAVED_ROW_LABEL.test(left) && left) {
+      lines.push(left);
+    }
+    if (right) {
+      lines.push(right);
+    }
+  }
+  if (lines.length === 0) {
+    return table;
+  }
+  return {
+    caption: table.caption,
+    headers: [],
+    rows: [],
+    preformatted: lines.join("\n"),
   };
 }
 

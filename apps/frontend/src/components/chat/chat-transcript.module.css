@@ -210,9 +210,9 @@
 }
 
 .answerTable {
-  width: max-content;
+  width: 100%;
   min-width: 100%;
-  max-width: none;
+  max-width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
   line-height: 1.45;
@@ -226,7 +226,8 @@
   padding: 10px 12px;
   text-align: start;
   vertical-align: top;
-  overflow-wrap: anywhere;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .answerTable th:last-child,
@@ -243,7 +244,7 @@
   top: 0;
   background: var(--color-surface-muted);
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .answerTable tbody tr:nth-child(even) td {
@@ -263,7 +264,8 @@
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   line-height: 1.6;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 .answerBody {
