@@ -219,6 +219,24 @@ def test_local_cors_omits_test_identity_headers() -> None:
     assert "X-Request-ID" in allow
 
 
+def test_local_cors_allows_private_network_preflight() -> None:
+    """A public page calling loopback must pass Chrome's private-network check."""
+
+    test_client, create_app, as_openapi_client = _http_app()
+    with test_client(create_app()) as raw:
+        response = as_openapi_client(raw).options(
+            "/health/live",
+            headers={
+                "Origin": "http://127.0.0.1:3000",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Private-Network": "true",
+            },
+        )
+    assert response.status_code == 204
+    assert response.headers.get("access-control-allow-private-network") == "true"
+    assert response.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
+
+
 def test_test_env_cors_advertises_test_identity_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -143,7 +143,7 @@ if ($deny.Trim() -ne "403") { throw "crawl proxy did not deny: $deny" }
 Write-Host "OK crawl-proxy deny-by-default"
 
 # Non-root application users (host worker is not a Compose service)
-foreach ($service in @("api", "frontend")) {
+foreach ($service in @("api")) {
   $user = docker compose --env-file $EnvFile exec -T $service id -u
   if ($user.Trim() -ne "10001") { throw "$service not running as uid 10001: $user" }
   Write-Host "OK $service non-root uid 10001"

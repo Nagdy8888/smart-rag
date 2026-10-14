@@ -91,6 +91,10 @@ async def add_cors(
 def _apply_cors(response: Response, origin: str, request: Request) -> None:
     """Set credentialed CORS headers for one exact origin.
 
+    When the browser asks for private-network access, the response allows
+    it. That header is what lets a public HTTPS page call this API on
+    ``127.0.0.1``.
+
     Args:
         response: Outgoing response.
         origin: Allow-listed Origin value.
@@ -104,3 +108,9 @@ def _apply_cors(response: Response, origin: str, request: Request) -> None:
     response.headers["Access-Control-Expose-Headers"] = _EXPOSE_HEADERS
     response.headers["Access-Control-Max-Age"] = "600"
     response.headers["Vary"] = "Origin"
+    # A public HTTPS page calling this loopback listener (the Vercel console
+    # on the same laptop) sends a private-network preflight. Reflect it only
+    # for an origin that is already allow-listed.
+    if request.headers.get("access-control-request-private-network") == "true":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        response.headers["Vary"] = "Origin, Access-Control-Request-Private-Network"

@@ -5,7 +5,7 @@
 .DESCRIPTION
   Requires a pre-wired ignored Compose env with hosted Auth and separate
   transaction/session DSNs. Builds the parser image, starts ParadeDB,
-  both Valkeys, ClamAV, crawl-proxy, api, and frontend via base plus
+  both Valkeys, ClamAV, crawl-proxy, and api via base plus
   packet8 (loopback-only host ports). Launches the approved host ingest
   worker. Does not start the distroless Compose worker or local Supabase.
 #>
@@ -22,9 +22,7 @@ $required = @(
   "SUPABASE_URL",
   "API_SUPABASE_DB_URL",
   "WORKER_SUPABASE_DB_URL",
-  "LANGGRAPH_CHECKPOINT_URL",
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  "LANGGRAPH_CHECKPOINT_URL"
 )
 $present = @{}
 Get-Content $EnvFile | ForEach-Object {
@@ -66,7 +64,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Starting hosted-runtime Docker Compose stack with packet8 loopback overlay ..."
-docker compose --env-file $EnvFile -f docker-compose.yml -f docker-compose.packet8.yml up --build -d --wait paradedb valkey-limits valkey-cache clamav crawl-proxy api frontend
+docker compose --env-file $EnvFile -f docker-compose.yml -f docker-compose.packet8.yml up --build -d --wait paradedb valkey-limits valkey-cache clamav crawl-proxy api
 if ($LASTEXITCODE -ne 0) {
   throw "Compose up failed."
 }

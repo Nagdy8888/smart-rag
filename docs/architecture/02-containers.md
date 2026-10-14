@@ -13,9 +13,9 @@ audience: engineering
 ```mermaid
 flowchart TB
   subgraph edge ["edge network"]
-    fe["frontend:3000"]
     api["api:8000"]
   end
+  vercel["Vercel frontend"]
   subgraph private ["private internal network"]
     pdb["paradedb no host port in base compose"]
     vl["valkey-limits"]
@@ -23,7 +23,7 @@ flowchart TB
     cp["crawl-proxy"]
   end
   hostWorker["host run_laptop_ingest_worker.py"]
-  fe --> api
+  vercel --> api
   api --> pdb
   api --> vl
   api --> vc
@@ -33,7 +33,7 @@ flowchart TB
   api --> cloudDb
 ```
 
-Published developer ports only: frontend and API. ParadeDB, both Valkey instances, ClamAV, crawl-proxy, and the distroless Compose `worker` have **no host ports** in `docker-compose.yml`. The Compose `worker` is behind the non-default `compose-worker` profile because it cannot launch `--network none` parser containers. Local ingest uses `scripts/ops/run_laptop_ingest_worker.py`. Auth/Postgres/Storage are the cloud project; Compose `private` is `internal: true` and cannot route to the Docker host gateway.
+The UI is the Vercel project `smart-rag-staging`. Published developer port: API only. ParadeDB, both Valkey instances, ClamAV, crawl-proxy, and the distroless Compose `worker` have **no host ports** in `docker-compose.yml`. The Compose `worker` is behind the non-default `compose-worker` profile because it cannot launch `--network none` parser containers. Local ingest uses `scripts/ops/run_laptop_ingest_worker.py`. Auth/Postgres/Storage are the cloud project; Compose `private` is `internal: true` and cannot route to the Docker host gateway.
 
 Application images use a split base: CPython services build on official
 `python:3.11-slim-trixie` and copy onto `gcr.io/distroless/cc-debian13:nonroot`

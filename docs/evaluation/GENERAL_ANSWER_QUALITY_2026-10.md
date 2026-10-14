@@ -734,6 +734,24 @@ Kept. A source-word or code-reproduce ask that names a page now appends the open
 
 `5a` 6→3. Strict +2 on the stage report. The runner summary line printed `strict_pass=34`; the stage report is 35. The rerank miss stays `d18`. Draft misses are `d07`, `d13`, and `d22`. The post-draft removal is `trimmed_or_rewritten` on `d21`. By kind, code is 10/14, table is 7/8, and text is 18/18. Question ids stay in `.private-eval/runs/dev40-v3-continuation/stage-loss.json`.
 
+## dev40-v3 escaped token chunks (2026-10-14)
+
+Kept. A verified answer is now split so each HTML-escaped `token_delta` stays within the 4096-character catalog limit. A raw slice of 4000 characters full of quotes and brackets was previously rejected, and the stream stored `run_failed` with an empty release. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `escaped_pack present`. `check_gold_literals` fails on `packages/core/src/smart_rag_core/observability/error_telemetry.py`, a file this packet does not change (`failing_files=1`).
+
+| Metric | After page continuation | After escaped chunks |
+| --- | ---: | ---: |
+| strict passes | 35/40 | 36/40 |
+| ok | 35 | 36 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 1 | 1 |
+| 5a_draft_missing | 3 | 3 |
+| 5b_removed_after_draft | 1 | 0 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5b` 1→0. Strict +1 on the stage report, inside the drop limit of 3. The runner summary line printed `strict_pass=35`; the stage report is 36. `5a` stays 3: `d07`, `d13`, and `d21`. The rerank miss stays `d18`. By kind, code is 11/14, table is 7/8, and text is 18/18. Question ids stay in `.private-eval/runs/dev40-v3-sse-chunks/stage-loss.json`.
+
 ## Approvals recorded
 
 - 2026-10-06 - G4b re-ingest pre-approved: "no need for my approval make g4b".
@@ -749,3 +767,4 @@ Kept. A source-word or code-reproduce ask that names a page now appends the open
 - 2026-10-08 - Cycle 11 no paraphrase of retrieved evidence; keep bar failed; full revert.
 - 2026-10-14 - Page passage windows on dev40-v3; keep bar failed; full revert.
 - 2026-10-14 - Page continuation on dev40-v3; `5a` 6→3; kept.
+- 2026-10-14 - Escaped token chunks on dev40-v3; `5b` 1→0; kept.

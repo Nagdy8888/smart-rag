@@ -159,10 +159,10 @@ def test_api_and_worker_load_compose_env_file_for_tracing() -> None:
 
 
 def test_developer_endpoints_are_explicit() -> None:
-    """Only api and frontend may publish documented developer ports."""
+    """The API is the only Compose service that publishes a developer port."""
 
     assert "ports" in _service("api")
-    assert "ports" in _service("frontend")
+    assert "frontend" not in _services()
     assert "ports" not in _service("worker")
 
 
@@ -263,19 +263,11 @@ def test_api_and_worker_supabase_url_requires_hosted_auth() -> None:
 
     api_env = _mapping(_service("api")["environment"])
     worker_env = _mapping(_service("worker")["environment"])
-    frontend = _service("frontend")
-    build = _mapping(frontend["build"])
-    args = _mapping(build["args"])
     api_url = api_env["SUPABASE_URL"]
     worker_url = worker_env["SUPABASE_URL"]
     assert api_url == "${SUPABASE_URL:?set hosted SUPABASE_URL}"
     assert worker_url == "${SUPABASE_URL:?set hosted SUPABASE_URL}"
-    assert args["NEXT_PUBLIC_SUPABASE_URL"] == (
-        "${NEXT_PUBLIC_SUPABASE_URL:?set NEXT_PUBLIC_SUPABASE_URL}"
-    )
-    assert args["NEXT_PUBLIC_SUPABASE_ANON_KEY"] == (
-        "${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY}"
-    )
+    assert "frontend" not in _services()
 
 
 def test_staging_api_uses_session_dsn_for_checkpoint_and_lightrag() -> None:

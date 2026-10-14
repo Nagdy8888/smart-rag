@@ -1,5 +1,6 @@
 # Smart RAG local foundation stack (Phase 1 Packet 3).
-# Private services have NO host ports. Developer endpoints only on api/frontend.
+# Private services have NO host ports. The only published app port is the API.
+# The browser UI is the Vercel project, not a Compose frontend.
 
 name: smart-rag
 
@@ -181,7 +182,7 @@ services:
       # Session/direct only. Never transaction pooler port 6543.
       LANGGRAPH_CHECKPOINT_URL: "${LANGGRAPH_CHECKPOINT_URL:?set LANGGRAPH_CHECKPOINT_URL}"
       LIGHTRAG_DB_URL: "${LIGHTRAG_DB_URL:-}"
-      CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010,https://smart-rag-staging.vercel.app,https://smart-rag-staging-nagdy8888s-projects.vercel.app
       VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
       PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
@@ -288,34 +289,6 @@ services:
     user: "10001:10001"
     profiles:
       - compose-worker
-
-  frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-      args:
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_HOST_PORT:-8000}
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?set NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY}
-    restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_HOST_PORT:-8000}
-    ports:
-      - "${FRONTEND_HOST_PORT:-3000}:3000"
-    networks:
-      - edge
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 10
 
   parser-sandbox:
     build:
