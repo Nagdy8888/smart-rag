@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from enum import StrEnum
 from typing import Self, TypeVar
+from urllib.parse import urlsplit
 
 from pydantic import AnyHttpUrl, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -36,6 +37,84 @@ class LogLevel(StrEnum):
 
 class SettingsValidationError(RuntimeError):
     """Report invalid startup configuration without exposing source values."""
+
+
+def _secret_text(secret: SecretStr | None) -> str | None:
+    """Return a stripped secret, or None when it is missing or blank.
+
+    Args:
+        secret: Optional settings secret.
+
+    Returns:
+        The stripped value, or None when unset or whitespace.
+    """
+
+    if secret is None:
+        return None
+    text = secret.get_secret_value().strip()
+    if text == "":
+        return None
+    return text
+
+
+def _require_https_dsn(dsn: str) -> None:
+    """Reject a GlitchTip DSN that is not an https URL with a public key.
+
+    Args:
+        dsn: Candidate DSN. The value is never included in the error.
+
+    Raises:
+        ValueError: If the scheme, host, or public key is missing.
+    """
+
+    parsed = urlsplit(dsn)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname is None
+        or parsed.username is None
+        or parsed.username.strip() == ""
+    ):
+        raise ValueError("GLITCHTIP_DSN must be an https URL with a public key")
+
+
+def parse_otlp_headers(raw: str) -> dict[str, str]:
+    """Parse OTLP ``key=value`` headers without echoing their values.
+
+    Args:
+        raw: Comma-separated header list from ``OTEL_EXPORTER_OTLP_HEADERS``.
+
+    Returns:
+        Header names mapped to values. Values stay in memory only for the
+        exporter client.
+
+    Raises:
+        ValueError: If the list is empty, too long, or not ``key=value`` pairs.
+            The message names the field and never includes the raw text.
+    """
+
+    if len(raw) > 4_096:
+        raise ValueError("OTEL_EXPORTER_OTLP_HEADERS is too long")
+    headers: dict[str, str] = {}
+    for part in raw.split(","):
+        piece = part.strip()
+        if piece == "":
+            continue
+        name, separator, value = piece.partition("=")
+        header_name = name.strip()
+        if (
+            separator == ""
+            or header_name == ""
+            or any(character in header_name for character in "\r\n\x00")
+        ):
+            raise ValueError(
+                "OTEL_EXPORTER_OTLP_HEADERS must be comma-separated key=value pairs"
+            )
+        headers[header_name] = value.strip()
+    if not headers:
+        raise ValueError(
+            "OTEL_EXPORTER_OTLP_HEADERS must be comma-separated key=value pairs"
+        )
+    return headers
 
 
 class SharedSettings(BaseSettings):
@@ -87,6 +166,19 @@ class SharedSettings(BaseSettings):
             because it can contain credentials.
         crawl_proxy_url: Internal crawl-proxy endpoint from
             ``CRAWL_PROXY_URL``. Internal, optional in the foundation phase.
+        glitchtip_enabled: Whether GlitchTip/Sentry error export is on from
+            ``GLITCHTIP_ENABLED``. Public, secure default ``false``.
+        glitchtip_dsn: GlitchTip DSN from ``GLITCHTIP_DSN``. Secret. Required
+            when error export is enabled, and forbidden when it is off.
+        otel_export_enabled: Whether Grafana OTLP log and trace export is on
+            from ``OTEL_EXPORT_ENABLED``. Public, secure default ``false``.
+        otel_exporter_otlp_endpoint: Grafana OTLP base URL from
+            ``OTEL_EXPORTER_OTLP_ENDPOINT``. Secret-bearing only because it
+            identifies the stack. Required when export is enabled, and
+            forbidden when it is off. Must be ``https``.
+        otel_exporter_otlp_headers: Ingest headers from
+            ``OTEL_EXPORTER_OTLP_HEADERS``. Secret. Required when export is
+            enabled, and forbidden when it is off.
     """
 
     model_config = SettingsConfigDict(
@@ -259,6 +351,45 @@ class SharedSettings(BaseSettings):
         description="Exa REST credential. Server-only. Never logged or committed.",
         json_schema_extra={"security": "secret"},
     )
+    glitchtip_enabled: bool = Field(
+        default=False,
+        validation_alias="GLITCHTIP_ENABLED",
+        description="Export scrubbed exception groups to GlitchTip.",
+        json_schema_extra={"security": "public"},
+    )
+    glitchtip_dsn: SecretStr | None = Field(
+        default=None,
+        validation_alias="GLITCHTIP_DSN",
+        description=(
+            "GlitchTip DSN. Required when GLITCHTIP_ENABLED=true and "
+            "forbidden when that flag is false."
+        ),
+        json_schema_extra={"security": "secret"},
+    )
+    otel_export_enabled: bool = Field(
+        default=False,
+        validation_alias="OTEL_EXPORT_ENABLED",
+        description="Export redacted logs and correlation spans to Grafana OTLP.",
+        json_schema_extra={"security": "public"},
+    )
+    otel_exporter_otlp_endpoint: AnyHttpUrl | None = Field(
+        default=None,
+        validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
+        description=(
+            "Grafana OTLP base URL. Required when OTEL_EXPORT_ENABLED=true "
+            "and forbidden when that flag is false."
+        ),
+        json_schema_extra={"security": "internal"},
+    )
+    otel_exporter_otlp_headers: SecretStr | None = Field(
+        default=None,
+        validation_alias="OTEL_EXPORTER_OTLP_HEADERS",
+        description=(
+            "OTLP ingest headers, comma-separated key=value pairs. Required "
+            "when OTEL_EXPORT_ENABLED=true and forbidden when that flag is false."
+        ),
+        json_schema_extra={"security": "secret"},
+    )
 
     @model_validator(mode="after")
     def require_provider_key_outside_mock_mode(self) -> Self:
@@ -346,6 +477,54 @@ class SharedSettings(BaseSettings):
         secret = self.exa_api_key
         if secret is None or not secret.get_secret_value().strip():
             raise ValueError("EXA_API_KEY is required when WEB_SEARCH_ENABLED=true")
+        return self
+
+    @model_validator(mode="after")
+    def require_error_telemetry_credentials(self) -> Self:
+        """Fail closed when error-export flags and credentials disagree.
+
+        A DSN, OTLP endpoint, or ingest header without its enable flag is
+        rejected so a leftover secret cannot silently start export. Enabling
+        a flag without its credential is also rejected.
+
+        Returns:
+            The validated settings instance.
+
+        Raises:
+            ValueError: If GlitchTip or OTLP export is half-configured, or
+                if a URL or header value is not safe to use.
+        """
+
+        dsn = _secret_text(self.glitchtip_dsn)
+        if self.glitchtip_enabled:
+            if dsn is None:
+                raise ValueError(
+                    "GLITCHTIP_DSN is required when GLITCHTIP_ENABLED=true"
+                )
+            _require_https_dsn(dsn)
+        elif dsn is not None:
+            raise ValueError("GLITCHTIP_DSN requires GLITCHTIP_ENABLED=true")
+
+        endpoint = self.otel_exporter_otlp_endpoint
+        headers = _secret_text(self.otel_exporter_otlp_headers)
+        if self.otel_export_enabled:
+            if endpoint is None:
+                raise ValueError(
+                    "OTEL_EXPORTER_OTLP_ENDPOINT is required when "
+                    "OTEL_EXPORT_ENABLED=true"
+                )
+            if endpoint.scheme != "https":
+                raise ValueError("OTEL_EXPORTER_OTLP_ENDPOINT must use https")
+            if headers is None:
+                raise ValueError(
+                    "OTEL_EXPORTER_OTLP_HEADERS is required when "
+                    "OTEL_EXPORT_ENABLED=true"
+                )
+            parse_otlp_headers(headers)
+        elif endpoint is not None or headers is not None:
+            raise ValueError(
+                "OTLP endpoint and headers require OTEL_EXPORT_ENABLED=true"
+            )
         return self
 
     def allows_unsigned_local_live_providers(self) -> bool:

@@ -11,6 +11,7 @@ from smart_rag_core.ingestion.bm25_projection import Bm25ProjectionService
 from smart_rag_core.ingestion.bm25_reconcile import Bm25ReconcileDecision
 from smart_rag_core.jobs.bm25_repository import Bm25IndexJobRepository
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
+from smart_rag_core.observability.error_telemetry import telemetry_span
 from smart_rag_core.observability.ingest_progress import log_ingest_progress
 from smart_rag_core.observability.logging import correlation_context
 from smart_rag_core.schema.enums import JobErrorCategory
@@ -161,7 +162,10 @@ class Bm25WorkerLoop:
         )
         heartbeat_thread.start()
         try:
-            with correlation_context(job_id=str(job_id)):
+            with (
+                correlation_context(job_id=str(job_id)),
+                telemetry_span("worker.bm25_job"),
+            ):
                 with (
                     psycopg.connect(postgres_url) as supabase,
                     psycopg.connect(parade_url) as parade,

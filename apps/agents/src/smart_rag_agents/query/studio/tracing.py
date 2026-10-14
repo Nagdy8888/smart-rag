@@ -7,6 +7,7 @@ The Agent Server only exports traces when ``LANGSMITH_API_KEY`` and
 
 from __future__ import annotations
 
+from smart_rag_core.observability.error_telemetry import configure_error_telemetry
 from smart_rag_core.observability.langsmith_tracing import configure_langsmith
 from smart_rag_core.settings import SettingsValidationError, load_agent_settings
 
@@ -20,12 +21,15 @@ def apply_studio_langsmith_flags() -> dict[str, str]:
 
     Side Effects:
         Mutates ``LANGSMITH_*`` and ``LANGCHAIN_TRACING_V2`` process
-        environment keys when agent settings validate. Does not open a
-        network connection. Never logs the API key.
+        environment keys when agent settings validate. Configures GlitchTip
+        and Grafana export when those flags are on. Does not open a network
+        connection. Never logs the API key, DSN, or ingest token.
     """
 
     try:
         settings = load_agent_settings()
     except (SettingsValidationError, ValueError):
         return {}
-    return configure_langsmith(settings)
+    applied = configure_langsmith(settings)
+    applied.update(configure_error_telemetry(settings))
+    return applied

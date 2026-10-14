@@ -31,6 +31,7 @@ export type ConnectSrcEnv = {
   nodeEnv: string | undefined;
   apiBaseUrl: string | undefined;
   supabaseUrl: string | undefined;
+  glitchtipDsn?: string | undefined;
 };
 
 const DEV_LOOPBACK_ORIGINS = [
@@ -64,22 +65,26 @@ export function originFromPublicUrl(value: string | undefined): string | null {
  * Build the CSP `connect-src` directive.
  *
  * Production includes `'self'` plus the exact API and Auth origins when
- * those env vars parse. Development also allows local FastAPI loopback
- * ports. Missing production env fails closed (no localhost
- * fallback, no `*.supabase.co` wildcard).
+ * those env vars parse. A GlitchTip DSN adds only that DSN origin.
+ * Development also allows local FastAPI loopback ports. Missing production
+ * env fails closed (no localhost fallback, no `*.supabase.co` wildcard).
  *
- * @param env - `NODE_ENV` and public API/Auth URLs.
+ * @param env - `NODE_ENV`, public API/Auth URLs, and optional GlitchTip DSN.
  * @returns Full `connect-src …` directive.
  */
 export function buildConnectSrcDirective(env: ConnectSrcEnv): string {
   const origins = new Set<string>();
   const apiOrigin = originFromPublicUrl(env.apiBaseUrl);
   const authOrigin = originFromPublicUrl(env.supabaseUrl);
+  const glitchtipOrigin = originFromPublicUrl(env.glitchtipDsn);
   if (apiOrigin !== null) {
     origins.add(apiOrigin);
   }
   if (authOrigin !== null) {
     origins.add(authOrigin);
+  }
+  if (glitchtipOrigin !== null) {
+    origins.add(glitchtipOrigin);
   }
   if (env.nodeEnv === "development") {
     for (const extra of DEV_LOOPBACK_ORIGINS) {
@@ -128,6 +133,7 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
   nodeEnv: process.env.NODE_ENV,
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  glitchtipDsn: process.env.NEXT_PUBLIC_GLITCHTIP_DSN,
 });
 
 const nextConfig: NextConfig = {

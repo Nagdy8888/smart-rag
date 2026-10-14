@@ -110,11 +110,17 @@ recorded in
 
 ## Leaf-unresolved citations (2026-09)
 
-`insert_run_citation_v2` still requires a span to sit inside exactly one
-search-representative child. Python only checks that the span is inside
-the cited chunk, so a span that straddles two children, or a sentence
-repeated in two children, raises `span_not_contained`, `leaf_ambiguous`,
-or `page_ambiguous`.
+`insert_run_citation_v2` prefers exactly one search-representative child
+that contains the span. When no representative child contains it, the
+cited chunk itself is the leaf, including when that chunk is not
+search-representative. Several representative children that contain the
+same span stay `leaf_ambiguous`. A span outside the cited chunk and its
+representative children raises `span_not_contained`. `page_ambiguous`
+is unchanged. Python only checks that the span is inside the cited chunk.
+When a skipped span is an exact slice of a fused passage, verify retries
+the leading sentence and keeps the paragraph text. An unexpected
+exception in verify releases the generated draft instead of aborting
+the run.
 
 `persist_answer_citations` isolates each passage attempt with
 `SAVEPOINT citation_leaf`. On those three reasons it retries once with

@@ -397,6 +397,57 @@ def test_two_matching_children_are_rejected(
 
 
 @pytest.mark.parametrize("span", [None, "", "   ", "not in the leaf"])
+def test_non_representative_cited_chunk_resolves_to_itself(
+    db_connection: psycopg.Connection,
+) -> None:
+    """A span that sits only in a non-representative cited chunk persists."""
+
+    owner_id = uuid4()
+    member_id = uuid4()
+    chunk_id = uuid4()
+    with db_connection.cursor() as cursor:
+        insert_user_profile(cursor, user_id=owner_id, role="owner")
+        insert_user_profile(cursor, user_id=member_id, role="member")
+        conversation_id = insert_conversation(cursor, user_id=member_id)
+        document_id, version_id = _seed_document(cursor, owner_id=owner_id)
+        _insert_chunk(
+            cursor,
+            chunk_id=chunk_id,
+            document_id=document_id,
+            version_id=version_id,
+            raw_text=SPAN,
+            page_number=25,
+            provenance=_pdf_locators(page_index=24, page_label="12"),
+        )
+        cursor.execute(
+            """
+            UPDATE app.document_chunks
+            SET is_search_representative = false
+            WHERE id = %s
+            """,
+            (chunk_id,),
+        )
+        authz = authorization_version(cursor)
+    member = caller_context(member_id, "member", authz)
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
+    _persist(
+        db_connection,
+        caller=member,
+        run_id=admitted.context.run_id,
+        chunk_id=chunk_id,
+        document_id=document_id,
+        version_id=version_id,
+    )
+    db_connection.execute("SET ROLE app_api")
+    try:
+        records = list_run_citations(
+            db_connection, caller=member, run_id=admitted.context.run_id
+        )
+    finally:
+        db_connection.execute("RESET ROLE")
+    assert records[0].chunk_id == chunk_id
+
+
 def test_null_empty_or_non_contained_span_is_rejected(
     db_connection: psycopg.Connection,
     span: str | None,

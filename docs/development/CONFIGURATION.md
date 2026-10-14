@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-09-16
+last-reviewed: 2026-10-13
 audience: developers, operators
 ---
 
@@ -28,6 +28,12 @@ Validation errors list field paths and categories but omit source values.
 | `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces. Open this exact project in the UI |
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
 | `LANGSMITH_EXPORT_IO` | boolean; `false` | public | Local-only. When `true` with `APP_ENV=local` and tracing on, LangSmith receives the user message, assistant reply, model prompts, and completions. Token counts and estimated USD export even when this flag is false. Staging and production reject the flag. API keys, JWTs, and embedding vectors stay omitted. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) and [ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md) |
+| `GLITCHTIP_ENABLED` | boolean; `false` | public | Off by default. When true, unhandled and logged errors are sent to GlitchTip after scrubbing. See [ERROR_TELEMETRY.md](./ERROR_TELEMETRY.md) |
+| `GLITCHTIP_DSN` | optional secret | secret | Required when `GLITCHTIP_ENABLED=true`. Forbidden when the flag is false. Never logged |
+| `OTEL_EXPORT_ENABLED` | boolean; `false` | public | Off by default. When true, redacted JSON logs and correlation spans go to Grafana Cloud OTLP |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | optional https URL | internal | Grafana OTLP base URL. Required when `OTEL_EXPORT_ENABLED=true`. Forbidden when the flag is false. Must be `https` |
+| `OTEL_EXPORTER_OTLP_HEADERS` | optional secret | secret | Comma-separated `key=value` ingest headers. Required when `OTEL_EXPORT_ENABLED=true`. Forbidden when the flag is false. Never logged |
+| `NEXT_PUBLIC_GLITCHTIP_DSN` | optional public DSN | public | Browser-only. Unset leaves the browser SDK idle. The value is a GlitchTip ingest DSN, not a privileged API key |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 32,768 | public | Deployable gateway input bound |
 | `VALKEY_LIMITS_URL` | optional URL | secret | Rate-limit Valkey. Packet 5 connects per command at request time, never at import. Unset falls back to Postgres for mutations |

@@ -59,6 +59,17 @@ describe("buildConnectSrcDirective", () => {
     expect(directive).not.toContain("http://127.0.0.1:54321");
   });
 
+  it("allows the GlitchTip origin without the public key", () => {
+    const directive = buildConnectSrcDirective({
+      nodeEnv: "production",
+      apiBaseUrl: "https://rag-api.example.com",
+      supabaseUrl: "https://qsjivtwtmlmtksufqjik.supabase.co",
+      glitchtipDsn: "https://public-key@app.glitchtip.com/12",
+    });
+    expect(directive).toContain("https://app.glitchtip.com");
+    expect(directive).not.toContain("public-key");
+  });
+
   it("adds local FastAPI loopback only in development", () => {
     const directive = buildConnectSrcDirective({
       nodeEnv: "development",

@@ -17,9 +17,12 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request, Response
 from pydantic import SecretStr
 from smart_rag_core.observability import (
+    configure_error_telemetry,
     configure_json_logging,
     configure_langsmith,
     correlation_context,
+    flush_error_telemetry,
+    telemetry_span,
 )
 from smart_rag_core.settings import BackendSettings, Environment, load_backend_settings
 
@@ -124,7 +127,9 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
 
     Side Effects:
         Configures process logging, LangSmith hide/tracing flags via the model
-        gateway factory, and, in mock mode, denies OpenAI DNS access.
+        gateway factory, optional GlitchTip and Grafana export, and, in mock
+        mode, denies OpenAI DNS access. Shutdown flushes both LangSmith and
+        error telemetry for at most two seconds.
         When ``LIGHTRAG_DB_URL`` is set, attaches the runtime LightRAG adapter
         without calling schema-admin ``initialize_storages``. Constructs Valkey
         clients without connecting.         Starts a bounded ``ThreadPoolExecutor`` on
@@ -157,6 +162,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         level=settings.log_level.value,
     )
     configure_langsmith(settings)
+    configure_error_telemetry(settings)
     LOGGER.info(
         "LangSmith tracing configured project=%s enabled=%s",
         settings.langsmith_project,
@@ -280,6 +286,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
             await adapter.finalize()
             application.state.lightrag_adapter = None
         flush_langsmith_traces(timeout_seconds=2.0)
+        flush_error_telemetry(timeout_seconds=2.0)
 
 
 async def add_correlation_context(
@@ -296,11 +303,12 @@ async def add_correlation_context(
         Downstream response with ``X-Request-ID`` set.
 
     Side Effects:
-        Binds request-local logging context. It logs no URL, query, body,
+        Binds request-local logging context and, when OTLP export is on, a
+        span named ``http.request``. It logs no URL, query, body,
         authorization header, or source content.
     """
     request_id = normalized_request_id(request.headers.get("X-Request-ID"))
-    with correlation_context(request_id=request_id):
+    with correlation_context(request_id=request_id), telemetry_span("http.request"):
         LOGGER.info(
             "HTTP request started",
             extra={"event": "http.request.started"},

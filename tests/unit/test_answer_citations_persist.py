@@ -20,8 +20,13 @@ from smart_rag_core.query_answer.citations import (
     maybe_persist_verified_citations,
     persist_answer_citations,
     repair_leaf_citations,
+    shorten_contained_skipped_spans,
 )
-from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
+from smart_rag_core.query_answer.models import (
+    AnswerCitation,
+    AnswerParagraph,
+    AnswerPayload,
+)
 from smart_rag_core.query_fusion.models import PassageOrigin, ScoredPassage
 
 from tests.contract.integration_support import require_supabase_db_url, try_connect
@@ -916,6 +921,60 @@ def test_leading_sentence_rules() -> None:
     assert leading_sentence("Short one. Two.") == ""
     assert leading_sentence("No terminal punctuation at all here") == ""
     assert leading_sentence("Only one sentence but a long one indeed.") == ""
+
+
+def test_contained_opening_keeps_paragraph_and_shortens_span() -> None:
+    """A leaf skip of a fused opening keeps the paragraph and shortens the span."""
+
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    chunk_id = fusion.evidence[0].chunk_id
+    answer = AnswerPayload(
+        answer_text=_TWO_SENTENCES,
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text=_TWO_SENTENCES,
+                link_ids=("opening-1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span=_TWO_SENTENCES,
+                paragraph_index=0,
+                atomic_link_id="opening-1",
+            ),
+        ),
+        status="complete",
+    )
+    shortened = shorten_contained_skipped_spans(
+        answer,
+        fusion,
+        (
+            SkippedCitation(
+                chunk_id=str(chunk_id),
+                paragraph_index=0,
+                span=_TWO_SENTENCES,
+                reason="span_not_contained",
+            ),
+        ),
+    )
+    assert shortened.paragraphs[0].text == _TWO_SENTENCES
+    assert shortened.answer_text == _TWO_SENTENCES
+    assert shortened.citations[0].span == leading_sentence(_TWO_SENTENCES)
+    dropped = drop_skipped_citations(
+        shortened,
+        (
+            SkippedCitation(
+                chunk_id=str(chunk_id),
+                paragraph_index=0,
+                span=shortened.citations[0].span,
+                reason="span_not_contained",
+            ),
+        ),
+    )
+    assert dropped.paragraphs[0].text == _TWO_SENTENCES
+    assert dropped.answer_text == _TWO_SENTENCES
 
 
 def test_drop_skipped_citations_removes_only_matching_span() -> None:

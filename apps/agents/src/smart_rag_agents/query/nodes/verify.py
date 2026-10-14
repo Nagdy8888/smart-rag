@@ -18,6 +18,7 @@ from smart_rag_core.query_answer.citations import (
     maybe_persist_verified_citations,
     persist_web_answer_citations,
     repair_leaf_citations,
+    shorten_contained_skipped_spans,
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
@@ -40,12 +41,14 @@ from smart_rag_core.query_answer.release import (
     render_verified_company_answer,
 )
 from smart_rag_core.query_answer.verifier import run_verifier_batch
+from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.constants import (
     FALLBACK_RETRIEVERS_UNBOUND,
     LIMITATION_VERIFIER_OMITTED_LINKS,
     VERIFIER_SKIPPED_DETAIL_PREFIX,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.query_routing.serde import plan_from_state
 from smart_rag_core.web_research.models import WebSourceRecord
@@ -63,6 +66,73 @@ from smart_rag_agents.query.nodes.state_codec import (
 )
 from smart_rag_agents.query.run_timings import with_verifier_timing
 from smart_rag_agents.query.state import QueryGraphState
+
+
+def _company_release_payload(
+    checked: AnswerPayload,
+    *,
+    fusion: FusionResult,
+    tables: tuple[TableEvidenceRecord, ...],
+    user_query: str,
+) -> AnswerPayload:
+    """Render, salvage, and reshape one company answer.
+
+    Validation and answer errors keep the last successful payload.
+    Any other exception propagates so the caller can release the
+    generated draft instead of aborting the graph.
+
+    Args:
+        checked: Answer after deterministic checks and the verifier.
+        fusion: Fitted canonical evidence for this run.
+        tables: Deterministic table snapshots.
+        user_query: Original user text. Untrusted.
+
+    Returns:
+        Released company payload.
+
+    Raises:
+        Exception: Unexpected render or salvage failures.
+    """
+
+    try:
+        checked = render_verified_company_answer(
+            checked,
+            fusion=fusion,
+            tables=tables,
+            user_query=user_query,
+        )
+    except (ValidationError, ValueError, AnswerError):
+        # Keep the pre-render payload; the structural salvages below may still repair.
+        pass
+    if fusion.evidence:
+        for salvage_fn in (
+            salvage_named_code_definition,
+            salvage_named_table_block,
+            salvage_anchor_claim_fill,
+        ):
+            try:
+                salvaged = salvage_fn(checked, fusion, user_query=user_query)
+            except (ValidationError, ValueError, AnswerError):
+                continue
+            if salvaged is checked:
+                continue
+            try:
+                checked = render_verified_company_answer(
+                    salvaged,
+                    fusion=fusion,
+                    tables=tables,
+                    user_query=user_query,
+                )
+            except (ValidationError, ValueError, AnswerError):
+                # Keep the extractive salvage rather than dropping it.
+                checked = salvaged
+    try:
+        checked = format_requested_answer_shape(checked, user_query=user_query)
+    except (ValidationError, ValueError, AnswerError):
+        # Pipe-table / fence reshaping must not fail the verified path
+        # after a successful extractive salvage.
+        pass
+    return checked
 
 
 def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
@@ -102,11 +172,18 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         Inspection/NoRetrieval stay refused.
         Missing gateway, omitted verifier links, or a schema-invalid
         verifier payload never terminate ``verified``. Omitted IDs force
-        ``verified_partial`` and ``verifier_omitted_links``. Invalid
+        ``verified_partial`` and ``verifier_omitted_links``.         Invalid
         verifier JSON degrades to ``verified_partial`` with the
-        already-generated answer.         A verifier timeout or gateway failure
+        already-generated answer. A verifier timeout or gateway failure
         degrades to ``verified_partial`` with detail
         ``verifier_skipped:<reason>`` and still persists citations.
+        Any other unexpected exception releases that generated draft as
+        ``verified_partial`` with ``verifier_skipped:<ExceptionType>``
+        and does not abort the graph. ``CancelledError`` and
+        ``GeneratorExit`` still propagate.
+        A skipped citation whose span is an exact slice of a fused
+        passage keeps its paragraph and is retried with the leading
+        sentence.
         Leaf-unresolved citations are skipped: some remaining citations
         become ``verified_partial`` with ``citation_leaf_unresolved``;
         zero persisted citations stay ``insufficient_evidence``.
@@ -198,6 +275,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     added_prompt_tokens = 0
     added_completion_tokens = 0
     verifier_skipped_reason: str | None = None
+    release_generated_draft = False
     pre_verifier = checked
     verifier_started = time.perf_counter()
     verifier_timed = bool(checked.atomic_links) and not is_web
@@ -249,6 +327,10 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         except (AnswerError, QueryCeilingError) as exc:
             reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
             verifier_skipped_reason = str(reason)[:64]
+        except Exception as exc:
+            verifier_skipped_reason = type(exc).__name__[:64]
+            checked = payload
+            release_generated_draft = True
     verifier_timing = (
         with_verifier_timing(
             state,
@@ -258,49 +340,26 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         if verifier_timed
         else {}
     )
-    if company_release_applies(checked, is_web=is_web):
+    if not release_generated_draft and company_release_applies(checked, is_web=is_web):
         user_query = state["user_query"] or ""
         try:
-            checked = render_verified_company_answer(
+            checked = _company_release_payload(
                 checked,
                 fusion=fusion,
                 tables=tables.records,
                 user_query=user_query,
             )
-        except (ValidationError, ValueError, AnswerError):
-            # Keep the pre-render payload; the structural salvages below may still repair.
-            pass
-        if fusion.evidence:
-            for salvage_fn in (
-                salvage_named_code_definition,
-                salvage_named_table_block,
-                salvage_anchor_claim_fill,
-            ):
-                try:
-                    salvaged = salvage_fn(checked, fusion, user_query=user_query)
-                except (ValidationError, ValueError, AnswerError):
-                    continue
-                if salvaged is checked:
-                    continue
-                try:
-                    checked = render_verified_company_answer(
-                        salvaged,
-                        fusion=fusion,
-                        tables=tables.records,
-                        user_query=user_query,
-                    )
-                except (ValidationError, ValueError, AnswerError):
-                    # Keep the extractive salvage rather than dropping it.
-                    checked = salvaged
-        try:
-            checked = format_requested_answer_shape(checked, user_query=user_query)
-        except (ValidationError, ValueError, AnswerError):
-            # Pipe-table / fence reshaping must not fail the verified path
-            # after a successful extractive salvage.
-            pass
+        except Exception as exc:
+            verifier_skipped_reason = type(exc).__name__[:64]
+            checked = payload
+            release_generated_draft = True
     knowledge_scope = plan.knowledge_scope if plan is not None else None
     terminal = "verified_partial"
-    if (
+    if release_generated_draft:
+        detail = (
+            f"{VERIFIER_SKIPPED_DETAIL_PREFIX}{verifier_skipped_reason or 'Exception'}"
+        )[:128]
+    elif (
         checked.status == "refused"
         and not fusion.evidence
         and not tables.records
@@ -364,7 +423,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
         )
     skipped_citation_count = 0
-    if is_web:
+    if release_generated_draft:
+        pass
+    elif is_web:
         checked = checked.model_copy(
             update={
                 "citations": (),
@@ -400,7 +461,37 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             if deps.connection is not None and context is not None:
                 terminal = "insufficient_evidence"
                 detail = "citation_persist_failed"
+        except Exception as exc:
+            verifier_skipped_reason = type(exc).__name__[:64]
+            checked = payload
+            terminal = "verified_partial"
+            detail = (f"{VERIFIER_SKIPPED_DETAIL_PREFIX}{verifier_skipped_reason}")[
+                :128
+            ]
+            skipped_citation_count = 0
         else:
+            if persisted.skipped:
+                shortened = shorten_contained_skipped_spans(
+                    checked, fusion, persisted.skipped
+                )
+                if shortened is not checked:
+                    try:
+                        shortened_persisted = maybe_persist_verified_citations(
+                            deps.connection,
+                            caller=(
+                                caller_from_runtime(context)
+                                if context is not None
+                                else None
+                            ),
+                            run_id=(context.run_id if context is not None else None),
+                            fusion=fusion,
+                            answer=shortened,
+                        )
+                    except (QueryAdmissionError, psycopg.Error):
+                        shortened_persisted = None
+                    if shortened_persisted is not None:
+                        checked = shortened
+                        persisted = shortened_persisted
             if persisted.skipped:
                 skipped_citation_count = len(persisted.skipped)
                 if not persisted.ids and fusion.evidence:

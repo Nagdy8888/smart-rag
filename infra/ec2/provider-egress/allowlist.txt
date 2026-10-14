@@ -3,6 +3,9 @@
 
 api.openai.com
 api.smith.langchain.com
+app.glitchtip.com
+# Grafana Cloud OTLP gateway is account-specific. Add the exact
+# otlp-gateway-prod-<region>.grafana.net host after signup. Do not guess it.
 *.supabase.co
 ssm.us-east-1.amazonaws.com
 ssmmessages.us-east-1.amazonaws.com

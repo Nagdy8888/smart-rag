@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
+import sys
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -40,11 +41,13 @@ from smart_rag_core.ingestion.parser.sandbox.launcher import (
 )
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.observability.error_telemetry import telemetry_span
 from smart_rag_core.observability.ingest_progress import log_ingest_progress
 from smart_rag_core.observability.ingest_trace import (
     ingest_run_name_for_job_kind,
     invoke_traced_ingestion,
 )
+from smart_rag_core.observability.logging import correlation_context
 from smart_rag_core.retrieval.lightrag_adapter import (
     LightRagRuntimeAdapter,
     bind_process_runtime_adapter,
@@ -413,6 +416,8 @@ class WorkerLifecycle:
         Side Effects:
             Unexpected exceptions (including scan-event RLS failures) are
             logged and persisted through ``fail`` so the lease is not orphaned.
+            Binds ``job_id`` for logs and, when OTLP export is on, opens a
+            ``worker.job`` span that carries that id only.
         """
 
         postgres_url = self._require_postgres_url()
@@ -436,7 +441,13 @@ class WorkerLifecycle:
             daemon=True,
         )
         heartbeat_thread.start()
+        job_scope = correlation_context(job_id=str(job.id))
+        job_span = telemetry_span("worker.job")
+        scope_entered = False
         try:
+            job_scope.__enter__()
+            job_span.__enter__()
+            scope_entered = True
             config = self._run_config(job)
             configurable = cast(dict[str, object], config["configurable"])
             configurable["lease_lost"] = lease_lost
@@ -563,6 +574,12 @@ class WorkerLifecycle:
         finally:
             stop_heartbeat.set()
             heartbeat_thread.join(timeout=5)
+            if scope_entered:
+                exit_info = sys.exc_info()
+                try:
+                    job_span.__exit__(*exit_info)
+                finally:
+                    job_scope.__exit__(*exit_info)
 
     def _enqueue_query_maintenance(self) -> None:
         """Enqueue daily reaper and LangSmith-deletion jobs without a budget.

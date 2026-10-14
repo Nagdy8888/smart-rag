@@ -137,8 +137,8 @@ def test_page_wrapper_delegates_to_anchor_fill() -> None:
     assert "handshake token" in salvaged.answer_text.casefold()
 
 
-def test_anchor_claim_fill_skips_after_structural_salvage() -> None:
-    """Code-definition salvage link blocks anchor claim fill."""
+def test_anchor_claim_fill_keeps_a_short_code_block() -> None:
+    """A short def already covers the page opening, so the payload stays."""
 
     code = (
         "def cancel_order(order_id: str) -> None:\n"
@@ -366,3 +366,131 @@ def test_existing_anchor_claim_still_gains_the_other_opening() -> None:
     assert citation.span is not None
     assert citation.span in holder.citation_text
     assert "final balance" in salvaged.answer_text.casefold()
+
+
+def _long_page_text() -> str:
+    """Build a passage whose opening ends before the following characters.
+
+    Returns:
+        Text longer than the citation cap, with one sentence boundary inside
+        the opening window.
+    """
+
+    return "The ledger records a final balance. " + ("a" * 1100)
+
+
+def test_source_word_ask_appends_the_continuation() -> None:
+    """A passage longer than the opening contributes the following window."""
+
+    text = _long_page_text()
+    passage = verifier_passage(13, text=text)
+    passage = passage.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(passage)
+    payload = _payload("Setup is required.", chunk=passage.chunk_id)
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "What exact wording does page 12 use for the main claim? "
+            "Use only that document."
+        ),
+    )
+    openings = [
+        link
+        for link in salvaged.atomic_links
+        if link.link_id.startswith("page-opening-")
+    ]
+    assert len(openings) == 2
+    spans = []
+    for link in openings:
+        citation = next(
+            item for item in salvaged.citations if item.atomic_link_id == link.link_id
+        )
+        assert citation.span is not None
+        assert citation.span in text
+        spans.append(citation.span)
+    assert spans[0] == "The ledger records a final balance."
+    assert text.find(spans[1]) > text.find(spans[0])
+    assert set(spans[1]) == {"a"}
+
+
+def test_code_block_keeps_the_continuation() -> None:
+    """An existing code-definition link does not suppress the continuation."""
+
+    text = _long_page_text()
+    passage = verifier_passage(14, text=text)
+    passage = passage.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(passage)
+    code_claim = "def cancel_order(order_id: str) -> None:"
+    payload = AnswerPayload(
+        answer_text=code_claim,
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text=code_claim,
+                link_ids=("code-def-1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=passage.chunk_id,
+                span=code_claim,
+                paragraph_index=0,
+                atomic_link_id="code-def-1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="code-def-1",
+                claim=code_claim,
+                chunk_ids=(passage.chunk_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "On page 12, reproduce the cancel_order listing as a fenced "
+            "Python code block. Use only that document."
+        ),
+    )
+    assert any(link.link_id == "code-def-1" for link in salvaged.atomic_links)
+    openings = [
+        link
+        for link in salvaged.atomic_links
+        if link.link_id.startswith("page-opening-")
+    ]
+    assert len(openings) == 2
+    assert all(link.priority == 0 for link in openings)
+    later = next(
+        item
+        for item in salvaged.citations
+        if item.atomic_link_id == openings[1].link_id
+    )
+    assert later.span is not None
+    assert later.span in text
+    assert set(later.span) == {"a"}
+
+
+def test_table_reproduce_ask_does_not_gain_page_windows() -> None:
+    """A table reproduce ask keeps the anchor path and skips page windows."""
+
+    text = _long_page_text()
+    passage = verifier_passage(15, text=text)
+    passage = passage.model_copy(update={"page_number": 12})
+    fusion = verifier_fusion(passage)
+    payload = _payload("Setup is required.", chunk=passage.chunk_id)
+    salvaged = salvage_anchor_claim_fill(
+        payload,
+        fusion,
+        user_query=(
+            "On page 12, reproduce Table 2-1 as a Markdown pipe table. "
+            "Use only that document."
+        ),
+    )
+    assert all(
+        not link.link_id.startswith("page-opening-") for link in salvaged.atomic_links
+    )

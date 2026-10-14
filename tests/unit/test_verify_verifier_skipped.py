@@ -165,7 +165,9 @@ def test_verifier_success_records_ok_timing(monkeypatch: pytest.MonkeyPatch) -> 
 
     state = _verified_state()
 
-    def _batch(checked: object, **_kwargs: object) -> tuple[object, int, tuple[str, ...]]:
+    def _batch(
+        checked: object, **_kwargs: object
+    ) -> tuple[object, int, tuple[str, ...]]:
         """Return the checked answer as if the verifier agreed."""
 
         return checked, 1, ()
@@ -199,3 +201,36 @@ def test_verifier_gateway_failure_uses_the_same_prefix(
 
     verified, _persist = _run_skipped(monkeypatch, "gateway_failed")
     assert verified["detail"] == "verifier_skipped:gateway_failed"
+
+
+def test_unexpected_verifier_exception_releases_the_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unexpected verifier exception returns the generated draft."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.verify import verify_answer_node
+
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.run_verifier_batch",
+        MagicMock(side_effect=RuntimeError("verifier blew up")),
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.summarize_run_usage",
+        MagicMock(side_effect=QueryAdmissionError("database_rejected")),
+    )
+    persist = MagicMock(return_value=CitationPersistResult())
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.verify.maybe_persist_verified_citations",
+        persist,
+    )
+    verified = verify_answer_node(
+        _verified_state(),
+        QueryGraphDeps(connection=MagicMock(), model_gateway=None),
+    )
+    assert verified["status"] == "verified_partial"
+    assert verified["detail"] == "verifier_skipped:RuntimeError"
+    answer = verified["answer"]
+    assert isinstance(answer, dict)
+    assert answer["answer_text"] == "Refund period is 30 days."
+    persist.assert_not_called()

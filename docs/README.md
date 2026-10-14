@@ -107,6 +107,7 @@ The table below is the complete maintained map. Packet evidence under
 | [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-09-22 | eng |
 | [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-27 | eng, ops, security |
+| [development/ERROR_TELEMETRY.md](./development/ERROR_TELEMETRY.md) | engineering-lead | draft | 2026-10-13 | eng, ops, security |
 | [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-25 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
 | [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-09-16 | eng |
@@ -207,7 +208,8 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md](./evaluation/ANSWER_UI_SMOKE_24_2026-10-01.md) | engineering-lead | draft | 2026-10-01 | eng, frontend, reviewers |
 | [evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md](./evaluation/ANSWER_ONLY_50_ROOT_CAUSES_2026-09-24.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md](./evaluation/ANSWER_LOSS_REPAIR_EVIDENCE_2026-09.md) | engineering-lead | draft | 2026-09-25 | eng, reviewers |
-| [evaluation/GENERAL_ANSWER_QUALITY_2026-10.md](./evaluation/GENERAL_ANSWER_QUALITY_2026-10.md) | engineering-lead | draft | 2026-10-13 | eng, reviewers |
+| [evaluation/GENERAL_ANSWER_QUALITY_2026-10.md](./evaluation/GENERAL_ANSWER_QUALITY_2026-10.md) | engineering-lead | draft | 2026-10-14 | eng, reviewers |
+| [evaluation/DEV40_V3_CHECKPOINT_TRACE_2026-10.md](./evaluation/DEV40_V3_CHECKPOINT_TRACE_2026-10.md) | engineering-lead | draft | 2026-10-14 | eng, reviewers |
 | [evaluation/HYBRID_STAGE_TIMINGS_2026-09.md](./evaluation/HYBRID_STAGE_TIMINGS_2026-09.md) | engineering-lead | draft | 2026-09-24 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |

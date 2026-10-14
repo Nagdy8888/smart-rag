@@ -2387,6 +2387,19 @@ wheels = [
 ]
 
 [[package]]
+name = "sentry-sdk"
+version = "2.72.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/26/c1/d2bbb2b03bdc2ef14b35e02b647b8489156c50b6e0b8bacc5fa303902e23/sentry_sdk-2.72.0.tar.gz", hash = "sha256:0d2ffbc28ee2e63cbaf3d015e93b448cffcc3ef3be03a44704ad36ade72faa95", size = 1069699, upload-time = "2026-10-12T13:08:11.195Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/0b/0dd9686842d9dc49c3ee84cced31c54bceb0fb52a826be7d3d4fe30d882a/sentry_sdk-2.72.0-py3-none-any.whl", hash = "sha256:3e13ace4ffd0b3cc78288236edfc4e4bd90eb12a396cc5845fa10a58ff289f50", size = 544754, upload-time = "2026-10-12T13:08:01.619Z" },
+]
+
+[[package]]
 name = "setuptools"
 version = "84.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2459,6 +2472,9 @@ dependencies = [
     { name = "markdown-it-py" },
     { name = "openai" },
     { name = "openpyxl" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
     { name = "pgvector" },
     { name = "pillow" },
     { name = "psycopg", extra = ["binary"] },
@@ -2470,6 +2486,7 @@ dependencies = [
     { name = "pytesseract" },
     { name = "python-docx" },
     { name = "python-pptx" },
+    { name = "sentry-sdk" },
     { name = "tiktoken" },
     { name = "typing-extensions" },
 ]
@@ -2486,6 +2503,9 @@ requires-dist = [
     { name = "markdown-it-py", specifier = "==3.0.0" },
     { name = "openai", specifier = "==2.26.0" },
     { name = "openpyxl", specifier = "==3.1.5" },
+    { name = "opentelemetry-api", specifier = "==1.37.0" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = "==1.37.0" },
+    { name = "opentelemetry-sdk", specifier = "==1.37.0" },
     { name = "pgvector", specifier = "==0.5.0" },
     { name = "pillow", specifier = "==12.3.0" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.3" },
@@ -2497,6 +2517,7 @@ requires-dist = [
     { name = "pytesseract", specifier = "==0.3.13" },
     { name = "python-docx", specifier = "==1.1.2" },
     { name = "python-pptx", specifier = "==1.0.2" },
+    { name = "sentry-sdk", specifier = "==2.72.0" },
     { name = "tiktoken", specifier = "==0.9.0" },
     { name = "typing-extensions", specifier = "==4.16.0" },
 ]

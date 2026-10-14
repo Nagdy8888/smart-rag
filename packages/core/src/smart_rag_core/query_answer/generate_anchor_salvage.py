@@ -32,18 +32,14 @@ from smart_rag_core.query_answer.versions import (
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.retrieval.rerank import (
     named_page_numbers,
+    wants_cited_page_windows,
 )
 
-_STRUCTURAL_SALVAGE_LINK_IDS = frozenset({"code-def-1", "table-block-1"})
+_TABLE_BLOCK_LINK_ID = "table-block-1"
 
 _ANCHOR_CLAIM_LINK_ID = "anchor-claim-1"
 
 _ANCHOR_CLAIM_LINK_IDS = frozenset({_ANCHOR_CLAIM_LINK_ID, "page-claim-1"})
-
-_SOURCE_WORD_ASK = re.compile(
-    r"\b(?:exact wording|verbatim|quote)\b",
-    re.IGNORECASE,
-)
 
 
 def salvage_anchor_claim_fill(
@@ -54,10 +50,11 @@ def salvage_anchor_claim_fill(
 ) -> AnswerPayload:
     """Inject omitted fitted evidence spans (anchor-gated).
 
-    Skips when structural code/table salvages already replaced the payload.
-    When the ask wants the source's own words and names a page, appends
-    the opening of every fitted passage on that page, up to the paragraph
-    cap. An existing anchor claim does not block the other page openings.
+    When the ask names a page and wants source words or reproduced code,
+    appends the opening of every fitted passage on that page and the
+    continuation that starts where that opening ends. An existing code
+    block or anchor claim does not block those windows. A table block
+    still returns before the fill so the table body keeps its slots.
     Otherwise appends at most one contiguous span that clears the anchor
     gate: two distinct anchor hits in the chosen passage, or one
     distinctive literal/name of length ≥4.
@@ -71,9 +68,7 @@ def salvage_anchor_claim_fill(
         Payload with added page openings or one anchor claim, or unchanged.
     """
 
-    if any(
-        link.link_id in _STRUCTURAL_SALVAGE_LINK_IDS for link in payload.atomic_links
-    ):
+    if any(link.link_id == _TABLE_BLOCK_LINK_ID for link in payload.atomic_links):
         return payload
     opened = _fill_cited_page_opening(payload, fusion, user_query=user_query)
     if opened is not None:
@@ -152,19 +147,6 @@ def _contiguous_anchor_span(text: str, anchors: tuple[str, ...]) -> str:
     return span[:MAX_CITATION_SPAN_CHARS]
 
 
-def _asks_for_source_words(user_query: str) -> bool:
-    """Return whether the ask wants the source's own words.
-
-    Args:
-        user_query: Original user text. Untrusted.
-
-    Returns:
-        True for exact-wording, verbatim, or quote asks.
-    """
-
-    return _SOURCE_WORD_ASK.search(user_query) is not None
-
-
 def _opening_exact_span(text: str) -> str:
     """Copy the opening of a passage as an exact evidence substring.
 
@@ -197,18 +179,83 @@ def _opening_exact_span(text: str) -> str:
     return span[:MAX_CITATION_SPAN_CHARS]
 
 
+def _continuation_exact_span(text: str) -> str:
+    """Copy the passage text that starts where the opening ends.
+
+    The window begins at the first non-space character after the opening
+    and is capped at ``MAX_CITATION_SPAN_CHARS``, ending on a sentence
+    boundary when one falls inside the cap. The result stays a substring
+    of ``text``.
+
+    Args:
+        text: Passage citation text.
+
+    Returns:
+        Exact continuation substring, or empty when the passage does not
+        continue past the opening.
+    """
+
+    opening = _opening_exact_span(text)
+    if not opening:
+        return ""
+    start = text.find(opening)
+    if start < 0:
+        return ""
+    rest_start = start + len(opening)
+    while rest_start < len(text) and text[rest_start].isspace():
+        rest_start += 1
+    if rest_start >= len(text):
+        return ""
+    end_limit = min(len(text), rest_start + MAX_CITATION_SPAN_CHARS)
+    window_end = end_limit
+    if end_limit < len(text):
+        last_sentence = -1
+        for index, char in enumerate(text[rest_start:end_limit]):
+            if char in ".!?":
+                last_sentence = index
+        if last_sentence >= 0:
+            window_end = rest_start + last_sentence + 1
+    span = text[rest_start:window_end].strip()
+    if not span or span not in text or span == opening:
+        return ""
+    return span[:MAX_CITATION_SPAN_CHARS]
+
+
+def _page_windows(text: str) -> tuple[str, ...]:
+    """Return the opening and, when the passage continues, the next window.
+
+    Args:
+        text: Passage citation text.
+
+    Returns:
+        One or two exact substrings. A continuation that repeats the
+        opening is omitted.
+    """
+
+    opening = _opening_exact_span(text)
+    later = _continuation_exact_span(text)
+    windows: list[str] = []
+    if opening:
+        windows.append(opening)
+    if later and later != opening:
+        windows.append(later)
+    return tuple(windows)
+
+
 def _fill_cited_page_opening(
     payload: AnswerPayload,
     fusion: FusionResult,
     *,
     user_query: str,
 ) -> AnswerPayload | None:
-    """Append the opening of every cited-page passage for a source-word ask.
+    """Append page windows for a source-word or code-reproduce ask.
 
-    Page openings take the paragraph and verifier slots first. When more
-    than six fitted passages share the named pages, six are kept in page,
-    hybrid-rank, then chunk-id order. An opening already present in the
-    answer is not copied again.
+    Each fitted passage on the named page contributes its opening and,
+    when the passage continues, the text that starts where that opening
+    ends. Page windows take the paragraph and verifier slots first. Six
+    windows are kept in page, hybrid-rank, then chunk-id order. A window
+    already present in the answer is not copied again. An existing code
+    block stays when a slot remains.
 
     Args:
         payload: Company answer after code/table salvages.
@@ -216,13 +263,13 @@ def _fill_cited_page_opening(
         user_query: Original user text. Untrusted.
 
     Returns:
-        Updated payload, the original when every opening is already
+        Updated payload, the original when every window is already
         released, or None when this ask is not a cited-page source-word
-        ask or no cited-page passage has text.
+        or code-reproduce ask, or no cited-page passage has text.
     """
 
     pages = set(named_page_numbers(user_query))
-    if not pages or not _asks_for_source_words(user_query):
+    if not pages or not wants_cited_page_windows(user_query):
         return None
     matched = [
         item
@@ -238,10 +285,10 @@ def _fill_cited_page_opening(
     )
     chosen: list[tuple[str, str]] = []
     for item in matched:
-        span = _opening_exact_span(item.citation_text or "")
-        if not span:
-            continue
-        chosen.append((item.chunk_id, span))
+        for span in _page_windows(item.citation_text or ""):
+            chosen.append((item.chunk_id, span))
+            if len(chosen) >= MAX_ANSWER_PARAGRAPHS:
+                break
         if len(chosen) >= MAX_ANSWER_PARAGRAPHS:
             break
     if not chosen:

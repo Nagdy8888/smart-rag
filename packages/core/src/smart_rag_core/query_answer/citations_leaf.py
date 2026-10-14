@@ -260,6 +260,59 @@ def repair_leaf_citations(
     )
 
 
+def shorten_contained_skipped_spans(
+    answer: AnswerPayload,
+    fusion: FusionResult,
+    skipped: Sequence[SkippedCitation],
+) -> AnswerPayload:
+    """Keep a paragraph whose skipped span is an exact fused-passage slice.
+
+    The citation span becomes the leading sentence when that sentence is
+    still inside the same passage. Paragraph text and ``answer_text`` stay
+    so a later citation drop cannot remove the fact. The caller retries
+    persistence with the shorter span.
+
+    Args:
+        answer: Verified answer that still holds the paragraph.
+        fusion: Fitted canonical evidence for this run.
+        skipped: Leaf-unresolved citations from the first persist attempt.
+
+    Returns:
+        Answer with shortened citation spans when a contained opening can
+        be retried. Unchanged when no skipped span sits in a fused passage.
+    """
+
+    if not skipped or not fusion.evidence or not answer.citations:
+        return answer
+    passages = tuple(
+        item.citation_text for item in fusion.evidence if item.citation_text
+    )
+    if not passages:
+        return answer
+    skip_keys = {
+        (item.chunk_id, item.paragraph_index, (item.span or "").strip())
+        for item in skipped
+    }
+    rewritten: list[AnswerCitation] = []
+    changed = False
+    for citation in answer.citations:
+        span = (citation.span or "").strip()
+        key = (str(citation.chunk_id or ""), citation.paragraph_index, span)
+        if key not in skip_keys:
+            rewritten.append(citation)
+            continue
+        holder = next((text for text in passages if span in text), None)
+        sentence = leading_sentence(span) if holder is not None else ""
+        if holder is None or not sentence or sentence not in holder:
+            rewritten.append(citation)
+            continue
+        rewritten.append(citation.model_copy(update={"span": sentence}))
+        changed = True
+    if not changed:
+        return answer
+    return answer.model_copy(update={"citations": tuple(rewritten)})
+
+
 def citation_error_reason(exc: BaseException) -> str:
     """Extract the ``query_citation:`` reason from a database error.
 

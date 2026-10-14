@@ -2,7 +2,7 @@
 title: General answer-quality repair evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-10-13
+last-reviewed: 2026-10-14
 audience: eng, reviewers
 ---
 
@@ -18,6 +18,8 @@ Counts only. Private questions, gold phrases, and answer text stay under
 | `dev40-2026-10-v1` | 40 | ~14 code / ≤12 table / rest text | debug and tune |
 | `holdout40-2026-10-v1` | 40 | ~14 code / ≤12 table / rest text | retired (G0 + G5); now dev data |
 | `holdout40-2026-10-v2` | 40 | 14 code / 3 table / 23 text | sealed Cycle 2 acceptance |
+| `dev40-2026-10-v2` | 40 | 40 text | tuned through 2026-10-13 |
+| `dev40-2026-10-v3` | 40 | 14 code / 8 table / 18 text | fresh measurement set |
 
 ## Baseline (G0)
 
@@ -642,6 +644,78 @@ Kept. A source-word ask that names a page now appends the opening of every fitte
 
 `5a` 13→2. Strict +12 on the stage report, inside the drop limit of 3. The runner summary line printed `strict_pass=31`; the stage report is 35. The remaining draft misses are `d09` and `d20`. The one post-draft removal is `trimmed_or_rewritten` (`d26`). Question ids stay in `.private-eval/runs/dev40-v2-openings/stage-loss.json`.
 
+## dev40-v2 pin every cited-page passage (2026-10-13)
+
+Kept. A source-word ask that names a page now pins every pool or fused passage on that page, ordered by page, chunk index, then chunk id, inside the evidence limit. Other page asks still pin only the first match. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `pin_all present`. `check_gold_literals` exit 0.
+
+| Metric | After every page opening | After pinning every page passage |
+| --- | ---: | ---: |
+| strict passes | 35/40 | 37/40 |
+| ok | 35 | 37 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 2 | 0 |
+| 5a_draft_missing | 2 | 0 |
+| 5b_removed_after_draft | 1 | 3 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5a` plus `4_rerank_select` 4→0. Strict +2 on the stage report, inside the drop limit of 3. The runner summary line printed `strict_pass=34`; the stage report is 37. `5b` rose 1→3 (`refused_after_draft` 2, `trimmed_or_rewritten` 1) on `d23`, `d26`, and `d30`. Question ids stay in `.private-eval/runs/dev40-v2-pin-pages/stage-loss.json`.
+
+## dev40-v2 keep drafted openings (2026-10-13)
+
+Kept. A cited chunk is now a valid citation leaf when the span sits in its own raw text and no representative child contains that span. Several representative children that contain the same span stay ambiguous. Verify releases the generated draft as `verified_partial` when an unexpected exception would otherwise abort the run. A skipped span that is an exact slice of a fused passage keeps its paragraph and is retried with the leading sentence. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `draft present`, `shorten present`. `check_gold_literals` exit 0 (`failing_files=0`).
+
+| Metric | After pinning every page passage | After keeping drafted openings |
+| --- | ---: | ---: |
+| strict passes | 37/40 | 39/40 |
+| ok | 37 | 39 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 0 | 0 |
+| 5a_draft_missing | 0 | 0 |
+| 5b_removed_after_draft | 3 | 1 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5b` 3→1 (`trimmed_or_rewritten` on `d26`). Strict +2 on the stage report, inside the drop limit of 3. The runner summary line printed `strict_pass=39`. `d23` and `d30` finished verify. Question ids stay in `.private-eval/runs/dev40-v2-openings-kept/stage-loss.json`.
+
+## dev40-v3 fresh measurement set (2026-10-13)
+
+The ingested document has 348 pages and 345 of them already appear in some private gold file, so a 40-question set of never-used pages cannot be built. `.private-eval/dev40-2026-10-v3.json` uses 40 other pages, none of them in `dev40-2026-10-v2` or the sealed holdout. Each canonical phrase is new relative to every older private set. Validator `failures=0`. Kind mix is 14 code, 8 table, and 18 text. No application code changed for this run. The live api image is the kept drafted-openings image.
+
+| Metric | Count |
+| --- | ---: |
+| strict passes | 33/40 |
+| ok | 33 |
+| 1_ingestion | 0 |
+| 2_retrieval | 0 |
+| 3_fusion_pool | 0 |
+| 4_rerank_select | 1 |
+| 5a_draft_missing | 6 |
+| 5b_removed_after_draft | 0 |
+| 5_unknown_no_checkpoint | 0 |
+
+The runner summary line printed `strict_pass=32`; the stage report is 33. The rerank miss is `d18`. The draft misses are `d07`, `d13`, `d19`, `d21`, `d23`, and `d39`. By kind, code is 10/14, table is 7/8, and text is 16/18. Question ids stay in `.private-eval/runs/dev40-v3-baseline/stage-loss.json`. The checkpoint trace of these seven misses is [DEV40_V3_CHECKPOINT_TRACE_2026-10.md](./DEV40_V3_CHECKPOINT_TRACE_2026-10.md).
+
+## dev40-v3 page passage windows (2026-10-14)
+
+Rejected. Code and table reproduce asks that name a page pinned every passage on that page, and each named-page passage contributed a second sentence window after the opening, including when a code or table block was already present. `5a_draft_missing` rose 6→10, so the target stage did not fall. Strict 33→30, inside the drop limit of 3. Full revert of the pin and window change. The kept code remains the drafted-openings image. Prompt pin stays `answer_v6`. `check_gold_literals` exit 0 before the revert.
+
+| Metric | v3 baseline | After page windows |
+| --- | ---: | ---: |
+| strict passes | 33/40 | 30/40 |
+| ok | 33 | 30 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 1 | 0 |
+| 5a_draft_missing | 6 | 10 |
+| 5b_removed_after_draft | 0 | 0 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+The runner summary line printed `strict_pass=30`. Rerank went 1→0. Draft misses are `d04`, `d05`, `d07`, `d08`, `d09`, `d14`, `d18`, `d21`, `d23`, and `d39`. By kind, code is 10/14, table is 4/8, and text is 16/18. Question ids stay in `.private-eval/runs/dev40-v3-windows/stage-loss.json`.
+
 ## Approvals recorded
 
 - 2026-10-06 - G4b re-ingest pre-approved: "no need for my approval make g4b".
@@ -655,3 +729,4 @@ Kept. A source-word ask that names a page now appends the opening of every fitte
 - 2026-10-07 - Cycle 9 multi-fill + table span + refusal fill; keep bar failed; full revert.
 - 2026-10-08 - Cycle 10 restore a supported draft after an empty refusal; keep bar failed; full revert.
 - 2026-10-08 - Cycle 11 no paraphrase of retrieved evidence; keep bar failed; full revert.
+- 2026-10-14 - Page passage windows on dev40-v3; keep bar failed; full revert.

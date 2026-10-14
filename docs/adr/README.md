@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-21
+last-reviewed: 2026-10-13
 audience: engineering
 ---
 
@@ -28,6 +28,7 @@ audience: engineering
 | Phase 9 local candidate envelope reduce | accepted | 9 | [ADR-phase9-local-envelope-reduce.md](./ADR-phase9-local-envelope-reduce.md) |
 | Phase 10 hosted Supabase reuse (not local) | accepted | 10 | [ADR-phase10-hosted-supabase-reuse.md](./ADR-phase10-hosted-supabase-reuse.md) |
 | Phase 10 live EC2 Free Tier instance type | accepted | 10 | [ADR-phase10-free-tier-ec2.md](./ADR-phase10-free-tier-ec2.md) |
+| Hosted GlitchTip and Grafana error telemetry | accepted | ops | [ADR-hosted-error-telemetry.md](./ADR-hosted-error-telemetry.md) |
 | Demo local ingest / AWS ask later | accepted | 10 demo | [ADR-demo-local-ingest-aws-ask.md](./ADR-demo-local-ingest-aws-ask.md) |
 | Stitch-first production UX | accepted | 8 UX | [ADR-stitch-first-ux.md](./ADR-stitch-first-ux.md) |
 | Frontend functional overhaul | accepted | 8 remediation | [ADR-frontend-functional-overhaul.md](./ADR-frontend-functional-overhaul.md) |

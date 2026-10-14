@@ -344,6 +344,23 @@ _SOURCE_WORD_ASK = re.compile(
 )
 
 
+def wants_cited_page_windows(query: str) -> bool:
+    """Return whether a named page should contribute opening windows.
+
+    Source-word asks and code-reproduce asks copy those windows. Table
+    reproduce asks and ordinary page asks do not. This does not change
+    which passages are pinned.
+
+    Args:
+        query: Original user query. Untrusted.
+
+    Returns:
+        True when cited-page openings should be appended to the draft.
+    """
+
+    return bool(_SOURCE_WORD_ASK.search(query) or _CODE_DEF_ASK.search(query))
+
+
 def promote_named_page_passages(
     trimmed: tuple[RerankPassage, ...],
     *,
