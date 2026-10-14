@@ -23,7 +23,9 @@ from smart_rag_api.services.query_sse_mapping import (
 )
 from smart_rag_api.services.sse.mapping.contracts import CANONICAL_REFUSAL_TEXT
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.security.untrusted import isolate_untrusted_text
 from smart_rag_core.sse.catalog import PAYLOAD_MODELS
+from smart_rag_core.sse.sanitize import validate_sse_payload
 
 from tests.support.typed_graph import untyped
 
@@ -53,6 +55,20 @@ def test_chunk_answer_text_respects_catalog_bound() -> None:
     assert all(len(item) <= TOKEN_DELTA_LIMIT for item in chunks)
     assert "".join(chunks) == long_text
     assert chunk_answer_text("   ") == ()
+    assert chunk_answer_text("hello") == ("hello",)
+
+
+def test_chunk_answer_text_fits_after_html_escape() -> None:
+    """Quotes under the raw cap still split so each escaped delta validates."""
+
+    quoted = '"' * 4000
+    assert len(quoted) < TOKEN_DELTA_LIMIT
+    assert len(isolate_untrusted_text(quoted)) > TOKEN_DELTA_LIMIT
+    chunks = chunk_answer_text(quoted)
+    assert len(chunks) > 1
+    assert "".join(chunks) == quoted
+    for piece in chunks:
+        validate_sse_payload("token_delta", {"delta": piece})
 
 
 def test_mapper_holds_draft_until_verify_then_emits_token_delta() -> None:

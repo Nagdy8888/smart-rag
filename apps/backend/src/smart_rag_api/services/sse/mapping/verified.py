@@ -8,6 +8,7 @@ supposedly releasable verified payload that is blank.
 from __future__ import annotations
 
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.security.untrusted import isolate_untrusted_text
 
 from smart_rag_api.services.sse.mapping.citations import citation_preview
 from smart_rag_api.services.sse.mapping.contracts import (
@@ -23,9 +24,14 @@ from smart_rag_api.services.sse.mapping.usage import usage_event
 def chunk_answer_text(text: str, *, limit: int = TOKEN_DELTA_LIMIT) -> tuple[str, ...]:
     """Split verified answer text into catalog-bounded ``token_delta`` chunks.
 
+    Each piece is packed so ``isolate_untrusted_text`` of that piece stays
+    within ``limit``. HTML escapes expand quotes and brackets, so a raw
+    slice of 4096 characters can fail the catalog check. Joining the raw
+    pieces equals the stripped answer.
+
     Args:
         text: Verified or refused prose. Never retrieved source.
-        limit: Maximum characters per chunk. Catalog max is 4096.
+        limit: Maximum escaped characters per chunk. Catalog max is 4096.
 
     Returns:
         Non-empty chunks, or an empty tuple when ``text`` is blank.
@@ -35,10 +41,24 @@ def chunk_answer_text(text: str, *, limit: int = TOKEN_DELTA_LIMIT) -> tuple[str
     if not stripped:
         return ()
     bounded = max(1, min(limit, TOKEN_DELTA_LIMIT))
-    return tuple(
-        stripped[offset : offset + bounded]
-        for offset in range(0, len(stripped), bounded)
-    )
+    pieces: list[str] = []
+    start = 0
+    while start < len(stripped):
+        low = start + 1
+        high = len(stripped)
+        best = start
+        while low <= high:
+            mid = (low + high) // 2
+            if len(isolate_untrusted_text(stripped[start:mid])) <= bounded:
+                best = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+        if best <= start:
+            best = start + 1
+        pieces.append(stripped[start:best])
+        start = best
+    return tuple(pieces)
 
 
 def payload_from_update(update: dict[str, object]) -> AnswerPayload | None:

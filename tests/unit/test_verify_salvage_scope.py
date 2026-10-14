@@ -6,13 +6,13 @@ import inspect
 import re
 
 import smart_rag_core.query_answer.generate_grounded as grounded
-from smart_rag_agents.query.nodes import verify
+from smart_rag_agents.query.nodes import verify, verify_release
 
 
 def test_verify_salvage_loop_names_are_general() -> None:
     """Verify runs structural and general claim-fill salvages only."""
 
-    source = inspect.getsource(verify)
+    source = inspect.getsource(verify) + inspect.getsource(verify_release)
     names = set(re.findall(r"\bsalvage_[a-z_]+\b", source)) - {"salvage_fn"}
     assert names == {
         "salvage_named_code_definition",
