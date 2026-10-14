@@ -24,6 +24,7 @@ class RefusingHybridRetriever:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> object:
         """Refuse retrieve so tests prove Hybrid never ran.
 
@@ -32,12 +33,13 @@ class RefusingHybridRetriever:
             caller: Unused caller.
             profile: Unused profile.
             deadline_seconds: Unused remaining slice.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Raises:
             AssertionError: Always.
         """
 
-        del query, caller, profile, deadline_seconds
+        del query, caller, profile, deadline_seconds, _kwargs
         raise AssertionError("hybrid retrieve must not run in this test")
 
 

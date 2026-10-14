@@ -68,6 +68,7 @@ class _FakeHybrid:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> object:
         """Return an empty Hybrid retrieve so graph locators stand alone.
 
@@ -76,12 +77,13 @@ class _FakeHybrid:
             caller: Unused.
             profile: Unused.
             deadline_seconds: Unused.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Returns:
             Namespace with empty ranked ids.
         """
 
-        del query, caller, profile, deadline_seconds
+        del query, caller, profile, deadline_seconds, _kwargs
         return SimpleNamespace(
             ranked_ids=(),
             evidence=(),

@@ -48,6 +48,7 @@ class _HybridRetrieveWithCacheLike(Protocol):
         profile: object | None = None,
         deadline_seconds: float | None = None,
         cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
+        remaining_run_seconds: float | None = None,
     ) -> object:
         """Run one Hybrid retrieve, optionally bypassing the rank cache.
 
@@ -57,6 +58,8 @@ class _HybridRetrieveWithCacheLike(Protocol):
             profile: Typed query profile.
             deadline_seconds: Remaining retrieval slice.
             cache_mode: Rank-cache mode. ``cold_bypass`` skips get/put.
+            remaining_run_seconds: Seconds left on the admitted run.
+                ``None`` never reruns a timed-out channel.
 
         Returns:
             Object with ``ranked_ids`` and ``coverage`` attributes.

@@ -285,6 +285,12 @@ def _retriever(
     )
 
 
+sample_caller = _caller
+sample_candidate = _candidate
+sample_context = _context
+sample_retriever = _retriever
+
+
 def test_flatten_channel_candidates_dedupes_first_seen() -> None:
     """Temporal lookup sees each chunk once across dense, BM25, and term."""
 

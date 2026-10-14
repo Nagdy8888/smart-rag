@@ -20,6 +20,8 @@ ALLOWED_PATH_PARTS: tuple[str, ...] = (
     "supabase/migrations/20260816120000_graph_mapping_ready_v1.sql",
     "packages/core/src/smart_rag_core/schema/",
     "packages/core/src/smart_rag_core/retrieval/graph_mapping.py",
+    # Reads existing document_status values. It does not write graph_ready.
+    "packages/core/src/smart_rag_core/retrieval/pages.py",
     "apps/worker/src/smart_rag_worker/graph_runner.py",
 )
 

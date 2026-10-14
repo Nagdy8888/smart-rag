@@ -14,7 +14,11 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 from smart_rag_api.auth_admin.invitations import CreatedInvitation
-from smart_rag_api.dependencies.services import get_model_gateway, get_postgres_url
+from smart_rag_api.dependencies.services import (
+    get_model_gateway,
+    get_postgres_url,
+    get_sse_stream_service,
+)
 from smart_rag_api.main import create_app
 from smart_rag_api.routers.auth_team import get_auth_team_service
 from smart_rag_api.routers.conversations import (
@@ -679,6 +683,36 @@ def test_foreign_run_fetch_is_not_found(
     assert json_object(response.json())["detail"] == "not_found"
 
 
+class _IdleSseService:
+    """SSE double that records admission without opening Postgres."""
+
+    def remember_admitted(self, *_args: object, **_kwargs: object) -> None:
+        """Ignore the admitted message.
+
+        Args:
+            *_args: Caller, context, and message.
+            **_kwargs: Unused keywords.
+        """
+
+    async def start_admitted(self, *_args: object, **_kwargs: object) -> None:
+        """Skip starting the graph.
+
+        Args:
+            *_args: Caller and admission context.
+            **_kwargs: Unused keywords.
+        """
+
+
+def _idle_sse_service() -> _IdleSseService:
+    """Return an SSE double for message-submit unit tests.
+
+    Returns:
+        Service that does not touch the database.
+    """
+
+    return _IdleSseService()
+
+
 def test_submit_message_returns_composite_stream_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -704,6 +738,7 @@ def test_submit_message_returns_composite_stream_path(
     application.dependency_overrides[get_query_run_service] = lambda: (
         _FakeQueryRunService(context, stream_path)
     )
+    application.dependency_overrides[get_sse_stream_service] = _idle_sse_service
     with TestClient(application) as raw:
         client = as_openapi_client(raw)
         response = client.post(

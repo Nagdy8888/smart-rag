@@ -18,7 +18,7 @@ from smart_rag_core.security.identity import CallerContext
 _PAGE_FETCH_SCAN_CAP = 60
 """Scan bound for current-version chunks on cited pages."""
 
-_PAGE_CANDIDATE_SQL = """
+PAGE_CANDIDATE_SQL = """
 SELECT c.id, c.document_id, c.version_id
 FROM app.document_chunks AS c
 INNER JOIN app.documents AS d
@@ -198,7 +198,7 @@ def retrieve_page_candidates(
     ):
         with connection.cursor() as cursor:
             cursor.execute(
-                _PAGE_CANDIDATE_SQL,
+                PAGE_CANDIDATE_SQL,
                 (
                     list(unique_pages),
                     version_id,

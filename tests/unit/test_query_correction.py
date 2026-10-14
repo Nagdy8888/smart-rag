@@ -360,6 +360,7 @@ class _FakeHybrid:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> object:
         """Return a weak Hybrid payload.
 
@@ -368,12 +369,13 @@ class _FakeHybrid:
             caller: Unused caller.
             profile: Unused profile.
             deadline_seconds: Unused slice.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Returns:
             Simple namespace matching HybridRunResult fields used here.
         """
 
-        del caller, profile, deadline_seconds
+        del caller, profile, deadline_seconds, _kwargs
         return SimpleNamespace(
             ranked_ids=(UUID("00000000-0000-0000-0000-000000000001"),),
             coverage=SimpleNamespace(
@@ -470,6 +472,7 @@ def test_empty_hybrid_evidence_still_refuses_after_weak_retry() -> None:
             caller: CallerContext,
             profile: object | None = None,
             deadline_seconds: float | None = None,
+            **_kwargs: object,
         ) -> object:
             """Return an empty Hybrid payload.
 
@@ -478,12 +481,13 @@ def test_empty_hybrid_evidence_still_refuses_after_weak_retry() -> None:
                 caller: Unused caller.
                 profile: Unused profile.
                 deadline_seconds: Unused slice.
+                **_kwargs: Unused retrieve keywords such as cache mode.
 
             Returns:
                 Empty ranked Hybrid namespace.
             """
 
-            del query, caller, profile, deadline_seconds
+            del query, caller, profile, deadline_seconds, _kwargs
             return SimpleNamespace(
                 ranked_ids=(),
                 coverage=SimpleNamespace(

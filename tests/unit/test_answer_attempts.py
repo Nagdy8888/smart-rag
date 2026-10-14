@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 import pytest
 from smart_rag_agents.query.nodes.answer_attempts import run_answer_attempts
+from smart_rag_agents.query.state import QueryGraphState
 from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_answer.exceptions import AnswerError
 
@@ -56,7 +58,10 @@ def _run(
 
         attempt_id = str(kwargs["provider_attempt_id"])
         try:
-            payload = kwargs["send"]()  # type: ignore[operator]
+            sent = kwargs["send"]
+            if not callable(sent):
+                raise AssertionError("send must be callable")
+            payload: object = sent()
         except TimeoutAfterSendError:
             usage.append(attempt_id)
             raise
@@ -68,18 +73,21 @@ def _run(
     )
     state: dict[str, object] = {}
     try:
-        result = run_answer_attempts(
-            state,
-            connection=object(),
-            caller=object(),
-            run_id=uuid4(),
-            reservation_id=uuid4(),
-            expected_version=1,
-            model_id="gpt-4o-mini",
-            send=send,  # type: ignore[arg-type]
-            usage_from_result=lambda payload: (1, 1, None),
-            context=_context(seconds),  # type: ignore[arg-type]
-            remaining_model_calls=remaining,
+        result: object = cast(
+            object,
+            run_answer_attempts(
+                cast(QueryGraphState, state),
+                connection=object(),
+                caller=object(),
+                run_id=uuid4(),
+                reservation_id=uuid4(),
+                expected_version=1,
+                model_id="gpt-4o-mini",
+                send=send,  # type: ignore[arg-type]
+                usage_from_result=lambda payload: (1, 1, None),
+                context=_context(seconds),  # type: ignore[arg-type]
+                remaining_model_calls=remaining,
+            ),
         )
     except (TimeoutAfterSendError, AnswerError) as exc:
         return usage, exc

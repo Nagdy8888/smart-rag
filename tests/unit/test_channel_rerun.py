@@ -8,7 +8,12 @@ from smart_rag_core.retrieval.hybrid_run.channel_rerun import should_rerun_chann
 from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.types import Bm25RetrievalResult
 
-from tests.unit.test_hybrid_run import _caller, _candidate, _context, _retriever
+from tests.unit.test_hybrid_run import (
+    sample_caller,
+    sample_candidate,
+    sample_context,
+    sample_retriever,
+)
 
 
 def test_should_rerun_requires_empty_timeout_and_time() -> None:
@@ -23,9 +28,9 @@ def test_should_rerun_requires_empty_timeout_and_time() -> None:
 def test_timeout_empty_then_a_hit_reruns_once() -> None:
     """A timed-out empty pass runs again and keeps a single embedding call."""
 
-    dense = _candidate(rank=1)
-    contexts = {dense.chunk_id: _context(dense, text="canonical dense")}
-    retriever = _retriever(contexts=contexts)
+    dense = sample_candidate(rank=1)
+    contexts = {dense.chunk_id: sample_context(dense, text="canonical dense")}
+    retriever = sample_retriever(contexts=contexts)
     calls = {"n": 0}
 
     def flaky() -> object:
@@ -43,7 +48,7 @@ def test_timeout_empty_then_a_hit_reruns_once() -> None:
 
     result = retriever.retrieve(
         query="annual leave policy",
-        caller=_caller(),
+        caller=sample_caller(),
         deadline_seconds=0.05,
         remaining_run_seconds=20.0,
         channel_jobs={
@@ -59,7 +64,7 @@ def test_timeout_empty_then_a_hit_reruns_once() -> None:
 def test_genuine_empty_and_short_run_do_not_rerun() -> None:
     """No timeout, or too little run time, leaves the channel jobs at one pass."""
 
-    retriever = _retriever()
+    retriever = sample_retriever()
     calls = {"n": 0}
 
     def empty() -> object:
@@ -74,7 +79,7 @@ def test_genuine_empty_and_short_run_do_not_rerun() -> None:
 
     result = retriever.retrieve(
         query="annual leave policy",
-        caller=_caller(),
+        caller=sample_caller(),
         deadline_seconds=1.0,
         remaining_run_seconds=30.0,
         channel_jobs={"dense": empty},
@@ -96,7 +101,7 @@ def test_genuine_empty_and_short_run_do_not_rerun() -> None:
     calls["n"] = 0
     retriever.retrieve(
         query="annual leave policy",
-        caller=_caller(),
+        caller=sample_caller(),
         deadline_seconds=0.05,
         remaining_run_seconds=5.0,
         channel_jobs={"dense": hang},

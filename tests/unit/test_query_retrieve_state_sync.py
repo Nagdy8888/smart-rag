@@ -41,6 +41,7 @@ class _DebitHybrid:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> object:
         """Debit two counted retrieve calls and return an empty Hybrid payload.
 
@@ -49,6 +50,7 @@ class _DebitHybrid:
             caller: Unused.
             profile: Unused.
             deadline_seconds: Unused.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Returns:
             Namespace matching Hybrid fields used by branch execution.
@@ -57,7 +59,7 @@ class _DebitHybrid:
             AssertionError: If execute_branches did not bind the ledger.
         """
 
-        del query, caller, profile, deadline_seconds
+        del query, caller, profile, deadline_seconds, _kwargs
         if self.query_budget is None:
             raise AssertionError("query_budget must be bound before retrieve")
         self.query_budget.remaining_model_calls -= 2
@@ -302,7 +304,7 @@ def test_answer_consume_uses_runtime_version_after_profile() -> None:
         connection=cast(psycopg.Connection, SimpleNamespace()),
     )
     with patch(
-        "smart_rag_agents.query.nodes.answer.execute_counted_model_call",
+        "smart_rag_agents.query.nodes.answer_attempts.execute_counted_model_call",
         _counted,
     ):
         updated = generate_answer_node(state, deps)

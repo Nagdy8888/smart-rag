@@ -401,14 +401,15 @@ def test_source_word_ask_appends_the_continuation() -> None:
         if link.link_id.startswith("page-opening-")
     ]
     assert len(openings) == 2
-    spans = []
+    spans: list[str] = []
     for link in openings:
         citation = next(
             item for item in salvaged.citations if item.atomic_link_id == link.link_id
         )
-        assert citation.span is not None
-        assert citation.span in text
-        spans.append(citation.span)
+        span = citation.span
+        assert span is not None
+        assert span in text
+        spans.append(span)
     assert spans[0] == "The ledger records a final balance."
     assert text.find(spans[1]) > text.find(spans[0])
     assert set(spans[1]) == {"a"}

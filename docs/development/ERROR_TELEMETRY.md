@@ -56,13 +56,13 @@ token are never written to logs.
    `Authorization=Basic <token>`.
 3. Set these on the API, worker, and agent processes:
 
-```bash
-GLITCHTIP_ENABLED=true
-GLITCHTIP_DSN=https://<public-key>@app.glitchtip.com/<project>
-OTEL_EXPORT_ENABLED=true
-OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-prod-<region>.grafana.net/otlp
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <token>
-```
+   ```bash
+   GLITCHTIP_ENABLED=true
+   GLITCHTIP_DSN=https://<public-key>@app.glitchtip.com/<project>
+   OTEL_EXPORT_ENABLED=true
+   OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-prod-<region>.grafana.net/otlp
+   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <token>
+   ```
 
 4. Add the exact Grafana gateway hostname to
    [allowlist.txt](../../infra/ec2/provider-egress/allowlist.txt) and a

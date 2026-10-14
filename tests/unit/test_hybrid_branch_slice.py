@@ -32,6 +32,7 @@ class _RecordingRetriever:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> SimpleNamespace:
         """Record ``deadline_seconds`` and return an empty Hybrid outcome.
 
@@ -40,12 +41,13 @@ class _RecordingRetriever:
             caller: Server-derived caller.
             profile: Typed profile, unused.
             deadline_seconds: Slice under test.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Returns:
             Outcome with no ranked IDs.
         """
 
-        del query, caller, profile
+        del query, caller, profile, _kwargs
         self.deadlines.append(deadline_seconds)
         return SimpleNamespace(
             ranked_ids=(),

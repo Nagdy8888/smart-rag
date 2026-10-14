@@ -21,6 +21,7 @@ class HybridRetrieveLike(Protocol):
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        remaining_run_seconds: float | None = None,
     ) -> object:
         """Run one Hybrid retrieve.
 
@@ -29,6 +30,8 @@ class HybridRetrieveLike(Protocol):
             caller: Server-derived caller.
             profile: Typed query profile.
             deadline_seconds: Remaining retrieval slice.
+            remaining_run_seconds: Seconds left on the admitted run.
+                ``None`` never reruns a timed-out channel.
 
         Returns:
             Object with ``ranked_ids`` and ``coverage`` attributes.

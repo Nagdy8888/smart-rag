@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TypeVar
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from smart_rag_core.query_admission.ceilings import assert_call_available
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -14,6 +14,7 @@ from smart_rag_core.query_admission.exceptions import (
     QueryCeilingError,
     TimeoutAfterSendError,
 )
+from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.query_admission.usage import execute_counted_model_call
 from smart_rag_core.query_answer.exceptions import AnswerError
 
@@ -21,6 +22,7 @@ from smart_rag_agents.query.run_timings import (
     classify_attempt_outcome,
     with_answer_attempt,
 )
+from smart_rag_agents.query.state import QueryGraphState
 
 ANSWER_ATTEMPT_CAP_SECONDS = 10.0
 """Per-attempt cap until a measured 99th percentile replaces it."""
@@ -34,7 +36,7 @@ T = TypeVar("T")
 
 
 def run_answer_attempts(
-    state: dict[str, object],
+    state: QueryGraphState,
     *,
     connection: object,
     caller: object,
@@ -46,7 +48,7 @@ def run_answer_attempts(
     usage_from_result: Callable[[T], tuple[int | None, int | None, object]],
     context: AuthorizedRuntimeContext | None,
     remaining_model_calls: int,
-) -> tuple[T, object, object, int]:
+) -> tuple[T, ReservationConsumeResult, UUID, int]:
     """Send the answer at most twice.
 
     Args:
@@ -143,7 +145,7 @@ def _retry_allowed(
 
 
 def _record(
-    state: dict[str, object],
+    state: QueryGraphState,
     started: float,
     outcome: str,
     reason: str,
@@ -163,4 +165,5 @@ def _record(
         outcome=outcome,  # type: ignore[arg-type]
         reason=reason,
     )
-    state["run_timings"] = update["run_timings"]
+    timings = update["run_timings"]
+    state["run_timings"] = timings if isinstance(timings, dict) else None

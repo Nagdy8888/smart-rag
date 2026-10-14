@@ -430,7 +430,7 @@ def test_partial_fields_reach_diagnostics_and_export() -> None:
     assert full is not None
     assert full.rerank_partial is False
     bad = hybrid_diagnostics_from_outcome(
-            SimpleNamespace(**base, rerank_ranked_count=True, rerank_appended_count=99),
+        SimpleNamespace(**base, rerank_ranked_count=True, rerank_appended_count=99),
         effective_route="hybrid",
         fallback_reason="none",
     )

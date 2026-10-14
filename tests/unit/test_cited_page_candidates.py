@@ -8,7 +8,7 @@ from uuid import uuid4
 import psycopg
 from psycopg.pq import TransactionStatus
 from smart_rag_core.retrieval.pages import (
-    _PAGE_CANDIDATE_SQL,
+    PAGE_CANDIDATE_SQL,
     idle_page_connection,
     merge_cited_page_candidates,
 )
@@ -76,7 +76,7 @@ def test_page_fetch_uses_a_new_connection_when_the_term_connection_is_busy() -> 
 def test_cited_page_sql_keeps_acl_and_skips_the_representative_flag() -> None:
     """Explicit page cites authorize chunks search ranking would drop."""
 
-    sql = _PAGE_CANDIDATE_SQL.casefold()
+    sql = PAGE_CANDIDATE_SQL.casefold()
     assert "is_search_representative" not in sql
     assert "caller_can_read_document" in sql
     assert "current_version_id" in sql

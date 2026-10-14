@@ -197,7 +197,7 @@ def test_event_stream_headers_and_html_not_in_events(
 def test_json_accept_still_returns_202_stream_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """JSON Accept keeps the packet 5 202 contract."""
+    """JSON Accept keeps the packet 5 202 body and starts the admitted run."""
 
     monkeypatch.setenv("APP_ENV", "test")
     patch_sse_rate_limits(monkeypatch)
@@ -216,7 +216,7 @@ def test_json_accept_still_returns_202_stream_path(
     payload = json_object(response.json())
     stream_path = require_str(payload["stream_path"])
     assert stream_path.endswith("/events")
-    assert executor.start_count == 0
+    assert executor.start_count == 1
     assert admit.calls == 1
 
 

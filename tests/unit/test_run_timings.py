@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from smart_rag_agents.query.run_timings import (
@@ -15,11 +15,26 @@ from smart_rag_core.query_admission.envelopes import FAMILY_DEADLINE_SECONDS
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 
 
+class _Clock:
+    """Minimal deadline and route family for timing tests."""
+
+    def __init__(self, *, deadline_at: datetime, route_family: object) -> None:
+        """Store the fields ``start_run_timings`` reads.
+
+        Args:
+            deadline_at: Admitted run deadline.
+            route_family: Route family or an unrecognized stand-in.
+        """
+
+        self.deadline_at = deadline_at
+        self.route_family = route_family
+
+
 def test_attach_delay_uses_the_family_deadline_and_a_fixed_clock() -> None:
     """Attach delay is the family budget minus time left at graph start."""
 
     now = datetime(2026, 10, 8, tzinfo=UTC)
-    context = SimpleNamespace(
+    context = _Clock(
         deadline_at=now + timedelta(seconds=10),
         route_family=Phase6RouteFamily.HYBRID,
     )
@@ -33,7 +48,7 @@ def test_unknown_family_omits_attach_delay() -> None:
     """An unrecognized family still records time left."""
 
     now = datetime(2026, 10, 8, tzinfo=UTC)
-    context = SimpleNamespace(deadline_at=now, route_family="not-a-family")
+    context = _Clock(deadline_at=now, route_family="not-a-family")
     timings = start_run_timings(context, now=now)
     assert timings == {"remaining_ms_at_start": 0}
     assert "attach_delay_ms" not in timings
@@ -52,12 +67,19 @@ def test_answer_attempts_keep_four_and_cut_reasons() -> None:
                 reason="x" * 80,
             )
         )
-    timings = state["run_timings"]
-    assert isinstance(timings, dict)
-    attempts = timings["answer_attempts"]
-    assert isinstance(attempts, list)
-    assert len(attempts) == MAX_RECORDED_ATTEMPTS
-    assert len(attempts[0]["reason"]) == 64
+    timings_raw = state["run_timings"]
+    assert isinstance(timings_raw, dict)
+    timings = cast(dict[str, object], timings_raw)
+    attempts_raw = timings["answer_attempts"]
+    assert isinstance(attempts_raw, list)
+    recorded = cast(list[object], attempts_raw)
+    assert len(recorded) == MAX_RECORDED_ATTEMPTS
+    first_raw = recorded[0]
+    assert isinstance(first_raw, dict)
+    first = cast(dict[str, object], first_raw)
+    reason = first["reason"]
+    assert isinstance(reason, str)
+    assert len(reason) == 64
 
 
 def test_unknown_attempt_outcome_is_rejected() -> None:

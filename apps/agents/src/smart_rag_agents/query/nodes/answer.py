@@ -306,11 +306,12 @@ def generate_answer_node(
                 ).model_dump(mode="json")
             else:
                 answer, added_prompt_tokens, added_completion_tokens = _send()
-                state["run_timings"] = with_answer_attempt(
+                recorded = with_answer_attempt(
                     state,
                     duration_ms=_elapsed_ms(started),
                     outcome="ok",
                 )["run_timings"]
+                state["run_timings"] = recorded if isinstance(recorded, dict) else None
         except (
             AnswerError,
             QueryBudgetError,
@@ -345,16 +346,19 @@ def generate_answer_node(
                         **attempt,
                     },
                 )
-            return {
-                **state,
-                "status": "verified_partial",
-                "detail": reason,
-                "answer": AnswerPayload(
-                    answer_text="Verified partial: answer generation stopped.",
-                    status="partial",
-                ).model_dump(mode="json"),
-                **attempt,
-            }
+            return cast(
+                QueryGraphState,
+                {
+                    **state,
+                    "status": "verified_partial",
+                    "detail": reason,
+                    "answer": AnswerPayload(
+                        answer_text="Verified partial: answer generation stopped.",
+                        status="partial",
+                    ).model_dump(mode="json"),
+                    **attempt,
+                },
+            )
         answer = apply_degraded_scope_framing(
             answer, scope_degradation_reason=degradation
         )

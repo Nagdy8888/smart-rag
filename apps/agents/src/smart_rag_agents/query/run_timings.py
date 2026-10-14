@@ -23,10 +23,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Literal, cast
+from typing import Literal, Protocol, cast
 
-from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.envelopes import FAMILY_DEADLINE_SECONDS
+from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 
 AttemptOutcome = Literal["ok", "timeout_after_send", "deadline_exhausted", "error"]
 """Allowed ``answer_attempts[].outcome`` values."""
@@ -42,15 +42,30 @@ _ATTEMPT_OUTCOMES = frozenset(
 )
 
 
+class RunTimingContext(Protocol):
+    """Deadline and route family used to record attach delay."""
+
+    @property
+    def deadline_at(self) -> datetime:
+        """Admitted run deadline."""
+        ...
+
+    @property
+    def route_family(self) -> object:
+        """Route family, or an unrecognized stand-in."""
+        ...
+
+
 def start_run_timings(
-    context: AuthorizedRuntimeContext,
+    context: RunTimingContext,
     *,
     now: datetime | None = None,
 ) -> dict[str, object]:
     """Return the timings known when the API builds the graph input.
 
     Args:
-        context: Server-derived runtime context with the admitted deadline.
+        context: Admitted runtime, or any object with the same deadline
+            and route family.
         now: Clock override for tests. Defaults to UTC now.
 
     Returns:
@@ -61,7 +76,12 @@ def start_run_timings(
     current = now if now is not None else datetime.now(UTC)
     remaining_ms = max(0, int((context.deadline_at - current).total_seconds() * 1000))
     timings: dict[str, object] = {"remaining_ms_at_start": remaining_ms}
-    family_seconds = FAMILY_DEADLINE_SECONDS.get(context.route_family)
+    family = context.route_family
+    family_seconds = (
+        FAMILY_DEADLINE_SECONDS.get(family)
+        if isinstance(family, Phase6RouteFamily)
+        else None
+    )
     if family_seconds is not None:
         timings["attach_delay_ms"] = max(0, family_seconds * 1000 - remaining_ms)
     return timings

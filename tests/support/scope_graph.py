@@ -35,6 +35,7 @@ class SpyHybrid:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> object:
         """Count one retrieve and return an empty Hybrid payload.
 
@@ -43,12 +44,13 @@ class SpyHybrid:
             caller: Unused.
             profile: Unused.
             deadline_seconds: Unused.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Returns:
             Namespace matching Hybrid fields used by branch execution.
         """
 
-        del query, caller, profile, deadline_seconds
+        del query, caller, profile, deadline_seconds, _kwargs
         self.calls += 1
         return SimpleNamespace(
             ranked_ids=(UUID("00000000-0000-0000-0000-000000000001"),),

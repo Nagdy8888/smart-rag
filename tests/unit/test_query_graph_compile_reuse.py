@@ -56,6 +56,7 @@ class _TaggedHybrid:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        **_kwargs: object,
     ) -> object:
         """Record a retrieve and return empty Hybrid-shaped evidence.
 
@@ -64,12 +65,13 @@ class _TaggedHybrid:
             caller: Unused caller.
             profile: Unused profile.
             deadline_seconds: Unused remaining slice.
+            **_kwargs: Unused retrieve keywords such as cache mode.
 
         Returns:
             Empty authorized Hybrid payload so the run can refuse later.
         """
 
-        del query, caller, profile, deadline_seconds
+        del query, caller, profile, deadline_seconds, _kwargs
         self.calls.append(self.tag)
         return _EMPTY_HYBRID
 

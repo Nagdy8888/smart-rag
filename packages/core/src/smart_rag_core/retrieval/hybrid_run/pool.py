@@ -7,7 +7,11 @@ the per-document cap. This is the same selection the retriever used inline.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager
+from typing import cast
 from uuid import UUID
+
+import psycopg
 
 from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.pages import load_chunk_page_numbers
@@ -75,14 +79,20 @@ def build_pool_ids(
     page_pins: tuple[UUID, ...] = ()
     if cited_pages and fused_ids and supabase_dsn:
         try:
-            with open_supabase() as page_conn:
-                page_by_id = load_chunk_page_numbers(page_conn, chunk_ids=fused_ids)
-            page_pins = page_head_pins(
-                fused_ids=fused_ids,
-                page_by_id=page_by_id,
-                pages=cited_pages,
-                head=CHANNEL_HEAD_PIN,
-            )
+            page_by_id: dict[UUID, int | None] | None = None
+            opened = open_supabase()
+            if isinstance(opened, AbstractContextManager):
+                with cast(
+                    AbstractContextManager[psycopg.Connection], opened
+                ) as page_conn:
+                    page_by_id = load_chunk_page_numbers(page_conn, chunk_ids=fused_ids)
+            if page_by_id is not None:
+                page_pins = page_head_pins(
+                    fused_ids=fused_ids,
+                    page_by_id=page_by_id,
+                    pages=cited_pages,
+                    head=CHANNEL_HEAD_PIN,
+                )
         except Exception:
             page_pins = ()
     pinned_ids = merge_rerank_pins(page_pins, channel_pins)

@@ -323,7 +323,7 @@ def _verify_persisted(
 def test_verify_partial_when_some_citations_skipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """One skipped leaf leaves a partial answer backed by the rest."""
+    """One skipped leaf leaves a partial answer citing the fused sentence."""
 
     verified = _verify_persisted(
         monkeypatch,
@@ -337,7 +337,7 @@ def test_verify_partial_when_some_citations_skipped(
     assert verification["skipped_citation_count"] == 1
     answer = verified["answer"]
     released = AnswerPayload.model_validate(answer)
-    assert [item.span for item in released.citations] == ["Refund period"]
+    assert [item.span for item in released.citations] == ["Refund period is 30 days."]
 
 
 def test_verify_insufficient_when_every_citation_skipped(
@@ -962,13 +962,15 @@ def test_contained_opening_keeps_paragraph_and_shortens_span() -> None:
     assert shortened.paragraphs[0].text == _TWO_SENTENCES
     assert shortened.answer_text == _TWO_SENTENCES
     assert shortened.citations[0].span == leading_sentence(_TWO_SENTENCES)
+    shortened_span = shortened.citations[0].span
+    assert shortened_span is not None
     dropped = drop_skipped_citations(
         shortened,
         (
             SkippedCitation(
                 chunk_id=str(chunk_id),
                 paragraph_index=0,
-                span=shortened.citations[0].span,
+                span=shortened_span,
                 reason="span_not_contained",
             ),
         ),

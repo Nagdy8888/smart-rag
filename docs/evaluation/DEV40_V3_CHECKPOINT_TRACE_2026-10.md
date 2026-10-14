@@ -89,7 +89,7 @@ The topology does not. Admission, memory, planning, fusion, tables, and tool dis
 
 `verify_answer` does not create these misses. `5b_removed_after_draft` is 0. On `d07` it swaps the anchor claim for a table block that also misses the fact. On `d19`, `d23`, and `d39` it shortens text that already missed the fact. A verifier-only keep was tried earlier on `dev40-v2` and reverted because draft misses rose.
 
-The page-window change edited both `company_scope` pinning and the `generate_answer` page fill. On this set, `5a_draft_missing` rose from 6 to 10 and table passes fell from 7/8 to 4/8, so that change was reverted. The next edit has to be a narrower extract inside `generate_answer`, measured again on this set, and kept only if draft misses fall without giving back more than three strict passes.
+The page-window change edited both `company_scope` pinning and the `generate_answer` page fill. On this set, `5a_draft_missing` rose from 6 to 10 and table passes fell from 7/8 to 4/8, so that change was reverted. The later continuation packet appends the text that starts where each named-page opening ends, for source-word and code-reproduce asks, and leaves table pinning unchanged. That packet is kept: `5a_draft_missing` 6→3 and stage strict 33→35. Counts are in [GENERAL_ANSWER_QUALITY_2026-10.md](./GENERAL_ANSWER_QUALITY_2026-10.md).
 
 ## Limits
 

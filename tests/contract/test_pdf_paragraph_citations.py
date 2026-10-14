@@ -396,7 +396,6 @@ def test_two_matching_children_are_rejected(
         )
 
 
-@pytest.mark.parametrize("span", [None, "", "   ", "not in the leaf"])
 def test_non_representative_cited_chunk_resolves_to_itself(
     db_connection: psycopg.Connection,
 ) -> None:
@@ -448,6 +447,7 @@ def test_non_representative_cited_chunk_resolves_to_itself(
     assert records[0].chunk_id == chunk_id
 
 
+@pytest.mark.parametrize("span", [None, "", "   ", "not in the leaf"])
 def test_null_empty_or_non_contained_span_is_rejected(
     db_connection: psycopg.Connection,
     span: str | None,

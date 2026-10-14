@@ -243,7 +243,7 @@ def stage_record(
     """
 
     if diagnostics is None:
-        missing = {name: "unknown" for name in REQUIRED_FIELDS}
+        missing: dict[str, object] = {name: "unknown" for name in REQUIRED_FIELDS}
         missing["channel_timed_out"] = "unknown"
         missing["run_timings"] = "unknown"
         return missing
@@ -353,17 +353,20 @@ def _safe_run_timings(value: Mapping[str, object] | None) -> dict[str, object] |
         kept["verifier_reason"] = reason[:64]
     attempts = value.get("answer_attempts")
     if isinstance(attempts, list):
+        attempt_rows = cast(list[object], attempts)
         kept["answer_attempts"] = [
             {
                 field: (
-                    max(0, item[field])
-                    if field == "duration_ms" and isinstance(item.get(field), int)
-                    else str(item.get(field) or "")[:64]
+                    max(0, duration)
+                    if field == "duration_ms"
+                    and isinstance(duration := row.get(field), int)
+                    else str(row.get(field) or "")[:64]
                 )
                 for field in _ATTEMPT_FIELDS
             }
-            for item in cast(list[object], attempts)
+            for item in attempt_rows
             if isinstance(item, Mapping)
+            for row in (cast(Mapping[str, object], item),)
         ][:4]
     return kept
 

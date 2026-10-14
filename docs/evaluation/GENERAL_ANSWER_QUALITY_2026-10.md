@@ -716,6 +716,24 @@ Rejected. Code and table reproduce asks that name a page pinned every passage on
 
 The runner summary line printed `strict_pass=30`. Rerank went 1→0. Draft misses are `d04`, `d05`, `d07`, `d08`, `d09`, `d14`, `d18`, `d21`, `d23`, and `d39`. By kind, code is 10/14, table is 4/8, and text is 16/18. Question ids stay in `.private-eval/runs/dev40-v3-windows/stage-loss.json`.
 
+## dev40-v3 page continuation (2026-10-14)
+
+Kept. A source-word or code-reproduce ask that names a page now appends the opening of each fitted passage on that page and the text that starts where that opening ends, capped at 1000 characters. An existing `code-def-1` link does not block those windows. A `table-block-1` link still returns before the fill, and cited-page pinning is unchanged. Prompt pin stays `answer_v6`. Image rebuilt. Probe: `continuation present`, `windows present`. `check_gold_literals` exit 0 (`failing_files=0`).
+
+| Metric | v3 baseline | After page continuation |
+| --- | ---: | ---: |
+| strict passes | 33/40 | 35/40 |
+| ok | 33 | 35 |
+| 1_ingestion | 0 | 0 |
+| 2_retrieval | 0 | 0 |
+| 3_fusion_pool | 0 | 0 |
+| 4_rerank_select | 1 | 1 |
+| 5a_draft_missing | 6 | 3 |
+| 5b_removed_after_draft | 0 | 1 |
+| 5_unknown_no_checkpoint | 0 | 0 |
+
+`5a` 6→3. Strict +2 on the stage report. The runner summary line printed `strict_pass=34`; the stage report is 35. The rerank miss stays `d18`. Draft misses are `d07`, `d13`, and `d22`. The post-draft removal is `trimmed_or_rewritten` on `d21`. By kind, code is 10/14, table is 7/8, and text is 18/18. Question ids stay in `.private-eval/runs/dev40-v3-continuation/stage-loss.json`.
+
 ## Approvals recorded
 
 - 2026-10-06 - G4b re-ingest pre-approved: "no need for my approval make g4b".
@@ -730,3 +748,4 @@ The runner summary line printed `strict_pass=30`. Rerank went 1→0. Draft misse
 - 2026-10-08 - Cycle 10 restore a supported draft after an empty refusal; keep bar failed; full revert.
 - 2026-10-08 - Cycle 11 no paraphrase of retrieved evidence; keep bar failed; full revert.
 - 2026-10-14 - Page passage windows on dev40-v3; keep bar failed; full revert.
+- 2026-10-14 - Page continuation on dev40-v3; `5a` 6→3; kept.
