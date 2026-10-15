@@ -3,6 +3,7 @@ import {
   formatCodeSnippet,
   formatCodeSnippetModel,
   isCodeSnippet,
+  splitTrailingSourceListing,
 } from "./code-snippet";
 
 describe("code snippets", () => {
@@ -65,6 +66,31 @@ describe("code snippets", () => {
 
   it("leaves ordinary prose alone", () => {
     expect(isCodeSnippet("The refund period is 30 days.")).toBe(false);
+    expect(splitTrailingSourceListing("The refund period is 30 days.")).toBeNull();
+    expect(splitTrailingSourceListing("from the handbook we copy the steps.")).toBeNull();
+  });
+
+  it("splits a trailing import listing and keeps a wrapped import tail", () => {
+    const split = splitTrailingSourceListing(
+      [
+        "Load the helpers before calling them.",
+        "from pkg.mod import Widget",
+        "12",
+        "from pkg.other import Helper,",
+        "ExtraName",
+        "from lan",
+      ].join("\n"),
+    );
+    expect(split?.prose).toBe("Load the helpers before calling them.");
+    expect(split?.language).toBe("python");
+    expect(split?.code).toBe(
+      [
+        "from pkg.mod import Widget",
+        "from pkg.other import Helper,",
+        "ExtraName",
+        "from lan",
+      ].join("\n"),
+    );
   });
 
   it("detects a fenced python block and strips fences", () => {

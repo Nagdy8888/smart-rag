@@ -232,6 +232,39 @@ describe("AnswerSurface origin chrome", () => {
     expect(container.textContent).not.toMatch(/```/);
   });
 
+  it("renders an import listing as code and skips a fenced repeat of the table", () => {
+    renderSurface({
+      answerOrigin: "general_knowledge",
+      citations: [],
+      answer: [
+        "| Name | Note |",
+        "| --- | --- |",
+        "| Alpha | First row |",
+        "| Beta | Second row |",
+        "",
+        "Load the helpers before calling them.",
+        "from pkg.mod import Widget",
+        "12",
+        "from pkg.other import Helper,",
+        "ExtraName",
+        "",
+        "```",
+        "Alpha",
+        "Beta",
+        "```",
+      ].join("\n"),
+    });
+    expect(screen.getAllByTestId("answer-table")).toHaveLength(1);
+    expect(screen.getAllByTestId("answer-code-snippet")).toHaveLength(1);
+    const snippet = screen.getByTestId("answer-code-snippet");
+    expect(snippet.textContent).toContain("from pkg.mod import Widget");
+    expect(snippet.textContent).toContain("ExtraName");
+    expect(snippet.textContent).not.toContain("Alpha");
+    expect(screen.getByTestId("answer-prose").textContent).toContain(
+      "Load the helpers",
+    );
+  });
+
   it("renders a pipe table as a table and keeps markup inert", () => {
     const { container } = renderSurface({
       answerOrigin: "company_documents",

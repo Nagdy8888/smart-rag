@@ -39,6 +39,103 @@ export function isCodeSnippet(text: string): boolean {
   return DEF_PATTERN.test(text) || CLASS_PATTERN.test(text) || TOOL_PATTERN.test(text);
 }
 
+/** A full line that starts a source listing, not a sentence that mentions code. */
+const SOURCE_LINE =
+  /^(?:from\s+\S+(?:\s+import\b.*)?|import\s+\S+|(?:async\s+)?def\s+\w+|class\s+\w+|@\w+\b)$/;
+
+export type SourceListingSplit = {
+  /** Sentences before the listing. Empty when the paragraph is only source. */
+  prose: string;
+  /** Listing body with original line breaks. */
+  code: string;
+  /** Language label when the listing looks like Python, else null. */
+  language: string | null;
+};
+
+/**
+ * Split a trailing import or definition listing off a prose paragraph.
+ *
+ * A listing needs at least two source lines. Wrapped import tails stay in
+ * the listing. A lone line number between those lines is left out. A
+ * sentence that only mentions an import stays prose.
+ *
+ * @param text - One verified paragraph.
+ * @returns Prose prefix and listing, or null when the paragraph is not a listing.
+ */
+export function splitTrailingSourceListing(text: string): SourceListingSplit | null {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  let start = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (SOURCE_LINE.test(lines[index]?.trim() ?? "")) {
+      start = index;
+      break;
+    }
+  }
+  if (start < 0) {
+    return null;
+  }
+  const tail = lines.slice(start);
+  let previous = "";
+  let sourceHits = 0;
+  for (const line of tail) {
+    if (!line.trim()) {
+      continue;
+    }
+    const trimmed = line.trim();
+    if (/^\d{1,4}$/.test(trimmed)) {
+      continue;
+    }
+    if (SOURCE_LINE.test(trimmed)) {
+      sourceHits += 1;
+      previous = line;
+      continue;
+    }
+    if (previous !== "" && isListingContinuation(line, previous)) {
+      previous = line;
+      continue;
+    }
+    return null;
+  }
+  if (sourceHits < 2) {
+    return null;
+  }
+  const code = tail
+    .filter((line) => !/^\d{1,4}$/.test(line.trim()))
+    .join("\n")
+    .trim();
+  return {
+    prose: lines.slice(0, start).join("\n").trim(),
+    code,
+    language: code
+      .split("\n")
+      .some((line) => SOURCE_LINE.test(line.trim()))
+      ? "python"
+      : null,
+  };
+}
+
+/**
+ * Return whether a line continues the previous source line.
+ *
+ * @param line - Current line, including leading spaces.
+ * @param previous - Previous non-empty source line.
+ * @returns True for an indent, a trailing comma, or an identifier tail.
+ */
+function isListingContinuation(line: string, previous: string): boolean {
+  const current = line.trim();
+  const prior = previous.trimEnd();
+  if (current === "" || prior === "") {
+    return false;
+  }
+  if (/^\s+\S/.test(line)) {
+    return true;
+  }
+  if (/[,\\(]$/.test(prior)) {
+    return true;
+  }
+  return /^[A-Za-z_][\w.]*(?:\s*,\s*[A-Za-z_][\w.]*)*,?$/.test(current);
+}
+
 /**
  * Return display code and an optional language label for a code paragraph.
  *

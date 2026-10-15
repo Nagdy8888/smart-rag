@@ -29,6 +29,7 @@ import {
 } from "../../lib/run-details";
 import { formatRelativeTime } from "../../lib/relative-time";
 import {
+  codeBodyRepeatsTable,
   isAnswerTable,
   parseAnswerTable,
   type AnswerTableModel,
@@ -37,6 +38,7 @@ import { renderAnswerProse } from "../../lib/answer-prose";
 import {
   formatCodeSnippetModel,
   isCodeSnippet,
+  splitTrailingSourceListing,
 } from "../../lib/code-snippet";
 import { AnswerFigure, splitFigureMark } from "./answer-figure";
 import { displayText } from "../../lib/safe-text";
@@ -287,9 +289,15 @@ export function visibleParagraphSlice(
  *
  * @param text - Visible paragraph text.
  * @param complete - True when the full paragraph is available.
+ * @param seenTables - Tables already rendered in this answer. A code box
+ *   that only repeats those rows is omitted. The array grows as tables render.
  * @returns Code, table, or prose React node.
  */
-function renderAnswerParagraphBody(text: string, complete: boolean): ReactNode {
+function renderAnswerParagraphBody(
+  text: string,
+  complete: boolean,
+  seenTables: AnswerTableModel[],
+): ReactNode {
   const decoded = displayText(text);
   const figure = splitFigureMark(decoded);
   if (complete && figure.figureId !== null) {
@@ -301,6 +309,9 @@ function renderAnswerParagraphBody(text: string, complete: boolean): ReactNode {
   }
   if (complete && isCodeSnippet(decoded)) {
     const snippet = formatCodeSnippetModel(decoded);
+    if (codeBodyRepeatsTable(snippet.code, seenTables)) {
+      return null;
+    }
     return (
       <AnswerCodeBlock code={snippet.code} language={snippet.language} />
     );
@@ -308,7 +319,26 @@ function renderAnswerParagraphBody(text: string, complete: boolean): ReactNode {
   if (complete && isAnswerTable(decoded)) {
     const table = parseAnswerTable(decoded);
     if (table !== null) {
+      seenTables.push(table);
       return <AnswerTableView table={table} />;
+    }
+  }
+  if (complete) {
+    const listing = splitTrailingSourceListing(decoded);
+    if (listing !== null) {
+      return (
+        <>
+          {listing.prose
+            ? renderAnswerProse(
+                listing.prose,
+                styles.answerProse,
+                styles.answerList,
+                styles.answerInlineCode,
+              )
+            : null}
+          <AnswerCodeBlock code={listing.code} language={listing.language} />
+        </>
+      );
     }
   }
   return renderAnswerProse(
@@ -425,6 +455,7 @@ function AnswerParagraphs({
   const showChips = shouldShowCitations(answerOrigin);
   const visibleCitations = showChips ? [...citations] : [];
   const leftover = unmappedCitations(visibleCitations, paragraphs.length);
+  const seenTables: AnswerTableModel[] = [];
 
   return (
     <div
@@ -447,7 +478,7 @@ function AnswerParagraphs({
             data-paragraph-index={String(index)}
             key={`p-${String(index)}`}
           >
-            {renderAnswerParagraphBody(slice.text, slice.complete)}
+            {renderAnswerParagraphBody(slice.text, slice.complete, seenTables)}
             <ParagraphCitations
               citations={mapped}
               hrefForCitation={hrefForCitation}

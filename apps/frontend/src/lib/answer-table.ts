@@ -895,3 +895,45 @@ function padRow(row: string[], width: number): string[] {
   }
   return [...row, ...Array.from({ length: width - row.length }, () => "")];
 }
+
+/**
+ * Return whether a code body is only repeating rows from tables already shown.
+ *
+ * @param code - Code block body.
+ * @param tables - Tables rendered earlier in the same answer.
+ * @returns True when most lines contain every cell of some earlier row.
+ */
+export function codeBodyRepeatsTable(
+  code: string,
+  tables: readonly AnswerTableModel[],
+): boolean {
+  const lines = code
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (lines.length < 2 || !tables || tables.length === 0) {
+    return false;
+  }
+  const rows = tables.flatMap((table) =>
+    table.preformatted
+      ? table.preformatted.split("\n").map((line) => [line.trim()])
+      : [table.headers, ...table.rows],
+  );
+  let hits = 0;
+  for (const line of lines) {
+    const matched = rows.some((row) => {
+      const cells = row.map((cell) => cell.replace(/\s+/g, " ").trim()).filter(Boolean);
+      if (cells.length === 0) {
+        return false;
+      }
+      if (cells.some((cell) => cell === line)) {
+        return true;
+      }
+      return cells.every((cell) => line.includes(cell));
+    });
+    if (matched) {
+      hits += 1;
+    }
+  }
+  return hits / lines.length >= 0.6;
+}
