@@ -3,7 +3,7 @@ title: ADR — PDF paragraph citations
 adr_id: ADR-pdf-paragraph-citations
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-09-15
+last-reviewed: 2026-10-15
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-09-15"
 audience: engineering, reviewers, security, frontend
@@ -13,11 +13,13 @@ audience: engineering, reviewers, security, frontend
 
 ## Status
 
-`accepted` on 2026-09-15. Implementation packets are P06-44 through
+`accepted` on 2026-09-15. Amended 2026-10-15: the chat page is the
+Acrobat logical label when the PDF has one, and the citation popup may
+show one PNG of that authorized file page. A signed Storage URL to the
+PDF is still not allowed. Implementation packets are P06-44 through
 P06-48 because P06-37 through P06-43 already authorize advanced web
 research. This ADR does not authorize signed Storage URLs, full-chunk
-disclosure, printed-page chat labels, or retrofitted mappings for
-legacy citation rows.
+disclosure, or retrofitted mappings for legacy citation rows.
 
 ## Context
 
@@ -48,10 +50,12 @@ flowchart LR
 
 User named/date approvals on 2026-09-15:
 
-1. **PDF viewer page.** Chat “page” is the 1-based file position
-   `page_index + 1`. Display `Book title · PDF page N`. Printed
-   `page_label` may remain in stored locators and must not drive the
-   chip.
+1. **PDF viewer page.** Amended 2026-10-15. Chat “page” is the Acrobat
+   page-box label (`page_label` from PDF `/PageLabels`) when present.
+   Display `Book title · p. {label}` (`179`, `vii`). When the file has
+   no label, display the 1-based file position `page_index + 1` as
+   `Book title · PDF page N`. Retrieval and evaluation still score the
+   file page, not the label.
 2. **Paragraph granularity.** Every factual company paragraph maps to
    one or more authorized canonical passages and a non-empty exact
    source span. Footer-only run sources are not paragraph support.
@@ -93,14 +97,20 @@ User named/date approvals on 2026-09-15:
 
 ## Alternatives considered
 
-- **Printed `page_label` as the chat page.** Rejected: it is not the
-  viewer coordinate the user uses to navigate the file.
+- **Printed `page_label` as the chat page.** Rejected on 2026-09-15,
+  then accepted on 2026-10-15. Acrobat’s page box shows that label
+  when “Use logical page numbers” is on, which is the number printed
+  in the book. The sequential file page remains the fallback and the
+  evaluation coordinate.
 - **Footer-only citations.** Rejected: they do not prove which
   paragraph a source supports.
 - **Cite every fusion passage when the model omits citations.**
   Rejected: retrieval is not proof of support.
 - **Return full chunks or signed Storage URLs.** Rejected: that
-  broadens disclosure beyond the cited span.
+  broadens disclosure beyond the cited span. Amended 2026-10-15: one
+  server-rendered PNG of the cited file page is allowed after the
+  same access check. The browser still does not receive the PDF or a
+  Storage URL.
 - **Retrofitted mappings for old null spans.** Rejected: those rows
   carry no proof.
 
@@ -121,9 +131,9 @@ through P06-48 next. Resume P06-42, P06-43, then P06-17 and P06-18.
 
 Rollout is additive: new prompt version, RPCs, and HTTP fields. Old
 clients may ignore new fields. Rollback stops using `answer_v2` and
-`list_run_citations_v4` in application code, leaves additive columns
-and historical rows in place, and must not present `page_label` as the
-PDF viewer page.
+`list_run_citations_v4` in application code and leaves additive columns
+and historical rows in place. Display rollback restores the sequential
+file page as the only chat page.
 
 ## Consequences
 

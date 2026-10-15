@@ -33,6 +33,19 @@
   box-shadow: var(--shadow-2);
 }
 
+.citationPopup {
+  position: fixed;
+  z-index: 40;
+  width: min(22rem, calc(100vw - 1.5rem));
+  max-height: min(24rem, calc(100vh - 1.5rem));
+  overflow: auto;
+  padding: calc(var(--space) * 3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
 .drawerHeader {
   display: flex;
   flex-wrap: wrap;

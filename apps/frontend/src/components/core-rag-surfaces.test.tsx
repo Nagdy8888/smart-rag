@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { XSS_ENTITY, XSS_FILENAME } from "../lib/hostile-text-fixtures";
 import { DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
+import { CITATION_PAGE_LOADING, CITATION_PASSAGE_LOADING } from "./chat/citation-drawer";
 import { CitationDrawer } from "./chat/chat-app";
 import { CitationSheet } from "./chat/citation-sheet";
 import { DocumentDetail } from "./documents/document-detail";
@@ -102,6 +103,7 @@ vi.mock("../lib/api", async () => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 beforeEach(() => {
@@ -181,7 +183,7 @@ describe("CitationDrawer", () => {
     expect(document.querySelector("script")).toBeNull();
   });
 
-  it("shows book title, PDF page, and supporting passage", () => {
+  it("shows book title, Acrobat page, and supporting passage", () => {
     const citation: CitationResponse = {
       citation_id: "cite-1",
       citation_index: 0,
@@ -200,16 +202,131 @@ describe("CitationDrawer", () => {
     render(<CitationDrawer citation={citation} onClose={() => undefined} />);
     expect(
       screen.getByRole("heading", {
-        name: "Building applications with AI agents — PDF page 129",
+        name: "Building applications with AI agents — p. 12",
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("Building applications with AI agents")).toBeInTheDocument();
-    expect(screen.getByText("129")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.queryByText("129")).not.toBeInTheDocument();
     expect(screen.getByText("Parallel Tool Execution")).toBeInTheDocument();
     expect(
       screen.getByText("Parallel tool execution reduces latency."),
     ).toBeInTheDocument();
     expect(screen.queryByText(SOURCE_PREVIEW_UNAVAILABLE)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dismiss drawer" })).toBeNull();
+    expect(screen.queryByRole("img")).toBeNull();
+  });
+
+  it("shows the PDF page image and keeps the passage", async () => {
+    const createObjectURL = vi.fn(() => "blob:page");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL,
+      revokeObjectURL,
+    });
+    render(
+      <CitationDrawer
+        citation={{
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: "chunk-1",
+          provenance: { page_label: "12" },
+          source_unavailable: false,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+          evidence_excerpt: "Refunds close in thirty calendar days.",
+        }}
+        pageSource={{
+          auth: { accessToken: "token" },
+          runId: "run-1",
+          citationId: "cite-1",
+        }}
+        loadPage={async () => new Blob([Uint8Array.from([137, 80, 78, 71])], { type: "image/png" })}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByText(CITATION_PAGE_LOADING)).toBeInTheDocument();
+    const image = await screen.findByRole("img", { name: "AI Agents — p. 12" });
+    expect(image).toHaveAttribute("src", "blob:page");
+    expect(screen.getByText("Refunds close in thirty calendar days.")).toBeInTheDocument();
+    expect(screen.queryByText(CITATION_PAGE_LOADING)).not.toBeInTheDocument();
+  });
+
+  it("keeps the passage when the page image fails", async () => {
+    render(
+      <CitationDrawer
+        citation={{
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: "chunk-1",
+          provenance: { page_label: "12" },
+          source_unavailable: false,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+          evidence_excerpt: "Refunds close in thirty calendar days.",
+        }}
+        pageSource={{
+          auth: { accessToken: "token" },
+          runId: "run-1",
+          citationId: "cite-1",
+        }}
+        loadPage={() => Promise.reject(new Error("missing"))}
+        onClose={() => undefined}
+      />,
+    );
+    expect(await screen.findByText("Refunds close in thirty calendar days.")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText(CITATION_PAGE_LOADING)).not.toBeInTheDocument();
+  });
+
+  it("shows a loading line while the passage is in flight", () => {
+    render(
+      <CitationDrawer
+        citation={{
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: "chunk-1",
+          provenance: { page_label: "12" },
+          source_unavailable: false,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+          evidence_excerpt: "must stay hidden until detail returns",
+        }}
+        passagePending
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(CITATION_PASSAGE_LOADING)).toBeInTheDocument();
+    expect(screen.queryByText("must stay hidden until detail returns")).not.toBeInTheDocument();
+    expect(screen.queryByText(SOURCE_PREVIEW_UNAVAILABLE)).not.toBeInTheDocument();
+  });
+
+  it("keeps unavailable copy when the cited source is gone", () => {
+    render(
+      <CitationDrawer
+        citation={{
+          citation_id: "cite-gone",
+          citation_index: 2,
+          chunk_id: null,
+          provenance: {},
+          source_unavailable: true,
+          document_title: "SECRET TITLE",
+          evidence_excerpt: "SECRET SPAN",
+        }}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByText("Citation 2")).toBeInTheDocument();
+    expect(screen.queryByText("SECRET TITLE")).not.toBeInTheDocument();
+    expect(screen.queryByText("SECRET SPAN")).not.toBeInTheDocument();
+    expect(screen.getByText(SOURCE_PREVIEW_UNAVAILABLE)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "A cited source was deleted after the run. History is not rewritten; the citation is marked unavailable.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders hostile excerpt as text and keeps tab focus in the drawer", async () => {

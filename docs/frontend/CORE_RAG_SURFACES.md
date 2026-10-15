@@ -81,7 +81,7 @@ flowchart TD
 | --- | --- |
 | GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
-| GAP-07-09 | Source drawer: company PDFs show typed book title, toolbar PDF page, optional section, and supporting passage. Printed `page_label` is not the chip/drawer page. Web chips may be http(s) href after `isSafeHttpUrl`; company citations stay non-href. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
+| GAP-07-09 | Source drawer: company PDFs show typed book title, the Acrobat logical page (`page_label`) when present, otherwise the sequential file page, optional section, and supporting passage. Web chips may be http(s) href after `isSafeHttpUrl`; company citations stay non-href. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
 | GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |

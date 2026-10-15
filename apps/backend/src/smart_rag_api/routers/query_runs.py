@@ -5,7 +5,16 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
@@ -25,6 +34,10 @@ from smart_rag_api.schemas.fastapi_security import (
     RunResponse,
 )
 from smart_rag_api.services.auth_rate_limits import RateLimitKind
+from smart_rag_api.services.citation_page_http import (
+    CitationPageReadError,
+    CitationPageService,
+)
 from smart_rag_api.services.feedback_usage import FeedbackUsageService
 from smart_rag_api.services.http_errors import raise_admission_http
 from smart_rag_api.services.query_runs import QueryRunService
@@ -55,6 +68,21 @@ def get_query_run_service(
         postgres_url,
         valkey_client=get_valkey_limits_client(request),
     )
+
+
+def get_citation_page_service(
+    postgres_url: Annotated[str, Depends(get_postgres_url)],
+) -> CitationPageService:
+    """Factory for one-page citation PNG reads.
+
+    Args:
+        postgres_url: Injected DSN.
+
+    Returns:
+        Citation page service.
+    """
+
+    return CitationPageService(postgres_url)
 
 
 def get_feedback_service(
@@ -309,6 +337,46 @@ def get_citation_detail_route(
         evidence_excerpt=item.evidence_excerpt,
         source_url=detail.source_url,
     )
+
+
+@router.get("/{run_id}/citations/{citation_id}/page")
+def get_citation_page_route(
+    request: Request,
+    run_id: UUID,
+    citation_id: UUID,
+    caller: CallerContextDep,
+    service: Annotated[CitationPageService, Depends(get_citation_page_service)],
+) -> Response:
+    """Return a PNG of one authorized PDF page. No Storage URL.
+
+    Args:
+        request: Active request.
+        run_id: Run id.
+        citation_id: Citation id on that run.
+        caller: Authenticated caller.
+        service: Injected page renderer.
+
+    Returns:
+        PNG bytes for that file page only.
+
+    Raises:
+        HTTPException: 404 when the citation is foreign, unavailable, or
+            the page cannot be rendered.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"run-read:{caller.user_id}",
+        kind=RateLimitKind.LOW_RISK_READ,
+        max_attempts=120,
+    )
+    try:
+        png = service.read_png(caller, run_id=run_id, citation_id=citation_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    except CitationPageReadError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    return Response(content=png, media_type="image/png")
 
 
 @router.post(

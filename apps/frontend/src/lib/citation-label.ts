@@ -1,8 +1,8 @@
 /**
  * Human citation locators. Page/title/section only; never passage text.
  *
- * Company PDF chips use typed `document_title` and `pdf_page_number`. They
- * never call `citationDisplayPage()` or printed `page_label`.
+ * Company PDF chips use typed `document_title` and the Acrobat logical page
+ * (`page_label`) when the PDF has one. They fall back to `pdf_page_number`.
  */
 
 import { displayText } from "./safe-text";
@@ -57,10 +57,8 @@ export function citationPageLabel(value: unknown): string {
 /**
  * Return the page string users should open in the original file.
  *
- * Prefers the PDF `/PageLabels` value (printed roman or arabic) over the
+ * Prefers the PDF `/PageLabels` value (Acrobat’s page box) over the
  * 1-based file index. File index is a fallback when the PDF has no labels.
- *
- * Company PDF chips must not call this helper.
  *
  * @param provenance - Citation provenance mapping.
  * @returns Printed or file page text, or empty.
@@ -145,17 +143,41 @@ export function isCompanyPdfCitation(citation: CitationResponse): boolean {
 }
 
 /**
- * Return the typed PDF toolbar page, or `unavailable`.
+ * Return the page Acrobat’s page box would show, or `unavailable`.
+ *
+ * Prefers provenance `page_label` (PDF `/PageLabels`). Falls back to the
+ * 1-based file page `pdf_page_number` when the file has no label.
  *
  * @param citation - Authorized citation row.
- * @returns Decimal page text. Never printed `page_label`.
+ * @returns Logical label, file page text, or `unavailable`.
  */
 export function pdfPageDisplay(citation: CitationResponse): string {
+  const printed = citationPageLabel(citation.provenance.page_label);
+  if (printed) {
+    return printed;
+  }
   const page = citation.pdf_page_number;
   if (typeof page === "number" && Number.isInteger(page) && page >= 1) {
     return String(page);
   }
   return "unavailable";
+}
+
+/**
+ * Return the chip and drawer phrase for a company PDF page.
+ *
+ * A stored label is `p. 179` or `p. vii`. A file-page fallback is
+ * `PDF page N`, including `PDF page unavailable`.
+ *
+ * @param citation - Authorized citation row.
+ * @returns Visible page phrase.
+ */
+function companyPdfPagePhrase(citation: CitationResponse): string {
+  const printed = citationPageLabel(citation.provenance.page_label);
+  if (printed) {
+    return `p. ${printed}`;
+  }
+  return `PDF page ${pdfPageDisplay(citation)}`;
 }
 
 /**
@@ -204,7 +226,10 @@ export function unmappedCitations(
 }
 
 /**
- * Return the drawer heading. Company PDFs never use printed `page_label`.
+ * Return the drawer heading.
+ *
+ * Company PDFs use the Acrobat logical label when present, otherwise the
+ * sequential file page.
  *
  * @param citation - Authorized citation row.
  * @returns Visible dialog title.
@@ -214,7 +239,7 @@ export function citationDrawerTitle(citation: CitationResponse): string {
     return `Citation ${String(citation.citation_index)}`;
   }
   if (isCompanyPdfCitation(citation)) {
-    return `${companyPdfBookTitle(citation)} — PDF page ${pdfPageDisplay(citation)}`;
+    return `${companyPdfBookTitle(citation)} — ${companyPdfPagePhrase(citation)}`;
   }
   const page = citationDisplayPage(citation.provenance);
   return page === ""
@@ -225,8 +250,8 @@ export function citationDrawerTitle(citation: CitationResponse): string {
 /**
  * Return a chip label from typed PDF fields or locator provenance.
  *
- * Company PDF chips are `<title> · PDF page N` and never call
- * `citationDisplayPage()`. Sheets and web keep the previous locators.
+ * Company PDF chips are `<title> · p. {label}` when `page_label` is set,
+ * otherwise `<title> · PDF page N`. Sheets and web keep the previous locators.
  * Unavailable sources stay labeled as such.
  *
  * @param citation - Authorized citation row.
@@ -249,7 +274,7 @@ export function citationSourceLabel(citation: CitationResponse): string {
     return "Web source";
   }
   if (isCompanyPdfCitation(citation)) {
-    return `${companyPdfBookTitle(citation)} · PDF page ${pdfPageDisplay(citation)}`;
+    return `${companyPdfBookTitle(citation)} · ${companyPdfPagePhrase(citation)}`;
   }
   const provenance = citation.provenance;
   const title = locatorString(provenance.document_title);
@@ -280,8 +305,9 @@ export function citationSourceLabel(citation: CitationResponse): string {
 /**
  * Return labeled locator rows for the sources drawer.
  *
- * Company PDFs use typed Book/source and PDF page. Printed `page_label` is
- * omitted for those rows. Unavailable citations omit stale locators.
+ * Company PDFs use typed Book/source and the Acrobat page label when
+ * present. The sequential file page is the fallback. Unavailable citations
+ * omit stale locators.
  *
  * @param citation - Authorized citation row.
  * @returns Locator rows then technical ids. Omits empty values.
@@ -294,17 +320,20 @@ export function citationLocatorFields(
     return { locators: [], technical };
   }
   if (isCompanyPdfCitation(citation)) {
+    const printed = citationPageLabel(citation.provenance.page_label);
     const locators: CitationLocatorField[] = [
       {
         key: "document_title",
         label: "Book/source",
         value: companyPdfBookTitle(citation),
       },
-      {
-        key: "pdf_page_number",
-        label: "PDF page",
-        value: pdfPageDisplay(citation),
-      },
+      printed
+        ? { key: "page_label", label: "Page", value: printed }
+        : {
+            key: "pdf_page_number",
+            label: "PDF page",
+            value: pdfPageDisplay(citation),
+          },
     ];
     const section = citationSectionParts(citation.provenance.section_path).join(
       " / ",

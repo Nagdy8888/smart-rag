@@ -42,9 +42,9 @@ Graph-disabled ingest of that hash with `parser_v1_pdf_headings_v2` produced
 embedding input cap. The 90% gate
 is a Packet 5 stop, not a reason to relax merge rules. `document_chunks.page_number` is the 1-based PDF file
 page (`page_index + 1`). Printed `/PageLabels` values (roman or arabic) are
-copied onto provenance locators as `page_label`. Chat company-PDF chips use
-the typed toolbar page (`pdf_page_number` = `page_index + 1`) and must not
-treat `page_label` as the displayed page.
+copied onto provenance locators as `page_label`. Chat company-PDF chips
+show that label when it is present, and the typed file page
+(`pdf_page_number` = `page_index + 1`) when it is not.
 
 PDF line joins (`parser_v1_pdf_reflow_v4`, `join_pdf_lines` in
 `ingestion/parser/helpers.py`): lines of one PyMuPDF block join with a

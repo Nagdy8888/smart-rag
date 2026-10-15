@@ -145,9 +145,9 @@ survived. Fusion passages are never backfilled as citations. Acronym
 expansions and fact literals are fail-closed even when a mock verifier
 marks a cited ID supported.
 
-Company PDF chat chips use the typed toolbar page (`pdf_page_number` =
-locator `page_index + 1`) and canonical `document_title`. Printed
-`page_label` stays on locators and is not the displayed page. Persistence
+Company PDF chat chips use the Acrobat logical label (`page_label`) when
+present, otherwise the typed file page (`pdf_page_number` =
+locator `page_index + 1`), plus canonical `document_title`. Persistence
 resolves one leaf chunk that contains the exact span. Two matching
 children, multi-page locators, or a missing span fail closed. HTTP
 `evidence_excerpt` is disclosed only after live ACL and current-version

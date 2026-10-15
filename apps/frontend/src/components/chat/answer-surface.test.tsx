@@ -94,7 +94,7 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.getByTestId("answer-citations")).toBeInTheDocument();
   });
 
-  it("labels company citations with typed title and PDF page", () => {
+  it("labels company citations with the Acrobat page", () => {
     renderSurface({
       answerOrigin: "company_documents",
       citations: [
@@ -111,10 +111,10 @@ describe("AnswerSurface origin chrome", () => {
       ],
     });
     expect(
-      screen.getByRole("button", { name: "Citation 0, AI agents · PDF page 129" }),
+      screen.getByRole("button", { name: "Citation 0, AI agents · p. 12" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("cite-1")).not.toBeInTheDocument();
-    expect(screen.queryByText("p. 12")).not.toBeInTheDocument();
+    expect(screen.queryByText("PDF page 129")).not.toBeInTheDocument();
   });
 
   it("shows clarification and no citation chips for an ambiguous origin", () => {

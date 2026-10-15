@@ -225,7 +225,7 @@ flowchart LR
 - Width 560px desktop, full width mobile.
 - Header “Sources.”
 - Group citations by safe source identity only when actual provenance supports it.
-- Citation card shows index, typed book/source title, PDF toolbar page, optional section, sheet/range/URL locators actually present, supporting passage when authorized, and “Source unavailable” status when true. Printed `page_label` is not the company PDF page.
+- Citation card shows index, typed book/source title, the Acrobat logical page (`p. {label}`) when the PDF has one, otherwise the sequential file page, optional section, sheet/range/URL locators actually present, supporting passage when authorized, and “Source unavailable” status when true.
 - No fake excerpt, preview, download, relevance score, or open-source button.
 
 #### `RunDetailsDrawer`

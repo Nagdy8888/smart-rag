@@ -346,6 +346,15 @@
   line-height: var(--text-label-height);
 }
 
+.citationPageImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: calc(var(--space) * 2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
 .supportingPassageLabel {
   margin: calc(var(--space) * 4) 0 0;
   color: var(--color-text-muted);

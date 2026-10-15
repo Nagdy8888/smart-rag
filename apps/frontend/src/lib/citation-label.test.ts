@@ -11,8 +11,7 @@ import {
 } from "./citation-label";
 import {
   AI_AGENTS_CHIP_LABEL,
-  AI_AGENTS_FORBIDDEN_PAGE_12,
-  AI_AGENTS_FORBIDDEN_PRINTED,
+  AI_AGENTS_FORBIDDEN_FILE_PAGE,
 } from "./pdf-paragraph-citation-fixture";
 import type { CitationResponse } from "./types";
 
@@ -44,7 +43,7 @@ describe("citationSourceLabel", () => {
           },
         }),
       ),
-    ).toBe("Building applications with AI agents · PDF page 129");
+    ).toBe("Building applications with AI agents · p. 12");
     expect(
       citationChipName(
         citation({
@@ -55,7 +54,7 @@ describe("citationSourceLabel", () => {
     ).toBe("Citation 1, Source · PDF page 3");
   });
 
-  it("does not use printed page_label for a company PDF chip", () => {
+  it("uses the Acrobat page label for a company PDF chip", () => {
     const label = citationSourceLabel(
       citation({
         document_title: "AI Agents",
@@ -68,11 +67,19 @@ describe("citationSourceLabel", () => {
       }),
     );
     expect(label).toBe(AI_AGENTS_CHIP_LABEL);
-    expect(label).not.toContain(AI_AGENTS_FORBIDDEN_PRINTED);
-    expect(label).not.toContain(AI_AGENTS_FORBIDDEN_PAGE_12);
+    expect(label).not.toContain(AI_AGENTS_FORBIDDEN_FILE_PAGE);
     expect(citationDisplayPage({ page_number: 201, page_label: "179" })).toBe(
       "179",
     );
+    expect(
+      citationSourceLabel(
+        citation({
+          document_title: "Handbook",
+          pdf_page_number: 201,
+          provenance: { page_label: "vii" },
+        }),
+      ),
+    ).toBe("Handbook · p. vii");
   });
 
   it("uses Source and unavailable when typed PDF fields are missing", () => {
@@ -114,7 +121,7 @@ describe("citationSourceLabel", () => {
 });
 
 describe("citationLocatorFields", () => {
-  it("lists book title and typed PDF page for company PDFs", () => {
+  it("lists book title and Acrobat page label for company PDFs", () => {
     const fields = citationLocatorFields(
       citation({
         document_title: "Policy",
@@ -129,7 +136,7 @@ describe("citationLocatorFields", () => {
     );
     expect(fields.locators).toEqual([
       { key: "document_title", label: "Book/source", value: "Policy" },
-      { key: "pdf_page_number", label: "PDF page", value: "12" },
+      { key: "page_label", label: "Page", value: "xii" },
       { key: "section_path", label: "Section", value: "Refunds" },
     ]);
     expect(fields.technical.map((item) => item.key)).toEqual([
@@ -138,8 +145,8 @@ describe("citationLocatorFields", () => {
     ]);
   });
 
-  it("omits printed page_label from company PDF locators", () => {
-    const fields = citationLocatorFields(
+  it("shows the Acrobat label and falls back to the file page", () => {
+    const labeled = citationLocatorFields(
       citation({
         document_title: "AI agents",
         pdf_page_number: 201,
@@ -150,13 +157,21 @@ describe("citationLocatorFields", () => {
         },
       }),
     );
-    expect(fields.locators).toEqual([
+    expect(labeled.locators).toEqual([
       { key: "document_title", label: "Book/source", value: "AI agents" },
-      { key: "pdf_page_number", label: "PDF page", value: "201" },
+      { key: "page_label", label: "Page", value: "179" },
     ]);
-    expect(fields.locators.some((item) => item.key === "page_label")).toBe(
-      false,
+    const unlabeled = citationLocatorFields(
+      citation({
+        document_title: "Notes",
+        pdf_page_number: 8,
+        provenance: { document_title: "Notes" },
+      }),
     );
+    expect(unlabeled.locators).toEqual([
+      { key: "document_title", label: "Book/source", value: "Notes" },
+      { key: "pdf_page_number", label: "PDF page", value: "8" },
+    ]);
   });
 
   it("omits stale locators when the source is unavailable", () => {
@@ -181,7 +196,7 @@ describe("citationDrawerTitle", () => {
           provenance: { page_label: "12" },
         }),
       ),
-    ).toBe("AI Agents — PDF page 25");
+    ).toBe("AI Agents — p. 12");
   });
 });
 

@@ -234,6 +234,41 @@ export async function fetchCitationDetail(
 }
 
 /**
+ * Fetch one authorized PDF page image. The response is PNG bytes, never a URL.
+ *
+ * @param auth - Access token.
+ * @param runId - Owning run UUID.
+ * @param citationId - Citation UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns PNG blob for that file page.
+ * @throws ClassifiedApiError when the page is missing or not an image.
+ */
+export async function fetchCitationPagePng(
+  auth: ApiAuth,
+  runId: string,
+  citationId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Blob> {
+  const response = await fetchImpl(
+    apiUrl(`/runs/${runId}/citations/${citationId}/page`),
+    { headers: resumeHeaders(auth) },
+  );
+  if (!response.ok) {
+    const body = await readJsonObject(response);
+    throw new ClassifiedApiError(
+      classifiedOrGenericFailure(response.status, body, response.headers),
+    );
+  }
+  const mediaType = response.headers.get("content-type") ?? "";
+  if (!mediaType.startsWith("image/png")) {
+    throw new ClassifiedApiError(
+      classifiedOrGenericFailure(response.status, {}, response.headers),
+    );
+  }
+  return response.blob();
+}
+
+/**
  * Submit thumbs feedback with a required unmerged tag.
  *
  * @param auth - Access token.

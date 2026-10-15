@@ -9,6 +9,7 @@ import { isClassifiedApiError, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
 import { hrefForCitationRecord } from "../../lib/citation-drawer";
+import { isCompanyPdfCitation } from "../../lib/citation-label";
 import { overlaySettledTurns } from "../../lib/chat-history";
 import { showSaveToQuizConvenience } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
@@ -166,6 +167,36 @@ export function ChatApp() {
     setSelectedCitationId: selection.setSelectedCitationId,
     setSourcesOpen: selection.setSourcesOpen,
   });
+  const pageRunId =
+    selection.viewingRunId ??
+    (run.chat.terminal !== null ? run.chat.runId : null);
+  const selectedForPage = restore.selectedCitation;
+  const pageSource = useMemo(() => {
+    if (
+      liveQueries.citationDetailPending ||
+      liveQueries.auth === null ||
+      pageRunId === null ||
+      selectedForPage === null ||
+      selectedForPage.source_unavailable ||
+      !isCompanyPdfCitation(selectedForPage)
+    ) {
+      return null;
+    }
+    const page = selectedForPage.pdf_page_number;
+    if (typeof page !== "number" || !Number.isInteger(page) || page < 1) {
+      return null;
+    }
+    return {
+      auth: liveQueries.auth,
+      runId: pageRunId,
+      citationId: selectedForPage.citation_id,
+    };
+  }, [
+    liveQueries.auth,
+    liveQueries.citationDetailPending,
+    pageRunId,
+    selectedForPage,
+  ]);
   const paradeDbDown =
     liveQueries.ready?.dependencies.some(
       (item) => item.name === "paradedb" && item.status === "down",
@@ -296,6 +327,8 @@ export function ChatApp() {
       />
       <CitationDrawer
         citation={restore.selectedCitation}
+        passagePending={liveQueries.citationDetailPending}
+        pageSource={pageSource}
         onClose={() => selection.setSelectedCitationId(null)}
         returnFocusRef={restore.citationTriggerRef}
       />

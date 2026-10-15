@@ -55,6 +55,8 @@ export type UseChatQueriesResult = {
   citations: readonly CitationResponse[];
   viewingCitations: readonly CitationResponse[];
   citationDetail: CitationResponse | null;
+  /** True while the selected citation's detail request has not resolved. */
+  citationDetailPending: boolean;
   usage: UsageResponse | null;
   meta: Awaited<ReturnType<typeof fetchMeta>> | undefined;
   metaPending: boolean;
@@ -137,6 +139,14 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     enabled:
       auth !== null && detailRunId !== null && selectedCitationId !== null,
   });
+  const detailMatches =
+    citationDetailQuery.data?.citation_id === selectedCitationId;
+  const citationDetailPending =
+    auth !== null &&
+    detailRunId !== null &&
+    selectedCitationId !== null &&
+    !detailMatches &&
+    (citationDetailQuery.isPending || citationDetailQuery.isFetching);
 
   return {
     keys,
@@ -153,6 +163,7 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     citations: citationsQuery.data ?? [],
     viewingCitations: viewingCitationsQuery.data ?? [],
     citationDetail: citationDetailQuery.data ?? null,
+    citationDetailPending,
     usage: usageQuery.data ?? null,
     meta: metaQuery.data,
     metaPending: metaQuery.isPending,

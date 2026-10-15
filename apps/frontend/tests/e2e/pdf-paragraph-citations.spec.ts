@@ -1,13 +1,12 @@
 /**
- * Historical Ask citation journey: toolbar page 25, never printed label 12.
+ * Historical Ask citation journey: Acrobat label 12, not file page 25.
  */
 
 import { expect, test, type Page } from "@playwright/test";
 import {
   AI_AGENTS_CHIP_LABEL,
   AI_AGENTS_DRAWER_TITLE,
-  AI_AGENTS_FORBIDDEN_PAGE_12,
-  AI_AGENTS_FORBIDDEN_PRINTED,
+  AI_AGENTS_FORBIDDEN_FILE_PAGE,
   AI_AGENTS_UNIQUE_SPAN,
 } from "../../src/lib/pdf-paragraph-citation-fixture";
 import { signInLiveMember } from "./live-auth";
@@ -15,7 +14,7 @@ import { signInLiveMember } from "./live-auth";
 const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 /**
- * Stub conversation history with a mapped PDF citation on toolbar page 25.
+ * Stub conversation history with a mapped PDF citation labeled page 12.
  *
  * @param page - Playwright page after live sign-in.
  */
@@ -84,7 +83,7 @@ async function stubCitedConversation(page: Page): Promise<void> {
   });
 }
 
-test("historical company PDF chip uses toolbar page 25 not printed 12", async ({
+test("historical company PDF chip uses Acrobat label 12 not file page 25", async ({
   page,
   request,
 }) => {
@@ -98,13 +97,11 @@ test("historical company PDF chip uses toolbar page 25 not printed 12", async ({
   await page.getByRole("button", { name: "AI Agents refunds" }).click();
   const chip = page.getByRole("button", { name: `Citation 0, ${AI_AGENTS_CHIP_LABEL}` });
   await expect(chip).toBeVisible();
-  await expect(page.getByText(AI_AGENTS_FORBIDDEN_PRINTED)).toHaveCount(0);
-  await expect(page.getByText(AI_AGENTS_FORBIDDEN_PAGE_12)).toHaveCount(0);
+  await expect(page.getByText(AI_AGENTS_FORBIDDEN_FILE_PAGE)).toHaveCount(0);
   await chip.click();
   const drawer = page.getByRole("dialog");
   await expect(drawer.getByRole("heading", { name: AI_AGENTS_DRAWER_TITLE })).toBeVisible();
   await expect(drawer.getByText("Supporting passage")).toBeVisible();
   await expect(drawer.getByText(AI_AGENTS_UNIQUE_SPAN)).toBeVisible();
-  await expect(drawer.getByText(AI_AGENTS_FORBIDDEN_PRINTED)).toHaveCount(0);
-  await expect(drawer.getByText(AI_AGENTS_FORBIDDEN_PAGE_12)).toHaveCount(0);
+  await expect(drawer.getByText(AI_AGENTS_FORBIDDEN_FILE_PAGE)).toHaveCount(0);
 });
