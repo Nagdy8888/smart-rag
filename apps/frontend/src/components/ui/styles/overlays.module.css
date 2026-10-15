@@ -208,6 +208,10 @@
   border-inline-start: 1px solid var(--color-border);
 }
 
+.citationSheet {
+  width: min(42rem, 100%);
+}
+
 .sheetHeader {
   display: flex;
   align-items: center;

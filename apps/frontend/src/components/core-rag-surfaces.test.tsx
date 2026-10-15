@@ -8,7 +8,11 @@ import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { XSS_ENTITY, XSS_FILENAME } from "../lib/hostile-text-fixtures";
 import { DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
-import { CITATION_PAGE_LOADING, CITATION_PASSAGE_LOADING } from "./chat/citation-drawer";
+import {
+  CITATION_PAGE_FAILED,
+  CITATION_PAGE_LOADING,
+  CITATION_PASSAGE_LOADING,
+} from "./chat/citation-drawer";
 import { CitationDrawer } from "./chat/chat-app";
 import { CitationSheet } from "./chat/citation-sheet";
 import { DocumentDetail } from "./documents/document-detail";
@@ -248,9 +252,84 @@ describe("CitationDrawer", () => {
     );
     expect(screen.getByText(CITATION_PAGE_LOADING)).toBeInTheDocument();
     const image = await screen.findByRole("img", { name: "AI Agents — p. 12" });
+    const passage = screen.getByText("Refunds close in thirty calendar days.");
     expect(image).toHaveAttribute("src", "blob:page");
-    expect(screen.getByText("Refunds close in thirty calendar days.")).toBeInTheDocument();
+    expect(image.compareDocumentPosition(passage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText(CITATION_PAGE_LOADING)).not.toBeInTheDocument();
+  });
+
+  it("requests the cited page with the run id, citation id, and bearer token", async () => {
+    const png = Uint8Array.from([137, 80, 78, 71]);
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(png, {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:page"),
+      revokeObjectURL: vi.fn(),
+    });
+    const { rerender } = render(
+      <CitationDrawer
+        citation={{
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: "chunk-1",
+          provenance: { page_label: "12" },
+          source_unavailable: false,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+          evidence_excerpt: "Refunds close in thirty calendar days.",
+        }}
+        pageSource={{
+          auth: { accessToken: "token" },
+          runId: "run-1",
+          citationId: "cite-1",
+        }}
+        onClose={() => undefined}
+      />,
+    );
+    const image = await screen.findByRole("img", { name: "AI Agents — p. 12" });
+    const passage = screen.getByText("Refunds close in thirty calendar days.");
+    const [url, init] = fetchMock.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(String(url)).toBe(
+      "http://127.0.0.1:8000/runs/run-1/citations/cite-1/page",
+    );
+    expect(init.headers).toMatchObject({ Authorization: "Bearer token" });
+    expect(image).toHaveAttribute("src", "blob:page");
+    expect(
+      image.compareDocumentPosition(passage) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByText(CITATION_PAGE_FAILED)).not.toBeInTheDocument();
+    rerender(
+      <CitationDrawer
+        citation={{
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: "chunk-1",
+          provenance: { page_label: "12" },
+          source_unavailable: false,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+          evidence_excerpt: "Refunds close in thirty calendar days.",
+        }}
+        pageSource={{
+          auth: { accessToken: "token" },
+          runId: "run-1",
+          citationId: "cite-1",
+        }}
+        onClose={() => undefined}
+      />,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("img", { name: "AI Agents — p. 12" })).toHaveAttribute(
+      "src",
+      "blob:page",
+    );
   });
 
   it("keeps the passage when the page image fails", async () => {
@@ -276,6 +355,7 @@ describe("CitationDrawer", () => {
       />,
     );
     expect(await screen.findByText("Refunds close in thirty calendar days.")).toBeInTheDocument();
+    expect(screen.getByText(CITATION_PAGE_FAILED)).toBeInTheDocument();
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.queryByText(CITATION_PAGE_LOADING)).not.toBeInTheDocument();
   });

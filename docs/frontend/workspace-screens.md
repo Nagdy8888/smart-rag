@@ -218,7 +218,7 @@ flowchart LR
 
 - 28px high evidence-muted pill, evidence text, evidence border, 12px/16px weight 600.
 - Label format: `[1] Source` when a safe source label exists; otherwise `[1] Evidence`.
-- Opens real Sources drawer for company citations. Web chips with a safe http(s) URL are anchors (`rel="noreferrer"`). Company Storage URLs stay non-href.
+- Opens a right-side sheet for company citations (`min(42rem, 100%)`). The header is the book title and Acrobat page. The page image is first; the quoted passage sits under it. If the page image request fails, the sheet says the page could not be loaded and still shows the passage. Web chips with a safe http(s) URL are anchors (`rel="noreferrer"`). Company Storage URLs stay non-href.
 
 #### `SourcesDrawer`
 

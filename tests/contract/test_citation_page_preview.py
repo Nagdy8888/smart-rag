@@ -17,7 +17,7 @@ _MIGRATION = (
     Path(__file__).resolve().parents[2]
     / "supabase"
     / "migrations"
-    / "20261015153000_citation_page_object_v1.sql"
+    / "20261015163000_citation_page_object_v2.sql"
 )
 _OWNED = UUID("22222222-2222-4222-8222-222222222222")
 _FOREIGN = UUID("33333333-3333-4333-8333-333333333333")
@@ -35,6 +35,8 @@ def test_citation_page_migration_has_no_signed_url() -> None:
     assert "app_api" in sql
     assert "signed_url" not in sql.lower()
     assert "create_signed" not in sql.lower()
+    assert "application/pdf" not in sql
+    assert "%.pdf" not in sql
 
 
 def test_citation_page_route_returns_png_only_for_an_owned_page(

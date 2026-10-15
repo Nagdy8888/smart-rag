@@ -14,8 +14,8 @@ audience: engineering, reviewers, security, frontend
 ## Status
 
 `accepted` on 2026-09-15. Amended 2026-10-15: the chat page is the
-Acrobat logical label when the PDF has one, and the citation popup may
-show one PNG of that authorized file page. A signed Storage URL to the
+Acrobat logical label when the PDF has one, and the citation side
+sheet may show one PNG of that authorized file page. A signed Storage URL to the
 PDF is still not allowed. Implementation packets are P06-44 through
 P06-48 because P06-37 through P06-43 already authorize advanced web
 research. This ADR does not authorize signed Storage URLs, full-chunk

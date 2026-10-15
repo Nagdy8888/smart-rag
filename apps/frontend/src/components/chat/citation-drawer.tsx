@@ -1,13 +1,13 @@
 /**
- * Citation passage popup. Presentation only; no fetch.
+ * Citation side sheet. Presentation only; the page image is fetched here.
  *
- * Anchored to the chip that opened it. Shows the book, Acrobat page, and
- * the authorized supporting span. No PDF page image and no Storage URL.
+ * The book page is the first thing in the panel. The quoted passage sits
+ * under it. No Storage URL.
  */
 
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { fetchCitationPagePng, type ApiAuth } from "../../lib/api";
 import { SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
 import {
@@ -17,10 +17,9 @@ import {
 } from "../../lib/citation-label";
 import { limitationCopy } from "../../lib/limitations";
 import type { CitationResponse } from "../../lib/types";
-import { Button } from "../ui/button";
-import { trapFocus } from "../ui/focus-trap";
 import overlayStyles from "../ui/styles/overlays.module.css";
 import { LimitationCallout } from "../ui/limitation-callout";
+import { Sheet } from "../ui/sheet";
 import { UserText } from "../ui/user-text";
 import chatStyles from "./chat-transcript.module.css";
 
@@ -29,6 +28,9 @@ export const CITATION_PASSAGE_LOADING = "Loading passage…";
 
 /** Copy while the single-page PNG is downloading. */
 export const CITATION_PAGE_LOADING = "Loading page…";
+
+/** Copy when the page image request fails. The passage still shows. */
+export const CITATION_PAGE_FAILED = "The book page could not be loaded.";
 
 export type CitationPageSource = {
   auth: ApiAuth;
@@ -49,72 +51,50 @@ export type CitationDrawerProps = {
 };
 
 /**
- * Place the popup under the chip, flipping above when the viewport is short.
+ * Render the citation as a right-side sheet.
  *
- * @param panel - Popup element.
- * @param trigger - Chip that opened it, or null.
- */
-function placeCitationPopup(
-  panel: HTMLElement,
-  trigger: HTMLElement | null,
-): void {
-  const width = panel.offsetWidth;
-  const height = panel.offsetHeight;
-  if (trigger === null) {
-    panel.style.top = "16px";
-    panel.style.left = "16px";
-    return;
-  }
-  const rect = trigger.getBoundingClientRect();
-  let top = rect.bottom + 8;
-  let left = rect.left;
-  if (top + height > window.innerHeight - 8) {
-    top = Math.max(8, rect.top - height - 8);
-  }
-  if (left + width > window.innerWidth - 8) {
-    left = Math.max(8, window.innerWidth - width - 8);
-  }
-  panel.style.top = `${String(top)}px`;
-  panel.style.left = `${String(left)}px`;
-}
-
-/**
- * Render the citation popup next to the opening chip.
+ * Escape, the backdrop, and focus return are handled by the sheet.
+ * No privileged href and no Storage download.
  *
- * Escape and a click outside the popup close it. Focus returns to the chip.
- * No privileged href, no snippet HTML, and no Storage download.
- *
- * @param props - Selected citation, pending flag, and close handler.
- * @returns Popup dialog, or null when closed.
+ * @param props - Selected citation, page request, and close handler.
+ * @returns Side sheet, or null when closed.
  */
 export function CitationDrawer({
   citation,
   passagePending = false,
   pageSource = null,
-  loadPage = fetchCitationPagePng,
+  loadPage = (source) =>
+    fetchCitationPagePng(source.auth, source.runId, source.citationId),
   onClose,
   returnFocusRef,
 }: CitationDrawerProps) {
-  const containerRef = useRef<HTMLElement>(null);
-  const titleId = useId();
   const [pageUrl, setPageUrl] = useState<string | null>(null);
   const [pagePending, setPagePending] = useState(false);
+  const [pageFailed, setPageFailed] = useState(false);
   const pageRunId = pageSource?.runId ?? null;
   const pageCitationId = pageSource?.citationId ?? null;
   const pageToken = pageSource?.auth.accessToken ?? null;
+  const loadPageRef = useRef(loadPage);
+  loadPageRef.current = loadPage;
 
   useEffect(() => {
-    if (pageSource === null || pageRunId === null || pageCitationId === null) {
+    if (pageRunId === null || pageCitationId === null || pageToken === null) {
       setPageUrl(null);
       setPagePending(false);
+      setPageFailed(false);
       return;
     }
-    const source = pageSource;
+    const source: CitationPageSource = {
+      auth: { accessToken: pageToken },
+      runId: pageRunId,
+      citationId: pageCitationId,
+    };
     let cancelled = false;
     let objectUrl: string | null = null;
     setPagePending(true);
+    setPageFailed(false);
     setPageUrl(null);
-    void loadPage(source)
+    void loadPageRef.current(source)
       .then((blob) => {
         if (cancelled) {
           return;
@@ -127,6 +107,7 @@ export function CitationDrawer({
         if (cancelled) {
           return;
         }
+        setPageFailed(true);
         setPagePending(false);
       });
     return () => {
@@ -135,78 +116,7 @@ export function CitationDrawer({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [loadPage, pageCitationId, pageRunId, pageSource, pageToken]);
-
-  useLayoutEffect(() => {
-    const panel = containerRef.current;
-    if (panel === null) {
-      return;
-    }
-    const place = (): void => {
-      placeCitationPopup(panel, returnFocusRef?.current ?? null);
-    };
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [citation, passagePending, returnFocusRef]);
-
-  useEffect(() => {
-    const root = containerRef.current;
-    if (root === null) {
-      return;
-    }
-    const release = trapFocus(root, {
-      returnFocus: returnFocusRef?.current ?? null,
-    });
-    return release;
-  }, [returnFocusRef]);
-
-  useEffect(() => {
-    const root = containerRef.current;
-    if (root === null) {
-      return;
-    }
-    /**
-     * Close when the pointer lands outside the popup and the opening chip.
-     *
-     * @param event - Document pointer event.
-     */
-    function onPointerDown(event: PointerEvent): void {
-      const target = event.target;
-      if (!(target instanceof Node) || root === null) {
-        return;
-      }
-      if (root.contains(target)) {
-        return;
-      }
-      if (returnFocusRef?.current?.contains(target)) {
-        return;
-      }
-      onClose();
-    }
-    /**
-     * Close on Escape from anywhere while the popup is open.
-     *
-     * @param event - Document keyboard event.
-     */
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key !== "Escape") {
-        return;
-      }
-      event.preventDefault();
-      onClose();
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose, returnFocusRef]);
+  }, [pageCitationId, pageRunId, pageToken]);
 
   if (citation === null) {
     return null;
@@ -217,40 +127,17 @@ export function CitationDrawer({
       ? null
       : citation.evidence_excerpt;
   return (
-    <aside
-      ref={containerRef}
-      className={overlayStyles.citationPopup}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
+    <Sheet
+      title={citationDrawerTitle(citation)}
+      side="right"
+      onClose={onClose}
+      returnFocusRef={returnFocusRef}
+      panelClassName={overlayStyles.citationSheet}
     >
-      <div className={overlayStyles.drawerHeader}>
-        <h3 id={titleId}>{citationDrawerTitle(citation)}</h3>
-        <Button type="button" onClick={onClose}>
-          Close
-        </Button>
-      </div>
-      <dl className={chatStyles.sourceDl}>
-        {fields.locators.map((item) => (
-          <div key={item.key}>
-            <dt>{item.label}</dt>
-            <dd>
-              <UserText value={item.value} />
-            </dd>
-          </div>
-        ))}
-        {fields.technical.map((item) => (
-          <div key={item.key}>
-            <dt>{item.label}</dt>
-            <dd>
-              <UserText value={item.value} />
-            </dd>
-          </div>
-        ))}
-      </dl>
       {pagePending ? (
         <p className={chatStyles.muted}>{CITATION_PAGE_LOADING}</p>
       ) : null}
+      {pageFailed ? <p className={chatStyles.muted}>{CITATION_PAGE_FAILED}</p> : null}
       {pageUrl !== null ? (
         <img
           className={chatStyles.citationPageImage}
@@ -270,6 +157,24 @@ export function CitationDrawer({
       ) : citation.source_unavailable ? null : (
         <p className={chatStyles.muted}>{LEGACY_EXCERPT_COPY}</p>
       )}
+      <dl className={chatStyles.sourceDl}>
+        {fields.locators.map((item) => (
+          <div key={item.key}>
+            <dt>{item.label}</dt>
+            <dd>
+              <UserText value={item.value} />
+            </dd>
+          </div>
+        ))}
+        {fields.technical.map((item) => (
+          <div key={item.key}>
+            <dt>{item.label}</dt>
+            <dd>
+              <UserText value={item.value} />
+            </dd>
+          </div>
+        ))}
+      </dl>
       {!passagePending && citation.source_unavailable ? (
         <LimitationCallout tone="warning">
           {limitationCopy("source_unavailable")}
@@ -278,6 +183,6 @@ export function CitationDrawer({
       {!passagePending && excerpt === null ? (
         <p className={chatStyles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
       ) : null}
-    </aside>
+    </Sheet>
   );
 }
