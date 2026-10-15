@@ -185,3 +185,166 @@ def test_attach_native_evidence_adds_code_block() -> None:
     released = attach_native_evidence(payload, fusion)
     assert "```" in released.answer_text
     assert "def run" in released.answer_text
+
+
+def test_attach_keeps_full_table_when_only_the_first_line_was_copied() -> None:
+    """A paraphrase that copies one row does not replace the pipe table."""
+
+    table = "| Name | Note |\n| --- | --- |\n| Alpha | First |\n| Beta | Second |"
+    payload = AnswerPayload(
+        answer_text="| Name | Note |",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="| Name | Note |",
+                link_ids=("l1",),
+            ),
+        ),
+        atomic_links=(),
+    )
+    fusion = FusionResult(
+        algorithm=FusionAlgorithm.NAIVE_UNION,
+        config_hash="b" * 64,
+        requested_route="hybrid",
+        effective_route="hybrid",
+        graph_discovered_only_ratio=0.0,
+        evidence=(
+            ScoredPassage(
+                chunk_id="11111111-1111-1111-1111-111111111111",
+                document_id="22222222-2222-2222-2222-222222222222",
+                version_id="33333333-3333-3333-3333-333333333333",
+                citation_text=table,
+                combined_score=1.0,
+                origin=PassageOrigin.HYBRID,
+                graph_discovered_only=False,
+                content_kind="table",
+            ),
+        ),
+    )
+    released = attach_native_evidence(payload, fusion)
+    assert table in released.answer_text
+
+
+def test_attach_keeps_full_listing_when_another_fence_is_present() -> None:
+    """A different fenced snippet does not hide the cited listing."""
+
+    listing = "def run():\n    return 1"
+    payload = AnswerPayload(
+        answer_text="```\nprint('other')\n```",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="```\nprint('other')\n```",
+                link_ids=("l1",),
+            ),
+        ),
+        atomic_links=(),
+    )
+    fusion = FusionResult(
+        algorithm=FusionAlgorithm.NAIVE_UNION,
+        config_hash="c" * 64,
+        requested_route="hybrid",
+        effective_route="hybrid",
+        graph_discovered_only_ratio=0.0,
+        evidence=(
+            ScoredPassage(
+                chunk_id="11111111-1111-1111-1111-111111111111",
+                document_id="22222222-2222-2222-2222-222222222222",
+                version_id="33333333-3333-3333-3333-333333333333",
+                citation_text=listing,
+                combined_score=1.0,
+                origin=PassageOrigin.HYBRID,
+                graph_discovered_only=False,
+                content_kind="code",
+            ),
+        ),
+    )
+    released = attach_native_evidence(payload, fusion)
+    assert released.answer_text.count("```") == 4
+    assert listing in released.answer_text
+
+
+def test_attach_skips_code_already_inside_a_fence() -> None:
+    """The cited listing is not appended twice."""
+
+    listing = "def run():\n    return 1"
+    fenced = f"```\n{listing}\n```"
+    payload = AnswerPayload(
+        answer_text=fenced,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=fenced, link_ids=("l1",)),
+        ),
+        atomic_links=(),
+    )
+    fusion = FusionResult(
+        algorithm=FusionAlgorithm.NAIVE_UNION,
+        config_hash="d" * 64,
+        requested_route="hybrid",
+        effective_route="hybrid",
+        graph_discovered_only_ratio=0.0,
+        evidence=(
+            ScoredPassage(
+                chunk_id="11111111-1111-1111-1111-111111111111",
+                document_id="22222222-2222-2222-2222-222222222222",
+                version_id="33333333-3333-3333-3333-333333333333",
+                citation_text=listing,
+                combined_score=1.0,
+                origin=PassageOrigin.HYBRID,
+                graph_discovered_only=False,
+                content_kind="code",
+            ),
+        ),
+    )
+    released = attach_native_evidence(payload, fusion)
+    assert released.answer_text == fenced
+
+
+def test_attach_replaces_trailing_prose_when_six_paragraphs_are_full() -> None:
+    """A figure and a pipe table still release after the draft filled six slots."""
+
+    prose = tuple(
+        AnswerParagraph(paragraph_index=index, text=f"Sentence {index}.", link_ids=("l1",))
+        for index in range(6)
+    )
+    table = "| Name | Note |\n| --- | --- |\n| Alpha | First |"
+    payload = AnswerPayload(
+        answer_text="\n\n".join(item.text for item in prose),
+        paragraphs=prose,
+        atomic_links=(),
+    )
+    fusion = FusionResult(
+        algorithm=FusionAlgorithm.NAIVE_UNION,
+        config_hash="e" * 64,
+        requested_route="hybrid",
+        effective_route="hybrid",
+        graph_discovered_only_ratio=0.0,
+        evidence=(
+            ScoredPassage(
+                chunk_id="11111111-1111-1111-1111-111111111111",
+                document_id="22222222-2222-2222-2222-222222222222",
+                version_id="33333333-3333-3333-3333-333333333333",
+                citation_text="A small diagram.",
+                combined_score=1.0,
+                origin=PassageOrigin.HYBRID,
+                graph_discovered_only=False,
+                content_kind="figure",
+                figure_id="abc123",
+            ),
+            ScoredPassage(
+                chunk_id="44444444-4444-4444-4444-444444444444",
+                document_id="22222222-2222-2222-2222-222222222222",
+                version_id="33333333-3333-3333-3333-333333333333",
+                citation_text=table,
+                combined_score=0.5,
+                origin=PassageOrigin.HYBRID,
+                graph_discovered_only=False,
+                content_kind="table",
+            ),
+        ),
+    )
+    released = attach_native_evidence(payload, fusion)
+    assert len(released.paragraphs) == 6
+    assert released.paragraphs[0].text == "Sentence 0."
+    assert "[[figure:abc123]]" in released.answer_text
+    assert table in released.answer_text
+    assert "Sentence 5." not in released.answer_text

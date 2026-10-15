@@ -29,7 +29,6 @@ from smart_rag_core.retrieval.temporal import TemporalDocument
 from smart_rag_core.retrieval.types import (
     Bm25RetrievalResult,
     RetrievalCandidate,
-    TermRetrievalResult,
 )
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings.postgres_connect import connect_postgres
@@ -224,7 +223,7 @@ class HybridChannelJobsMixin:
                 # dense/BM25-only.
                 from smart_rag_core.retrieval.pages import (
                     idle_page_connection,
-                    merge_cited_page_candidates,
+                    release_term_channel,
                     retrieve_page_candidates,
                 )
                 from smart_rag_core.retrieval.rerank import (
@@ -241,22 +240,21 @@ class HybridChannelJobsMixin:
                     term_texts = (*seed_extras, *term_texts)[:8]
                 pages = named_page_numbers(query)
 
-                def _merge_page_hits(
+                def _cited_page_hits(
                     connection: psycopg.Connection,
-                    lists: VariantLists,
-                ) -> VariantLists:
-                    """Prepend authorized page-scoped hits when the ask cites pages.
+                ) -> tuple[RetrievalCandidate, ...]:
+                    """Load cited-page chunks without failing the term channel.
 
                     Args:
                         connection: Canonical connection for the page fetch.
-                        lists: Per-variant term candidate lists.
 
                     Returns:
-                        Lists with page hits merged into the first variant.
+                        Authorized page hits, or empty when the query cites
+                        no page or the page fetch fails.
                     """
 
                     if not pages:
-                        return lists
+                        return ()
 
                     def _open_page_connection() -> psycopg.Connection:
                         """Open a second idle connection for the page fetch.
@@ -280,7 +278,7 @@ class HybridChannelJobsMixin:
                             connection,
                             _open_page_connection,
                         )
-                        page_hits = retrieve_page_candidates(
+                        return retrieve_page_candidates(
                             page_connection,
                             caller=caller,
                             pages=pages,
@@ -292,46 +290,53 @@ class HybridChannelJobsMixin:
                             RetrievalFallbackReason.PAGE_SCOPE_UNAVAILABLE,
                             type(exc).__name__,
                         )
-                        return lists
+                        return ()
                     finally:
                         if close_page:
                             page_connection.close()
-                    return merge_cited_page_candidates(lists, page_hits)
 
                 if self._supabase_dsn:
                     from smart_rag_core.retrieval.terms import TermRetriever
 
                     with self._channel_supabase() as connection:
+                        term_failed = False
                         try:
                             lists = collect_term_lists(
                                 TermRetriever(connection).retrieve,
                                 caller=caller,
                                 texts=term_texts,
                             )
-                            return _merge_page_hits(connection, lists)
                         except Exception:
-                            return TermRetrievalResult(
-                                candidates=(),
-                                query_normalized="",
-                                empty_channel=True,
-                                fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
-                            )
+                            lists = ()
+                            term_failed = True
+                        return release_term_channel(
+                            lists,
+                            _cited_page_hits(connection),
+                            term_failed=term_failed,
+                        )
                 try:
                     lists = collect_term_lists(
                         term_retriever.retrieve,
                         caller=caller,
                         texts=term_texts,
                     )
-                    if self._supabase is not None:
-                        return _merge_page_hits(self._supabase, lists)
-                    return lists
                 except Exception:
-                    return TermRetrievalResult(
-                        candidates=(),
-                        query_normalized="",
-                        empty_channel=True,
-                        fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
+                    lists = ()
+                    page_hits: tuple[RetrievalCandidate, ...] = ()
+                    if self._supabase is not None:
+                        page_hits = _cited_page_hits(self._supabase)
+                    return release_term_channel(
+                        lists,
+                        page_hits,
+                        term_failed=True,
                     )
+                if self._supabase is not None:
+                    return release_term_channel(
+                        lists,
+                        _cited_page_hits(self._supabase),
+                        term_failed=False,
+                    )
+                return lists
 
             jobs["term"] = _term_job
         return jobs

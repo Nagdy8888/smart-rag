@@ -50,7 +50,10 @@ from smart_rag_core.query_fusion.models import (
     PassageOrigin,
     ScoredPassage,
 )
-from smart_rag_core.query_fusion.quotas import apply_document_section_quotas
+from smart_rag_core.query_fusion.quotas import (
+    apply_document_section_quotas,
+    reserve_native_passages,
+)
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.models import BranchKind, BranchResult
 from smart_rag_core.retrieval.graph import GRAPH_SURVIVAL_FALLBACK_THRESHOLD
@@ -753,3 +756,32 @@ def test_eight_documents_keep_frozen_quota_two() -> None:
         counts[item.document_id] = counts.get(item.document_id, 0) + 1
     assert len(selected) == 12
     assert max(counts.values()) == 2
+
+
+def test_native_passage_replaces_lower_ranked_other_page_prose() -> None:
+    """A short table keeps a slot when longer prose on another page outranks it."""
+
+    prose = tuple(
+        _scored(index, doc=1, section="Chapter").model_copy(
+            update={"page_number": 2, "combined_score": float(20 - index)}
+        )
+        for index in range(1, 12)
+    )
+    same_page = _scored(12, doc=1, section="Chapter").model_copy(
+        update={"page_number": 9, "combined_score": 0.5}
+    )
+    table = _scored(13, doc=1, section="Chapter").model_copy(
+        update={
+            "page_number": 9,
+            "combined_score": 0.01,
+            "content_kind": "table",
+            "citation_text": "| Name | Note |\n| --- | --- |\n| Alpha | First |",
+        }
+    )
+    ordered = (*prose, same_page, table)
+    selected = reserve_native_passages(ordered, apply_document_section_quotas(ordered))
+    kept = {item.chunk_id for item in selected}
+    assert len(selected) == 12
+    assert table.chunk_id in kept
+    assert same_page.chunk_id in kept
+    assert prose[-1].chunk_id not in kept

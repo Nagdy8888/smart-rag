@@ -66,6 +66,75 @@ def apply_document_section_quotas(
     return tuple(selected)
 
 
+_NATIVE_KINDS = frozenset({"code", "table", "figure"})
+
+
+def reserve_native_passages(
+    ordered: tuple[ScoredPassage, ...],
+    selected: tuple[ScoredPassage, ...],
+    *,
+    limit: int = FUSION_FINAL_EVIDENCE_MAX,
+) -> tuple[ScoredPassage, ...]:
+    """Keep hybrid code, table, and figure passages inside the evidence cap.
+
+    Rank weights are unchanged. A native passage that quotas left out
+    replaces the lowest-scoring non-native passage, and a passage on
+    another page is dropped before one on the native passage's page.
+
+    Args:
+        ordered: Passages in score order, before the cap dropped any.
+        selected: Passages already kept by document and section quotas.
+        limit: Final evidence cap. Frozen at 12.
+
+    Returns:
+        Selected passages in ``ordered`` sequence, at most ``limit`` items.
+        Native graph-only passages are not reserved.
+    """
+
+    if limit < 1:
+        return ()
+    chosen = list(selected[:limit])
+    chosen_ids = {item.chunk_id for item in chosen}
+    missing = [
+        item
+        for item in ordered
+        if item.content_kind in _NATIVE_KINDS
+        and not item.graph_discovered_only
+        and item.citation_text.strip()
+        and item.chunk_id not in chosen_ids
+    ]
+    for native in missing:
+        if len(chosen) < limit:
+            chosen.append(native)
+            chosen_ids.add(native.chunk_id)
+            continue
+        prose = [item for item in chosen if item.content_kind not in _NATIVE_KINDS]
+        if not prose:
+            break
+        victim = min(prose, key=lambda item: _native_drop_key(item, native.page_number))
+        chosen = [item for item in chosen if item.chunk_id != victim.chunk_id]
+        chosen.append(native)
+        chosen_ids.add(native.chunk_id)
+    order = {item.chunk_id: index for index, item in enumerate(ordered)}
+    chosen.sort(key=lambda item: order.get(item.chunk_id, limit + 1))
+    return tuple(chosen[:limit])
+
+
+def _native_drop_key(item: ScoredPassage, native_page: int | None) -> tuple[int, float, str]:
+    """Sort key for the prose passage a native block should replace.
+
+    Args:
+        item: Non-native passage currently inside the cap.
+        native_page: Page of the native passage being reserved.
+
+    Returns:
+        Other-page prose sorts first, then lower score, then chunk id.
+    """
+
+    other_page = 0 if item.page_number != native_page else 1
+    return (other_page, item.combined_score, item.chunk_id)
+
+
 def cap_graph_discovered_only(
     selected: tuple[ScoredPassage, ...],
     *,

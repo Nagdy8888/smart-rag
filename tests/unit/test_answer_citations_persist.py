@@ -22,6 +22,10 @@ from smart_rag_core.query_answer.citations import (
     repair_leaf_citations,
     shorten_contained_skipped_spans,
 )
+from smart_rag_core.query_answer.citations_leaf import (
+    RepresentativeChild,
+    unique_child_prefix,
+)
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -727,18 +731,25 @@ def test_persist_answer_citations_lists_for_owned_run(
 class _FakeCursor:
     """Cursor that fails chosen ``insert_run_citation_v2`` attempts."""
 
-    def __init__(self, failures: dict[int, str]) -> None:
+    def __init__(
+        self,
+        failures: dict[int, str],
+        children: tuple[tuple[str, str], ...] = (),
+    ) -> None:
         """Record which 1-based insert attempts should raise.
 
         Args:
             failures: Attempt number to ``query_citation`` reason.
+            children: Representative child rows returned for a parent lookup.
         """
 
         self.statements: list[str] = []
         self.params: list[object] = []
         self._failures = failures
+        self._children = children
         self._attempts = 0
         self._pending: tuple[object, ...] | None = None
+        self._pending_rows: list[tuple[str, str]] | None = None
 
     def __enter__(self) -> _FakeCursor:
         """Enter the cursor context.
@@ -775,6 +786,9 @@ class _FakeCursor:
         text = " ".join(sql.split())
         self.statements.append(text)
         self.params.append(params)
+        if "parent_chunk_id" in text:
+            self._pending_rows = list(self._children)
+            return
         if "insert_run_citation_v2" in text:
             self._attempts += 1
             reason = self._failures.get(self._attempts)
@@ -791,6 +805,16 @@ class _FakeCursor:
 
         row, self._pending = self._pending, None
         return row
+
+    def fetchall(self) -> list[tuple[str, str]]:
+        """Return representative children queued by the parent lookup.
+
+        Returns:
+            Child id and raw text rows, or an empty list.
+        """
+
+        rows, self._pending_rows = self._pending_rows, None
+        return rows or []
 
 
 def _connection_with(cursor: _FakeCursor) -> MagicMock:
@@ -848,6 +872,138 @@ def test_persist_retries_with_leading_sentence_then_succeeds() -> None:
     assert second[6] == leading_sentence(_TWO_SENTENCES)
     assert "SAVEPOINT citation_leaf" in cursor.statements
     assert "ROLLBACK TO SAVEPOINT citation_leaf" in cursor.statements
+
+
+def test_unique_child_prefix_passes_a_short_opening_line() -> None:
+    """A heading shorter than the retry minimum does not hide the next page slice."""
+
+    body = "Approved requests stay bound for thirty days after receipt."
+    span = f"Note\n{body} Later text that lives on the next page of the record."
+    found = unique_child_prefix(
+        span,
+        (
+            RepresentativeChild(chunk_id="child-a", raw_text=f"Note\n{body}"),
+            RepresentativeChild(
+                chunk_id="child-b",
+                raw_text="Later text that lives on the next page of the record.",
+            ),
+        ),
+    )
+    assert found is not None
+    assert found[0] == "child-a"
+    assert body in found[1]
+
+
+def test_persist_page_ambiguous_uses_unique_child_prefix() -> None:
+    """A multi-page parent span is stored on the one child that holds its opening."""
+
+    opening = leading_sentence(_TWO_SENTENCES)
+    parent_id = uuid4()
+    child_id = uuid4()
+    other_id = uuid4()
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    answer = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        citations=(
+            AnswerCitation(
+                chunk_id=str(parent_id),
+                span=_TWO_SENTENCES,
+                paragraph_index=0,
+            ),
+        ),
+        status="complete",
+    )
+    cursor = _FakeCursor(
+        failures={1: "page_ambiguous", 2: "page_ambiguous"},
+        children=(
+            (str(child_id), opening),
+            (str(other_id), "Shipping is refunded too."),
+        ),
+    )
+    result = persist_answer_citations(
+        _connection_with(cursor),
+        caller=MagicMock(user_id=uuid4()),
+        run_id=uuid4(),
+        fusion=fusion,
+        answer=answer,
+    )
+    assert len(result.ids) == 1
+    assert result.skipped == ()
+    inserts = [
+        params
+        for statement, params in zip(cursor.statements, cursor.params, strict=True)
+        if isinstance(params, tuple) and "insert_run_citation_v2" in statement
+    ]
+    assert len(inserts) == 3
+    retarget = inserts[2]
+    assert isinstance(retarget, tuple)
+    assert retarget[5] == str(child_id)
+    assert retarget[6] == opening
+
+
+def test_persist_page_ambiguous_skips_when_children_tie() -> None:
+    """Two children that hold the same prefix leave the citation unresolved."""
+
+    opening = leading_sentence(_TWO_SENTENCES)
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    answer = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        citations=(
+            AnswerCitation(
+                chunk_id=str(uuid4()),
+                span=_TWO_SENTENCES,
+                paragraph_index=0,
+            ),
+        ),
+        status="complete",
+    )
+    cursor = _FakeCursor(
+        failures={1: "page_ambiguous", 2: "page_ambiguous"},
+        children=((str(uuid4()), opening), (str(uuid4()), opening)),
+    )
+    result = persist_answer_citations(
+        _connection_with(cursor),
+        caller=MagicMock(user_id=uuid4()),
+        run_id=uuid4(),
+        fusion=fusion,
+        answer=answer,
+    )
+    assert result.ids == ()
+    assert len(result.skipped) == 1
+    assert result.skipped[0].reason == "page_ambiguous"
+
+
+def test_persist_ignores_a_repeated_passage_citation() -> None:
+    """A second copy of a stored passage is not inserted and is not a skip."""
+
+    fusion = verifier_fusion(verifier_passage(1, text=_TWO_SENTENCES))
+    chunk_id = fusion.evidence[0].chunk_id
+    citation = AnswerCitation(
+        chunk_id=chunk_id,
+        span=_TWO_SENTENCES,
+        paragraph_index=0,
+    )
+    answer = AnswerPayload(
+        answer_text="Refunds take 30 days.",
+        citations=(citation, citation),
+        status="complete",
+    )
+    cursor = _FakeCursor(failures={})
+    result = persist_answer_citations(
+        _connection_with(cursor),
+        caller=MagicMock(user_id=uuid4()),
+        run_id=uuid4(),
+        fusion=fusion,
+        answer=answer,
+    )
+    assert len(result.ids) == 1
+    assert result.skipped == ()
+    inserts = [
+        statement
+        for statement in cursor.statements
+        if "insert_run_citation_v2" in statement
+    ]
+    assert len(inserts) == 1
 
 
 def test_persist_skips_leaf_unresolved_and_keeps_other_citations() -> None:

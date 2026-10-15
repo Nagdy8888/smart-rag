@@ -12,11 +12,13 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
 from smart_rag_core.query_answer.citations_leaf import (
     CitationPersistResult,
+    RepresentativeChild,
     SkippedCitation,
     citation_error_reason,
     citation_provenance_payload,
     leading_sentence,
     raise_citation_error,
+    unique_child_prefix,
 )
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult
@@ -42,8 +44,12 @@ def persist_answer_citations(
 
     Passage citations resolve one page-bounded leaf through
     ``insert_run_citation_v2``. A leaf-resolution failure retries once
-    with the leading sentence, then skips that citation. Table citations
-    keep the v1 path and still fail closed.
+    with the leading sentence. A parent span that is still
+    ``page_ambiguous`` is retargeted to the unique representative child
+    that contains the span or that sentence. Anything still unresolved is
+    skipped. A later copy of a chunk, paragraph, and span already inserted
+    in this batch is ignored. Table citations keep the v1 path and still
+    fail closed.
 
     Args:
         connection: Open ``app_api`` connection.
@@ -67,6 +73,7 @@ def persist_answer_citations(
 
     ids: list[UUID] = []
     skipped: list[SkippedCitation] = []
+    stored_passages: set[tuple[str, int | None, str]] = set()
     index = 0
     ordered_passages = sorted(
         enumerate(answer.citations),
@@ -77,13 +84,16 @@ def persist_answer_citations(
     )
     with connection.cursor() as cursor:
         for _, citation in ordered_passages:
-            if index >= 12:
-                raise QueryAdmissionError("answer_bounds_exceeded")
             span = (citation.span or "").strip()
             if not citation.chunk_id:
                 raise QueryAdmissionError("chunk_required")
             if not span:
                 raise QueryAdmissionError("citation_span_required")
+            passage_key = (str(citation.chunk_id), citation.paragraph_index, span)
+            if passage_key in stored_passages:
+                continue
+            if index >= 12:
+                raise QueryAdmissionError("answer_bounds_exceeded")
             provenance = citation_provenance_payload(
                 fusion=fusion,
                 answer=answer,
@@ -120,6 +130,18 @@ def persist_answer_citations(
                     continue
                 cursor.execute("RELEASE SAVEPOINT citation_leaf")
                 break
+            if inserted is None and last_reason == "page_ambiguous":
+                inserted, last_reason = _retarget_page_ambiguous(
+                    cursor,
+                    caller=caller,
+                    run_id=run_id,
+                    index=index,
+                    citation=citation,
+                    span=span,
+                    fusion=fusion,
+                    answer=answer,
+                    reason=last_reason,
+                )
             if inserted is None:
                 skipped.append(
                     SkippedCitation(
@@ -139,6 +161,7 @@ def persist_answer_citations(
                 )
                 continue
             ids.append(inserted)
+            stored_passages.add(passage_key)
             index += 1
         for citation in answer.table_citations:
             if index >= 12:
@@ -230,6 +253,116 @@ def _insert_passage_citation(
     )
     row = cursor.fetchone()
     return UUID(str(row[0])) if row is not None else None
+
+
+def _retarget_page_ambiguous(
+    cursor: psycopg.Cursor[Any],
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+    index: int,
+    citation: AnswerCitation,
+    span: str,
+    fusion: FusionResult,
+    answer: AnswerPayload,
+    reason: str,
+) -> tuple[UUID | None, str]:
+    """Insert a page-ambiguous parent span against one child prefix.
+
+    Args:
+        cursor: Open cursor inside the run transaction.
+        caller: Server-derived caller.
+        run_id: Admitted run.
+        index: Write index within the run.
+        citation: Passage citation whose chunk is the multi-page parent.
+        span: Original span, already contained in the parent text.
+        fusion: Combined ranking result.
+        answer: Verified answer.
+        reason: Leaf reason that exhausted the parent attempts. Must be
+            ``page_ambiguous``; other reasons are unchanged.
+
+    Returns:
+        Inserted id and the last leaf reason. The id is None when no unique
+        child holds a prefix or the child insert still fails leaf resolution.
+
+    Raises:
+        QueryAdmissionError: Any non-leaf database rejection.
+
+    Side Effects:
+        May insert one ``app.citations`` row. Uses ``SAVEPOINT citation_leaf``.
+    """
+
+    if reason != "page_ambiguous" or not citation.chunk_id:
+        return None, reason
+    children = _representative_children(cursor, citation.chunk_id)
+    target = unique_child_prefix(span, children)
+    if target is None:
+        return None, reason
+    child_id, child_span = target
+    child = citation.model_copy(update={"chunk_id": child_id})
+    child_provenance = citation_provenance_payload(
+        fusion=fusion,
+        answer=answer,
+        chunk_id=child_id,
+        table_id=citation.table_id,
+        atomic_link_id=citation.atomic_link_id,
+        inference=citation.inference,
+        source_ranges=citation.source_ranges,
+    )
+    cursor.execute("SAVEPOINT citation_leaf")
+    try:
+        inserted = _insert_passage_citation(
+            cursor,
+            caller=caller,
+            run_id=run_id,
+            index=index,
+            citation=child,
+            span=child_span,
+            provenance=child_provenance,
+        )
+    except psycopg.Error as exc:
+        cursor.execute("ROLLBACK TO SAVEPOINT citation_leaf")
+        cursor.execute("RELEASE SAVEPOINT citation_leaf")
+        child_reason = citation_error_reason(exc)
+        if child_reason not in LEAF_RESOLUTION_REASONS:
+            raise QueryAdmissionError(child_reason) from exc
+        return None, child_reason
+    cursor.execute("RELEASE SAVEPOINT citation_leaf")
+    return inserted, reason
+
+
+def _representative_children(
+    cursor: psycopg.Cursor[Any],
+    chunk_id: str,
+) -> tuple[RepresentativeChild, ...]:
+    """Load search-representative children of one cited chunk.
+
+    Args:
+        cursor: Open ``app_api`` cursor. Chunk reads use the role's select
+            grant; citation insert still rechecks ACL.
+        chunk_id: Parent chunk id from the citation.
+
+    Returns:
+        Children in chunk order. Empty when the chunk has no representatives.
+    """
+
+    cursor.execute(
+        """
+        SELECT id::text, raw_text
+        FROM app.document_chunks
+        WHERE parent_chunk_id = %s::uuid
+          AND deleted_at IS NULL
+          AND is_search_representative IS TRUE
+        ORDER BY chunk_index
+        """,
+        (chunk_id,),
+    )
+    rows = cursor.fetchall()
+    return tuple(
+        RepresentativeChild(chunk_id=str(row[0]), raw_text=str(row[1] or ""))
+        for row in rows
+        if row[0]
+    )
 
 
 def maybe_persist_verified_citations(

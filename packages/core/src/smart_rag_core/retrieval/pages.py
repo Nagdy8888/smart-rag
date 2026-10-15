@@ -10,9 +10,12 @@ from psycopg.pq import TransactionStatus
 
 from smart_rag_core.retrieval.hybrid_run.channels import cap_unique_across_variants
 from smart_rag_core.retrieval.hybrid_run.types import VariantLists
-from smart_rag_core.retrieval.profiles import TERM_CANDIDATE_CAP
+from smart_rag_core.retrieval.profiles import (
+    TERM_CANDIDATE_CAP,
+    RetrievalFallbackReason,
+)
 from smart_rag_core.retrieval.session import retrieval_transaction
-from smart_rag_core.retrieval.types import RetrievalCandidate
+from smart_rag_core.retrieval.types import RetrievalCandidate, TermRetrievalResult
 from smart_rag_core.security.identity import CallerContext
 
 _PAGE_FETCH_SCAN_CAP = 60
@@ -149,6 +152,37 @@ def merge_cited_page_candidates(
         head = [item for item in lists[0] if item.chunk_id not in seen]
         merged = (tuple(page_hits) + tuple(head), *lists[1:])
     return cap_unique_across_variants(merged, cap)
+
+
+def release_term_channel(
+    lists: VariantLists,
+    page_hits: Sequence[RetrievalCandidate],
+    *,
+    term_failed: bool,
+) -> VariantLists | TermRetrievalResult:
+    """Merge cited-page hits and keep them when term retrieval failed.
+
+    Args:
+        lists: Lexical term lists. Empty when the term call raised.
+        page_hits: Authorized chunks on the cited pages.
+        term_failed: True when the term call raised.
+
+    Returns:
+        Merged variant lists when term retrieval succeeded. When it
+        failed, a term result that still carries the page hits and
+        ``term_unavailable``.
+    """
+
+    merged = merge_cited_page_candidates(lists, page_hits)
+    if not term_failed:
+        return merged
+    hits = tuple(item for variant in merged for item in variant)
+    return TermRetrievalResult(
+        candidates=hits,
+        query_normalized="",
+        empty_channel=not hits,
+        fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
+    )
 
 
 def retrieve_page_candidates(

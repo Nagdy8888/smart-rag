@@ -11,9 +11,13 @@ from smart_rag_core.retrieval.pages import (
     PAGE_CANDIDATE_SQL,
     idle_page_connection,
     merge_cited_page_candidates,
+    release_term_channel,
 )
-from smart_rag_core.retrieval.profiles import TERM_CANDIDATE_CAP
-from smart_rag_core.retrieval.types import RetrievalCandidate
+from smart_rag_core.retrieval.profiles import (
+    TERM_CANDIDATE_CAP,
+    RetrievalFallbackReason,
+)
+from smart_rag_core.retrieval.types import RetrievalCandidate, TermRetrievalResult
 
 
 def _candidate() -> RetrievalCandidate:
@@ -40,6 +44,29 @@ def test_cited_page_12_is_kept_when_lexical_term_is_empty() -> None:
     assert [item.chunk_id for variant in merged for item in variant] == [
         page_hit.chunk_id
     ]
+
+
+def test_term_failure_still_returns_the_cited_page_hit() -> None:
+    """A failed term call keeps a synthetic cited-page chunk and the outage."""
+
+    page_hit = _candidate()
+
+    def _failing_term() -> None:
+        """Raise the way a term RPC outage does.
+
+        Raises:
+            RuntimeError: Always.
+        """
+
+        raise RuntimeError("term_rpc_down")
+
+    try:
+        _failing_term()
+    except RuntimeError:
+        result = release_term_channel((), (page_hit,), term_failed=True)
+    assert isinstance(result, TermRetrievalResult)
+    assert result.fallback_reason is RetrievalFallbackReason.TERM_UNAVAILABLE
+    assert [item.chunk_id for item in result.candidates] == [page_hit.chunk_id]
 
 
 def test_cited_page_hits_stay_inside_the_term_cap() -> None:

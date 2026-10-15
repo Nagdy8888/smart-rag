@@ -7,6 +7,7 @@ from smart_rag_core.query_answer.generate_grounded import (
     salvage_named_code_definition,
     salvage_named_page_claim_fill,
 )
+from smart_rag_core.query_answer.generate_page_openings import fill_cited_page_opening
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -380,7 +381,7 @@ def _long_page_text() -> str:
 
 
 def test_source_word_ask_appends_the_continuation() -> None:
-    """A passage longer than the opening contributes the following window."""
+    """A passage longer than 1,000 characters stays one paragraph."""
 
     text = _long_page_text()
     passage = verifier_passage(13, text=text)
@@ -400,19 +401,22 @@ def test_source_word_ask_appends_the_continuation() -> None:
         for link in salvaged.atomic_links
         if link.link_id.startswith("page-opening-")
     ]
-    assert len(openings) == 2
-    spans: list[str] = []
-    for link in openings:
-        citation = next(
-            item for item in salvaged.citations if item.atomic_link_id == link.link_id
-        )
-        span = citation.span
-        assert span is not None
-        assert span in text
-        spans.append(span)
-    assert spans[0] == "The ledger records a final balance."
-    assert text.find(spans[1]) > text.find(spans[0])
-    assert set(spans[1]) == {"a"}
+    assert len(openings) == 1
+    citation = next(
+        item
+        for item in salvaged.citations
+        if item.atomic_link_id == openings[0].link_id
+    )
+    assert citation.span is not None
+    assert citation.span in text
+    assert len(citation.span) <= 1000
+    paragraph = next(
+        item
+        for item in salvaged.paragraphs
+        if openings[0].link_id in item.link_ids
+    )
+    assert "The ledger records a final balance." in paragraph.text
+    assert "a" * 1100 in paragraph.text
 
 
 def test_code_block_keeps_the_continuation() -> None:
@@ -464,16 +468,14 @@ def test_code_block_keeps_the_continuation() -> None:
         for link in salvaged.atomic_links
         if link.link_id.startswith("page-opening-")
     ]
-    assert len(openings) == 2
-    assert all(link.priority == 0 for link in openings)
-    later = next(
+    assert len(openings) == 1
+    assert openings[0].priority == 0
+    paragraph = next(
         item
-        for item in salvaged.citations
-        if item.atomic_link_id == openings[1].link_id
+        for item in salvaged.paragraphs
+        if openings[0].link_id in item.link_ids
     )
-    assert later.span is not None
-    assert later.span in text
-    assert set(later.span) == {"a"}
+    assert "a" * 1100 in paragraph.text
 
 
 def test_table_reproduce_ask_does_not_gain_page_windows() -> None:
@@ -495,3 +497,30 @@ def test_table_reproduce_ask_does_not_gain_page_windows() -> None:
     assert all(
         not link.link_id.startswith("page-opening-") for link in salvaged.atomic_links
     )
+
+
+def test_cited_page_windows_reach_past_the_second_span() -> None:
+    """A statement past the old 1,000-character cut stays in one paragraph."""
+
+    marker = "UNIQUE-MARKER"
+    text = ("x" * 2100) + marker + ("y" * 100)
+    passage = verifier_passage(16, text=text)
+    passage = passage.model_copy(update={"page_number": 4})
+    fusion = verifier_fusion(passage)
+    payload = _payload("A short draft.", chunk=passage.chunk_id)
+    released = fill_cited_page_opening(
+        payload,
+        fusion,
+        user_query="What exact wording does page 4 give? Use only that document.",
+    )
+    assert released is not None
+    assert marker in released.answer_text
+    openings = [
+        link.link_id
+        for link in released.atomic_links
+        if link.link_id.startswith("page-opening-")
+    ]
+    assert len(openings) == 1
+    for citation in released.citations:
+        if citation.atomic_link_id in openings and citation.span:
+            assert citation.span in text

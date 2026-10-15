@@ -121,6 +121,135 @@ def _unique_claim_holder(
     return (str(shortest.chunk_id), excerpt)
 
 
+@dataclass(frozen=True, slots=True)
+class RepresentativeChild:
+    """One search-representative child of a cited parent chunk.
+
+    Attributes:
+        chunk_id: Child chunk id.
+        raw_text: Canonical child text used for span containment.
+    """
+
+    chunk_id: str
+    raw_text: str
+
+
+def unique_child_prefix(
+    span: str,
+    children: Sequence[RepresentativeChild],
+) -> tuple[str, str] | None:
+    """Pick the unique child that contains a page-bounded slice of ``span``.
+
+    The full span is tried first, then its leading sentence. When neither
+    sits in exactly one child, the earliest offset is used whose longest
+    continuation is at least ``MIN_RETRY_SPAN_CHARS`` and belongs to one
+    child. A short opening line must not block the page that holds the rest.
+
+    Args:
+        span: Citation span rejected because its parent page was ambiguous.
+        children: Representative children in chunk order.
+
+    Returns:
+        ``(child_id, slice)`` when one child holds a candidate. ``None``
+        when every candidate is too short or not unique.
+    """
+
+    stripped = span.strip()
+    if not stripped or not children:
+        return None
+    direct = _unique_holder(stripped, children)
+    if direct is not None:
+        return direct
+    head = leading_sentence(stripped)
+    if head:
+        direct = _unique_holder(head, children)
+        if direct is not None:
+            return direct
+    return _earliest_child_slice(stripped, children)
+
+
+def _unique_holder(
+    candidate: str,
+    children: Sequence[RepresentativeChild],
+) -> tuple[str, str] | None:
+    """Return the only child that contains ``candidate``.
+
+    Args:
+        candidate: Span slice already checked for length.
+        children: Representative children.
+
+    Returns:
+        ``(child_id, candidate)`` or ``None`` when the slice is too short
+        or not held by exactly one child.
+    """
+
+    if len(candidate) < MIN_RETRY_SPAN_CHARS:
+        return None
+    holders = [
+        child for child in children if child.raw_text and candidate in child.raw_text
+    ]
+    if len(holders) != 1:
+        return None
+    return (holders[0].chunk_id, candidate[:MAX_CITATION_SPAN_CHARS])
+
+
+def _earliest_child_slice(
+    span: str,
+    children: Sequence[RepresentativeChild],
+) -> tuple[str, str] | None:
+    """Return the earliest long slice of ``span`` held by one child.
+
+    Args:
+        span: Parent citation span.
+        children: Representative children in chunk order.
+
+    Returns:
+        ``(child_id, slice)`` or ``None`` when no offset is unique.
+    """
+
+    for start in range(len(span)):
+        ranked = [
+            (child, _contained_length(span[start:], child.raw_text))
+            for child in children
+        ]
+        long_enough = [
+            (child, length)
+            for child, length in ranked
+            if length >= MIN_RETRY_SPAN_CHARS
+        ]
+        if len(long_enough) != 1:
+            continue
+        child, length = long_enough[0]
+        return (child.chunk_id, span[start : start + length][:MAX_CITATION_SPAN_CHARS])
+    return None
+
+
+def _contained_length(piece: str, text: str) -> int:
+    """Return how much of ``piece`` from the start sits in ``text``.
+
+    Args:
+        piece: Remaining citation span.
+        text: One child chunk body.
+
+    Returns:
+        Largest ``n`` such that ``piece[:n]`` occurs in ``text``, or 0.
+    """
+
+    if not piece or not text:
+        return 0
+    low = 0
+    high = len(piece)
+    best = 0
+    while low <= high:
+        mid = (low + high) // 2
+        if mid and piece[:mid] in text:
+            best = mid
+            low = mid + 1
+        else:
+            high = mid - 1
+    return best
+
+
 def leading_sentence(span: str, *, minimum: int = MIN_RETRY_SPAN_CHARS) -> str:
     """Return the first sentence of a span when it is a strictly shorter retry.
 

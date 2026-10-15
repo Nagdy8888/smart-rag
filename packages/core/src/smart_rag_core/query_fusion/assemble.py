@@ -24,6 +24,7 @@ from smart_rag_core.query_fusion.quotas import (
     apply_document_section_quotas,
     cap_graph_discovered_only,
     graph_only_ratio,
+    reserve_native_passages,
 )
 from smart_rag_core.query_fusion.ranking import (
     graph_branch_usable,
@@ -76,7 +77,7 @@ def fuse_evidence(
             fusion_input,
             graph_usable=graph_usable,
         )
-    trimmed = apply_document_section_quotas(scored)
+    trimmed = reserve_native_passages(scored, apply_document_section_quotas(scored))
     capped, dropped = cap_graph_discovered_only(trimmed)
     hybrid_present = any(not item.graph_discovered_only for item in capped)
     had_graph_only = any(item.graph_discovered_only for item in trimmed)

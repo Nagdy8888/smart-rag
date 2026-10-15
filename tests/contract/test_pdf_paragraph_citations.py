@@ -527,6 +527,87 @@ def test_multi_page_locators_are_rejected(db_connection: psycopg.Connection) -> 
         )
 
 
+_OPENING = "Alpha policy binds every approved request today."
+_CLOSING = "Beta policy applies only after review."
+_CROSSING = f"{_OPENING} {_CLOSING}"
+
+
+def test_page_ambiguous_parent_uses_unique_child_prefix(
+    db_connection: psycopg.Connection,
+) -> None:
+    """A span that crosses two child pages is stored on the child that holds its opening."""
+
+    owner_id = uuid4()
+    member_id = uuid4()
+    parent_id = uuid4()
+    opening_id = uuid4()
+    closing_id = uuid4()
+    with db_connection.cursor() as cursor:
+        insert_user_profile(cursor, user_id=owner_id, role="owner")
+        insert_user_profile(cursor, user_id=member_id, role="member")
+        conversation_id = insert_conversation(cursor, user_id=member_id)
+        document_id, version_id = _seed_document(cursor, owner_id=owner_id)
+        _insert_chunk(
+            cursor,
+            chunk_id=parent_id,
+            document_id=document_id,
+            version_id=version_id,
+            raw_text=_CROSSING,
+            page_number=4,
+            provenance=_pdf_locators(
+                page_index=4,
+                page_label="5",
+                extra={"format": "pdf", "page_index": 9, "page_label": "10"},
+            ),
+        )
+        _insert_chunk(
+            cursor,
+            chunk_id=opening_id,
+            document_id=document_id,
+            version_id=version_id,
+            raw_text=_OPENING,
+            page_number=5,
+            provenance=_pdf_locators(page_index=4, page_label="5"),
+            parent_chunk_id=parent_id,
+            chunk_index=0,
+        )
+        _insert_chunk(
+            cursor,
+            chunk_id=closing_id,
+            document_id=document_id,
+            version_id=version_id,
+            raw_text=_CLOSING,
+            page_number=10,
+            provenance=_pdf_locators(page_index=9, page_label="10"),
+            parent_chunk_id=parent_id,
+            chunk_index=1,
+        )
+        authz = authorization_version(cursor)
+    member = caller_context(member_id, "member", authz)
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
+    inserted = _persist(
+        db_connection,
+        caller=member,
+        run_id=admitted.context.run_id,
+        chunk_id=parent_id,
+        document_id=document_id,
+        version_id=version_id,
+        span=_CROSSING,
+    )
+    assert inserted
+    db_connection.execute("SET ROLE app_api")
+    try:
+        records = list_run_citations(
+            db_connection, caller=member, run_id=admitted.context.run_id
+        )
+    finally:
+        db_connection.execute("RESET ROLE")
+    assert len(records) == 1
+    assert records[0].chunk_id == opening_id
+    assert records[0].evidence_excerpt == _OPENING
+    assert records[0].pdf_page_number == 5
+
+
 def test_idempotent_replay_and_conflict_and_thirteenth_citation(
     db_connection: psycopg.Connection,
 ) -> None:

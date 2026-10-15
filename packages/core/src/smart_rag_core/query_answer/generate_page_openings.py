@@ -1,8 +1,8 @@
-"""Cited-page opening windows used by extractive answer salvage.
+"""Cited-page passage quotes used by extractive answer salvage.
 
-Page windows are exact substrings of fitted evidence. They occupy
-paragraph and verifier slots ahead of later claims so a source-word
-or code-reproduce ask still releases the named page.
+Each cited-page passage is one exact quote up to the paragraph limit.
+Quotes occupy paragraph and verifier slots ahead of later claims so a
+source-word or code-reproduce ask still releases the named page.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from smart_rag_core.query_answer.models import (
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_PARAGRAPHS,
-    MAX_CITATION_SPAN_CHARS,
     MAX_VERIFIER_LINKS,
 )
 from smart_rag_core.query_fusion.models import FusionResult
@@ -23,100 +22,34 @@ from smart_rag_core.retrieval.rerank import (
     wants_cited_page_windows,
 )
 
-
-def _opening_exact_span(text: str) -> str:
-    """Copy the opening of a passage as an exact evidence substring.
-
-    The window is capped at ``MAX_CITATION_SPAN_CHARS`` and ends on a
-    sentence boundary when one falls inside the cap. The result stays a
-    substring of ``text`` so citation alignment still succeeds.
-
-    Args:
-        text: Passage citation text.
-
-    Returns:
-        Exact opening substring, or empty when ``text`` is blank.
-    """
-
-    if not text or not text.strip():
-        return ""
-    start = len(text) - len(text.lstrip())
-    end_limit = min(len(text), start + MAX_CITATION_SPAN_CHARS)
-    window_end = end_limit
-    if end_limit < len(text):
-        last_sentence = -1
-        for index, char in enumerate(text[start:end_limit]):
-            if char in ".!?":
-                last_sentence = index
-        if last_sentence >= 0:
-            window_end = start + last_sentence + 1
-    span = text[start:window_end].strip()
-    if not span or span not in text:
-        return ""
-    return span[:MAX_CITATION_SPAN_CHARS]
-
-
-def _continuation_exact_span(text: str) -> str:
-    """Copy the passage text that starts where the opening ends.
-
-    The window begins at the first non-space character after the opening
-    and is capped at ``MAX_CITATION_SPAN_CHARS``, ending on a sentence
-    boundary when one falls inside the cap. The result stays a substring
-    of ``text``.
-
-    Args:
-        text: Passage citation text.
-
-    Returns:
-        Exact continuation substring, or empty when the passage does not
-        continue past the opening.
-    """
-
-    opening = _opening_exact_span(text)
-    if not opening:
-        return ""
-    start = text.find(opening)
-    if start < 0:
-        return ""
-    rest_start = start + len(opening)
-    while rest_start < len(text) and text[rest_start].isspace():
-        rest_start += 1
-    if rest_start >= len(text):
-        return ""
-    end_limit = min(len(text), rest_start + MAX_CITATION_SPAN_CHARS)
-    window_end = end_limit
-    if end_limit < len(text):
-        last_sentence = -1
-        for index, char in enumerate(text[rest_start:end_limit]):
-            if char in ".!?":
-                last_sentence = index
-        if last_sentence >= 0:
-            window_end = rest_start + last_sentence + 1
-    span = text[rest_start:window_end].strip()
-    if not span or span not in text or span == opening:
-        return ""
-    return span[:MAX_CITATION_SPAN_CHARS]
+_PASSAGE_QUOTE_CHARS = 4000
 
 
 def _page_windows(text: str) -> tuple[str, ...]:
-    """Return the opening and, when the passage continues, the next window.
+    """Return one exact quote of a cited-page passage.
 
     Args:
         text: Passage citation text.
 
     Returns:
-        One or two exact substrings. A continuation that repeats the
-        opening is omitted.
+        One exact substring of at most 4,000 characters, or empty when
+        the passage has no text. A longer passage keeps its opening
+        through that cap so a statement past the citation span stays
+        in the same paragraph.
     """
 
-    opening = _opening_exact_span(text)
-    later = _continuation_exact_span(text)
-    windows: list[str] = []
-    if opening:
-        windows.append(opening)
-    if later and later != opening:
-        windows.append(later)
-    return tuple(windows)
+    start = 0
+    while start < len(text) and text[start].isspace():
+        start += 1
+    end = len(text)
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    if start >= end:
+        return ()
+    quote = text[start:end][:_PASSAGE_QUOTE_CHARS]
+    if not quote or quote not in text:
+        return ()
+    return (quote,)
 
 
 def fill_cited_page_opening(
@@ -125,14 +58,14 @@ def fill_cited_page_opening(
     *,
     user_query: str,
 ) -> AnswerPayload | None:
-    """Append page windows for a source-word or code-reproduce ask.
+    """Append one quote per cited-page passage.
 
-    Each fitted passage on the named page contributes its opening and,
-    when the passage continues, the text that starts where that opening
-    ends. Page windows take the paragraph and verifier slots first. Six
-    windows are kept in page, hybrid-rank, then chunk-id order. A window
-    already present in the answer is not copied again. An existing code
-    block stays when a slot remains.
+    Each fitted passage on the named page contributes one exact quote of
+    at most 4,000 characters until the six paragraph slots are full.
+    Quotes stay exact substrings. They take paragraph and verifier slots
+    first, in page, hybrid-rank, then chunk-id order. A quote already
+    present in the answer is not copied again. An existing code block
+    stays when a slot remains.
 
     Args:
         payload: Company answer after code/table salvages.
@@ -140,7 +73,7 @@ def fill_cited_page_opening(
         user_query: Original user text. Untrusted.
 
     Returns:
-        Updated payload, the original when every window is already
+        Updated payload, the original when every quote is already
         released, or None when this ask is not a cited-page source-word
         or code-reproduce ask, or no cited-page passage has text.
     """

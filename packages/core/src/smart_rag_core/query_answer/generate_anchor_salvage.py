@@ -49,9 +49,9 @@ def salvage_anchor_claim_fill(
     """Inject omitted fitted evidence spans (anchor-gated).
 
     When the ask names a page and wants source words or reproduced code,
-    appends the opening of every fitted passage on that page and the
-    continuation that starts where that opening ends. An existing code
-    block or anchor claim does not block those windows. A table block
+    appends one quote of every fitted passage on that page, up to 4,000
+    characters, until the paragraph slots are full. An existing code
+    block or anchor claim does not block those quotes. A table block
     still returns before the fill so the table body keeps its slots.
     Otherwise appends at most one contiguous span that clears the anchor
     gate: two distinct anchor hits in the chosen passage, or one
@@ -299,19 +299,22 @@ def append_anchor_claim(
         chunk_id: Fusion chunk that holds ``span``.
         span: Exact citation span from evidence.
         link_id: Anchor or page-opening claim id to assign.
-        collapse_whitespace: When True, the visible claim joins wrapped
-            lines into spaces. The citation span stays exact.
+        collapse_whitespace: When True, the visible paragraph joins
+            wrapped lines into spaces and may run to 4,000 characters.
+            The citation span stays an exact substring of at most 1,000
+            characters.
         priority: Verifier rank. Lower is kept ahead of ordinary facts.
 
     Returns:
         Payload with one added anchor claim, or unchanged when empty.
     """
 
-    exact = span.strip()[:MAX_CITATION_SPAN_CHARS]
+    raw = span.strip()
+    exact = raw[:MAX_CITATION_SPAN_CHARS]
     if not exact:
         return payload
     if collapse_whitespace:
-        display = " ".join(exact.split())
+        display = " ".join(raw[:4000].split())
     else:
         display = re.sub(
             r"\n{2,}",
