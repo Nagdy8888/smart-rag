@@ -30,7 +30,9 @@
 .jumpLatest {
   position: sticky;
   bottom: 8px;
-  align-self: center;
+  align-self: flex-end;
+  margin-inline-end: calc(var(--space) * 3);
+  z-index: 2;
 }
 
 .answer {
@@ -181,6 +183,33 @@
 .codeBlockBody code span {
   white-space: pre;
   font-family: inherit;
+}
+
+.answerFigure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+  width: 100%;
+  max-width: 100%;
+}
+
+.answerFigureCaption {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.answerFigureImage {
+  display: block;
+  align-self: flex-start;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
 .answerTableFigure {

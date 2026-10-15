@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../../lib/api/http";
 import { useOptionalSession } from "../../lib/auth/session-provider";
+import { UserText } from "../ui/user-text";
+import styles from "./chat-transcript.module.css";
 
 const FIGURE_MARK = /\[\[figure:([A-Za-z0-9]{1,64})\]\]/;
 
@@ -30,6 +32,9 @@ export function splitFigureMark(text: string): { prose: string; figureId: string
 /**
  * Load one figure through the authorized API and show it as an image.
  *
+ * The bytes stay on a blob URL. CSP must allow `blob:` in `img-src`; a
+ * remote image host is never accepted.
+ *
  * @param props - Figure id and caption text. Caption is rendered as text.
  */
 export function AnswerFigure({
@@ -48,26 +53,30 @@ export function AnswerFigure({
       return;
     }
     const controller = new AbortController();
+    let active = true;
     let objectUrl = "";
     void fetch(apiUrl(`/figures/${figureId}`), {
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) {
+        if (!active || !response.ok) {
           return;
         }
         const blob = await response.blob();
-        if (blob.type !== "image/png" && blob.type !== "") {
+        if (!active || (blob.type !== "image/png" && blob.type !== "")) {
           return;
         }
         objectUrl = URL.createObjectURL(blob);
         setSrc(objectUrl);
       })
       .catch(() => {
-        setSrc(null);
+        if (active) {
+          setSrc(null);
+        }
       });
     return () => {
+      active = false;
       controller.abort();
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
@@ -76,9 +85,19 @@ export function AnswerFigure({
   }, [figureId, token]);
 
   return (
-    <figure data-testid="answer-figure">
-      {caption ? <figcaption>{caption}</figcaption> : null}
-      {src ? <img src={src} alt={caption || "Document figure"} /> : null}
+    <figure className={styles.answerFigure} data-testid="answer-figure">
+      {src ? (
+        <img
+          className={styles.answerFigureImage}
+          src={src}
+          alt={caption || "Document figure"}
+        />
+      ) : null}
+      {caption ? (
+        <figcaption className={styles.answerFigureCaption}>
+          <UserText value={caption} />
+        </figcaption>
+      ) : null}
     </figure>
   );
 }

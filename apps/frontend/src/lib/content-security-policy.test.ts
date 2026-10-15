@@ -98,6 +98,7 @@ describe("buildContentSecurityPolicy", () => {
       supabaseUrl: "https://qsjivtwtmlmtksufqjik.supabase.co",
     });
     expect(policy).toContain("https://rag-api.example.com");
+    expect(policy).toContain("img-src 'self' data: blob:");
     expect(policy).not.toContain("cdn.tailwindcss.com");
   });
 });

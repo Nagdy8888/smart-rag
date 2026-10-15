@@ -2,7 +2,7 @@
 title: Accessibility and security implementation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-10-15
 audience: frontend, security, reviewers
 packet: P08-20
 ---
@@ -57,8 +57,10 @@ lists use a roving tabindex (`ArrowUp` / `ArrowDown` / `Home` / `End`).
 
 `apps/frontend/next.config.ts` sends `nosniff`, `DENY`, `no-referrer`,
 `X-DNS-Prefetch-Control: off`, a restrictive `Permissions-Policy`, and
-CSP `default-src 'self'` with `font-src 'self'`, `img-src 'self' data:`,
-and `style-src 'self' 'unsafe-inline'`. `connect-src` is `'self'` plus
+CSP `default-src 'self'` with `font-src 'self'`, `img-src 'self' data: blob:`,
+and `style-src 'self' 'unsafe-inline'`. `blob:` is only there so an
+authorized figure PNG can be shown from a page-local object URL. The
+answer never accepts an image host from the model. `connect-src` is `'self'` plus
 the exact origins of `NEXT_PUBLIC_API_BASE_URL` and
 `NEXT_PUBLIC_SUPABASE_URL`. Loopback FastAPI/Auth origins are added only
 when `NODE_ENV=development`. Production does not ship hardcoded

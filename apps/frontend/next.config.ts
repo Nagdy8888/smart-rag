@@ -121,7 +121,7 @@ export function buildContentSecurityPolicy(env: ConnectSrcEnv): string {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "font-src 'self'",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "style-src 'self' 'unsafe-inline'",
     buildScriptSrcDirective(env.nodeEnv),
     buildConnectSrcDirective(env),

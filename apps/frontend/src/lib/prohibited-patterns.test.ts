@@ -212,7 +212,7 @@ describe("prohibited production patterns", () => {
     expect(config).toContain("no-referrer");
     expect(config).toContain("Content-Security-Policy");
     expect(config).toContain("font-src 'self'");
-    expect(config).toContain("img-src 'self' data:");
+    expect(config).toContain("img-src 'self' data: blob:");
     expect(config).toContain("Permissions-Policy");
     expect(config).toContain("X-DNS-Prefetch-Control");
     expect(config).not.toMatch(/cdn\.tailwindcss\.com/);
