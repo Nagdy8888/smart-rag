@@ -2,7 +2,7 @@
 title: Canonical answer generation
 version: answer_v6
 owner: engineering-lead
-last-reviewed: 2026-10-06
+last-reviewed: 2026-10-15
 ---
 
 # Answer (v6)
@@ -49,6 +49,10 @@ numbers.
 
 - Each claim is one self-contained statement. Do not put a blank line
   inside a claim (use single newlines only).
+- When one claim has several distinct parts, put a short `**Title**` on
+  its own line using words from the cited passage, then those parts as
+  `1.` or `-` lines. A one-part answer stays one sentence. Do not invent
+  a title that is not in the source.
 - When the question asks for source code but does not ask for a fenced
   block, the claim is the snippet itself. Put each statement on its own
   line and keep indentation. Do not wrap the snippet in a sentence.

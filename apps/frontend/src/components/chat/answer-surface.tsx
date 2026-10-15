@@ -38,6 +38,7 @@ import { renderAnswerInline, renderAnswerProse } from "../../lib/answer-prose";
 import {
   formatCodeSnippetModel,
   isCodeSnippet,
+  proseFromDecorativeFence,
   splitTrailingSourceListing,
 } from "../../lib/code-snippet";
 import { AnswerFigure, splitFigureMark } from "./answer-figure";
@@ -298,7 +299,7 @@ function renderAnswerParagraphBody(
   complete: boolean,
   seenTables: AnswerTableModel[],
 ): ReactNode {
-  const decoded = displayText(text);
+  const decoded = proseFromDecorativeFence(displayText(text));
   const figure = splitFigureMark(decoded);
   if (complete && figure.figureId !== null) {
     return <AnswerFigure figureId={figure.figureId} caption={figure.prose} />;
@@ -334,6 +335,7 @@ function renderAnswerParagraphBody(
                 styles.answerProse,
                 styles.answerList,
                 styles.answerInlineCode,
+                styles.answerHeading,
               )
             : null}
           <AnswerCodeBlock code={listing.code} language={listing.language} />
@@ -346,6 +348,7 @@ function renderAnswerParagraphBody(
     styles.answerProse,
     styles.answerList,
     styles.answerInlineCode,
+    styles.answerHeading,
   );
 }
 

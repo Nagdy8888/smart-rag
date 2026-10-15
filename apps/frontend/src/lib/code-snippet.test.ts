@@ -66,6 +66,11 @@ describe("code snippets", () => {
 
   it("leaves ordinary prose alone", () => {
     expect(isCodeSnippet("The refund period is 30 days.")).toBe(false);
+    expect(
+      isCodeSnippet(
+        "A class of failures stays visible until the next retry. The worker records the reason and continues with the remaining steps.",
+      ),
+    ).toBe(false);
     expect(splitTrailingSourceListing("The refund period is 30 days.")).toBeNull();
     expect(splitTrailingSourceListing("from the handbook we copy the steps.")).toBeNull();
   });
@@ -91,6 +96,20 @@ describe("code snippets", () => {
         "from lan",
       ].join("\n"),
     );
+  });
+
+  it("detects a class statement", () => {
+    expect(isCodeSnippet("class Widget:\n    pass")).toBe(true);
+    expect(isCodeSnippet("class Widget(Base):\n    value = 1")).toBe(true);
+  });
+
+  it("does not box a fenced paragraph of sentences", () => {
+    const fenced = [
+      "```python",
+      "A class of failures stays visible until the next retry. The worker records the reason and continues with the remaining steps.",
+      "```",
+    ].join("\n");
+    expect(isCodeSnippet(fenced)).toBe(false);
   });
 
   it("detects a fenced python block and strips fences", () => {

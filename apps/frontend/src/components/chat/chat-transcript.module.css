@@ -117,6 +117,26 @@
   color: var(--color-text);
 }
 
+.answerHeading {
+  margin: 0;
+  max-width: 40rem;
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.answerHeading + .answerProse,
+.answerHeading + .answerList {
+  margin-block-start: calc(var(--space) * 2);
+}
+
+.answerProse + .answerHeading,
+.answerList + .answerHeading {
+  margin-block-start: calc(var(--space) * 5);
+}
+
 .answerProse + .answerProse,
 .answerList + .answerProse,
 .answerProse + .answerList {
@@ -754,6 +774,10 @@
   .answerList {
     font-size: 17px;
     line-height: 1.5;
+  }
+
+  .answerHeading {
+    font-size: 1.2rem;
   }
 }
 

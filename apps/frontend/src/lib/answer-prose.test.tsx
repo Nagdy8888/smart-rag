@@ -85,6 +85,44 @@ describe("answer prose markdown-lite", () => {
     );
   });
 
+  it("renders a bold title above an ordered list and leaves a sentence as prose", () => {
+    const { container } = render(
+      <>
+        {renderAnswerProse(
+          ["**Setup**", "1. One", "2. Two"].join("\n"),
+          "prose",
+          "list",
+          "inline",
+          "heading",
+        )}
+      </>,
+    );
+    const heading = screen.getByRole("heading", { level: 3, name: "Setup" });
+    expect(heading).toHaveClass("heading");
+    expect(container.querySelectorAll("ol.list li")).toHaveLength(2);
+  });
+
+  it("leaves a one-sentence paragraph as text", () => {
+    const { container } = render(
+      <>
+        {renderAnswerProse("The refund period is 30 days.", "prose", "list", "inline")}
+      </>,
+    );
+    expect(container.querySelector("h3")).toBeNull();
+    expect(container.querySelector("ol")).toBeNull();
+    expect(screen.getByText("The refund period is 30 days.")).toBeInTheDocument();
+  });
+
+  it("renders a markdown heading and leaves a one-sentence paragraph as text", () => {
+    render(
+      <>
+        {renderAnswerProse("## Memory\nEdges run in order.", "prose", "list", "inline", "heading")}
+      </>,
+    );
+    expect(screen.getByRole("heading", { level: 3, name: "Memory" })).toBeInTheDocument();
+    expect(screen.getByText("Edges run in order.")).toBeInTheDocument();
+  });
+
   it("renders ordered lists", () => {
     const { container } = render(
       <>

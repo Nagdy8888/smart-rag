@@ -9,6 +9,9 @@ import { displayText, isSafeHttpUrl } from "./safe-text";
 
 const BULLET = /^\s*[-*]\s+(.+)$/;
 const ORDERED = /^\s*(\d+)\.\s+(.+)$/;
+/** A markdown title of one to three hashes, or a line that is only bold. */
+const ATX_HEADING = /^\s{0,3}#{1,3}\s+(\S.*?)\s*$/;
+const BOLD_HEADING = /^\s*\*\*([^*]+)\*\*\s*$/;
 const BOLD = /\*\*([^*]+)\*\*/g;
 const INLINE_CODE = /`([^`]+)`/g;
 /** Markdown link or a bare http(s) address. Group 1 is the label, group 2 the URL. */
@@ -16,14 +19,16 @@ const LINK_OR_URL =
   /\[([^\]\n]+)\]\(([^)\s]+)\)|https?:\/\/[^\s<>"']+/g;
 
 /**
- * Render one verified prose paragraph with lists, bold, inline code, and links.
+ * Render one verified prose paragraph with headings, lists, bold, inline code, and links.
  *
+ * A line that is only a markdown heading or only bold becomes a title.
  * Only http and https addresses become anchors. Other schemes stay text.
  *
  * @param text - Decoded paragraph text.
  * @param className - CSS module class for paragraph blocks.
  * @param listClassName - CSS module class for list blocks.
  * @param inlineCodeClassName - CSS module class for inline code.
+ * @param headingClassName - CSS module class for title lines.
  * @returns React nodes. XSS payloads remain text.
  */
 export function renderAnswerProse(
@@ -31,6 +36,7 @@ export function renderAnswerProse(
   className: string,
   listClassName: string,
   inlineCodeClassName: string,
+  headingClassName = "heading",
 ): ReactNode {
   const source = text.replace(/\r\n/g, "\n");
   const blocks = splitProseBlocks(source);
@@ -41,6 +47,17 @@ export function renderAnswerProse(
     "div",
     { "data-testid": "answer-prose" },
     ...blocks.map((block, index) => {
+      if (block.kind === "h") {
+        return createElement(
+          "h3",
+          {
+            key: `h-${String(index)}`,
+            className: headingClassName,
+            dir: "auto",
+          },
+          ...renderInline(block.text, inlineCodeClassName),
+        );
+      }
       if (block.kind === "ul" || block.kind === "ol") {
         return createElement(
           block.kind,
@@ -76,7 +93,26 @@ export function renderAnswerProse(
 
 type ProseBlock =
   | { kind: "p"; text: string }
+  | { kind: "h"; text: string }
   | { kind: "ul" | "ol"; items: string[] };
+
+/**
+ * Return the title text when a line is only a heading.
+ *
+ * @param line - One source line.
+ * @returns Title text, or null when the line is body or a list item.
+ */
+function headingText(line: string): string | null {
+  const atx = line.match(ATX_HEADING);
+  if (atx) {
+    return (atx[1] ?? "").trim();
+  }
+  const bold = line.match(BOLD_HEADING);
+  if (bold) {
+    return (bold[1] ?? "").trim();
+  }
+  return null;
+}
 
 /**
  * Split paragraph text into prose and list blocks on blank lines / list runs.
@@ -108,6 +144,13 @@ function splitProseBlocks(source: string): ProseBlock[] {
   };
 
   for (const line of lines) {
+    const title = headingText(line);
+    if (title) {
+      flushParagraph();
+      flushList();
+      blocks.push({ kind: "h", text: title });
+      continue;
+    }
     const bullet = line.match(BULLET);
     const ordered = line.match(ORDERED);
     if (bullet) {

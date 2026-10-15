@@ -5,7 +5,8 @@
  */
 
 const DEF_PATTERN = /\b(?:async\s+)?def\s+\w+\s*\(/;
-const CLASS_PATTERN = /\bclass\s+\w+/;
+/** A class statement, not the word "class" inside a sentence. */
+const CLASS_PATTERN = /\bclass\s+[A-Za-z_]\w*\s*(?:\([^)\n]*\))?\s*:/;
 const TOOL_PATTERN = /@tool\b/;
 const HEADER_PATTERN =
   /^((?:async\s+)?(?:def|class)\s+\w+\s*\([^)]*\)[^:]*):\s*([\s\S]*)$/;
@@ -27,10 +28,37 @@ export type CodeSnippetModel = {
 };
 
 /**
+ * Return sentence text when a fence only wraps prose.
+ *
+ * Source fences stay unchanged so the code box can still open them.
+ *
+ * @param text - One verified paragraph.
+ * @returns Inner sentences, or the original text.
+ */
+export function proseFromDecorativeFence(text: string): string {
+  const source = text.replace(/\r\n/g, "\n");
+  const whole = source.match(FENCE_WHOLE);
+  const anywhere = whole ?? source.match(FENCE_ANYWHERE);
+  const openOnly = anywhere ?? source.match(FENCE_OPEN_ONLY);
+  if (!openOnly) {
+    return text;
+  }
+  const body = (openOnly[2] ?? "")
+    .replace(/\n?[ \t]*```[ \t]*\s*$/, "")
+    .replace(/\n+$/, "")
+    .replace(/^\n+/, "");
+  if (!body.trim() || !looksLikeProse(body)) {
+    return text;
+  }
+  return body;
+}
+
+/**
  * Return whether a verified paragraph contains a function, class, or fence.
  *
  * @param text - One verified paragraph (prefer decoded).
- * @returns True when a definition, `@tool`, or fenced block is present.
+ * @returns True when a definition, `@tool`, or source fence is present.
+ * A sentence that only uses the word "class" stays prose.
  */
 export function isCodeSnippet(text: string): boolean {
   if (extractFencedCode(text) !== null) {
@@ -206,17 +234,11 @@ function extractFencedCode(text: string): CodeSnippetModel | null {
   const source = text.replace(/\r\n/g, "\n");
   const whole = source.match(FENCE_WHOLE);
   if (whole) {
-    return {
-      language: normalizeLanguage(whole[1] ?? ""),
-      code: (whole[2] ?? "").replace(/\n+$/, "").replace(/^\n+/, ""),
-    };
+    return fenceModel(whole[1] ?? "", whole[2] ?? "");
   }
   const anywhere = source.match(FENCE_ANYWHERE);
   if (anywhere) {
-    return {
-      language: normalizeLanguage(anywhere[1] ?? ""),
-      code: (anywhere[2] ?? "").replace(/\n+$/, "").replace(/^\n+/, ""),
-    };
+    return fenceModel(anywhere[1] ?? "", anywhere[2] ?? "");
   }
   const openOnly = source.match(FENCE_OPEN_ONLY);
   if (!openOnly) {
@@ -226,13 +248,48 @@ function extractFencedCode(text: string): CodeSnippetModel | null {
     .replace(/\n?[ \t]*```[ \t]*\s*$/, "")
     .replace(/\n+$/, "")
     .replace(/^\n+/, "");
-  if (!body.trim()) {
+  if (!body.trim() || looksLikeProse(body)) {
+    return null;
+  }
+  return fenceModel(openOnly[1] ?? "", body);
+}
+
+/**
+ * Build a snippet from a fence body.
+ *
+ * A fence around sentences is not a snippet. The caller renders that
+ * body as prose.
+ *
+ * @param language - Fence info string.
+ * @param body - Text between the fences.
+ * @returns Snippet, or null when the body is prose.
+ */
+function fenceModel(language: string, body: string): CodeSnippetModel | null {
+  const code = body.replace(/\n+$/, "").replace(/^\n+/, "");
+  if (!code.trim() || looksLikeProse(code)) {
     return null;
   }
   return {
-    language: normalizeLanguage(openOnly[1] ?? ""),
-    code: body,
+    language: normalizeLanguage(language),
+    code,
   };
+}
+
+/**
+ * Return whether fenced text is sentences rather than a listing.
+ *
+ * @param body - Fence body.
+ * @returns True for a long punctuated paragraph with no source statement.
+ */
+function looksLikeProse(body: string): boolean {
+  if (DEF_PATTERN.test(body) || CLASS_PATTERN.test(body) || TOOL_PATTERN.test(body)) {
+    return false;
+  }
+  if (body.split("\n").some((line) => SOURCE_LINE.test(line.trim()))) {
+    return false;
+  }
+  const words = body.trim().split(/\s+/);
+  return words.length >= 8 && /[.!?]/.test(body);
 }
 
 /**
