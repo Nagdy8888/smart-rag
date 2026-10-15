@@ -34,7 +34,7 @@ import {
   parseAnswerTable,
   type AnswerTableModel,
 } from "../../lib/answer-table";
-import { renderAnswerProse } from "../../lib/answer-prose";
+import { renderAnswerInline, renderAnswerProse } from "../../lib/answer-prose";
 import {
   formatCodeSnippetModel,
   isCodeSnippet,
@@ -360,12 +360,12 @@ function AnswerTableView({ table }: { table: AnswerTableModel }): ReactNode {
     return (
       <figure className={styles.answerTableFigure} data-testid="answer-table">
         {table.caption ? (
-          <figcaption className={styles.answerTableCaption}>
-            <UserText value={table.caption} />
+          <figcaption className={styles.answerTableCaption} dir="auto">
+            {renderAnswerInline(table.caption, styles.answerInlineCode)}
           </figcaption>
         ) : null}
         <pre className={styles.answerTablePre} dir="ltr">
-          <UserText value={table.preformatted} />
+          {renderAnswerInline(table.preformatted, styles.answerInlineCode)}
         </pre>
       </figure>
     );
@@ -373,8 +373,8 @@ function AnswerTableView({ table }: { table: AnswerTableModel }): ReactNode {
   return (
     <figure className={styles.answerTableFigure} data-testid="answer-table">
       {table.caption ? (
-        <figcaption className={styles.answerTableCaption}>
-          <UserText value={table.caption} />
+        <figcaption className={styles.answerTableCaption} dir="auto">
+          {renderAnswerInline(table.caption, styles.answerInlineCode)}
         </figcaption>
       ) : null}
       <div className={styles.answerTableScroll}>
@@ -383,7 +383,9 @@ function AnswerTableView({ table }: { table: AnswerTableModel }): ReactNode {
             <tr>
               {table.headers.map((header, index) => (
                 <th key={`h-${String(index)}`} scope="col">
-                  <UserText value={header} />
+                  <span dir="auto">
+                    {renderAnswerInline(header, styles.answerInlineCode)}
+                  </span>
                 </th>
               ))}
             </tr>
@@ -393,7 +395,9 @@ function AnswerTableView({ table }: { table: AnswerTableModel }): ReactNode {
               <tr key={`r-${String(rowIndex)}`}>
                 {row.map((cell, cellIndex) => (
                   <td key={`c-${String(rowIndex)}-${String(cellIndex)}`}>
-                    <UserText value={cell} />
+                    <span dir="auto">
+                      {renderAnswerInline(cell, styles.answerInlineCode)}
+                    </span>
                   </td>
                 ))}
               </tr>

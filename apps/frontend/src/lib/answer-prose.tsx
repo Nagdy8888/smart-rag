@@ -5,15 +5,20 @@
  */
 
 import { createElement, type ReactNode } from "react";
-import { displayText } from "./safe-text";
+import { displayText, isSafeHttpUrl } from "./safe-text";
 
 const BULLET = /^\s*[-*]\s+(.+)$/;
 const ORDERED = /^\s*(\d+)\.\s+(.+)$/;
 const BOLD = /\*\*([^*]+)\*\*/g;
 const INLINE_CODE = /`([^`]+)`/g;
+/** Markdown link or a bare http(s) address. Group 1 is the label, group 2 the URL. */
+const LINK_OR_URL =
+  /\[([^\]\n]+)\]\(([^)\s]+)\)|https?:\/\/[^\s<>"']+/g;
 
 /**
- * Render one verified prose paragraph with lists, bold, and inline code.
+ * Render one verified prose paragraph with lists, bold, inline code, and links.
+ *
+ * Only http and https addresses become anchors. Other schemes stay text.
  *
  * @param text - Decoded paragraph text.
  * @param className - CSS module class for paragraph blocks.
@@ -137,6 +142,54 @@ function splitProseBlocks(source: string): ProseBlock[] {
 }
 
 /**
+ * Render inline bold, backtick code, and clickable http(s) links.
+ *
+ * @param text - One line, cell, or paragraph body. HTML is not parsed.
+ * @param inlineCodeClassName - Class for inline code.
+ * @returns Mixed text and element children.
+ */
+export function renderAnswerInline(
+  text: string,
+  inlineCodeClassName: string,
+): ReactNode[] {
+  const safe = displayText(text);
+  const parts: ReactNode[] = [];
+  const codeSplit = splitByPattern(safe, INLINE_CODE);
+  let key = 0;
+  const nextKey = (): string => {
+    key += 1;
+    return String(key);
+  };
+  for (const piece of codeSplit) {
+    if (piece.type === "match") {
+      parts.push(
+        createElement(
+          "code",
+          { key: `c-${nextKey()}`, className: inlineCodeClassName },
+          piece.capture,
+        ),
+      );
+      continue;
+    }
+    const boldSplit = splitByPattern(piece.value, BOLD);
+    for (const boldPiece of boldSplit) {
+      if (boldPiece.type === "match") {
+        parts.push(
+          createElement(
+            "strong",
+            { key: `b-${nextKey()}` },
+            ...appendLinks(boldPiece.capture, nextKey),
+          ),
+        );
+      } else if (boldPiece.value) {
+        parts.push(...appendLinks(boldPiece.value, nextKey));
+      }
+    }
+  }
+  return parts.length > 0 ? parts : [safe];
+}
+
+/**
  * Render inline bold and backtick code as React nodes.
  *
  * @param text - One line or paragraph body.
@@ -144,36 +197,96 @@ function splitProseBlocks(source: string): ProseBlock[] {
  * @returns Mixed text and element children.
  */
 function renderInline(text: string, inlineCodeClassName: string): ReactNode[] {
-  const safe = displayText(text);
+  return renderAnswerInline(text, inlineCodeClassName);
+}
+
+/**
+ * Turn markdown links and bare http(s) addresses into anchors.
+ *
+ * @param text - Text that is not inside inline code.
+ * @param nextKey - Key factory for sibling nodes.
+ * @returns Text nodes and anchors. Unsafe URLs stay text.
+ */
+function appendLinks(text: string, nextKey: () => string): ReactNode[] {
   const parts: ReactNode[] = [];
-  // Split on inline code first so backticks inside bold stay literal.
-  const codeSplit = splitByPattern(safe, INLINE_CODE);
-  let key = 0;
-  for (const piece of codeSplit) {
-    if (piece.type === "match") {
-      parts.push(
-        createElement(
-          "code",
-          { key: `c-${String(key)}`, className: inlineCodeClassName },
-          piece.capture,
-        ),
-      );
-      key += 1;
-      continue;
+  const pattern = new RegExp(LINK_OR_URL.source, "g");
+  let last = 0;
+  let match = pattern.exec(text);
+  while (match) {
+    if (match.index > last) {
+      parts.push(text.slice(last, match.index));
     }
-    const boldSplit = splitByPattern(piece.value, BOLD);
-    for (const boldPiece of boldSplit) {
-      if (boldPiece.type === "match") {
-        parts.push(
-          createElement("strong", { key: `b-${String(key)}` }, boldPiece.capture),
-        );
-        key += 1;
-      } else if (boldPiece.value) {
-        parts.push(boldPiece.value);
+    const label = match[1];
+    const markdownUrl = match[2];
+    if (label !== undefined && markdownUrl !== undefined) {
+      if (isSafeHttpUrl(markdownUrl)) {
+        parts.push(answerLink(markdownUrl, label, nextKey()));
+      } else {
+        parts.push(match[0]);
+      }
+    } else {
+      const trimmed = trimUrlTail(match[0]);
+      if (isSafeHttpUrl(trimmed.href)) {
+        parts.push(answerLink(trimmed.href, trimmed.href, nextKey()));
+        if (trimmed.tail) {
+          parts.push(trimmed.tail);
+        }
+      } else {
+        parts.push(match[0]);
       }
     }
+    last = match.index + match[0].length;
+    match = pattern.exec(text);
   }
-  return parts.length > 0 ? parts : [safe];
+  if (last < text.length) {
+    parts.push(text.slice(last));
+  }
+  return parts.length > 0 ? parts : [text];
+}
+
+/**
+ * Build one external answer link. The label is a text child, never HTML.
+ *
+ * @param href - http or https URL already checked with `isSafeHttpUrl`.
+ * @param label - Visible text.
+ * @param key - React key.
+ * @returns Anchor that opens in a new tab.
+ */
+function answerLink(href: string, label: string, key: string): ReactNode {
+  return createElement(
+    "a",
+    {
+      key: `a-${key}`,
+      href,
+      target: "_blank",
+      rel: "noopener noreferrer",
+    },
+    label,
+  );
+}
+
+/**
+ * Drop sentence punctuation that stuck to a bare URL.
+ *
+ * @param raw - Matched address, possibly with a trailing period.
+ * @returns Href and the punctuation that should stay outside the link.
+ */
+function trimUrlTail(raw: string): { href: string; tail: string } {
+  let href = raw;
+  let tail = "";
+  while (href.length > 0 && /[.,;:!?)]$/.test(href)) {
+    const last = href.slice(-1);
+    if (last === ")") {
+      const opens = href.split("(").length - 1;
+      const closes = href.split(")").length - 1;
+      if (opens >= closes) {
+        break;
+      }
+    }
+    tail = last + tail;
+    href = href.slice(0, -1);
+  }
+  return { href, tail };
 }
 
 type SplitPiece =

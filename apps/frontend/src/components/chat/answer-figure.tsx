@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../../lib/api/http";
 import { useOptionalSession } from "../../lib/auth/session-provider";
-import { UserText } from "../ui/user-text";
+import { renderAnswerInline } from "../../lib/answer-prose";
 import styles from "./chat-transcript.module.css";
 
 const FIGURE_MARK = /\[\[figure:([A-Za-z0-9]{1,64})\]\]/;
@@ -94,8 +94,8 @@ export function AnswerFigure({
         />
       ) : null}
       {caption ? (
-        <figcaption className={styles.answerFigureCaption}>
-          <UserText value={caption} />
+        <figcaption className={styles.answerFigureCaption} dir="auto">
+          {renderAnswerInline(caption, styles.answerInlineCode)}
         </figcaption>
       ) : null}
     </figure>

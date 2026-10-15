@@ -44,6 +44,47 @@ describe("answer prose markdown-lite", () => {
     );
   });
 
+  it("makes http links clickable and leaves other schemes as text", () => {
+    const { container } = render(
+      <>
+        {renderAnswerProse(
+          "Read https://example.com/docs. and [the notes](https://example.com/notes) then [bad](javascript:alert(1)).",
+          "prose",
+          "list",
+          "inline",
+        )}
+      </>,
+    );
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute("href", "https://example.com/docs");
+    expect(links[0]).toHaveAttribute("target", "_blank");
+    expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+    expect(links[1]).toHaveAttribute("href", "https://example.com/notes");
+    expect(links[1]).toHaveTextContent("the notes");
+    expect(container.querySelector("a[href^='javascript:']")).toBeNull();
+    expect(screen.getByTestId("answer-prose").textContent).toContain(
+      "javascript:alert(1)",
+    );
+  });
+
+  it("keeps a URL inside inline code as text", () => {
+    const { container } = render(
+      <>
+        {renderAnswerProse(
+          "Run `https://example.com/hook` locally.",
+          "prose",
+          "list",
+          "inline",
+        )}
+      </>,
+    );
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.querySelector("code")).toHaveTextContent(
+      "https://example.com/hook",
+    );
+  });
+
   it("renders ordered lists", () => {
     const { container } = render(
       <>

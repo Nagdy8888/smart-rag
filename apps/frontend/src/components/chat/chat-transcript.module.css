@@ -93,6 +93,25 @@
   text-wrap: pretty;
 }
 
+.answerProse a,
+.answerList a,
+.answerTable a,
+.answerTableCaption a,
+.answerFigureCaption a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.answerProse a:hover,
+.answerList a:hover,
+.answerTable a:hover,
+.answerTableCaption a:hover,
+.answerFigureCaption a:hover {
+  color: var(--color-accent-hover);
+}
+
 .answerProse strong {
   font-weight: 700;
   color: var(--color-text);
