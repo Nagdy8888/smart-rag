@@ -20,7 +20,7 @@ Packet 4 discloses optional tools after tables
 
 Packet 1 `admit_query_run` reserves a **route envelope** before profiling.
 The client route is not authorization. Normal Auto chat should reserve the
-widest family the run might need (`composite`: 50s / 9 calls / 5 tools) so
+widest family the run might need (`composite`: 75s / 9 calls / 5 tools) so
 profiling can select Hybrid/Combined without enlarging spend. Diagnostic
 surfaces may reserve a specific family. The planner **never exceeds** the
 remaining packet 1 ceilings. Effective route may be cheaper than the

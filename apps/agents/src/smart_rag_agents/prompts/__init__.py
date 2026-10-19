@@ -10,6 +10,8 @@ RERANK_PROMPT_VERSION = "rerank_v2"
 RERANK_PROMPT_PATH = Path(__file__).resolve().parent / "rerank_v2.md"
 ANSWER_PROMPT_VERSION = "answer_v6"
 ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v6.md"
+ORGANIZE_PROMPT_VERSION = "organize_v1"
+ORGANIZE_PROMPT_PATH = Path(__file__).resolve().parent / "organize_v1.md"
 GENERAL_CHAT_PROMPT_VERSION = "general_chat_v1"
 GENERAL_CHAT_PROMPT_PATH = Path(__file__).resolve().parent / "general_chat_v1.md"
 VERIFIER_PROMPT_VERSION = "verifier_v2"
@@ -69,6 +71,19 @@ def answer_prompt_text() -> str:
     """
 
     return ANSWER_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def organize_prompt_text() -> str:
+    """Return the verified-answer rewrite prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return ORGANIZE_PROMPT_PATH.read_text(encoding="utf-8")
 
 
 def general_chat_prompt_text() -> str:

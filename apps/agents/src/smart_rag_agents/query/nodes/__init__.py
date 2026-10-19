@@ -13,6 +13,7 @@ from smart_rag_agents.query.nodes.invalid_scope import invalid_scope_node
 from smart_rag_agents.query.nodes.memory import load_memory_node
 from smart_rag_agents.query.nodes.mixed_scope import mixed_scope_node
 from smart_rag_agents.query.nodes.optional_tools import disclose_optional_tools_node
+from smart_rag_agents.query.nodes.organize import organize_answer_node
 from smart_rag_agents.query.nodes.plan import compile_plan_node
 from smart_rag_agents.query.nodes.prepare import prepare_query_node
 from smart_rag_agents.query.nodes.tables import compose_tables_node
@@ -33,6 +34,7 @@ __all__ = [
     "invalid_scope_node",
     "load_memory_node",
     "mixed_scope_node",
+    "organize_answer_node",
     "prepare_query_node",
     "verify_answer_node",
     "web_scope_node",

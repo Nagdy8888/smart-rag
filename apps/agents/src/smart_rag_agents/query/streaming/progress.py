@@ -33,6 +33,7 @@ PRODUCTION_PROGRESS_STAGES: tuple[str, ...] = (
     "disclose_optional_tools",
     "generate_answer",
     "verify_answer",
+    "organize_answer",
 )
 
 
@@ -134,6 +135,7 @@ def register_production_progress_nodes(
         ("disclose_optional_tools", nodes.disclose_optional_tools),
         ("generate_answer", nodes.generate_answer),
         ("verify_answer", nodes.verify_answer),
+        ("organize_answer", nodes.organize_answer),
     )
     for stage, node in staged:
         builder.add_node(  # pyright: ignore[reportUnknownMemberType]

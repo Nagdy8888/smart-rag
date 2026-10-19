@@ -29,6 +29,7 @@ const LINK_OR_URL =
  * @param listClassName - CSS module class for list blocks.
  * @param inlineCodeClassName - CSS module class for inline code.
  * @param headingClassName - CSS module class for title lines.
+ * @param groupSentences - When true, two or more sentences become a numbered list.
  * @returns React nodes. XSS payloads remain text.
  */
 export function renderAnswerProse(
@@ -37,9 +38,10 @@ export function renderAnswerProse(
   listClassName: string,
   inlineCodeClassName: string,
   headingClassName = "heading",
+  groupSentences = false,
 ): ReactNode {
   const source = text.replace(/\r\n/g, "\n");
-  const blocks = splitProseBlocks(source);
+  const blocks = splitProseBlocks(source, groupSentences);
   if (blocks.length === 0) {
     return null;
   }
@@ -97,6 +99,36 @@ type ProseBlock =
   | { kind: "ul" | "ol"; items: string[] };
 
 /**
+ * Split plain prose into sentences when each one ends a real clause.
+ *
+ * A period after fewer than three letters or digits stays inside the
+ * sentence, so short abbreviations are not list items. One sentence
+ * stays one item.
+ *
+ * @param text - Paragraph body with newlines already flattened by the caller.
+ * @returns Sentence strings in order.
+ */
+function splitAnswerSentences(text: string): string[] {
+  const flat = text.replace(/\s*\n\s*/g, " ").trim();
+  const items: string[] = [];
+  const pattern = /(?<=[A-Za-z0-9]{3}[.!?])\s+(?=[A-Z])/g;
+  let last = 0;
+  for (const match of flat.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    const sentence = flat.slice(last, index).trim();
+    if (sentence) {
+      items.push(sentence);
+    }
+    last = index + match[0].length;
+  }
+  const tail = flat.slice(last).trim();
+  if (tail) {
+    items.push(tail);
+  }
+  return items;
+}
+
+/**
  * Return the title text when a line is only a heading.
  *
  * @param line - One source line.
@@ -118,10 +150,14 @@ function headingText(line: string): string | null {
  * Split paragraph text into prose and list blocks on blank lines / list runs.
  *
  * @param source - Normalized newline text.
+ * @param groupSentences - Split a plain paragraph into a numbered list.
+ *     Under a title, several sentences become separate paragraphs instead.
  * @returns Ordered blocks for rendering.
  */
-function splitProseBlocks(source: string): ProseBlock[] {
+function splitProseBlocks(source: string, groupSentences: boolean): ProseBlock[] {
   const lines = source.split("\n");
+  const groupPlainSentences =
+    groupSentences && !lines.some((line) => headingText(line) !== null);
   const blocks: ProseBlock[] = [];
   let paragraphLines: string[] = [];
   let listKind: "ul" | "ol" | null = null;
@@ -130,9 +166,21 @@ function splitProseBlocks(source: string): ProseBlock[] {
   const flushParagraph = (): void => {
     const text = paragraphLines.join("\n").trim();
     paragraphLines = [];
-    if (text) {
-      blocks.push({ kind: "p", text });
+    if (!text) {
+      return;
     }
+    const sentences = splitAnswerSentences(text);
+    if (groupPlainSentences && sentences.length >= 2) {
+      blocks.push({ kind: "ol", items: sentences });
+      return;
+    }
+    if (lines.some((line) => headingText(line) !== null) && sentences.length >= 2) {
+      for (const sentence of sentences) {
+        blocks.push({ kind: "p", text: sentence });
+      }
+      return;
+    }
+    blocks.push({ kind: "p", text });
   };
 
   const flushList = (): void => {

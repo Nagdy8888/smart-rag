@@ -28,6 +28,7 @@ from smart_rag_agents.query.nodes import (
     invalid_scope_node,
     load_memory_node,
     mixed_scope_node,
+    organize_answer_node,
     prepare_query_node,
     verify_answer_node,
     web_scope_node,
@@ -57,6 +58,7 @@ class BoundQueryNodes:
     disclose_optional_tools: QueryNode
     generate_answer: QueryNode
     verify_answer: QueryNode
+    organize_answer: QueryNode
 
 
 def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
@@ -129,4 +131,5 @@ def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
         disclose_optional_tools=bind(disclose_optional_tools_node),
         generate_answer=bind(generate_answer_node),
         verify_answer=bind(verify_answer_node),
+        organize_answer=bind(organize_answer_node),
     )

@@ -99,7 +99,7 @@ per-call cap is the conservative maximum kind used on that route (answer
 | hybrid | 25 | 7 | 4 | 2.80 | 56000 | 14000 |
 | combined | 45 | 8 | 4 | 3.20 | 64000 | 16000 |
 | structured_table | 30 | 6 | 4 | 2.40 | 48000 | 12000 |
-| composite | 50 | 9 | 5 | 3.60 | 72000 | 18000 |
+| composite | 75 | 9 | 5 | 3.60 | 72000 | 18000 |
 | graph_inspection | 10 | 3 | 4 | 0.75 | 12000 | 4500 |
 | no_retrieval | 25 | 7 | 4 | 2.80 | 56000 | 14000 |
 | scoped_refusal | 25 | 7 | 4 | 2.80 | 56000 | 14000 |

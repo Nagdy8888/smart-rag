@@ -27,6 +27,8 @@ from smart_rag_core.query_answer.versions import (
     EVAL_JUDGE_PROMPT_VERSION,
     EVAL_PDF_JUDGE_PROMPT_SHA256,
     EVAL_PDF_JUDGE_PROMPT_VERSION,
+    ORGANIZE_PROMPT_SHA256,
+    ORGANIZE_PROMPT_VERSION,
     VERIFIER_MAX_OUTPUT_TOKENS,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
@@ -83,7 +85,11 @@ def execute_openai_answer(
         One HTTPS Responses request. ``max_retries=0``. No tools.
     """
 
-    if prompt_version != ANSWER_PROMPT_VERSION or prompt_sha256 != ANSWER_PROMPT_SHA256:
+    allowed_prompts = {
+        (ANSWER_PROMPT_VERSION, ANSWER_PROMPT_SHA256),
+        (ORGANIZE_PROMPT_VERSION, ORGANIZE_PROMPT_SHA256),
+    }
+    if (prompt_version, prompt_sha256) not in allowed_prompts:
         raise OpenAIAnswerError("answer_version_mismatch")
     if model_id not in ALLOWED_ANSWER_MODEL_IDS:
         raise OpenAIAnswerError("answer_version_mismatch")

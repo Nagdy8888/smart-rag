@@ -102,6 +102,47 @@ describe("answer prose markdown-lite", () => {
     expect(container.querySelectorAll("ol.list li")).toHaveLength(2);
   });
 
+  it("numbers several sentences and leaves one sentence as text", () => {
+    const { container } = render(
+      <>
+        {renderAnswerProse(
+          "The window is 30 days. The request must be in writing.",
+          "prose",
+          "list",
+          "inline",
+          "heading",
+          true,
+        )}
+      </>,
+    );
+    const items = container.querySelectorAll("ol.list li");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("The window is 30 days.");
+    expect(items[1]).toHaveTextContent("The request must be in writing.");
+  });
+
+  it("splits sentences under a title into paragraphs and does not number them", () => {
+    const { container } = render(
+      <>
+        {renderAnswerProse(
+          ["**Setup**", "The window is 30 days. The request must be in writing."].join(
+            "\n",
+          ),
+          "prose",
+          "list",
+          "inline",
+          "heading",
+          true,
+        )}
+      </>,
+    );
+    expect(screen.getByRole("heading", { level: 3, name: "Setup" })).toBeInTheDocument();
+    expect(container.querySelector("ol")).toBeNull();
+    expect(container.querySelectorAll("p.prose")).toHaveLength(2);
+    expect(screen.getByText("The window is 30 days.")).toBeInTheDocument();
+    expect(screen.getByText("The request must be in writing.")).toBeInTheDocument();
+  });
+
   it("leaves a one-sentence paragraph as text", () => {
     const { container } = render(
       <>

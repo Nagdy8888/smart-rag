@@ -16,6 +16,7 @@ from smart_rag_core.query_answer.models import (
     AtomicLink,
 )
 from smart_rag_core.query_answer.versions import (
+    MAX_ANSWER_CITATIONS,
     MAX_CITATION_SPAN_CHARS,
 )
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
@@ -453,7 +454,9 @@ def salvage_named_code_definition(
 
     Applies only when the query asks to reproduce code and names a function
     identifier, and canonical evidence holds ``def <name>(``. After an empty
-    refusal the matching block is always released.
+    refusal the matching block is always released. When the gold block is
+    already on screen but that chunk is not cited, the citation is added
+    and the visible text stays.
 
     Args:
         payload: Company answer after binding.
@@ -474,13 +477,50 @@ def salvage_named_code_definition(
     if not is_empty_refusal(payload) and extractive_block_already_released(
         payload, span
     ):
-        return payload
+        return _cite_shown_definition(payload, chunk_id=item.chunk_id, span=span)
     return replace_with_extractive_block(
         payload,
         chunk_id=item.chunk_id,
         span=span,
         link_id="code-def-1",
     )
+
+
+def _cite_shown_definition(
+    payload: AnswerPayload, *, chunk_id: str, span: str
+) -> AnswerPayload:
+    """Cite a definition that the answer already shows.
+
+    Args:
+        payload: Company answer that already contains ``span``.
+        chunk_id: Fusion chunk that holds ``span``.
+        span: Exact definition block from evidence.
+
+    Returns:
+        The same payload when that chunk is already cited or the citation
+        cap is full. Otherwise a copy with one added citation.
+    """
+
+    if any(item.chunk_id == chunk_id for item in payload.citations):
+        return payload
+    if len(payload.citations) >= MAX_ANSWER_CITATIONS:
+        return payload
+    exact = span.strip()[:MAX_CITATION_SPAN_CHARS]
+    if not exact:
+        return payload
+    paragraph_index = 0 if payload.paragraphs else None
+    link_id = None
+    if payload.atomic_links:
+        link_id = payload.atomic_links[0].link_id
+    elif payload.paragraphs and payload.paragraphs[0].link_ids:
+        link_id = payload.paragraphs[0].link_ids[0]
+    citation = AnswerCitation(
+        chunk_id=chunk_id,
+        span=exact,
+        atomic_link_id=link_id,
+        paragraph_index=paragraph_index,
+    )
+    return payload.model_copy(update={"citations": (*payload.citations, citation)})
 
 
 def extractive_block_already_released(

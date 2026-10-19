@@ -8,6 +8,7 @@ from smart_rag_core.query_answer.models import AnswerPayload
 
 from smart_rag_api.services.sse.mapping.contracts import (
     DRAFT_ANSWER_NODES,
+    ORGANIZE_ANSWER_NODE,
     PARTIAL_STATUSES,
     VERIFY_ANSWER_NODE,
 )
@@ -88,6 +89,8 @@ class QuerySseMapper:
 
         self._draft: AnswerPayload | None = None
         self._final: AnswerPayload | None = None
+        self._pending_payload: AnswerPayload | None = None
+        self._pending_update: dict[str, object] = {}
         self.verified = False
         self.emitted_token_delta = False
         self.terminal_emitted = False
@@ -149,7 +152,17 @@ class QuerySseMapper:
                 self._draft = parsed
             if node_name == VERIFY_ANSWER_NODE:
                 self.verified = True
-                events.extend(self._emit_verified(parsed or self._draft, update))
+                self._pending_payload = parsed or self._draft
+                self._pending_update = update
+                continue
+            if node_name == ORGANIZE_ANSWER_NODE:
+                self.verified = True
+                events.extend(
+                    self._emit_verified(
+                        parsed or self._pending_payload or self._draft,
+                        update,
+                    )
+                )
                 continue
             if not self.verified:
                 raw_status = update.get("status")
@@ -174,6 +187,8 @@ class QuerySseMapper:
 
         if self.terminal_emitted:
             return []
+        if self._pending_payload is not None and not self.emitted_token_delta:
+            return self._emit_verified(self._pending_payload, self._pending_update)
         if self.emitted_token_delta:
             self.terminal_emitted = True
             return [("completed", {})]

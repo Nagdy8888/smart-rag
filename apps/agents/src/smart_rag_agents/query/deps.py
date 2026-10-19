@@ -43,6 +43,7 @@ class QueryGraphDeps:
             live or mock profile adapter runs.
         profile_model_id: Provider model id recorded on profile usage.
         answer_prompt_text: Pinned ``answer_v2`` body when a live adapter runs.
+        organize_prompt_text: Pinned ``organize_v1`` body for the post-verify rewrite.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body when a live
             general-chat adapter runs.
         verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
@@ -79,6 +80,7 @@ class QueryGraphDeps:
     query_profile_prompt_text: str | None = None
     profile_model_id: str = PROFILE_MODEL_ID
     answer_prompt_text: str | None = None
+    organize_prompt_text: str | None = None
     general_chat_prompt_text: str | None = None
     verifier_prompt_text: str | None = None
     web_critique_prompt_text: str | None = None

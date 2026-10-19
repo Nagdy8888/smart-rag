@@ -432,7 +432,8 @@ def test_generate_answer_accumulates_provider_tokens() -> None:
     assert generated["completion_tokens"] == 7
     mapper = QuerySseMapper()
     mapper.consume_chunk({"generate_answer": generated})
-    events = mapper.consume_chunk({"verify_answer": generated})
+    mapper.consume_chunk({"verify_answer": generated})
+    events = mapper.finish()
     usage = [payload for event_type, payload in events if event_type == "usage"]
     assert usage == [{"prompt_tokens": 12, "completion_tokens": 7}]
 

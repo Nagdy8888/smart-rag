@@ -217,7 +217,7 @@ flowchart LR
 #### Answer text
 
 - A line that is only a markdown heading (`#`, `##`, `###`) or only `**Title**` renders as a larger bold heading. The following lines stay a paragraph or a numbered or bullet list, with space between the heading and that block.
-- A one-sentence answer with no title and no list stays body text. Saved answers keep their stored wording until the question is asked again. New multi-part answers put a short source title on its own line, then `1.` or `-` lines.
+- A one-sentence answer with no title and no list stays body text. Two or more sentences in one paragraph render as a numbered list until a verified rewrite adds titles. A line that is only `**Title**` stays a heading. Under that heading, each sentence is its own paragraph and each `-` or `1.` line is a list, so the body is not one block under the title. A `[[figure:...]]` mark renders the book figure. Refresh the chat to see that layout.
 
 #### `CitationChip`
 

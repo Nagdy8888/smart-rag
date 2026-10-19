@@ -19,6 +19,7 @@ DRAFT_ANSWER_NODES: Final[frozenset[str]] = frozenset(
     }
 )
 VERIFY_ANSWER_NODE: Final[str] = "verify_answer"
+ORGANIZE_ANSWER_NODE: Final[str] = "organize_answer"
 TOKEN_DELTA_LIMIT: Final[int] = 4096
 # Catalog payload keys. Derived from extra=forbid ``PAYLOAD_MODELS``.
 ALLOWED_SSE_FIELDS: Final[frozenset[str]] = frozenset(

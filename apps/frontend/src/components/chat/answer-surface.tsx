@@ -336,6 +336,7 @@ function renderAnswerParagraphBody(
                 styles.answerList,
                 styles.answerInlineCode,
                 styles.answerHeading,
+                complete,
               )
             : null}
           <AnswerCodeBlock code={listing.code} language={listing.language} />
@@ -349,6 +350,7 @@ function renderAnswerParagraphBody(
     styles.answerList,
     styles.answerInlineCode,
     styles.answerHeading,
+    complete,
   );
 }
 
@@ -464,6 +466,14 @@ function AnswerParagraphs({
   const leftover = unmappedCitations(visibleCitations, paragraphs.length);
   const seenTables: AnswerTableModel[] = [];
 
+  const titled = paragraphs.some((paragraph) =>
+    paragraph.split("\n").some((line) =>
+      /^\s*(?:\*\*[^*]+\*\*|#{1,3}\s+\S)/.test(line),
+    ),
+  );
+  const grouped = paragraphs.length > 1 && !titled;
+  const Group = grouped ? "ol" : "div";
+  const Item = grouped ? "li" : "div";
   return (
     <div
       className={styles.answerBody}
@@ -471,6 +481,10 @@ function AnswerParagraphs({
         showChips && visibleCitations.length > 0 ? "answer-citations" : undefined
       }
     >
+      <Group
+        className={grouped ? styles.answerGroups : undefined}
+        data-answer-groups={grouped ? "true" : undefined}
+      >
       {paragraphs.map((_, index) => {
         const slice = visibleParagraphSlice(paragraphs, index, visibleText);
         if (slice.text === "") {
@@ -480,20 +494,23 @@ function AnswerParagraphs({
           ? citationsForParagraph(visibleCitations, index)
           : [];
         return (
-          <div
-            className={styles.paragraphBlock}
+          <Item
+            className={grouped ? styles.answerGroupItem : styles.paragraphBlock}
             data-paragraph-index={String(index)}
             key={`p-${String(index)}`}
           >
-            {renderAnswerParagraphBody(slice.text, slice.complete, seenTables)}
-            <ParagraphCitations
-              citations={mapped}
-              hrefForCitation={hrefForCitation}
-              onSelectCitation={onSelectCitation}
-            />
-          </div>
+            <div className={grouped ? styles.paragraphBlock : undefined}>
+              {renderAnswerParagraphBody(slice.text, slice.complete, seenTables)}
+              <ParagraphCitations
+                citations={mapped}
+                hrefForCitation={hrefForCitation}
+                onSelectCitation={onSelectCitation}
+              />
+            </div>
+          </Item>
         );
       })}
+      </Group>
       {showChips && leftover.length > 0 && visibleText === answerText ? (
         <div className={styles.legacySources}>
           <p className={styles.legacySourcesLabel}>{LEGACY_RUN_SOURCES_LABEL}</p>

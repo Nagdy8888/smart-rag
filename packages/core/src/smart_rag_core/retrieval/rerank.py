@@ -78,6 +78,7 @@ _CODE_DEF_ASK = re.compile(
     r"|\bcode\s+block\b"
     r"|\b@tool\b"
     r"|\b(?:async\s+)?def\s+[A-Za-z_][\w]*"
+    r"|\bfunction\b.{0,40}\b[A-Za-z]+_[A-Za-z0-9_]+"
 )
 # Capture names after ``def`` / ``@tool def`` only. Bare ``@tool and`` in
 # prose must not become an identifier; snake_case tokens still match below.
@@ -178,7 +179,8 @@ def named_code_definition_ids(query: str) -> tuple[str, ...]:
 
     Returns:
         Distinct identifier strings in query order. Empty when the ask is
-        not code-shaped or no usable identifier is present.
+        not a code-reproduce or named-function ask, or no usable identifier
+        is present.
     """
 
     if not _CODE_DEF_ASK.search(query):
@@ -562,7 +564,8 @@ def literal_anchor_ask(query: str) -> bool:
         query: Original user query. Untrusted.
 
     Returns:
-        True for code-reproduce or table-reproduce asks.
+        True for a code-reproduce ask, a named-function ask, or a
+        table-reproduce ask.
     """
 
     return bool(_CODE_DEF_ASK.search(query) or _TABLE_REPRO_ASK.search(query))

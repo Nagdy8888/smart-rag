@@ -25,7 +25,7 @@ FAMILY_DEADLINE_SECONDS: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.HYBRID: 25,
     Phase6RouteFamily.COMBINED: 45,
     Phase6RouteFamily.STRUCTURED_TABLE: 30,
-    Phase6RouteFamily.COMPOSITE: 50,
+    Phase6RouteFamily.COMPOSITE: 75,
     Phase6RouteFamily.GRAPH_INSPECTION: 10,
     # QUALITY_TARGETS has no sixth deadline. Packet 1 uses the Hybrid 25s envelope.
     Phase6RouteFamily.NO_RETRIEVAL: 25,

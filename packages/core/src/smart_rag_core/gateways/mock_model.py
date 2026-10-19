@@ -44,6 +44,8 @@ from smart_rag_core.query_answer.versions import (
     GENERAL_CHAT_PROMPT_VERSION,
     MAX_ANSWER_PARAGRAPHS,
     MAX_VERIFIER_LINKS,
+    ORGANIZE_PROMPT_SHA256,
+    ORGANIZE_PROMPT_VERSION,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
     WEB_ANSWER_PROMPT_SHA256,
@@ -60,6 +62,50 @@ from smart_rag_core.retrieval.rerank_versions import (
     RERANK_PROMPT_SHA256,
     RERANK_PROMPT_VERSION,
 )
+
+
+def _mock_organize_response(
+    fixture_id: str, request: AnswerModelRequest
+) -> AnswerModelResponse:
+    """Return one titled claim built only from the verified text.
+
+    Args:
+        fixture_id: Mock request id suffix.
+        request: Organize prompt request. ``source_records`` is the
+            verified answer.
+
+    Returns:
+        Structured claims payload. No network.
+    """
+
+    verified = request.source_records.strip()
+    words = re.findall(r"[A-Za-z]{4,}", verified)
+    title = words[0] if words else "Notes"
+    body = verified.replace("\r\n", "\n").replace("\n\n", "\n")
+    text = f"**{title}**\n{body}"
+    return AnswerModelResponse(
+        mode="mock",
+        payload={
+            "claims": [
+                {
+                    "text": text,
+                    "kind": "fact",
+                    "citations": [
+                        {
+                            "source_id": "verified",
+                            "span": verified[:200],
+                            "source_ranges": [],
+                        }
+                    ],
+                }
+            ],
+            "conclusion": None,
+            "status": "complete",
+        },
+        request_id=f"mock-organize-{fixture_id}",
+        input_tokens=1,
+        output_tokens=1,
+    )
 
 
 class MockModelAdapter:
@@ -220,6 +266,11 @@ class MockModelAdapter:
             None. No network, retrieval, or tool calls.
         """
 
+        if (
+            request.prompt_version == ORGANIZE_PROMPT_VERSION
+            and request.prompt_sha256 == ORGANIZE_PROMPT_SHA256
+        ):
+            return _mock_organize_response(self._fixture_id, request)
         if (
             request.prompt_version != ANSWER_PROMPT_VERSION
             or request.prompt_sha256 != ANSWER_PROMPT_SHA256

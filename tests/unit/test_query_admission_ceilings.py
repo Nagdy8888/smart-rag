@@ -55,7 +55,7 @@ def test_signed_monthly_and_concurrency_defaults() -> None:
         (Phase6RouteFamily.HYBRID, 25, 7, 4, Decimal("2.80")),
         (Phase6RouteFamily.COMBINED, 45, 8, 4, Decimal("3.20")),
         (Phase6RouteFamily.STRUCTURED_TABLE, 30, 6, 4, Decimal("2.40")),
-        (Phase6RouteFamily.COMPOSITE, 50, 9, 5, Decimal("3.60")),
+        (Phase6RouteFamily.COMPOSITE, 75, 9, 5, Decimal("3.60")),
         (Phase6RouteFamily.GRAPH_INSPECTION, 10, 3, 4, Decimal("0.75")),
         (Phase6RouteFamily.NO_RETRIEVAL, 25, 7, 4, Decimal("2.80")),
         (Phase6RouteFamily.SCOPED_REFUSAL, 25, 7, 4, Decimal("2.80")),
@@ -259,7 +259,7 @@ def test_retrieve_kind_caps_fail_closed_when_remaining_cannot_cover() -> None:
     """Embed/rerank/lightrag must not run when remaining USD or calls are gone."""
 
     usd, prompt, completion = assert_retrieve_kind_available(
-        remaining_model_calls=3,
+        remaining_model_calls=4,
         remaining_usd=Decimal("0.20"),
         usage_kind="rerank",
     )
@@ -268,7 +268,7 @@ def test_retrieve_kind_caps_fail_closed_when_remaining_cannot_cover() -> None:
     assert completion == 2000
     with pytest.raises(QueryCeilingError, match="answer_stage_reserve_exhausted"):
         assert_retrieve_kind_available(
-            remaining_model_calls=2,
+            remaining_model_calls=3,
             remaining_usd=Decimal("0.20"),
             usage_kind="rerank",
         )

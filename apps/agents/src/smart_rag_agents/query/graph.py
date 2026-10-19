@@ -66,6 +66,7 @@ _PRODUCTION_STAGE_NAMES: tuple[str, ...] = (
     "disclose_optional_tools",
     "generate_answer",
     "verify_answer",
+    "organize_answer",
 )
 
 
@@ -103,7 +104,8 @@ def build_query_graph(
             ``studio_local`` or ``studio_live``.
         State outputs: fused evidence, one answer, and layered verification.
         Persistence writes: counted prep/answer/verifier consume when used.
-        External/model calls: at most one prep, one answer, one verifier.
+        External/model calls: at most one prep, one answer, one verifier,
+        and one verified-answer rewrite.
         Budget/deadline behavior: copies server ceilings; never enlarges.
         Failure/fallback route: ``admission_rejected`` / ``routing_rejected``
             / ``insufficient_evidence`` / ``verified_partial`` then END.
@@ -210,7 +212,8 @@ def build_query_graph(
     builder.add_edge("compose_tables", "disclose_optional_tools")
     builder.add_edge("disclose_optional_tools", "generate_answer")
     builder.add_edge("generate_answer", "verify_answer")
-    builder.add_edge("verify_answer", terminal_target)
+    builder.add_edge("verify_answer", "organize_answer")
+    builder.add_edge("organize_answer", terminal_target)
     if studio_local or studio_live:
         builder.add_edge("emit_studio_response", END)
     return builder

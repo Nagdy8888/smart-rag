@@ -60,7 +60,7 @@ def authorized_runtime(
         Phase6RouteFamily.HYBRID: (25, 7, 4, Decimal("2.80")),
         Phase6RouteFamily.COMBINED: (45, 8, 4, Decimal("3.20")),
         Phase6RouteFamily.STRUCTURED_TABLE: (30, 6, 4, Decimal("2.40")),
-        Phase6RouteFamily.COMPOSITE: (50, 9, 5, Decimal("3.60")),
+        Phase6RouteFamily.COMPOSITE: (75, 9, 5, Decimal("3.60")),
         Phase6RouteFamily.GRAPH_INSPECTION: (10, 3, 4, Decimal("0.75")),
         Phase6RouteFamily.NO_RETRIEVAL: (25, 7, 4, Decimal("2.80")),
         Phase6RouteFamily.SCOPED_REFUSAL: (25, 7, 4, Decimal("2.80")),

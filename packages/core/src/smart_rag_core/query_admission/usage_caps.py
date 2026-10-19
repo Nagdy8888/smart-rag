@@ -42,8 +42,8 @@ USAGE_KIND_COMPLETION_TOKEN_CAPS: dict[str, int] = {
 
 ALLOWED_USAGE_KINDS: frozenset[str] = frozenset(USAGE_KIND_USD_CAPS)
 
-ANSWER_STAGE_RESERVED_MODEL_CALLS = 2
-"""One company answer call plus one verifier call. Does not raise ceilings."""
+ANSWER_STAGE_RESERVED_MODEL_CALLS = 3
+"""Company answer, verifier, and verified-answer rewrite. Does not raise ceilings."""
 
 ANSWER_STAGE_MIN_SECONDS = 8.0
 """Minimum remaining wall time before a company answer provider call starts."""

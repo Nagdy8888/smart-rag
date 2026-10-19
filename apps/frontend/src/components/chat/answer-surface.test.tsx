@@ -197,7 +197,7 @@ describe("AnswerSurface origin chrome", () => {
     });
     expect(screen.getAllByTestId("answer-prose").length).toBeGreaterThan(0);
     expect(container.querySelector("strong")).toHaveTextContent("care");
-    expect(container.querySelectorAll("li")).toHaveLength(2);
+    expect(container.querySelectorAll("ul li")).toHaveLength(2);
   });
 
   it("renders a mixed bold/list/fence/table answer without a stray fence", () => {
@@ -222,7 +222,7 @@ describe("AnswerSurface origin chrome", () => {
       ].join("\n"),
     });
     expect(container.querySelector("strong")).toHaveTextContent("bold");
-    expect(container.querySelectorAll("li")).toHaveLength(2);
+    expect(container.querySelectorAll("ul li")).toHaveLength(2);
     const snippet = screen.getByTestId("answer-code-snippet");
     expect(snippet.textContent).toContain("def hello");
     expect(snippet.textContent).not.toMatch(/```/);
@@ -493,6 +493,19 @@ describe("AnswerSurface origin chrome", () => {
 describe("AnswerSurface paragraph citations", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it("numbers several claims and several sentences in one claim", () => {
+    const { container, unmount } = renderSurface({
+      answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
+    });
+    expect(container.querySelectorAll("ol[data-answer-groups='true'] > li")).toHaveLength(2);
+    unmount();
+    const view = renderSurface({
+      answer: "The window is 30 days. The request must be in writing.",
+    });
+    expect(view.container.querySelectorAll("ol li")).toHaveLength(2);
+    expect(view.container.querySelector("[data-answer-groups='true']")).toBeNull();
   });
 
   it("puts each mapped citation after its own paragraph", () => {

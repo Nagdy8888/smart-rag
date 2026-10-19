@@ -344,6 +344,23 @@
   gap: calc(var(--space) * 4);
 }
 
+.answerGroups {
+  margin: 0;
+  padding-inline-start: 1.6rem;
+  list-style: decimal;
+}
+
+.answerGroupItem {
+  display: list-item;
+  min-width: 0;
+  margin-block-end: calc(var(--space) * 4);
+}
+
+.answerGroupItem::marker {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
 .paragraphBlock {
   display: flex;
   flex-direction: column;

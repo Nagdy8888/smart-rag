@@ -40,6 +40,7 @@ def test_summary_v1_is_versioned_and_hashed() -> None:
             "answer_v4",
             "answer_v5",
             "answer_v6",
+            "organize_v1",
             "web_critique_v1",
             "web_answer_v1",
         }

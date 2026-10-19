@@ -21,13 +21,34 @@ from smart_rag_api.services.query_sse_mapping import (
     assert_catalog_event,
     chunk_answer_text,
 )
-from smart_rag_api.services.sse.mapping.contracts import CANONICAL_REFUSAL_TEXT
+from smart_rag_api.services.sse.mapping.contracts import (
+    CANONICAL_REFUSAL_TEXT,
+    ORGANIZE_ANSWER_NODE,
+)
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.security.untrusted import isolate_untrusted_text
 from smart_rag_core.sse.catalog import PAYLOAD_MODELS
 from smart_rag_core.sse.sanitize import validate_sse_payload
 
 from tests.support.typed_graph import untyped
+
+
+def _release(
+    mapper: QuerySseMapper, update: dict[str, object]
+) -> list[tuple[str, dict[str, object]]]:
+    """Hold the verified payload, then release it from the rewrite node.
+
+    Args:
+        mapper: Stream mapper under test.
+        update: Verify-node update that the rewrite node echoes.
+
+    Returns:
+        Events emitted when the rewrite node completes.
+    """
+
+    held = mapper.consume_chunk({VERIFY_ANSWER_NODE: update})
+    assert "token_delta" not in [item[0] for item in held]
+    return mapper.consume_chunk({ORGANIZE_ANSWER_NODE: update})
 
 
 def _payload(
@@ -72,7 +93,7 @@ def test_chunk_answer_text_fits_after_html_escape() -> None:
 
 
 def test_mapper_holds_draft_until_verify_then_emits_token_delta() -> None:
-    """generate_answer text is withheld; verify_answer emits token_delta."""
+    """generate_answer text is withheld; the rewrite node emits token_delta."""
 
     mapper = QuerySseMapper()
     draft_events = mapper.consume_chunk(
@@ -91,13 +112,12 @@ def test_mapper_holds_draft_until_verify_then_emits_token_delta() -> None:
     for event_type, payload in draft_events:
         assert_catalog_event(event_type, payload)
 
-    final_events = mapper.consume_chunk(
+    final_events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified",
-                "answer": _payload("PUBLIC_FINAL_ANSWER"),
-            }
-        }
+            "status": "verified",
+            "answer": _payload("PUBLIC_FINAL_ANSWER"),
+        },
     )
     for event_type, payload in final_events:
         assert_catalog_event(event_type, payload)
@@ -122,35 +142,31 @@ def test_mapper_emits_one_answer_origin_before_token_delta() -> None:
         status="complete",
         answer_origin=KnowledgeScope.GENERAL_KNOWLEDGE,
     ).model_dump(mode="json")
-    events = mapper.consume_chunk(
-        {VERIFY_ANSWER_NODE: {"status": "verified", "answer": payload}}
-    )
+    events = _release(mapper, {"status": "verified", "answer": payload})
     types = [item[0] for item in events]
     assert types.count("answer_origin") == 1
     assert types.index("answer_origin") < types.index("token_delta")
     assert events[types.index("answer_origin")][1] == {"origin": "general_knowledge"}
-    web_events = QuerySseMapper().consume_chunk(
+    web_events = _release(
+        QuerySseMapper(),
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified",
-                "answer": AnswerPayload(
-                    answer_text="Public web draft.",
-                    status="complete",
-                    answer_origin=KnowledgeScope.WEB,
-                ).model_dump(mode="json"),
-            }
-        }
+            "status": "verified",
+            "answer": AnswerPayload(
+                answer_text="Public web draft.",
+                status="complete",
+                answer_origin=KnowledgeScope.WEB,
+            ).model_dump(mode="json"),
+        },
     )
     web_types = [item[0] for item in web_events]
     assert web_events[web_types.index("answer_origin")][1] == {"origin": "web"}
     assert "citation_preview" not in types
-    historical = QuerySseMapper().consume_chunk(
+    historical = _release(
+        QuerySseMapper(),
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified",
-                "answer": _payload("Older compatible answer"),
-            }
-        }
+            "status": "verified",
+            "answer": _payload("Older compatible answer"),
+        },
     )
     assert "answer_origin" not in [item[0] for item in historical]
 
@@ -159,15 +175,14 @@ def test_mapper_emits_usage_from_verify_totals() -> None:
     """Verified answers publish accumulated provider tokens before the terminal."""
 
     mapper = QuerySseMapper()
-    events = mapper.consume_chunk(
+    events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified",
-                "answer": _payload("Counted answer."),
-                "prompt_tokens": 12,
-                "completion_tokens": 7,
-            }
-        }
+            "status": "verified",
+            "answer": _payload("Counted answer."),
+            "prompt_tokens": 12,
+            "completion_tokens": 7,
+        },
     )
     for event_type, payload in events:
         assert_catalog_event(event_type, payload)
@@ -184,16 +199,15 @@ def test_mapper_emits_billed_cost_with_usage() -> None:
     """Verified answers may publish billed USD alongside provider tokens."""
 
     mapper = QuerySseMapper()
-    events = mapper.consume_chunk(
+    events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified",
-                "answer": _payload("Counted answer."),
-                "prompt_tokens": 923,
-                "completion_tokens": 167,
-                "cost_usd": 0.48,
-            }
-        }
+            "status": "verified",
+            "answer": _payload("Counted answer."),
+            "prompt_tokens": 923,
+            "completion_tokens": 167,
+            "cost_usd": 0.48,
+        },
     )
     usage = next(item for item in events if item[0] == "usage")
     assert usage[1] == {
@@ -265,8 +279,8 @@ def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
     mapper.consume_chunk(
         {GENERATE_ANSWER_NODE: {"status": "drafted", "answer": _payload("held")}}
     )
-    events = mapper.consume_chunk(
-        {VERIFY_ANSWER_NODE: {"status": "verified", "answer": _payload("   ")}}
+    events = _release(
+        mapper, {"status": "verified", "answer": _payload("   ")}
     )
     assert events[-1] == ("error", {"code": "empty_answer"})
     assert "completed" not in {item[0] for item in events}
@@ -287,13 +301,12 @@ def test_mapper_holds_general_and_mixed_scope_drafts() -> None:
         )
         assert "token_delta" not in [item[0] for item in draft_events]
         assert "SCOPE_DRAFT_SECRET" not in str(draft_events)
-        final_events = mapper.consume_chunk(
+        final_events = _release(
+            mapper,
             {
-                VERIFY_ANSWER_NODE: {
-                    "status": "verified",
-                    "answer": _payload("SCOPE_PUBLIC_FINAL"),
-                }
-            }
+                "status": "verified",
+                "answer": _payload("SCOPE_PUBLIC_FINAL"),
+            },
         )
         deltas = [
             payload["delta"]
@@ -576,13 +589,12 @@ def test_mapper_maps_refused_verify_to_partial_not_error() -> None:
     """Verified refusal stays partial with a non-empty token."""
 
     mapper = QuerySseMapper()
-    events = mapper.consume_chunk(
+    events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "refused",
-                "answer": _payload("  ", status="refused"),
-            }
-        }
+            "status": "refused",
+            "answer": _payload("  ", status="refused"),
+        },
     )
     types = [item[0] for item in events]
     assert "error" not in types
@@ -597,13 +609,12 @@ def test_mapper_verified_partial_is_not_a_deadline() -> None:
     """Ordinary verified_partial does not emit a deadline diagnostic."""
 
     mapper = QuerySseMapper()
-    events = mapper.consume_chunk(
+    events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified_partial",
-                "answer": _payload("Kept partial.", status="partial"),
-            }
-        }
+            "status": "verified_partial",
+            "answer": _payload("Kept partial.", status="partial"),
+        },
     )
     types = [item[0] for item in events]
     assert "deadline" not in types
@@ -638,13 +649,12 @@ def test_mapper_verify_update_is_idempotent() -> None:
     """A second verify chunk after a terminal is a no-op."""
 
     mapper = QuerySseMapper()
-    first = mapper.consume_chunk(
+    first = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified",
-                "answer": _payload("PUBLIC_FINAL_ANSWER"),
-            }
-        }
+            "status": "verified",
+            "answer": _payload("PUBLIC_FINAL_ANSWER"),
+        },
     )
     second = mapper.consume_chunk(
         {
@@ -665,18 +675,17 @@ def test_mapper_verifier_skipped_is_partial_not_deadline() -> None:
     """A skipped verifier releases the answer as partial with a limitation."""
 
     mapper = QuerySseMapper()
-    events = mapper.consume_chunk(
+    events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified_partial",
-                "detail": "verifier_skipped:deadline_exhausted",
-                "answer": _payload("Refund period is 30 days.", status="complete"),
-                "verification": {
-                    "omitted_link_ids": [],
-                    "verifier_skipped_reason": "deadline_exhausted",
-                },
-            }
-        }
+            "status": "verified_partial",
+            "detail": "verifier_skipped:deadline_exhausted",
+            "answer": _payload("Refund period is 30 days.", status="complete"),
+            "verification": {
+                "omitted_link_ids": [],
+                "verifier_skipped_reason": "deadline_exhausted",
+            },
+        },
     )
     types = [item[0] for item in events]
     assert "deadline" not in types
@@ -689,18 +698,17 @@ def test_mapper_citation_leaf_unresolved_is_partial() -> None:
     """A skipped leaf emits a limitation and keeps the partial terminal."""
 
     mapper = QuerySseMapper()
-    events = mapper.consume_chunk(
+    events = _release(
+        mapper,
         {
-            VERIFY_ANSWER_NODE: {
-                "status": "verified_partial",
-                "detail": "citation_leaf_unresolved",
-                "answer": _payload("Refund period is 30 days.", status="complete"),
-                "verification": {
-                    "omitted_link_ids": [],
-                    "skipped_citation_count": 1,
-                },
-            }
-        }
+            "status": "verified_partial",
+            "detail": "citation_leaf_unresolved",
+            "answer": _payload("Refund period is 30 days.", status="complete"),
+            "verification": {
+                "omitted_link_ids": [],
+                "skipped_citation_count": 1,
+            },
+        },
     )
     assert ("limitation", {"code": "citation_leaf_unresolved"}) in events
     assert events[-1] == ("partial", {"reason": "verified_partial"})

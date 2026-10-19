@@ -105,6 +105,11 @@ def test_literal_anchor_ask_matches_reproduce_code_and_table() -> None:
     assert named_table_captions("reproduce Table 2-1 as a Markdown pipe table") == (
         "Table 2-1",
     )
+    assert literal_anchor_ask("Show the Python function parse_invoice from the document.")
+    assert named_code_definition_ids(
+        "Show the Python function parse_invoice from the document."
+    ) == ("parse_invoice",)
+    assert not literal_anchor_ask("What does the document say about retry budgets?")
 
 
 def test_promote_named_code_definition_prefers_def_over_invoke() -> None:
@@ -472,3 +477,38 @@ def test_salvage_named_code_trims_trailing_sibling_when_already_present() -> Non
     assert "has been cancelled." in salvaged.answer_text
     assert "call_model" not in salvaged.answer_text
     assert "# -- 2)" not in salvaged.answer_text
+
+
+def test_salvage_cites_a_definition_already_on_screen() -> None:
+    """A shown definition with no citations still cites its chunk."""
+
+    gold = "def parse_invoice(path):\n    return path\n"
+    fusion = verifier_fusion(verifier_passage(1, text=gold, rank=1))
+    visible = gold.strip()
+    payload = AnswerPayload(
+        answer_text=visible,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=visible, link_ids=("claim-1",)),
+        ),
+        citations=(),
+        atomic_links=(
+            AtomicLink(
+                link_id="claim-1",
+                claim="Shown definition.",
+                chunk_ids=(verifier_uid(1),),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    salvaged = salvage_named_code_definition(
+        payload,
+        fusion,
+        user_query="Show the Python function parse_invoice from the document.",
+    )
+    assert salvaged.answer_text == visible
+    assert len(salvaged.citations) == 1
+    assert salvaged.citations[0].chunk_id == verifier_uid(1)
+    span = salvaged.citations[0].span
+    assert span is not None
+    assert span in gold

@@ -185,6 +185,54 @@ def test_attach_native_evidence_adds_code_block() -> None:
     released = attach_native_evidence(payload, fusion)
     assert "```" in released.answer_text
     assert "def run" in released.answer_text
+    assert len(released.citations) == 1
+    span = released.citations[0].span
+    assert span is not None
+    assert span in "def run():\n    return 1"
+
+
+def test_attach_native_evidence_cites_a_figure_block() -> None:
+    """A figure placed from fusion gains a citation inside the chunk text."""
+
+    caption = "A small diagram of the flow."
+    payload = AnswerPayload(
+        answer_text="The helper returns one.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="The helper returns one.",
+                link_ids=("l1",),
+            ),
+        ),
+        atomic_links=(),
+    )
+    fusion = FusionResult(
+        algorithm=FusionAlgorithm.NAIVE_UNION,
+        config_hash="f" * 64,
+        requested_route="hybrid",
+        effective_route="hybrid",
+        graph_discovered_only_ratio=0.0,
+        evidence=(
+            ScoredPassage(
+                chunk_id="11111111-1111-1111-1111-111111111111",
+                document_id="22222222-2222-2222-2222-222222222222",
+                version_id="33333333-3333-3333-3333-333333333333",
+                citation_text=caption,
+                combined_score=1.0,
+                origin=PassageOrigin.HYBRID,
+                graph_discovered_only=False,
+                content_kind="figure",
+                figure_id="abc123",
+            ),
+        ),
+    )
+    released = attach_native_evidence(payload, fusion)
+    assert "[[figure:abc123]]" in released.answer_text
+    assert len(released.citations) == 1
+    span = released.citations[0].span
+    assert span is not None
+    assert span in caption
+    assert released.citations[0].chunk_id == "11111111-1111-1111-1111-111111111111"
 
 
 def test_attach_keeps_full_table_when_only_the_first_line_was_copied() -> None:
