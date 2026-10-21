@@ -24,10 +24,10 @@ import { UserText } from "../ui/user-text";
 import chatStyles from "./chat-transcript.module.css";
 
 /** Copy while the citation detail request has not returned the span. */
-export const CITATION_PASSAGE_LOADING = "Loading passageâ€¦";
+export const CITATION_PASSAGE_LOADING = "Loading passage…";
 
 /** Copy while the single-page PNG is downloading. */
-export const CITATION_PAGE_LOADING = "Loading pageâ€¦";
+export const CITATION_PAGE_LOADING = "Loading page…";
 
 /** Copy when the page image request fails. The passage still shows. */
 export const CITATION_PAGE_FAILED = "The book page could not be loaded.";

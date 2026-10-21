@@ -226,15 +226,11 @@
   .workspaceSessionsExpanded,
   .workspaceSessionsCollapsed {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(8rem, 28vh) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .workspace > .rail {
-    display: flex;
-    max-height: 28vh;
-    border-inline-end: 0;
-    border-bottom: 1px solid var(--color-border);
-    padding: 0 0 calc(var(--space) * 3);
+    display: none;
   }
 }
 

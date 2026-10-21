@@ -783,6 +783,10 @@
 }
 
 @media (max-width: 1279px) {
+  .stageHeader [data-action-id="ask.sources"] {
+    display: none;
+  }
+
   .conversation {
     padding-inline: 16px;
   }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1095,6 +1095,17 @@ describe("ChatApp Ask workspace", () => {
     expect(screen.getByText("Older")).toBeInTheDocument();
     expect(document.querySelector('[role="option"]')).toBeNull();
     expect(document.querySelector('[role="option"] button')).toBeNull();
+  });
+
+  it("closes the mobile Sessions sheet after selecting a conversation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    renderChat(<ChatApp />);
+    await screen.findByRole("button", { name: "Chat" });
+    await user.click(screen.getByRole("button", { name: "Sessions" }));
+    const dialog = screen.getByRole("dialog", { name: "Sessions" });
+    await user.click(within(dialog).getByRole("button", { name: "Chat" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Sessions" })).toBeNull());
   });
 
   it("collapses the Sessions list without deleting conversations", async () => {

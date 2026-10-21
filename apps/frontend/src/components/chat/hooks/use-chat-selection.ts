@@ -63,6 +63,7 @@ export function useChatSelection(): UseChatSelectionResult {
     setViewingRunId(null);
     setSelectedCitationId(null);
     setSourcesOpen(false);
+    setSessionsOpen(false);
   }, []);
 
   return {

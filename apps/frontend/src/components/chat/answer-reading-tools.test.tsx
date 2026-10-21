@@ -166,6 +166,7 @@ describe("Answer reading tools", () => {
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Enlarge diagram" })).toHaveFocus();
     unmount();
     expect(revoke).toHaveBeenCalledWith("blob:authorized-figure");
   });

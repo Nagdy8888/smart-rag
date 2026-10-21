@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiUrl } from "../../lib/api/http";
 import { useOptionalSession } from "../../lib/auth/session-provider";
 import { Sheet } from "../ui/sheet";
@@ -91,6 +91,7 @@ function FigureAsset({
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const expandTrigger = useRef<HTMLButtonElement>(null);
   const parts = figureTextParts(caption);
   const alt = parts.caption || "Document figure";
 
@@ -132,6 +133,7 @@ function FigureAsset({
       <figure className={styles.answerFigure} data-testid="answer-figure">
         {src ? (
           <button
+            ref={expandTrigger}
             type="button"
             className={styles.figureExpand}
             aria-label="Enlarge diagram"
@@ -165,6 +167,7 @@ function FigureAsset({
         <Sheet
           title="Diagram"
           panelClassName={styles.figureReader}
+          returnFocusRef={expandTrigger}
           onClose={() => setExpanded(false)}
         >
           <img className={styles.figureReaderImage} src={src} alt={alt} />

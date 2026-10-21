@@ -33,6 +33,9 @@ rendering dropped the live answer's inline citation chips after history refetche
 - Add Copy answer with truthful success/failure feedback. Copy retains code
   whitespace and removes internal figure markers.
 - Keep wide tables horizontally scrollable and keyboard focusable on mobile.
+- Hide the permanent session rail on mobile and use the existing Sessions sheet.
+  Selecting a session closes the sheet. Remove the duplicate mobile source
+  control and retain its real citation count. Correct garbled loading labels.
 
 ## Verification scope
 

@@ -214,9 +214,10 @@ export function ChatApp() {
             type="button"
             variant="ghost"
             data-action-id="ask.sources"
+            aria-label={`Open sources (${String(restore.sourcesCount)})`}
             onClick={restore.openLiveSources}
           >
-            Sources
+            Sources ({String(restore.sourcesCount)})
           </Button>
         ) : null}
       </div>
