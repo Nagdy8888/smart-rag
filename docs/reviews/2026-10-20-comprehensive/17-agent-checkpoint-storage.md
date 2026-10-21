@@ -49,6 +49,19 @@ new retention policy, schema migration, model call, or answer-policy change.
   suite passed from a clean checkout without private runtime artifacts.
 - Full strict Python type checking passed with zero errors and warnings; the two
   offline pinned-library/runtime-setup contract checks passed.
+- The complete clean-checkout contract suite passed 287 tests and skipped 270
+  environment-dependent cases, with ten existing warnings.
+- The rebuilt API image passed real synchronous and asynchronous PostgreSQL
+  checkpoint plus pending-write readback checks in a separate local test database.
+  Stored source bodies were compacted, metadata survived, and in-memory source
+  evidence remained unchanged. Neither the hosted project nor the restored
+  backup tables were modified by these checks.
+
+CI also identified missing docstrings in two test capture helpers, now corrected,
+and a dependency-audit finding for development-only `virtualenv` 21.14.5. The lock
+now selects 21.14.9, retaining the upstream fixes documented in the
+[official release history](https://virtualenv.pypa.io/en/21.14.9/changelog.html).
+No audit finding is suppressed for this update.
 
 Remote checks must be verified against the resulting commit.
 Hosted resume, new writes, and the remaining live answer gate cannot currently

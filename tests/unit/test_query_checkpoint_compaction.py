@@ -93,6 +93,7 @@ def test_sync_pending_writes_compact_nested_sources(
         task_id: str,
         task_path: str = "",
     ) -> None:
+        """Capture the compacted sync write without requiring a database."""
         assert config == _CONFIG
         assert (task_id, task_path) == ("task-1", "branch-1")
         captured.extend(values)
@@ -119,6 +120,7 @@ def test_async_pending_writes_compact_nested_sources(
         task_id: str,
         task_path: str = "",
     ) -> None:
+        """Capture the compacted async write without requiring a database."""
         assert config == _CONFIG
         assert (task_id, task_path) == ("task-1", "branch-1")
         captured.extend(values)
