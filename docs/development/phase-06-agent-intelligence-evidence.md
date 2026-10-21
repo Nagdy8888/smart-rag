@@ -145,3 +145,12 @@ The [live user-flow follow-up](../reviews/2026-10-20-comprehensive/13-live-user-
 records 25 valid authenticated live-provider runs, the four excluded encoding
 attempts, text/history parity, and observed quality failures. No accuracy
 promotion or phase completion is claimed.
+
+## Query checkpoint compaction follow-up (21 October 2026)
+
+The packet 7 compact-checkpoint requirement now covers pending writes whose
+channel values are lists or tuples, including retrieval branch results. The
+[checkpoint storage repair](../reviews/2026-10-20-comprehensive/17-agent-checkpoint-storage.md)
+records the archived-data evidence, synchronous/asynchronous regression tests,
+offline replay, and hosted verification limits. This preserves the existing
+source-hash policy and does not authorize historical deletion or close a phase.

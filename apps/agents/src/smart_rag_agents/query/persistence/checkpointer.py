@@ -86,9 +86,7 @@ class CompactPostgresSaver(PostgresSaver):
         compacted = tuple(
             (
                 channel,
-                compact_query_state(cast(Mapping[str, object], value))
-                if isinstance(value, Mapping)
-                else value,
+                compact_query_state({"value": value})["value"],
             )
             for channel, value in writes
         )
@@ -152,9 +150,7 @@ class CompactAsyncPostgresSaver(AsyncPostgresSaver):
         compacted = tuple(
             (
                 channel,
-                compact_query_state(cast(Mapping[str, object], value))
-                if isinstance(value, Mapping)
-                else value,
+                compact_query_state({"value": value})["value"],
             )
             for channel, value in writes
         )
