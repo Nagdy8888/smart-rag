@@ -70,6 +70,7 @@ def main() -> None:
     fetches = []
 
     def fake_fetch(**_kwargs):
+        """Count synthetic key refreshes without making network requests."""
         fetches.append(1)
         return empty_keys
 

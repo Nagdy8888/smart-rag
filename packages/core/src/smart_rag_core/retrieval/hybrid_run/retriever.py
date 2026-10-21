@@ -56,9 +56,7 @@ from smart_rag_core.retrieval.hybrid_run.channels import (
     unpack_term,
 )
 from smart_rag_core.retrieval.hybrid_run.embed import embed_query_texts
-from smart_rag_core.retrieval.hybrid_run.evidence import (
-    evidence_units,
-)
+from smart_rag_core.retrieval.hybrid_run.evidence import evidence_units
 from smart_rag_core.retrieval.hybrid_run.jobs import HybridChannelJobsMixin
 from smart_rag_core.retrieval.hybrid_run.pool import build_pool_ids
 from smart_rag_core.retrieval.hybrid_run.profile_fields import (

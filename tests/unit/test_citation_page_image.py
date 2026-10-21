@@ -11,6 +11,7 @@ from tests.support.pdf_fixture import empty_pdf
 
 
 def _two_page_pdf() -> bytes:
+    """Build a small in-memory PDF for page bounds and PNG tests."""
     document = empty_pdf()
     try:
         document.new_page()

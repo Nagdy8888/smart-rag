@@ -509,6 +509,7 @@ def _sorted_cells(cells: list[TypedElement]) -> list[TypedElement]:
     """Order cells by column index, then reading order."""
 
     def key(cell: TypedElement) -> tuple[int, int]:
+        """Use explicit column order with reading order as the stable fallback."""
         column = cell.metadata.get("column_index")
         return (
             column if isinstance(column, int) else cell.reading_order,

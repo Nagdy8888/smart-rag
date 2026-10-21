@@ -126,6 +126,7 @@ def test_verifier_verdicts_must_match_the_selected_claims(
     payload = AnswerPayload.model_validate(verified_answer_state()["answer"])
 
     def verdicts(_links: object) -> VerifierPayload:
+        """Return the malformed verdict identity set for this test case."""
         return VerifierPayload(
             link_verdicts=tuple(
                 VerifierLinkVerdict(link_id=key, supported=True, reason="ok")
