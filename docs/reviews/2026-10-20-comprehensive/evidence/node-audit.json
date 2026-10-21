@@ -1,0 +1,663 @@
+{
+  "actions": [
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1240103,
+          "path": "apps__frontend>eslint-config-next>eslint-plugin-import>@typescript-eslint/parser>@typescript-eslint/typescript-estree>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "brace-expansion",
+      "target": "5.0.12",
+      "depth": 7
+    },
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1240621,
+          "path": ".>@mermaid-js/mermaid-cli>@mermaid-js/mermaid-zenuml>@zenuml/core>dompurify",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1241204,
+          "path": ".>@mermaid-js/mermaid-cli>@mermaid-js/mermaid-zenuml>@zenuml/core>dompurify",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "dompurify",
+      "target": "3.4.17",
+      "depth": 5
+    },
+    {
+      "action": "review",
+      "module": "vitest",
+      "resolves": [
+        {
+          "id": 1193683,
+          "path": "apps__frontend>vitest",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "@vitest/mocker",
+      "resolves": [
+        {
+          "id": 1193684,
+          "path": "apps__frontend>vitest>@vitest/mocker",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "markdown-it",
+      "resolves": [
+        {
+          "id": 1239989,
+          "path": ".>markdownlint-cli2>markdown-it",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "js-yaml",
+      "resolves": [
+        {
+          "id": 1239991,
+          "path": ".>markdownlint-cli2>js-yaml",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "brace-expansion",
+      "resolves": [
+        {
+          "id": 1240100,
+          "path": "apps__frontend>eslint>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "braces",
+      "resolves": [
+        {
+          "id": 1240992,
+          "path": ".>markdownlint-cli2>micromatch>braces",
+          "dev": false,
+          "bundled": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "smol-toml",
+      "resolves": [
+        {
+          "id": 1241205,
+          "path": ".>markdownlint-cli2>smol-toml",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "katex",
+      "resolves": [
+        {
+          "id": 1241206,
+          "path": ".>@mermaid-js/mermaid-cli>katex",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    }
+  ],
+  "advisories": {
+    "1193683": {
+      "findings": [
+        {
+          "version": "4.1.10",
+          "paths": [
+            "apps\\frontend > vitest@4.1.10"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9\n- https://nvd.nist.gov/vuln/detail/CVE-2026-84373\n- https://github.com/vitest-dev/vitest/pull/10972\n- https://github.com/vitest-dev/vitest/pull/10974\n- https://github.com/vitest-dev/vitest/commit/51edf2b072902aec6d30c90ebaafd8f121c6f9d8\n- https://github.com/vitest-dev/vitest/commit/8ff9b9a9efca7c6cfd5243569440de8d7a33aec4\n- https://github.com/vitest-dev/vitest/commit/fe5a11d3ceac5ec10d6d7d21a46d4caca132c48f\n- https://github.com/vitest-dev/vitest/releases/tag/v4.1.11\n- https://github.com/vitest-dev/vitest/releases/tag/v5.0.0-rc.2\n- https://github.com/advisories/GHSA-82fw-gwwq-j7x9",
+      "created": "2026-09-08T20:46:45.000Z",
+      "id": 1193683,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n`@vitest/mocker` registers a redirect mock's target path without validating it\nagainst the dev server's file-serving allowlist. An attacker who can reach the\ndev server's WebSocket can register a redirect mock pointing outside the project\nroot; when the mocked module is requested, the plugin's `load` hook returns\n`readFile(<attacker path>)` as the module source, disclosing local files.\n\nThis is exploitable **without authentication** only through the public\n`mockerPlugin` / standalone `interceptorPlugin` exports (used by third-party dev\nservers), which register the handler on Vite's unauthenticated HMR socket.\nVitest's own browser mode registers mocks over a **token-authenticated** RPC and\nis not remotely reachable by default (see Scope).\n\n## Affected code\n`packages/mocker/src/node/interceptorPlugin.ts`.\n\nThe `load` hook is the file-read sink:\n\n```ts\nif (mock.type === 'redirect') {\n  return readFile(mock.redirect, 'utf-8')\n}\n```\n\n`mock.redirect` is derived from client input at registration time with no\nboundary check:\n\n```ts\nif (event.type === 'redirect') {\n  const redirectUrl = new URL(event.redirect)\n  event.redirect = join(server.config.root, redirectUrl.pathname)\n}\nregistry.register(event)\n```\n\nThere is no `server.fs.allow` / `server.fs.deny` check and no assertion that the\nresolved path stays within the project root.\n\n## Registration paths and trust boundaries\n- **Public `mockerPlugin` / `interceptorPlugin` (unauthenticated).** In\n  `configureServer`, the plugin registers `server.ws.on('vitest:interceptor:register', …)`\n  on Vite's HMR WebSocket. That socket performs no token, Origin, or same-origin\n  check, so any client that can reach it can register a redirect mock. This is\n  the path the \"unauthenticated\" impact applies to.\n- **Vitest browser mode (authenticated).** Mocks register over the browser RPC\n  (`registerMock`), which sits behind a per-run token (`isValidApiRequest`, a\n  random `api.token`). The interceptor's `configureServer` socket is not used for\n  registration here (in v5 it does not run at all, as the plugin is injected per\n  environment). The same missing boundary check exists on the authenticated RPC\n  path, but reaching it requires the token, so it is not a remote-unauthenticated\n  read.\n\n## Path handling\n`new URL(redirect).pathname` combined with `join(root, pathname)` does **not**\nconfine reads to the root:\n\n- Special/hierarchical schemes (`file:`, `http:`) are normalized by WHATWG URL,\n  so `..` segments are collapsed and the result stays under the root. Payloads of\n  the form `file:///../../etc/passwd` do **not** escape.\n- A non-special (opaque) scheme preserves `..` in `pathname`, so\n  `join(root, \"../../…/etc/passwd\")` resolves outside the root and reads an\n  arbitrary file.\n\nEven without escaping the root, the missing `server.fs` check allows reading any\nin-root file the dev server would otherwise refuse to serve (for example an\nin-root `.env` or source that is denied by `server.fs.deny`).\n\n## Scope / preconditions\n- This is a **development-server** issue. The dev server binds to `localhost` by\n  default and is not reachable from the network unless the developer exposes it\n  (`server.host` / `0.0.0.0`, a LAN bind, or a proxy).\n- A raw (non-browser) client against a reachable server bypasses browser origin\n  and CORS protections entirely and can both register the mock and read the\n  response.\n- A browser-based drive-by against a localhost server is substantially mitigated\n  by Vite defaults: the default CORS origin allowlist is limited to `localhost`\n  origins, and `server.allowedHosts` blocks DNS-rebinding, so a cross-origin page\n  cannot read the file contents back.\n\n## Impact\nDisclosure of local files readable by the dev-server process (source, in-root\n`.env`/secrets, and, via the opaque-scheme payload, files outside the project\nroot). No integrity or availability impact.\n\n## Affected versions\nPresent since `@vitest/mocker` was introduced.\n\n- **Affected: `@vitest/mocker` >= 2.1.0** (shipped in `vitest` and\n  `@vitest/browser` >= 2.1.0), through 4.1.x and the 5.0.0 pre-releases.\n- **Fixed:** Vitest 4.1.11 and 5.0.0. Older majors (2.1.x, 3.x) are not\n  maintained and are not planned to receive the fix.\n\n## Fix\nValidate the resolved redirect target against Vite's file-serving allowlist\n(`isFileLoadingAllowed`) before registering it, at every registration site, and\nstop registering the interceptor WebSocket events in Vitest's browser mode\n(mocks there flow through the authenticated RPC).",
+      "reported_by": null,
+      "title": "Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-84373"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "vitest",
+      "vulnerable_versions": ">=2.1.0 <4.1.11",
+      "github_advisory_id": "GHSA-82fw-gwwq-j7x9",
+      "recommendation": "Upgrade to version 4.1.11 or later",
+      "patched_versions": ">=4.1.11",
+      "updated": "2026-09-08T20:46:47.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-22"
+      ],
+      "url": "https://github.com/advisories/GHSA-82fw-gwwq-j7x9"
+    },
+    "1193684": {
+      "findings": [
+        {
+          "version": "4.1.10",
+          "paths": [
+            "apps\\frontend > vitest@4.1.10 > @vitest/mocker@4.1.10"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9\n- https://nvd.nist.gov/vuln/detail/CVE-2026-84373\n- https://github.com/vitest-dev/vitest/pull/10972\n- https://github.com/vitest-dev/vitest/pull/10974\n- https://github.com/vitest-dev/vitest/commit/51edf2b072902aec6d30c90ebaafd8f121c6f9d8\n- https://github.com/vitest-dev/vitest/commit/8ff9b9a9efca7c6cfd5243569440de8d7a33aec4\n- https://github.com/vitest-dev/vitest/commit/fe5a11d3ceac5ec10d6d7d21a46d4caca132c48f\n- https://github.com/vitest-dev/vitest/releases/tag/v4.1.11\n- https://github.com/vitest-dev/vitest/releases/tag/v5.0.0-rc.2\n- https://github.com/advisories/GHSA-82fw-gwwq-j7x9",
+      "created": "2026-09-08T20:46:45.000Z",
+      "id": 1193684,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n`@vitest/mocker` registers a redirect mock's target path without validating it\nagainst the dev server's file-serving allowlist. An attacker who can reach the\ndev server's WebSocket can register a redirect mock pointing outside the project\nroot; when the mocked module is requested, the plugin's `load` hook returns\n`readFile(<attacker path>)` as the module source, disclosing local files.\n\nThis is exploitable **without authentication** only through the public\n`mockerPlugin` / standalone `interceptorPlugin` exports (used by third-party dev\nservers), which register the handler on Vite's unauthenticated HMR socket.\nVitest's own browser mode registers mocks over a **token-authenticated** RPC and\nis not remotely reachable by default (see Scope).\n\n## Affected code\n`packages/mocker/src/node/interceptorPlugin.ts`.\n\nThe `load` hook is the file-read sink:\n\n```ts\nif (mock.type === 'redirect') {\n  return readFile(mock.redirect, 'utf-8')\n}\n```\n\n`mock.redirect` is derived from client input at registration time with no\nboundary check:\n\n```ts\nif (event.type === 'redirect') {\n  const redirectUrl = new URL(event.redirect)\n  event.redirect = join(server.config.root, redirectUrl.pathname)\n}\nregistry.register(event)\n```\n\nThere is no `server.fs.allow` / `server.fs.deny` check and no assertion that the\nresolved path stays within the project root.\n\n## Registration paths and trust boundaries\n- **Public `mockerPlugin` / `interceptorPlugin` (unauthenticated).** In\n  `configureServer`, the plugin registers `server.ws.on('vitest:interceptor:register', …)`\n  on Vite's HMR WebSocket. That socket performs no token, Origin, or same-origin\n  check, so any client that can reach it can register a redirect mock. This is\n  the path the \"unauthenticated\" impact applies to.\n- **Vitest browser mode (authenticated).** Mocks register over the browser RPC\n  (`registerMock`), which sits behind a per-run token (`isValidApiRequest`, a\n  random `api.token`). The interceptor's `configureServer` socket is not used for\n  registration here (in v5 it does not run at all, as the plugin is injected per\n  environment). The same missing boundary check exists on the authenticated RPC\n  path, but reaching it requires the token, so it is not a remote-unauthenticated\n  read.\n\n## Path handling\n`new URL(redirect).pathname` combined with `join(root, pathname)` does **not**\nconfine reads to the root:\n\n- Special/hierarchical schemes (`file:`, `http:`) are normalized by WHATWG URL,\n  so `..` segments are collapsed and the result stays under the root. Payloads of\n  the form `file:///../../etc/passwd` do **not** escape.\n- A non-special (opaque) scheme preserves `..` in `pathname`, so\n  `join(root, \"../../…/etc/passwd\")` resolves outside the root and reads an\n  arbitrary file.\n\nEven without escaping the root, the missing `server.fs` check allows reading any\nin-root file the dev server would otherwise refuse to serve (for example an\nin-root `.env` or source that is denied by `server.fs.deny`).\n\n## Scope / preconditions\n- This is a **development-server** issue. The dev server binds to `localhost` by\n  default and is not reachable from the network unless the developer exposes it\n  (`server.host` / `0.0.0.0`, a LAN bind, or a proxy).\n- A raw (non-browser) client against a reachable server bypasses browser origin\n  and CORS protections entirely and can both register the mock and read the\n  response.\n- A browser-based drive-by against a localhost server is substantially mitigated\n  by Vite defaults: the default CORS origin allowlist is limited to `localhost`\n  origins, and `server.allowedHosts` blocks DNS-rebinding, so a cross-origin page\n  cannot read the file contents back.\n\n## Impact\nDisclosure of local files readable by the dev-server process (source, in-root\n`.env`/secrets, and, via the opaque-scheme payload, files outside the project\nroot). No integrity or availability impact.\n\n## Affected versions\nPresent since `@vitest/mocker` was introduced.\n\n- **Affected: `@vitest/mocker` >= 2.1.0** (shipped in `vitest` and\n  `@vitest/browser` >= 2.1.0), through 4.1.x and the 5.0.0 pre-releases.\n- **Fixed:** Vitest 4.1.11 and 5.0.0. Older majors (2.1.x, 3.x) are not\n  maintained and are not planned to receive the fix.\n\n## Fix\nValidate the resolved redirect target against Vite's file-serving allowlist\n(`isFileLoadingAllowed`) before registering it, at every registration site, and\nstop registering the interceptor WebSocket events in Vitest's browser mode\n(mocks there flow through the authenticated RPC).",
+      "reported_by": null,
+      "title": "Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-84373"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "@vitest/mocker",
+      "vulnerable_versions": ">=2.1.0 <4.1.11",
+      "github_advisory_id": "GHSA-82fw-gwwq-j7x9",
+      "recommendation": "Upgrade to version 4.1.11 or later",
+      "patched_versions": ">=4.1.11",
+      "updated": "2026-09-08T20:46:47.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-22"
+      ],
+      "url": "https://github.com/advisories/GHSA-82fw-gwwq-j7x9"
+    },
+    "1239989": {
+      "findings": [
+        {
+          "version": "14.3.0",
+          "paths": [
+            ". > markdownlint-cli2@0.23.2 > markdown-it@14.3.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/markdown-it/markdown-it/security/advisories/GHSA-253c-mchw-3w2r\n- https://github.com/markdown-it/markdown-it/commit/09fa07118dda4c953f058848f53dae88395618ca\n- https://github.com/markdown-it/markdown-it/commit/aaadcfa6d817b3c5f89afb49d97c7b797a6dd4fd\n- https://github.com/markdown-it/markdown-it/commit/ad70f6b7cff64bee10e42a774147112480ca0d49\n- https://github.com/advisories/GHSA-253c-mchw-3w2r",
+      "created": "2026-09-29T17:57:56.000Z",
+      "id": 1239989,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\nTwo independent quadratic paths in the `linkify: true` handling. Both are in markdown-it's own code rather than in linkify-it, which stays linear on both payloads.\n\n`src/rules_core/linkify.ts` calls `arrayReplaceAt` once per linkified text token, and that rebuilds the whole `children` array each time. A paragraph of N soft-broken lines is one inline token with about 2N children, so you get N rebuilds over a 2N array. Schema-less emails are what reach it. A `http://` link gets consumed by the inline rule first and never arrives as a text token, so those stay linear.\n\n`src/rules_inline/linkify.ts` runs `state.pending.match(SCHEME_RE)` at every `://` in the source. `state.pending` only gets truncated once a link is actually produced, so an unregistered scheme leaves it growing and every `://` rescans the lot.\n\n## Proof of concept\n\nClean install of 15.0.0 from npm, `new MarkdownIt({ linkify: true }).render(payload)`, Node 24.\n\n| N | 5,000 | 10,000 | 20,000 | 40,000 |\n|---|---|---|---|---|\n| `'a@b.co\\n'.repeat(N)`, 34KB to 273KB | 1.1s | 4.7s | 19.6s | 89s |\n| `'a://'.repeat(N)`, 20KB to 156KB | 0.25s | 0.76s | 3.1s | 15.0s |\n\nDoubling the input roughly quadruples the time in both. With `linkify: false` the same inputs run in 25 to 131ms and stay flat.\n\nControls for the first one, all at N=20000: putting every email in a single text token (`'a@b.co '`) takes 0.59s, one email per paragraph (`'a@b.co\\n\\n'`) takes 0.64s, and soft-broken lines with nothing linkifiable take 42ms. So it needs many children AND many of them linkifying. For the second, replaying just the `SCHEME_RE` calls against the same growing prefixes with no markdown-it involved accounts for 11.7s of the 15s.\n\nOrdinary prose does it too. `'ping a@b.co ok\\n'.repeat(20000)` is 293KB and takes 31s.\n\n## Caveat\n\n`linkify` is off by default, so this only reaches apps that turn it on.\n\n## Impact\n\nAvailability only. A few hundred KB of fairly ordinary markdown pins one core for tens of seconds, and because it's quadratic it degrades quickly with size. Nothing is read, written or executed.",
+      "reported_by": null,
+      "title": "markdown-it linkify: true has two quadratic paths, so a few hundred KB of markdown blocks the event loop for tens of seconds",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "markdown-it",
+      "vulnerable_versions": "<14.3.1",
+      "github_advisory_id": "GHSA-253c-mchw-3w2r",
+      "recommendation": "Upgrade to version 14.3.1 or later",
+      "patched_versions": ">=14.3.1",
+      "updated": "2026-09-29T17:57:57.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-253c-mchw-3w2r"
+    },
+    "1239991": {
+      "findings": [
+        {
+          "version": "5.2.2",
+          "paths": [
+            ". > markdownlint-cli2@0.23.2 > js-yaml@5.2.2",
+            "apps\\frontend > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > @next/eslint-plugin-next@16.3.8 > @eslint-community/eslint-utils@4.9.1 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-jsx-a11y@6.10.2 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react@7.37.5 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react-hooks@7.1.1 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > js-yaml@5.2.2"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodeca/js-yaml/security/advisories/GHSA-r3ph-w7gj-g6xm\n- https://github.com/nodeca/js-yaml/commit/6a8e05f9a485188ed730ac81e81ae221352ef480\n- https://github.com/nodeca/js-yaml/releases/tag/5.4.1\n- https://github.com/advisories/GHSA-r3ph-w7gj-g6xm",
+      "created": "2026-09-29T17:57:39.000Z",
+      "id": 1239991,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\n`maxTotalMergeKeys` does not count empty mappings. An attacker can repeatedly merge a large sequence of them and consume significant CPU without reaching the configured limit.\n\n## Example\n\n```yaml\narr: &arr [{}, {}, {}, ...] # N empty mappings\ntargets:\n  - <<: *arr                # repeated K times\n```\n\nFor every target, the loader iterates all `N` elements of `arr`. This results in `O(N * K)` work while `totalMergeKeys` remains unchanged.\n\n## PoC\n\n```js\nimport { performance } from 'node:perf_hooks'\nimport { load, YAML11_SCHEMA } from 'js-yaml'\n\nconst n = 20000\n\nconst src =\n  'arr: &arr [' + '{},'.repeat(n).slice(0, -1) + ']\\n' +\n  'targets:\\n' +\n  '  - <<: *arr\\n'.repeat(n)\n\nconst started = performance.now()\n\nload(src, { schema: YAML11_SCHEMA })\n\nconsole.log(`${(performance.now() - started).toFixed(1)} ms`)\n```\n\nObserved results:\n\n| N | YAML size | Time |\n|---:|---:|---:|\n| 800 | ~13 KB | ~20 ms |\n| 3200 | ~50 KB | ~180 ms |\n| 20000 | ~500 KB | ~13 s |\n\n## Impact\n\nWhen merge keys are enabled, an attacker can submit a relatively small YAML document that causes prolonged CPU consumption despite the default `maxTotalMergeKeys` limit.\n\n## Fix\n\nCount every merge source mapping as one budget unit in addition to counting its keys.",
+      "reported_by": null,
+      "title": "js-yaml: maxTotalMergeKeys does not limit CPU use for empty merge sources",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "js-yaml",
+      "vulnerable_versions": ">=5.0.0 <=5.4.0",
+      "github_advisory_id": "GHSA-r3ph-w7gj-g6xm",
+      "recommendation": "Upgrade to version 5.4.1 or later",
+      "patched_versions": ">=5.4.1",
+      "updated": "2026-09-29T17:57:40.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-r3ph-w7gj-g6xm"
+    },
+    "1240100": {
+      "findings": [
+        {
+          "version": "1.1.20",
+          "paths": [
+            "apps\\frontend > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > @next/eslint-plugin-next@16.3.8 > @eslint-community/eslint-utils@4.9.1 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > @next/eslint-plugin-next@16.3.8 > @eslint-community/eslint-utils@4.9.1 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > @next/eslint-plugin-next@16.3.8 > @eslint-community/eslint-utils@4.9.1 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-jsx-a11y@6.10.2 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-jsx-a11y@6.10.2 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-jsx-a11y@6.10.2 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-jsx-a11y@6.10.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react@7.37.5 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react@7.37.5 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react@7.37.5 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react@7.37.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react-hooks@7.1.1 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react-hooks@7.1.1 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-react-hooks@7.1.1 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/parser@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/utils@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > eslint@9.39.5 > @eslint/config-array@0.21.2 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > eslint@9.39.5 > @eslint/eslintrc@3.3.6 > minimatch@3.1.5 > brace-expansion@1.1.20",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > eslint@9.39.5 > minimatch@3.1.5 > brace-expansion@1.1.20"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-q2hr-2g5m-vwhr\n- https://nvd.nist.gov/vuln/detail/CVE-2026-102277\n- https://github.com/juliangruber/brace-expansion/commit/33a5ef17b8d800bbfa8c52b14c39043b6aac1a96\n- https://github.com/juliangruber/brace-expansion/commit/bdff773f98e5988616b7039cc9b508df5d640b22\n- https://github.com/juliangruber/brace-expansion/commit/c55e67d8d8b1c56a2474afff15c2891166b2d364\n- https://github.com/juliangruber/brace-expansion/commit/ffdfa3e3806bed17c0874b8f1439b084de354a7e\n- https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "created": "2026-09-29T23:45:39.000Z",
+      "id": 1240100,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nExpanding `{a},b}`-shaped input takes time quadratic in the number of literal `}` characters, blocking the event loop.\n\nBash preserves a quirk where a brace group followed by a comma set still expands (`{a},b}`). The parser implements this by rewriting the string and restarting the scan. Each pass absorbs exactly one `}` and re-scans from the beginning, so `n` trailing braces cost `n` full passes.\n\n### Reproduction\n\n```js\nconst build = n => '{a}' + '}'.repeat(n) + ',z}'\n\nfor (const n of [8000, 16000, 32000, 64000, 128000]) {\n  const t = Date.now()\n  expand(build(n))\n  console.log(n, Date.now() - t + 'ms')\n}\n```\n\n| n | input | time | results |\n|---|---|---|---|\n| 8,000 | 8 KB | 110 ms | 2 |\n| 16,000 | 16 KB | 446 ms | 2 |\n| 32,000 | 32 KB | 1.7 s | 2 |\n| 64,000 | 64 KB | 6.9 s | 2 |\n| 128,000 | 128 KB | **27.7 s** | 2 |\n\n`ms/n^2` is flat at ~1.7 and each doubling of `n` costs exactly 4.0x - quadratic. 128 KB of input blocks the event loop for nearly half a minute to produce two results.\n\n### Mechanism\n\nInstrumenting the rewrite branch confirms it runs exactly `n + 1` times, once per literal `}`, each re-scanning the whole string.\n\nThere is a second multiplier. The rewrite replaces the group's closing `}` with the internal `escClose` sentinel, which is `'\\0CLOSE' + Math.random() + '\\0'` - about 25 characters. The working string therefore *grows* by ~25 characters on every pass:\n\n| n | input length | final string length |\n|---|---|---|\n| 1,000 | 1,006 | 26,006 |\n| 8,000 | 8,006 | 208,006 |\n\nSo the input is inflated roughly 26x, and that factor multiplies both the quadratic constant and peak memory. This makes it partly a memory-pressure issue as well as a CPU one.\n\n### Why `max` and `maxLength` do not help\n\nThe cost is in parsing, before the result set exists. The payload yields 2 results regardless of size, so neither bound is ever reached.\n\n### Impact\n\nAn application passing an untrusted pattern to `expand()`, directly or through `minimatch` / `glob`, can have its event loop blocked for tens of seconds by a payload well under minimatch's 65,536-character cap. For a single-threaded Node server that is a full stall, not just a slow request.\n\nDegraded availability rather than a crash - the process recovers once the expansion completes.\n\n### Affected versions\n\nVerified affected on 1.1.18, 2.1.4, 3.0.6 and 5.0.9, all within a few percent of each other (~460-490 ms at n=16,000).\n\n### Patch\n\nThe rewrite loop gets an iteration bound. Past the cap the remaining string is treated as non-expanding and returned literally, consistent with the existing `max` / `maxLength` caps, which truncate rather than throw.\n\nNote this bounds the number of passes, not the cost of each: worst-case work remains proportional to `cap x input length`. The cap is set low enough that the residual is bounded in practice, and far above what any realistic `{a},b}` input needs.\n\n### Severity note\n\nScored 5.3 Medium (`A:L`) for consistency with GHSA-3jxr-9vmj-r5cp, the other algorithmic-complexity advisory on this package (CWE-407), which uses the same vector. The stack-exhaustion advisories on this package score `A:H` because they crash the process outright; this one stalls it.",
+      "reported_by": null,
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-102277"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": "<1.1.21",
+      "github_advisory_id": "GHSA-q2hr-2g5m-vwhr",
+      "recommendation": "Upgrade to version 1.1.21 or later",
+      "patched_versions": ">=1.1.21",
+      "updated": "2026-09-29T23:45:39.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"
+    },
+    "1240103": {
+      "findings": [
+        {
+          "version": "5.0.11",
+          "paths": [
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-import-resolver-typescript@3.10.1 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > eslint-module-utils@2.14.0 > @typescript-eslint/parser@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > eslint-plugin-import@2.32.0 > @typescript-eslint/parser@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/parser@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/type-utils@8.67.0 > @typescript-eslint/utils@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/eslint-plugin@8.67.0 > @typescript-eslint/utils@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/parser@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11",
+            "apps\\frontend > eslint-config-next@16.3.8 > typescript-eslint@8.67.0 > @typescript-eslint/utils@8.67.0 > @typescript-eslint/typescript-estree@8.67.0 > minimatch@10.2.6 > brace-expansion@5.0.11"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-q2hr-2g5m-vwhr\n- https://nvd.nist.gov/vuln/detail/CVE-2026-102277\n- https://github.com/juliangruber/brace-expansion/commit/33a5ef17b8d800bbfa8c52b14c39043b6aac1a96\n- https://github.com/juliangruber/brace-expansion/commit/bdff773f98e5988616b7039cc9b508df5d640b22\n- https://github.com/juliangruber/brace-expansion/commit/c55e67d8d8b1c56a2474afff15c2891166b2d364\n- https://github.com/juliangruber/brace-expansion/commit/ffdfa3e3806bed17c0874b8f1439b084de354a7e\n- https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "created": "2026-09-29T23:45:39.000Z",
+      "id": 1240103,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nExpanding `{a},b}`-shaped input takes time quadratic in the number of literal `}` characters, blocking the event loop.\n\nBash preserves a quirk where a brace group followed by a comma set still expands (`{a},b}`). The parser implements this by rewriting the string and restarting the scan. Each pass absorbs exactly one `}` and re-scans from the beginning, so `n` trailing braces cost `n` full passes.\n\n### Reproduction\n\n```js\nconst build = n => '{a}' + '}'.repeat(n) + ',z}'\n\nfor (const n of [8000, 16000, 32000, 64000, 128000]) {\n  const t = Date.now()\n  expand(build(n))\n  console.log(n, Date.now() - t + 'ms')\n}\n```\n\n| n | input | time | results |\n|---|---|---|---|\n| 8,000 | 8 KB | 110 ms | 2 |\n| 16,000 | 16 KB | 446 ms | 2 |\n| 32,000 | 32 KB | 1.7 s | 2 |\n| 64,000 | 64 KB | 6.9 s | 2 |\n| 128,000 | 128 KB | **27.7 s** | 2 |\n\n`ms/n^2` is flat at ~1.7 and each doubling of `n` costs exactly 4.0x - quadratic. 128 KB of input blocks the event loop for nearly half a minute to produce two results.\n\n### Mechanism\n\nInstrumenting the rewrite branch confirms it runs exactly `n + 1` times, once per literal `}`, each re-scanning the whole string.\n\nThere is a second multiplier. The rewrite replaces the group's closing `}` with the internal `escClose` sentinel, which is `'\\0CLOSE' + Math.random() + '\\0'` - about 25 characters. The working string therefore *grows* by ~25 characters on every pass:\n\n| n | input length | final string length |\n|---|---|---|\n| 1,000 | 1,006 | 26,006 |\n| 8,000 | 8,006 | 208,006 |\n\nSo the input is inflated roughly 26x, and that factor multiplies both the quadratic constant and peak memory. This makes it partly a memory-pressure issue as well as a CPU one.\n\n### Why `max` and `maxLength` do not help\n\nThe cost is in parsing, before the result set exists. The payload yields 2 results regardless of size, so neither bound is ever reached.\n\n### Impact\n\nAn application passing an untrusted pattern to `expand()`, directly or through `minimatch` / `glob`, can have its event loop blocked for tens of seconds by a payload well under minimatch's 65,536-character cap. For a single-threaded Node server that is a full stall, not just a slow request.\n\nDegraded availability rather than a crash - the process recovers once the expansion completes.\n\n### Affected versions\n\nVerified affected on 1.1.18, 2.1.4, 3.0.6 and 5.0.9, all within a few percent of each other (~460-490 ms at n=16,000).\n\n### Patch\n\nThe rewrite loop gets an iteration bound. Past the cap the remaining string is treated as non-expanding and returned literally, consistent with the existing `max` / `maxLength` caps, which truncate rather than throw.\n\nNote this bounds the number of passes, not the cost of each: worst-case work remains proportional to `cap x input length`. The cap is set low enough that the residual is bounded in practice, and far above what any realistic `{a},b}` input needs.\n\n### Severity note\n\nScored 5.3 Medium (`A:L`) for consistency with GHSA-3jxr-9vmj-r5cp, the other algorithmic-complexity advisory on this package (CWE-407), which uses the same vector. The stack-exhaustion advisories on this package score `A:H` because they crash the process outright; this one stalls it.",
+      "reported_by": null,
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-102277"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=4.0.0 <5.0.12",
+      "github_advisory_id": "GHSA-q2hr-2g5m-vwhr",
+      "recommendation": "Upgrade to version 5.0.12 or later",
+      "patched_versions": ">=5.0.12",
+      "updated": "2026-09-29T23:45:39.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"
+    },
+    "1240621": {
+      "findings": [
+        {
+          "version": "3.4.13",
+          "paths": [
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/layout-elk@0.2.2 > mermaid@11.16.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/mermaid-zenuml@0.2.3 > @zenuml/core@3.50.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/mermaid-zenuml@0.2.3 > mermaid@11.16.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > mermaid@11.16.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/layout-tidy-tree@0.2.2 > mermaid@11.16.1 > dompurify@3.4.13"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-p98j-92pf-mc4p\n- https://github.com/cure53/DOMPurify/pull/1636\n- https://github.com/cure53/DOMPurify/commit/b9b9d80f7e401771c2ccaef5f45def7eec8f27d7\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.16\n- https://github.com/advisories/GHSA-p98j-92pf-mc4p",
+      "created": "2026-09-30T15:37:57.000Z",
+      "id": 1240621,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\nIn `IN_PLACE` mode DOMPurify sanitizes the caller's live DOM subtree directly. To close a known hazard (GHSA-55q2-fjhq-7xh7), the library neutralizes any node a hook detaches during sanitization by stripping its subtree's non-allow-listed attributes, but this neutralization is wired only into the `beforeSanitizeElements` and `uponSanitizeElement` hook sites. An `afterSanitizeElements` or `afterSanitizeAttributes` hook that removes a non-root element (a documented, supported pattern) detaches that element's subtree with no neutralization, so descendant `on*` handlers remain armed on the caller's live tree after `sanitize()` returns, yielding DOM XSS. No special privilege is required beyond supplying markup to an application that uses `IN_PLACE` together with a node-removing afterSanitize hook.\n\n## Root Cause\n\n`IN_PLACE` sanitization mutates the caller's live document, so any element a hook detaches from that tree must have its subtree neutralized before `sanitize()` returns; otherwise a queued resource-event handler (for example an `<img onerror>` that began loading when the caller built the tree) fires in page scope even though the handler never reached the sanitized output. The guard helper `_handleHookDetachedNode` (which calls `_neutralizeSubtree` in `IN_PLACE`) is invoked only after `beforeSanitizeElements` and after `uponSanitizeElement`. It is never invoked from the afterSanitize return paths, and `_sanitizeAttributes` never calls it at all. The post-walk `IN_PLACE` neutralization pass iterates only `DOMPurify.removed`, and hook-detached nodes are intentionally not recorded there, so that pass cannot reach them either.\n\n```text\nsrc/purify.ts\n  _sanitizeElements: _handleHookDetachedNode present at lines 2142 and 2175\n    (before/upon), absent after afterSanitizeElements at lines 2208 and 2249.\n  _sanitizeAttributes: afterSanitizeAttributes fires at line 2670 with no\n    detach re-check; the function never calls _handleHookDetachedNode.\n  Post-walk IN_PLACE pass (lines 3081-3090) iterates DOMPurify.removed only,\n    which by design (comment at lines 2096-2099) excludes hook-detached nodes.\n```\n\n## Impact\n\nAn attacker who supplies markup processed by a victim application that runs `DOMPurify.sanitize(node, { IN_PLACE: true })` and registers a node-removing `afterSanitizeElements` or `afterSanitizeAttributes` hook can retain arbitrary `on*` event handlers on descendants of a removed non-root element. Because `IN_PLACE` operates on the caller's live document, a queued resource-event handler on such a descendant fires in the page origin after the synchronous `sanitize()` call returns, giving script execution in the victim's session (DOM XSS). This defeats DOMPurify's `IN_PLACE` contract to neutralize handlers on subtrees removed from the live tree. The capability is script execution in the victim origin; exact confidentiality and integrity effects depend on the hosting application's session.\n\n## Proof of Concept\n\n```text\nDependencies: Node.js and jsdom. The harness builds a live tree, registers a\nremoval hook, runs IN_PLACE sanitize(), then inspects whether the attacker\nonerror handler survives on the detached descendant. jsdom does not perform\nreal image loads, so the retained handler (rather than an actual fired event)\nis the observed hazard; the retained on* attribute on a live detached node\nafter a synchronous sanitize() return is the neutralization failure.\n```\n\nReproduction steps:\n1. Build a live subtree `#root > section#wrap > img[onerror]` where `#root` is the walk root and `section#wrap` is a non-root wrapper.\n2. Register an `afterSanitizeElements` (or `afterSanitizeAttributes`) hook that calls `node.remove()` on the wrapper.\n3. Call `DOMPurify.sanitize(root, { IN_PLACE: true })`.\n4. Observe that the descendant `<img>` retains its `onerror` handler, whereas the same removal performed in a `beforeSanitizeElements`/`uponSanitizeElement` hook strips it.\n\n```javascript\nconst { JSDOM } = require('jsdom');\nconst createDOMPurify = require('dompurify');\nconst { window } = new JSDOM('<!DOCTYPE html><body></body>');\nconst DOMPurify = createDOMPurify(window);\n\nconst root = window.document.createElement('div');\nroot.id = 'root';\nroot.innerHTML = '<section id=\"wrap\"><img src=\"x\" onerror=\"ATTACKER()\"></section>';\nwindow.document.body.appendChild(root);\n\nDOMPurify.addHook('afterSanitizeElements', (node) => {\n  if (node.id === 'wrap') node.remove();\n});\nDOMPurify.sanitize(root, { IN_PLACE: true });\n\n// The detached <img> still carries its onerror handler:\nconsole.log(root.querySelector('#wrap') === null,               // true (removed from live tree)\n            !!window.document.querySelector('img[onerror]') ||  // handler survives on the detached node\n            root.innerHTML);\n```\n\n```text\nPASS: beforeSanitizeElements detach neutralizes descendant onerror (control)\nPASS: uponSanitizeElement detach neutralizes descendant onerror (control)\nPASS: without a removal hook the descendant onerror is stripped normally\nPASS: afterSanitizeElements detach LEAVES descendant onerror armed (GAP)\nPASS: afterSanitizeAttributes detach LEAVES descendant onerror armed (GAP)\nPASS: kept custom element removed in afterSanitizeElements leaves descendant onerror armed (GAP)\n```\n\n## Attack Chain\n\n1. **Exposure:** The victim application calls `DOMPurify.sanitize(liveNode, { IN_PLACE: true })` on attacker-influenced markup and has registered a node-removing `afterSanitizeElements` or `afterSanitizeAttributes` hook per an application policy (`src/purify.ts:3026` walk, `2136` element pass, `2522` attribute pass).\n2. **Control:** The attacker controls the markup, including a non-root wrapper element and, inside it, a descendant carrying an `on*` resource-event handler such as `<img src=x onerror=...>`.\n3. **Path:** The pre-order walk visits the wrapper before its descendants. During the wrapper's element or attribute pass the application hook detaches the wrapper from the live tree.\n4. **Guard:** The detach-neutralization guard `_handleHookDetachedNode` runs only after `beforeSanitizeElements` (`2142`) and `uponSanitizeElement` (`2175`); it is absent after `afterSanitizeElements` (`2208`, `2249`) and is never called by `_sanitizeAttributes` (afterSanitizeAttributes at `2670`). The NodeIterator advances past the detached subtree, so the descendants are never revisited, and the post-walk pass iterates only `DOMPurify.removed`, which excludes hook-detached nodes.\n5. **Primitive:** The descendant retains its `on*` handler on the caller's live document after `sanitize()` returns.\n6. **Result:** The queued resource event fires the attacker handler in the victim page origin, achieving DOM XSS despite `IN_PLACE` sanitization.\n\n## Bypass Evidence\n\nThe relevant prior fix is GHSA-55q2-fjhq-7xh7 (\"IN_PLACE hook removal leaves a detached subtree executable, causing XSS\"), whose change (`#1557`) added `_neutralizeSubtree` at the `beforeSanitizeElements` and `uponSanitizeElement` detach sites. Inspection of that change shows it touches no afterSanitize site: the diff adds the neutralization only at the before/upon locations, later refactored into `_handleHookDetachedNode` at `src/purify.ts:2142` and `2175`. A subsequent hardening change (`#1616`) added a `rootWasRemoved` throw and a neutralization sweep over `DOMPurify.removed`, but that sweep still iterates only `DOMPurify.removed`, which by design excludes hook-detached non-root nodes, so it does not close this gap. The `afterSanitizeElements`-on-kept-custom-element site at `2208` was itself introduced by the fix for GHSA-c2j3-45gr-mqc4 (`#1527`), adding another uncovered hook site.\n\nDisproof attempts, all failed: (a) that a later release closed the afterSanitize gap, refuted by inspecting the published 3.4.13, 3.4.14, and 3.4.15 artifacts; (b) that detached descendants are revisited or re-sanitized, refuted at runtime (the `onerror` is retained only at the afterSanitize sites and stripped at the before/upon sites and with no removal hook); (c) that the post-walk pass catches hook-detached nodes, refuted by the design that excludes them from `DOMPurify.removed`; (d) that the precondition is contrived, refuted by parity with the accepted GHSA-55q2 threat model and the library's own supported pattern of removing a node inside `afterSanitizeElements`. The only edge not directly executed is the browser resource-event dispatch (jsdom performs no real image load); it is established by the proven retention of the live handler after a synchronous return, the library's own comments describing exactly this hazard, and parity with the accepted GHSA-55q2 mechanism.\n\n## Affected Versions\n\n- `Ecosystem: npm`\n- `Package: dompurify`\n- `Confirmed affected range: >= 3.4.13, <= 3.4.15`\n- `Latest release checked: 3.4.15 (npm registry)`\n- `Fix status: fixed in 3.4.16`\n\nThe before/upon detach neutralization introduced for GHSA-55q2-fjhq-7xh7 first shipped in 3.4.13; the residual afterSanitize gap was verified by reproducing it against the published npm artifacts for 3.4.13, 3.4.14, and 3.4.15. The 3.4.12 artifact predates that neutralization and behaves differently at the before/upon sites, so it is outside this specific incomplete-fix range. No release through 3.4.15 neutralizes detached subtrees at the afterSanitize sites, so no fixed version is established.\n\n## Suggested Fix\n\nEnforce the same `IN_PLACE` detach-neutralization invariant at every hook site that can detach a node, not only the before/upon sites. Concretely, apply a `_handleHookDetachedNode(currentNode, root)` re-check after `afterSanitizeElements` at both `src/purify.ts:2208` and `2249` (returning as removed when the node was detached), and add an equivalent `IN_PLACE` detach check plus `_neutralizeSubtree` after `afterSanitizeAttributes` at `2670`. As an interim mitigation without a code change, applications using `IN_PLACE` can avoid removing nodes inside `afterSanitizeElements`/`afterSanitizeAttributes` hooks and instead perform such removals in `beforeSanitizeElements`/`uponSanitizeElement`, or avoid `IN_PLACE` for attacker-influenced content.\n\nReported by zx (GitHub: @manus-pi).",
+      "reported_by": null,
+      "title": "DOMPurify: IN_PLACE: node-removing afterSanitize hook leaves detached subtree event handlers armed, causing DOM XSS",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "low",
+      "module_name": "dompurify",
+      "vulnerable_versions": ">=3.4.13 <=3.4.15",
+      "github_advisory_id": "GHSA-p98j-92pf-mc4p",
+      "recommendation": "Upgrade to version 3.4.16 or later",
+      "patched_versions": ">=3.4.16",
+      "updated": "2026-09-30T15:37:59.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-p98j-92pf-mc4p"
+    },
+    "1241204": {
+      "findings": [
+        {
+          "version": "3.4.13",
+          "paths": [
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/layout-elk@0.2.2 > mermaid@11.16.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/mermaid-zenuml@0.2.3 > @zenuml/core@3.50.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/mermaid-zenuml@0.2.3 > mermaid@11.16.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > mermaid@11.16.1 > dompurify@3.4.13",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/layout-tidy-tree@0.2.2 > mermaid@11.16.1 > dompurify@3.4.13"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-6688-9rhm-gjv2\n- https://github.com/cure53/DOMPurify/pull/1636\n- https://github.com/cure53/DOMPurify/commit/b9b9d80f7e401771c2ccaef5f45def7eec8f27d7\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.16\n- https://github.com/advisories/GHSA-6688-9rhm-gjv2",
+      "created": "2026-10-05T23:43:53.000Z",
+      "id": 1241204,
+      "npm_advisory_id": null,
+      "overview": "## Environment\n\n- dompurify 3.4.15 (current npm release); reproduced independently on jsdom 30.0.1 and 29.1.1 (Node.js 20.x / 26.x)\n- Config: `DOMPurify.sanitize(node, { IN_PLACE: true })` on a Node input; `SAFE_FOR_XML` at its default (`true`)\n\n## Summary\n\nThe 3.4.9 fix for the IN_PLACE detached-root class added two protections on the IN_PLACE return path: a fail-closed `TypeError` in `_forceRemove` when a node selected for removal cannot be detached, and a `_neutralizeSubtree` pass (`dist/purify.js` line 1336) that strips non-allowlisted **attributes** from removed subtrees.\n\nBoth miss the rawtext **text-content** form. When the force-removed root is a rawtext element (`<style>`), the payload lives in the node's *text*: the node detaches fine (the `TypeError` guard is not reached), `_neutralizeSubtree` strips nothing (there are no attributes), and the IN_PLACE exit returns the detached, never-sanitized `<style>` whose text still carries live markup. Serializing that node and re-parsing it in **plain HTML context** materializes the payload — no foreign-content context required.\n\nThe same Node input sanitized **without** `IN_PLACE` returns an empty result: the only difference is the IN_PLACE return path handing the killed node back.\n\n## Steps to reproduce\n\n```js\nconst { JSDOM } = require('jsdom');\nconst createDOMPurify = require('dompurify');   // 3.4.15\n\nconst window = new JSDOM('').window;\nconst DOMPurify = createDOMPurify(window);\n\nconst styleRoot = window.document.createElement('style');\nstyleRoot.setAttribute('onclick', 'alert(1)');    // attribute payload\nstyleRoot.textContent = '</style><img src=x onerror=1>';  // text payload\nwindow.document.body.appendChild(styleRoot);\n\nconst returned = DOMPurify.sanitize(styleRoot, { IN_PLACE: true });\n\nconsole.log(returned === styleRoot);                       // true (same node)\nconsole.log(styleRoot.parentNode === null);                // true (detached)\nconsole.log(styleRoot.outerHTML);\n// <style></style><img src=x onerror=1></style>\nconsole.log(styleRoot.getAttribute('onclick'));            // null  (attribute neutralized)\nconsole.log(styleRoot.textContent);                        // '</style><img src=x onerror=1>' (text survives)\n\n// plain HTML reparse (no foreign-content context involved):\nconst probe = window.document.createElement('div');\nprobe.innerHTML = returned.outerHTML || styleRoot.outerHTML;\nconsole.log(probe.querySelectorAll('img').length);         // 1\nconsole.log(probe.querySelector('img').getAttribute('onerror')); // \"1\"\n```\n\nObserved on 3.4.15: one node, one call — the `onclick` **attribute** is neutralized while the **text** payload (`</style><img src=x onerror=1>`) survives verbatim; serializing and re-parsing the returned node in plain HTML context materializes the `img` with the live `onerror` handler.\n\nContrast on the same Node input without `IN_PLACE`: `RETURN_DOM: true` → `<body></body>`; `RETURN_DOM_FRAGMENT: true` → 0 children — the payload is fully sanitized away. The only difference is the IN_PLACE return path.\n\nContrast on the removal trigger: `SAFE_FOR_XML: false` → the node is not removed (detached stays false); plain CSS text → not removed. The removal is gated by the mXSS text probes and happens *specifically because* the serialized node would re-open tags on reparse.\n\n## Root cause\n\n`_isUnsafeNode` (`dist/purify.js` 3.4.15, lines 1700–1714) removes nodes whose literal text would re-open tags on reparse — shape (b) in the source comment is \"text-only content that already carries the element's OWN end tag\", detected by the `LITERAL_TEXT_CLOSE` probe (line 385) alongside the `ELEMENT_MARKUP_PROBE` (line 339) rules. `_forceRemove` (line 1122) records the node in `DOMPurify.removed` (`{element}`) and detaches it. The removal is intentional: the upstream comment states these shapes are removed **because the literal serializer emits them verbatim for the HTML parser to re-open**.\n\nThe IN_PLACE exit then hands the force-removed root back to the caller — the very node whose removal `DOMPurify.removed` just recorded (verified: `DOMPurify.removed.some(e => e.element === root)` is `true` on the returned instance). The 3.4.9 `_neutralizeSubtree` pass (line 1336) addresses only the attribute form — its own docstring: \"walks a removed subtree and strips every attribute\" (purpose: cancel queued resource events). Rawtext text content is out of its scope, so the removal that was performed *specifically to prevent reparse* is undone by returning the node: you removed it to stop the reparse, then returned it.\n\nDifferential (one node, one call, same removal path): the `onclick` attribute is neutralized by the existing pass while the text payload survives verbatim — the attribute axis is covered, the text axis is the gap.\n\n## Impact\n\nIdentical blast radius to the published IN_PLACE family: an application that sanitizes a Node in `IN_PLACE` mode and re-inserts (or serializes and then re-inserts) the result materializes attacker markup in plain HTML context: script execution in the page. Moving the returned node via `appendChild` alone is safe; the round trip through serialization is what fires the payload. No foreign-content context is required with the close-tag payload.\n\n## Affected versions\n\n- Verified live: 3.4.15 (current).\n- Source-verified: the attribute-only `_neutralizeSubtree` and the IN_PLACE return path are present in 3.4.9–3.4.14; releases before 3.4.9 predate the fix entirely (unconditional return; individual pre-3.4.9 releases not dynamically tested).\n- Per cure53 advisory convention the affected range is reported as `<= 3.4.15` (current at time of writing).\n\n## Suggested remediation\n\n**Primary (root-cause, covers every form):** at the IN_PLACE exit, check whether the returned root was recorded during sanitization — `DOMPurify.removed.some(e => e.element === root)` — and fail closed: throw the same `TypeError` style used by the 3.4.9 detach guard (\"a node selected for removal could not be safely returned; refusing to sanitize in place\"), or return `null`. This is consistent with the existing fail-closed design and covers all present and future root-kill reasons in one check.\n\n**Secondary (form-specific):** extend `_neutralizeSubtree` to neutralize **text content of rawtext descendants** — the elements in `LITERAL_TEXT_ELEMENT_NAMES` (`style`, `script`, `xmp`, `iframe`, `noembed`, `noframes`, `plaintext`, `noscript`) — by rewriting `textContent` to a defanged form, matching the probe coverage of `_isUnsafeNode`/`LITERAL_TEXT_CLOSE`.\n\nA regression test asserting that a force-removed rawtext root comes back with no `/<[/\\w!]/` match in `textContent` (and is not returned at all under the primary fix) prevents re-introduction.\n\n## Prior art / differentiation\n\n- GHSA-r47g-fvhr-h676 (fixed 3.4.6): clobbered-form **root** removal — different trigger; this report's root is a normal allowlisted `style` element killed by the text probe.\n- GHSA-55q2-fjhq-7xh7 (low): IN_PLACE **hook removal** leaves a detached subtree executable — the attribute-form twin (hook-stripped subtree retains onload-class handlers). This report's rawtext **text** form is not covered by `_neutralizeSubtree`'s attribute stripping and is not that advisory.\n- GHSA-h8r8-wccr-v5f2 (medium): mXSS via re-contextualization in the standard (non-IN_PLACE) serialize path — different mechanism; IN_PLACE is not involved.\n- The 3.4.9 release notes credit @mozfreedyb for the IN_PLACE handling improvements that this residual escapes on the text axis.\n\n## Applicability scope (stated up front)\n\nThe payload materializes when the application **serializes and re-parses** the sanitizer output (`innerHTML` assignment, template rendering, markdown/HTML round trips) or otherwise consumes the returned node's markup. Moving the returned node via `appendChild` alone does not trigger it. Applications that pass **live, connected attacker trees** into `IN_PLACE` are explicitly warned against by upstream's own source comment; this report concerns the serialize-and-reinsert consumption pattern that the IN_PLACE mode exists to serve.",
+      "reported_by": null,
+      "title": "DOMPurify: IN_PLACE returns a force-removed rawtext root whose text carries attacker markup — pure HTML reparse executes",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "low",
+      "module_name": "dompurify",
+      "vulnerable_versions": "<=3.4.15",
+      "github_advisory_id": "GHSA-6688-9rhm-gjv2",
+      "recommendation": "Upgrade to version 3.4.16 or later",
+      "patched_versions": ">=3.4.16",
+      "updated": "2026-10-05T23:43:54.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-6688-9rhm-gjv2"
+    },
+    "1241205": {
+      "findings": [
+        {
+          "version": "1.8.0",
+          "paths": [
+            ". > markdownlint-cli2@0.23.2 > smol-toml@1.8.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/squirrelchat/smol-toml/security/advisories/GHSA-r4xh-jqrq-34v2\n- https://github.com/squirrelchat/smol-toml/commit/99102aa57fc932f760ea9c15b4cf1c181f952d24\n- https://github.com/squirrelchat/smol-toml/releases/tag/v1.9.0\n- https://github.com/advisories/GHSA-r4xh-jqrq-34v2",
+      "created": "2026-10-05T23:41:14.000Z",
+      "id": 1241205,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\n`parse()` has a quadratic-time path in `parseKey`, reachable on default options with ordinary valid input. For every key line and table-header line, `parseKey` (dist/struct.js, lines 58 and 86) finds the dotted-key separator with `ctx.s.indexOf('.', ctx.p)`, where `ctx.s` is the whole document. When a key has no `.` ahead of it, that search runs all the way to the end of the input, and the result is then clamped back to the line terminator `endPtr` - so everything scanned past the current line is wasted. `parseKey` runs once per line, so a document of N dot-free keys costs O(n^2).\n\nThe most ordinary TOML shape triggers it: a flat list of `key = value` lines, or a repeated `[[a]]` table. No dotted keys, no special options, valid input throughout.\n\n### Proof of concept\n\n```js\nimport { parse } from 'smol-toml'\n\nlet doc = ''\nfor (let i = 0; i < 256000; i++) doc += 'k' + i + ' = 1\\n'\n\nconsole.time('parse')\nparse(doc) // ~2.8 MB of valid TOML, default options\nconsole.timeEnd('parse')\n```\n\nDoubling the line count roughly quadruples the time:\n\n| lines | size | parse() |\n|---|---|---|\n| 32k | 0.3 MB | 0.3 s |\n| 64k | 0.7 MB | 1.0 s |\n| 128k | 1.4 MB | 3.5 s |\n| 256k | 2.8 MB | 14 s |\n\n### Impact\nAny service that runs `parse()` on attacker-supplied TOML can be stalled. The work is synchronous, so it blocks the whole event loop, and the quadratic is unbounded: a ~7 MB body pins a core for about a minute, larger bodies for several.\n\n### Patches\nVersion 1.9.0 uses a different implementation for parsing keys which is strictly linear.\n\n### Workarounds\nLimit the maximum document size accepted when parsing arbitrary documents.",
+      "reported_by": null,
+      "title": "smol-toml: Quadratic-time parse() from parseKey rescanning to end of document on each key line",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "smol-toml",
+      "vulnerable_versions": "<=1.8.0",
+      "github_advisory_id": "GHSA-r4xh-jqrq-34v2",
+      "recommendation": "Upgrade to version 1.9.0 or later",
+      "patched_versions": ">=1.9.0",
+      "updated": "2026-10-05T23:41:15.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-r4xh-jqrq-34v2"
+    },
+    "1241206": {
+      "findings": [
+        {
+          "version": "0.16.47",
+          "paths": [
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/layout-elk@0.2.2 > mermaid@11.16.1 > katex@0.16.47",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/mermaid-zenuml@0.2.3 > mermaid@11.16.1 > katex@0.16.47",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > katex@0.16.47",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > mermaid@11.16.1 > katex@0.16.47",
+            ". > @mermaid-js/mermaid-cli@11.16.0 > @mermaid-js/layout-tidy-tree@0.2.2 > mermaid@11.16.1 > katex@0.16.47",
+            ". > markdownlint-cli2@0.23.2 > markdownlint@0.41.1 > micromark-extension-math@3.1.0 > katex@0.16.47"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/KaTeX/KaTeX/security/advisories/GHSA-238p-pmpm-9mq7\n- https://nvd.nist.gov/vuln/detail/CVE-2026-103923\n- https://github.com/KaTeX/KaTeX/pull/4260\n- https://github.com/KaTeX/KaTeX/commit/0adf7e77db6915d991803b29699f82b1ccf8d4f4\n- https://github.com/KaTeX/KaTeX/releases/tag/v0.18.2\n- https://github.com/advisories/GHSA-238p-pmpm-9mq7",
+      "created": "2026-10-05T23:41:05.000Z",
+      "id": 1241206,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nKaTeX can act as a read-side prototype pollution gadget in applications where `Object.prototype` has already been polluted, or where an attacker can influence the prototype of the renderer options object. (KaTeX does not enable said prototype pollution. This advisory applies when combining KaTeX with other vulnerable software that allows for prototype pollution.)\n\nAffected versions may treat inherited properties from `Object.prototype` as renderer options, internal setting metadata, or namespace entries. In particular, an inherited `trust` value will be treated as though the application explicitly enabled trusted rendering, rather than using the documented default of `false`.\n\nWith attacker-controlled mathematical expressions, this can produce links capable of user-interaction cross-site scripting or load attacker-selected external resources. Exploitation requires the consuming application to insert KaTeX output into a web page without a separate sanitizer. (KaTeX does not execute scripts merely by rendering an expression.)\n\nOther inherited settings can alter rendering behavior or resource limits. Inherited setting metadata can affect how defaults and supplied options are processed, while inherited namespace properties can be mistaken for defined macros or other internal values.\n\n### Patches\n\nUpgrade to KaTeX v0.18.2 to remove this vulnerability.\n\n### Workarounds\n\n- Address any prototype-pollution vulnerability in the application or its dependencies.\n- `delete Object.prototype.trust`, `delete Object.prototype.default`, and `delete Object.prototype.processor` before calling KaTeX\n- Do not allow untrusted input to control the renderer options object or its prototype.\n- Sanitize KaTeX-generated HTML before inserting it into a document.\n\n### Details\n\nKaTeX previously used ordinary JavaScript property access in the following contexts:\n\n- Renderer settings could be inherited from the prototype of the options object.\n- Internal `default` and `processor` setting metadata could be inherited from `Object.prototype`.\n- Namespace lookup could treat inherited properties as built-in definitions.\n- Namespace group restoration could preserve an inherited property as though it had been an explicitly defined value.\n\nThe fix adds own-property checks to each of these paths. Inherited properties are no longer accepted as renderer settings, setting metadata, namespace definitions, or values to be restored after a group ends.\n\n### For more information\n\nIf you have any questions or comments about this advisory:\n\n- Open an issue or security advisory in the [KaTeX repository](https://github.com/KaTeX/KaTeX/)\n- Email us at [katex-security@mit.edu](mailto:katex-security@mit.edu)",
+      "reported_by": null,
+      "title": "KaTeX: Existing prototype pollution can bypass trust restrictions",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-103923"
+      ],
+      "access": "public",
+      "severity": "low",
+      "module_name": "katex",
+      "vulnerable_versions": ">=0.11.0 <0.18.2",
+      "github_advisory_id": "GHSA-238p-pmpm-9mq7",
+      "recommendation": "Upgrade to version 0.18.2 or later",
+      "patched_versions": ">=0.18.2",
+      "updated": "2026-10-05T23:41:06.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-807"
+      ],
+      "url": "https://github.com/advisories/GHSA-238p-pmpm-9mq7"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 3,
+      "moderate": 7,
+      "high": 1,
+      "critical": 0
+    },
+    "dependencies": 834,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 834
+  }
+}

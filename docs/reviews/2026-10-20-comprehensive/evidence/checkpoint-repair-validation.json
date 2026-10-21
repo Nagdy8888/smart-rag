@@ -1,0 +1,251 @@
+{
+  "date": "2026-10-21",
+  "scope": "Fixed development checks on real authenticated app API/SSE; not sealed gold or deployment certification.",
+  "api_image_id": "sha256:e0a268f2b34fc5107d8ba5ada6ad901e1e195f446d34290b5acf624ea8010f39",
+  "questions_sha256": "8eeac29a3ca3ba6176fea44c57eb383f0a5c4f0f6d8f910e4f5b334a6f308295",
+  "acceptance_sha256": "ad7b6870cc197966572fd65aec60431dda7aa608060ff2d595c04e8be17d5935",
+  "original_fixed_checks_passed": 6,
+  "first_full_repair_fixed_checks_passed": 19,
+  "final_fixed_checks_passed": 25,
+  "questions": 25,
+  "code_syntax_passed": 5,
+  "code_syntax_scope": "Syntax compilation only; no code execution",
+  "code_quality_passed": 6,
+  "confirmed_original_source_syntax_errors_warned": 1,
+  "supplemental_criteria_sha256": "160eb805c441bb5c562e7718b65874512ce49dcb9a63946ecd8db8f1b6eeb32c",
+  "terminal_counts": {
+    "completed": 20,
+    "partial": 5
+  },
+  "verification_status_counts": {
+    "verified": 20,
+    "verified_partial": 5
+  },
+  "history_stream_parity": 25,
+  "available_persisted_citations_questions": 25,
+  "unit": {
+    "tests": 2089,
+    "failures": 2,
+    "errors": 0,
+    "skipped": 4
+  },
+  "unit_passed": 2083,
+  "pyright_errors": 96,
+  "answer_prompt": "answer_v11",
+  "verifier_prompt": "verifier_v5",
+  "case_outcomes": [
+    {
+      "id": "live-12",
+      "kind": "code",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-21",
+      "kind": "figure",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-23",
+      "kind": "figure",
+      "terminal": "partial",
+      "limitation": "verified_partial",
+      "passed": true
+    },
+    {
+      "id": "live-22",
+      "kind": "figure",
+      "terminal": "partial",
+      "limitation": "verified_partial",
+      "passed": true
+    },
+    {
+      "id": "live-24",
+      "kind": "figure",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-25",
+      "kind": "figure",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-04",
+      "kind": "text",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-11",
+      "kind": "code",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-14",
+      "kind": "code",
+      "terminal": "partial",
+      "limitation": "source_code_syntax_invalid",
+      "passed": true
+    },
+    {
+      "id": "live-03",
+      "kind": "text",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-08",
+      "kind": "text",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-06",
+      "kind": "text",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-07",
+      "kind": "text",
+      "terminal": "partial",
+      "limitation": "verified_partial",
+      "passed": true
+    },
+    {
+      "id": "live-01",
+      "kind": "text",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-02",
+      "kind": "text",
+      "terminal": "partial",
+      "limitation": "verified_partial",
+      "passed": true
+    },
+    {
+      "id": "live-05",
+      "kind": "text",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-09",
+      "kind": "code",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-10",
+      "kind": "code",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-13",
+      "kind": "code",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-15",
+      "kind": "table",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-16",
+      "kind": "table",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-17",
+      "kind": "table",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-18",
+      "kind": "table",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-19",
+      "kind": "table",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    },
+    {
+      "id": "live-20",
+      "kind": "table",
+      "terminal": "completed",
+      "limitation": "",
+      "passed": true
+    }
+  ],
+  "durable_usage_totals": {
+    "answer": 25,
+    "embedding": 25,
+    "rerank": 25,
+    "verifier": 25
+  },
+  "observed_latency_seconds": {
+    "median": 24.14,
+    "p95_nearest_rank": 90.09,
+    "max": 90.78
+  },
+  "elapsed_scope": "Conversation creation plus message admission and SSE; excludes history/citation readback.",
+  "observed_message_wall_seconds": {
+    "median": 22.078,
+    "p95_nearest_rank": 27.125,
+    "max": 27.265
+  },
+  "observed_sse_seconds": {
+    "median": 19.312,
+    "p95_nearest_rank": 23.734,
+    "max": 24.453
+  },
+  "durable_prompt_tokens": 345884,
+  "durable_completion_tokens": 13611,
+  "stored_ledger_cost_usd": 0.060036,
+  "cost_scope": "Stored usage ledger amount, not provider invoice reconciliation",
+  "release_ready": false,
+  "source_fingerprints_unchanged_during_final_run": true,
+  "manual_source_reviews_passed": 25,
+  "canonical_displayed_line_checks_passed": 16,
+  "authorized_figure_pngs_available": 5,
+  "frontend_tests_passed": 700,
+  "frontend_typecheck_passed": true,
+  "frontend_build_passed": true,
+  "frontend_full_lint_errors": 2,
+  "frontend_full_lint_warnings": 4,
+  "changed_frontend_warning_files_lint_passed": true,
+  "private_content_in_export": false
+}

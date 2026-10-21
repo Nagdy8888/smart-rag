@@ -1,0 +1,12 @@
+.venv\Scripts\python.exe : Found 3 known vulnerabilities, ignored 2 in 1 package
+At line:2 char:254
++ ... t.txt 2>&1; .venv\Scripts\python.exe -m pip_audit --strict --ignore-v ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Found 3 known v... 2 in 1 package:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Name    Version ID                  Fix Versions
+------- ------- ------------------- ------------
+aiohttp 3.14.3  CVE-2026-111064     3.14.4
+aiohttp 3.14.3  GHSA-2g87-pp6c-29x5 3.14.4
+aiohttp 3.14.3  CVE-2026-111063     3.14.4

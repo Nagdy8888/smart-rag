@@ -1,0 +1,54 @@
+{
+  "base_commit": "a2164952a3ea4bfd87879b2d6d6d0dadf5643f27",
+  "status": "local uncommitted implementation; no live evaluation or deployment",
+  "dataset_sha256": "512c13f7ac4f42777a1bd7a7a99d6ee5646b9fab0c16334373450f4ed7fb8e76",
+  "focused_tests": {
+    "total": 107,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "python_packages": {
+    "pytest": "9.1.1",
+    "langgraph": "1.2.11",
+    "openai": "2.26.0",
+    "psycopg": "3.3.3",
+    "pydantic": "2.13.4"
+  },
+  "source_sha256": {
+    "apps/agents/src/smart_rag_agents/query/deps.py": "238b6e6ddecd0a2ae746f4b9e0d5fc5575fdafb4ec79e2235fb7b6c820847c9b",
+    "apps/agents/src/smart_rag_agents/query/gateway/verifier.py": "9b00c691f9f2e08c1aecdc591c2996f59b131c719e77fe02b0b2d7b5bb85be02",
+    "apps/agents/src/smart_rag_agents/query/nodes/organize.py": "3b84fa5dc254bed2d820c16d88e41b6c08df3b3eb33e453d49da176fd01d0844",
+    "apps/agents/src/smart_rag_agents/query/nodes/release_safety.py": "6a254cd2913993fc80855185f4c3eab87ccd9fc2dd7e1071bbf4a1262be956f2",
+    "apps/agents/src/smart_rag_agents/query/nodes/verify.py": "77a31279c3f3413ffda4611d84359c57b771ef5801aa4b52dd9ec67c02b624e6",
+    "apps/agents/src/smart_rag_agents/query/nodes/verify_release.py": "5cba317d20f883d944f1409c34fedf523f5b60f580c1daa228c29f2c63b645b4",
+    "apps/agents/src/smart_rag_agents/query/runtime/bindings.py": "ca9ea92804085bc5adb2075d288ca69218e736fe56a3e64a1f04443c726ca359",
+    "apps/agents/src/smart_rag_agents/query/runtime/deps_factory.py": "7f9b6a7ff3f05505dd301e93838d34f2c7410a802224b588aabe950969a7b11f",
+    "apps/backend/src/smart_rag_api/services/sse/mapping/limitations.py": "e16f5e7d87a9fa22794ea64a8f803ef6305555e2b3eace80ad00bee757940e43",
+    "apps/backend/src/smart_rag_api/services/sse/mapping/mapper.py": "99409fee67f6ec5963fb29415cea8750dc3b13261ad900d307b6d423a86dd55a",
+    "apps/frontend/src/components/chat/answer-surface.test.tsx": "5a3ffe3b4d7641357c0d4d9e86de079be30a15973133cc617beb7d62df661de0",
+    "apps/frontend/src/components/chat/answer-surface.tsx": "92e59a98b09fb01132f44132861ee5c575ae6ea0033464f01568b35d68b5dc6c",
+    "apps/frontend/src/components/chat/chat-app.tsx": "c260b108b9d23dc3773b8c4c0207be5bcf892ed27a1b0f6d522945454b75cd6e",
+    "apps/frontend/src/components/chat/hooks/use-chat-presentation.ts": "e732aa89a6e990de93190e813f83deeb149727098e1acef369b7dcd6212aa81a",
+    "apps/frontend/src/lib/limitations.test.ts": "a010156a812a3670d42289c33c368c348617e82be142aa968674833602be53ac",
+    "apps/frontend/src/lib/limitations.ts": "17e433447aab7826c4b619e46c9c63cea3be5814878b8108135a4af1d638d666",
+    "packages/core/src/smart_rag_core/query_admission/usage_caps.py": "83b027f47d488e0b7826d7fa5b29a3bfadd586da710f11bd036d9c9dad77d67f",
+    "packages/core/src/smart_rag_core/query_answer/native_blocks.py": "d3299f7518a9a88ffb872e691ddcc6954d89816d8909cc726162e7dc4410d1ed",
+    "packages/core/src/smart_rag_core/query_answer/verifier.py": "115bdc21fb604fe449fc17a4bb739bda11363d23c65c6d53cecc1ce40fc359f0",
+    "tests/fixtures/agent_release_v1.json": "512c13f7ac4f42777a1bd7a7a99d6ee5646b9fab0c16334373450f4ed7fb8e76",
+    "tests/support/answer_verifier.py": "09b1d40b7cb001e1af49c58c974fdb0ac5767cc5f2ce9d44e23244b119a2a016",
+    "tests/unit/test_agent_release_failures.py": "64738038c7345ca4e486a703f8eb4eb645d2ce9f02e0c6d0ed2c8c9174912f79",
+    "tests/unit/test_agent_release_regression.py": "26ebbc89a4d93d156d102b9aecaacba49572b9c38efa8e9d52f0da93db0c50e4",
+    "tests/unit/test_answer_citations_persist.py": "328f7d1b5eb224eb3138a770af7a9c00be79b4a04f2f374d6efd60d42af62583",
+    "tests/unit/test_answer_source_assembly_budget.py": "3755fe24977eedfa198fdea029a76840e2c1c3a2a20e7cf53602bc2c03211e1b",
+    "tests/unit/test_organize_answer.py": "61980a2c3c4f81d8b6aeb9a947be3de30cf479ced4a4b6da5d6e9ab90cfefd38",
+    "tests/unit/test_pdf_native_types.py": "8a4c606617f8a6026562caf6ab5acb5160daf8e1c7371ed9d6a7b8e0cb926b82",
+    "tests/unit/test_query_admission_ceilings.py": "f465ffb2a9f2476b45b62556368d3e2f0802577b48e01fef60bb8051487cbddf",
+    "tests/unit/test_verifier_accounting.py": "c53141d0689840bb5b457389a9d79ce509477c60761637cd60fc09d1be28bb19",
+    "tests/unit/test_verifier_gateway.py": "c465be491aef1b378f66ce64dc8fdaae387405660ca4e6feef84384ff35fc8c6",
+    "tests/unit/test_verify_verifier_skipped.py": "1070c72088d58ae6c356db92ce41c3cb787e2411abd14ef449ecf6a4b53074b2"
+  },
+  "deleted_source_files": [
+    "apps/agents/src/smart_rag_agents/query/gateway/organize.py"
+  ]
+}

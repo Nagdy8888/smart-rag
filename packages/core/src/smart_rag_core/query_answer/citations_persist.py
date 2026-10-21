@@ -94,6 +94,9 @@ def persist_answer_citations(
                 continue
             if index >= 12:
                 raise QueryAdmissionError("answer_bounds_exceeded")
+            citation_index = index
+            index += 1
+            stored_passages.add(passage_key)
             provenance = citation_provenance_payload(
                 fusion=fusion,
                 answer=answer,
@@ -116,7 +119,7 @@ def persist_answer_citations(
                         cursor,
                         caller=caller,
                         run_id=run_id,
-                        index=index,
+                        index=citation_index,
                         citation=citation,
                         span=attempt,
                         provenance=provenance,
@@ -135,7 +138,7 @@ def persist_answer_citations(
                     cursor,
                     caller=caller,
                     run_id=run_id,
-                    index=index,
+                    index=citation_index,
                     citation=citation,
                     span=span,
                     fusion=fusion,
@@ -161,8 +164,6 @@ def persist_answer_citations(
                 )
                 continue
             ids.append(inserted)
-            stored_passages.add(passage_key)
-            index += 1
         for citation in answer.table_citations:
             if index >= 12:
                 raise QueryAdmissionError("answer_bounds_exceeded")

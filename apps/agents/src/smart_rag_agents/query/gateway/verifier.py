@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from decimal import Decimal
 from typing import Any, cast
+from uuid import uuid4
 
 from pydantic import ValidationError
+from smart_rag_core.gateways.openai_answer import OpenAIAnswerError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
+from smart_rag_core.query_admission.service import ReservationConsumeResult
+from smart_rag_core.query_admission.usage import execute_counted_model_call
 from smart_rag_core.query_answer.assembly import assemble_source_records
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.models import AtomicLink, VerifierPayload
@@ -16,6 +23,7 @@ from smart_rag_core.query_answer.versions import (
 )
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.models import TableEvidenceRecord
+from smart_rag_core.query_routing.preparation import caller_from_runtime
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.sync_bridge import (
@@ -26,6 +34,15 @@ from smart_rag_agents.query.nodes.answer_attempts import ANSWER_ATTEMPT_CAP_SECO
 from smart_rag_agents.query.nodes.tokens import tokens_from_gateway_response
 
 _VERIFIER_REASON_MAX = 128
+
+
+class VerifierAttemptError(TimeoutAfterSendError):
+    """Conservatively charged uncertain attempt with a safe cause code."""
+
+    def __init__(self, reason: str) -> None:
+        """Keep a stable provider failure code, never an exception message."""
+        super().__init__(reason)
+        self.reason = reason
 
 
 def parse_verifier_payload(raw: object) -> VerifierPayload:
@@ -90,6 +107,7 @@ def gateway_verifier(
     fusion: FusionResult,
     tables: tuple[object, ...],
     context: AuthorizedRuntimeContext | None,
+    on_consumed: Callable[[ReservationConsumeResult], None] | None = None,
 ) -> tuple[VerifierPayload, int, int]:
     """Run one async gateway verifier call from the sync graph.
 
@@ -99,6 +117,7 @@ def gateway_verifier(
         fusion: Canonical evidence.
         tables: Table records.
         context: Admitted run context used for the live deadline timeout.
+        on_consumed: Update the run's optimistic reservation snapshot.
 
     Returns:
         ``VerifierPayload`` plus provider prompt and completion tokens.
@@ -119,7 +138,21 @@ def gateway_verifier(
         )
     except ValidationError as exc:
         raise AnswerError("verifier_schema_invalid") from exc
-    records = assemble_source_records(fusion, typed_tables)
+    # Only cited records can support this batch. Unrelated retrieval hits add
+    # latency and distract the checker without supporting any selected claim.
+    chunk_ids = {chunk_id for link in links for chunk_id in link.chunk_ids}
+    table_ids = {link.table_id for link in links if link.table_id}
+    selected_fusion = fusion.model_copy(
+        update={
+            "evidence": tuple(
+                item for item in fusion.evidence if item.chunk_id in chunk_ids
+            )
+        }
+    )
+    records = assemble_source_records(
+        selected_fusion,
+        tuple(item for item in typed_tables if item.table_id in table_ids),
+    )
     timeout_seconds = attempt_timeout_seconds(context, ANSWER_ATTEMPT_CAP_SECONDS)
     request = VerifierModelRequest(
         prompt_version=VERIFIER_PROMPT_VERSION,
@@ -134,14 +167,67 @@ def gateway_verifier(
     gateway = deps.model_gateway
     if gateway is None:
         raise AnswerError("model_gateway_unbound")
-    response = cast(
-        Any,
-        run_coro(
+
+    def send() -> object:
+        """Invoke once; conservatively account an uncertain sent attempt."""
+        try:
+            return run_coro(
+                lambda: cast(Any, gateway).generate_verifier(request),
+                cancel_check=deps.cancel_check,
+                timeout_seconds=request.remaining_deadline_seconds,
+            )
+        except Exception as exc:
+            # The gateway may fail after the provider accepted the request,
+            # including response parsing. Do not record this as free work.
+            allowed = {
+                "verifier_timeout",
+                "verifier_provider_error",
+                "verifier_budget_denied",
+                "verifier_schema_invalid",
+                "verifier_incomplete",
+                "verifier_output_limit",
+                "verifier_content_filter",
+                "verifier_refusal",
+                "verifier_empty_output",
+                "verifier_unknown_usage",
+            }
+            reason = (
+                exc.reason
+                if isinstance(exc, (OpenAIAnswerError, AnswerError))
+                and exc.reason in allowed
+                else "verifier_gateway_failed"
+            )
+            raise VerifierAttemptError(reason) from exc
+
+    def usage(response: object) -> tuple[int, int, Decimal | None]:
+        """Read actual provider tokens before validating semantic output."""
+        prompt, completion = tokens_from_gateway_response(response)
+        return prompt, completion, None
+
+    if context is not None:
+        if deps.connection is None:
+            raise AnswerError("verifier_accounting_unavailable")
+        response, consumed, _usage_id = execute_counted_model_call(
+            deps.connection,
+            caller=caller_from_runtime(context),
+            run_id=context.run_id,
+            reservation_id=context.reservation_id,
+            expected_version=context.optimistic_version,
+            usage_kind="verifier",
+            model_id=request.model_id,
+            provider_attempt_id=str(uuid4()),
+            send=send,
+            usage_from_result=usage,
+        )
+        if on_consumed is not None:
+            on_consumed(consumed)
+    else:
+        # Unbound deterministic tests/Studio never receive a paid runtime.
+        response = run_coro(
             lambda: cast(Any, gateway).generate_verifier(request),
             cancel_check=deps.cancel_check,
             timeout_seconds=request.remaining_deadline_seconds,
-        ),
-    )
+        )
     prompt_tokens, completion_tokens = tokens_from_gateway_response(response)
     return (
         parse_verifier_payload(getattr(response, "payload", None)),

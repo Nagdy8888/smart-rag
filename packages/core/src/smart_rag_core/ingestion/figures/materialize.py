@@ -69,7 +69,10 @@ def materialize_pdf_figures(
     kept = 0
     try:
         for element in parse_result.elements:
-            if element.kind is not ElementKind.FIGURE or kept >= FIGURE_MAX_PER_DOCUMENT:
+            if (
+                element.kind is not ElementKind.FIGURE
+                or kept >= FIGURE_MAX_PER_DOCUMENT
+            ):
                 updated.append(element)
                 continue
             png = _crop(document, element)

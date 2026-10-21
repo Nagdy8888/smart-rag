@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -210,7 +211,8 @@ def test_verify_bound_persist_failure_is_not_verified(
         QueryGraphDeps(connection=MagicMock()),
     )
     assert verified["status"] != "verified"
-    assert verified["detail"] == "citation_persist_failed"
+    assert verified["detail"] == "verification_unavailable:citation_persist_failed"
+    assert verified["status"] == "refused"
 
 
 def _verify_persisted(
@@ -862,7 +864,7 @@ def test_persist_retries_with_leading_sentence_then_succeeds() -> None:
     assert len(result.ids) == 1
     assert result.skipped == ()
     inserts = [
-        params
+        cast(tuple[object, ...], params)
         for statement, params in zip(cursor.statements, cursor.params, strict=True)
         if "insert_run_citation_v2" in statement
     ]
@@ -930,7 +932,7 @@ def test_persist_page_ambiguous_uses_unique_child_prefix() -> None:
     assert len(result.ids) == 1
     assert result.skipped == ()
     inserts = [
-        params
+        cast(tuple[object, ...], params)
         for statement, params in zip(cursor.statements, cursor.params, strict=True)
         if isinstance(params, tuple) and "insert_run_citation_v2" in statement
     ]

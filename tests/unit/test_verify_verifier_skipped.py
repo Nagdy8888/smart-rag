@@ -1,4 +1,4 @@
-"""Verifier failures release the checked answer instead of a deadline."""
+"""Verifier failures refuse safely instead of releasing an unchecked draft."""
 
 from __future__ import annotations
 
@@ -10,59 +10,14 @@ from smart_rag_agents.query.state import QueryGraphState
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_answer.citations import CitationPersistResult
 from smart_rag_core.query_answer.exceptions import AnswerError
-from smart_rag_core.query_answer.models import (
-    AnswerCitation,
-    AnswerParagraph,
-    AnswerPayload,
-    AtomicLink,
-)
 from smart_rag_core.security.identity import UserRole
 
-from tests.support.answer_verifier import verifier_fusion, verifier_passage
+from tests.support.answer_verifier import verified_answer_state
 
 
 def _verified_state() -> QueryGraphState:
-    """Build one company answer that passes deterministic citation checks.
-
-    Returns:
-        Graph state with fusion and a cited paragraph.
-    """
-
-    from smart_rag_agents.query.state import pending_query_state
-
-    fusion = verifier_fusion(verifier_passage(1, text="Refund period is 30 days."))
-    chunk_id = fusion.evidence[0].chunk_id
-    state = pending_query_state(user_query="What is the refund period?")
-    state["status"] = "answered"
-    state["remaining_model_calls"] = 8
-    state["fusion"] = fusion.model_dump(mode="json")
-    state["answer"] = AnswerPayload(
-        answer_text="Refund period is 30 days.",
-        paragraphs=(
-            AnswerParagraph(
-                paragraph_index=0,
-                text="Refund period is 30 days.",
-                link_ids=("l1",),
-            ),
-        ),
-        citations=(
-            AnswerCitation(
-                chunk_id=chunk_id,
-                span="Refund period is 30 days.",
-                paragraph_index=0,
-                atomic_link_id="l1",
-            ),
-        ),
-        atomic_links=(
-            AtomicLink(
-                link_id="l1",
-                claim="Refund period is 30 days.",
-                chunk_ids=(chunk_id,),
-            ),
-        ),
-        status="complete",
-    ).model_dump(mode="json")
-    return state
+    """Reuse the shared synthetic cited-answer state."""
+    return verified_answer_state()
 
 
 def _run_skipped(
@@ -137,24 +92,24 @@ def _run_skipped(
     return verified, persist
 
 
-def test_verifier_deadline_releases_checked_answer(
+def test_verifier_deadline_refuses_unchecked_answer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A verifier deadline keeps the checked answer and persists citations."""
+    """A verifier deadline drops the draft and does not persist its citations."""
 
     verified, persist = _run_skipped(monkeypatch, "deadline_exhausted")
-    assert verified["status"] == "verified_partial"
-    assert verified["detail"] == "verifier_skipped:deadline_exhausted"
+    assert verified["status"] == "refused"
+    assert verified["detail"] == "verification_unavailable:deadline_exhausted"
     verification = verified["verification"]
     assert isinstance(verification, dict)
     assert verification["verifier_skipped_reason"] == "deadline_exhausted"
-    assert verification["status"] == "verified_partial"
+    assert verification["status"] == "refused"
     timings = verified["run_timings"]
     assert isinstance(timings, dict)
     assert timings["verifier_outcome"] == "skipped"
     assert timings["verifier_reason"] == "deadline_exhausted"
     assert isinstance(timings["verifier_ms"], int)
-    persist.assert_called_once()
+    persist.assert_not_called()
 
 
 def test_verifier_success_records_ok_timing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -200,13 +155,13 @@ def test_verifier_gateway_failure_uses_the_same_prefix(
     """Other verifier failures use the same non-deadline detail prefix."""
 
     verified, _persist = _run_skipped(monkeypatch, "gateway_failed")
-    assert verified["detail"] == "verifier_skipped:gateway_failed"
+    assert verified["detail"] == "verification_unavailable:gateway_failed"
 
 
-def test_unexpected_verifier_exception_releases_the_draft(
+def test_unexpected_verifier_exception_refuses_the_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An unexpected verifier exception returns the generated draft."""
+    """An unexpected verifier exception never returns the generated draft."""
 
     from smart_rag_agents.query.deps import QueryGraphDeps
     from smart_rag_agents.query.nodes.verify import verify_answer_node
@@ -228,9 +183,10 @@ def test_unexpected_verifier_exception_releases_the_draft(
         _verified_state(),
         QueryGraphDeps(connection=MagicMock(), model_gateway=None),
     )
-    assert verified["status"] == "verified_partial"
-    assert verified["detail"] == "verifier_skipped:RuntimeError"
+    assert verified["status"] == "refused"
+    assert verified["detail"] == "verification_unavailable:RuntimeError"
     answer = verified["answer"]
     assert isinstance(answer, dict)
-    assert answer["answer_text"] == "Refund period is 30 days."
+    assert answer["answer_text"] != "Refund period is 30 days."
+    assert answer["status"] == "refused"
     persist.assert_not_called()

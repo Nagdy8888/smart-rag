@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from smart_rag_agents.query.state import QueryGraphState
 from smart_rag_core.query_fusion import fusion_config_hash
 from smart_rag_core.query_fusion.models import (
     FusionAlgorithm,
@@ -117,3 +118,53 @@ def verifier_prompt_digest(name: str) -> str:
 
     payload = (PROMPTS / name).read_bytes().replace(b"\r\n", b"\n")
     return hashlib.sha256(payload).hexdigest()
+
+
+def verified_answer_state() -> QueryGraphState:
+    """Build one company answer that passes deterministic citation checks.
+
+    Returns:
+        Graph state with fusion and a cited paragraph.
+    """
+
+    from smart_rag_agents.query.state import pending_query_state
+    from smart_rag_core.query_answer.models import (
+        AnswerCitation,
+        AnswerParagraph,
+        AnswerPayload,
+        AtomicLink,
+    )
+
+    fusion = verifier_fusion(verifier_passage(1, text="Refund period is 30 days."))
+    chunk_id = fusion.evidence[0].chunk_id
+    state = pending_query_state(user_query="What is the refund period?")
+    state["status"] = "answered"
+    state["remaining_model_calls"] = 8
+    state["fusion"] = fusion.model_dump(mode="json")
+    state["answer"] = AnswerPayload(
+        answer_text="Refund period is 30 days.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="Refund period is 30 days.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="Refund period is 30 days.",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="Refund period is 30 days.",
+                chunk_ids=(chunk_id,),
+            ),
+        ),
+        status="complete",
+    ).model_dump(mode="json")
+    return state

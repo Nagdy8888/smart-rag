@@ -152,15 +152,15 @@ class QuerySseMapper:
                 self._draft = parsed
             if node_name == VERIFY_ANSWER_NODE:
                 self.verified = True
-                self._pending_payload = parsed or self._draft
+                self._pending_payload = parsed
                 self._pending_update = update
                 continue
             if node_name == ORGANIZE_ANSWER_NODE:
                 self.verified = True
                 events.extend(
                     self._emit_verified(
-                        parsed or self._pending_payload or self._draft,
-                        update,
+                        self._pending_payload,
+                        self._pending_update,
                     )
                 )
                 continue

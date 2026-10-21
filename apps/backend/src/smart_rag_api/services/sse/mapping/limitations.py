@@ -30,6 +30,9 @@ def limitations_from_update(
         return []
     typed_verification = cast(dict[object, object], verification)
     events: list[tuple[str, dict[str, object]]] = []
+    detail = update.get("detail")
+    if isinstance(detail, str) and detail.startswith("verification_unavailable:"):
+        return [("limitation", {"code": "verification_unavailable"})]
     if typed_verification.get("omitted_link_ids"):
         events.append(("limitation", {"code": LIMITATION_VERIFIER_OMITTED_LINKS}))
     if typed_verification.get("verifier_skipped_reason"):

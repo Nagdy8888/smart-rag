@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { fetchCitationPagePng, type ApiAuth } from "../../lib/api";
 import { SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
 import {
@@ -24,10 +24,10 @@ import { UserText } from "../ui/user-text";
 import chatStyles from "./chat-transcript.module.css";
 
 /** Copy while the citation detail request has not returned the span. */
-export const CITATION_PASSAGE_LOADING = "Loading passage…";
+export const CITATION_PASSAGE_LOADING = "Loading passageâ€¦";
 
 /** Copy while the single-page PNG is downloading. */
-export const CITATION_PAGE_LOADING = "Loading page…";
+export const CITATION_PAGE_LOADING = "Loading pageâ€¦";
 
 /** Copy when the page image request fails. The passage still shows. */
 export const CITATION_PAGE_FAILED = "The book page could not be loaded.";
@@ -50,6 +50,11 @@ export type CitationDrawerProps = {
   returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
+/** Fetch the authorized page through the API using a stable loader identity. */
+function loadCitationPage(source: CitationPageSource): Promise<Blob> {
+  return fetchCitationPagePng(source.auth, source.runId, source.citationId);
+}
+
 /**
  * Render the citation as a right-side sheet.
  *
@@ -63,60 +68,10 @@ export function CitationDrawer({
   citation,
   passagePending = false,
   pageSource = null,
-  loadPage = (source) =>
-    fetchCitationPagePng(source.auth, source.runId, source.citationId),
+  loadPage = loadCitationPage,
   onClose,
   returnFocusRef,
 }: CitationDrawerProps) {
-  const [pageUrl, setPageUrl] = useState<string | null>(null);
-  const [pagePending, setPagePending] = useState(false);
-  const [pageFailed, setPageFailed] = useState(false);
-  const pageRunId = pageSource?.runId ?? null;
-  const pageCitationId = pageSource?.citationId ?? null;
-  const pageToken = pageSource?.auth.accessToken ?? null;
-  const loadPageRef = useRef(loadPage);
-  loadPageRef.current = loadPage;
-
-  useEffect(() => {
-    if (pageRunId === null || pageCitationId === null || pageToken === null) {
-      setPageUrl(null);
-      setPagePending(false);
-      setPageFailed(false);
-      return;
-    }
-    const source: CitationPageSource = {
-      auth: { accessToken: pageToken },
-      runId: pageRunId,
-      citationId: pageCitationId,
-    };
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    setPagePending(true);
-    setPageFailed(false);
-    setPageUrl(null);
-    void loadPageRef.current(source)
-      .then((blob) => {
-        if (cancelled) {
-          return;
-        }
-        objectUrl = URL.createObjectURL(blob);
-        setPageUrl(objectUrl);
-        setPagePending(false);
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        setPageFailed(true);
-        setPagePending(false);
-      });
-    return () => {
-      cancelled = true;
-      if (objectUrl !== null) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [pageCitationId, pageRunId, pageToken]);
 
   if (citation === null) {
     return null;
@@ -134,15 +89,12 @@ export function CitationDrawer({
       returnFocusRef={returnFocusRef}
       panelClassName={overlayStyles.citationSheet}
     >
-      {pagePending ? (
-        <p className={chatStyles.muted}>{CITATION_PAGE_LOADING}</p>
-      ) : null}
-      {pageFailed ? <p className={chatStyles.muted}>{CITATION_PAGE_FAILED}</p> : null}
-      {pageUrl !== null ? (
-        <img
-          className={chatStyles.citationPageImage}
-          src={pageUrl}
-          alt={citationDrawerTitle(citation)}
+      {pageSource !== null ? (
+        <CitationPagePreview
+          key={JSON.stringify([pageSource.runId, pageSource.citationId, pageSource.auth.accessToken])}
+          pageSource={pageSource}
+          loadPage={loadPage}
+          title={citationDrawerTitle(citation)}
         />
       ) : null}
       {passagePending ? (
@@ -185,4 +137,78 @@ export function CitationDrawer({
       ) : null}
     </Sheet>
   );
+}
+
+/** Own the image request for one selection; changing selection releases its URL. */
+function CitationPagePreview({pageSource, loadPage, title}: {
+  pageSource: CitationPageSource;
+  loadPage: NonNullable<CitationDrawerProps["loadPage"]>;
+  title: string;
+}) {
+  const [pageResult, setPageResult] = useState<{
+    runId: string;
+    citationId: string;
+    token: string;
+    loader: typeof loadPage;
+    url: string | null;
+    failed: boolean;
+  } | null>(null);
+  const pageRunId = pageSource?.runId ?? null;
+  const pageCitationId = pageSource?.citationId ?? null;
+  const pageToken = pageSource?.auth.accessToken ?? null;
+  const hasPageSource = pageRunId !== null && pageCitationId !== null && pageToken !== null;
+  const currentResult = hasPageSource &&
+    pageResult?.runId === pageRunId &&
+    pageResult?.citationId === pageCitationId &&
+    pageResult?.token === pageToken &&
+    pageResult?.loader === loadPage ? pageResult : null;
+  const pageUrl = currentResult?.url ?? null;
+  const pagePending = hasPageSource && currentResult === null;
+  const pageFailed = currentResult?.failed ?? false;
+
+  useEffect(() => {
+    if (pageRunId === null || pageCitationId === null || pageToken === null) {
+      return;
+    }
+    const source: CitationPageSource = {
+      auth: { accessToken: pageToken },
+      runId: pageRunId,
+      citationId: pageCitationId,
+    };
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    const identity = {runId: pageRunId, citationId: pageCitationId, token: pageToken, loader: loadPage};
+    void loadPage(source)
+      .then((blob) => {
+        if (cancelled) {
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setPageResult({...identity, url: objectUrl, failed: false});
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPageResult({...identity, url: null, failed: true});
+        }
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl !== null) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [pageCitationId, pageRunId, pageToken, loadPage]);
+  return <>
+      {pagePending ? (
+        <p className={chatStyles.muted}>{CITATION_PAGE_LOADING}</p>
+      ) : null}
+      {pageFailed ? <p className={chatStyles.muted}>{CITATION_PAGE_FAILED}</p> : null}
+      {pageUrl !== null ? (
+        <img
+          className={chatStyles.citationPageImage}
+          src={pageUrl}
+          alt={title}
+        />
+      ) : null}
+  </>;
 }

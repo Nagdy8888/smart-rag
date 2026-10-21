@@ -73,6 +73,14 @@ def _entry(prompt_id: str, filename: str) -> PromptVersion:
 
 
 PROMPT_REGISTRY: dict[str, PromptVersion] = {
+    "answer_v11": _entry("answer_v11", "answer_v11.md"),
+    "verifier_v5": _entry("verifier_v5", "verifier_v5.md"),
+    "verifier_v4": _entry("verifier_v4", "verifier_v4.md"),
+    "answer_v8": _entry("answer_v8", "answer_v8.md"),
+    "answer_v9": _entry("answer_v9", "answer_v9.md"),
+    "answer_v10": _entry("answer_v10", "answer_v10.md"),
+    "answer_v7": _entry("answer_v7", "answer_v7.md"),
+    "verifier_v3": _entry("verifier_v3", "verifier_v3.md"),
     "query_profile_v1": _entry("query_profile_v1", "query_profile_v1.md"),
     "rerank_v1": _entry("rerank_v1", "rerank_v1.md"),
     "rerank_v2": _entry("rerank_v2", "rerank_v2.md"),

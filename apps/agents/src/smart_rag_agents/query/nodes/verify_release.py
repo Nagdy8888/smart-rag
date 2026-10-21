@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 from smart_rag_core.query_answer.exceptions import AnswerError
+from smart_rag_core.query_answer.figure_fallback import salvage_named_figure
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
 from smart_rag_core.query_answer.generate_grounded import (
     salvage_anchor_claim_fill,
@@ -16,7 +17,10 @@ from smart_rag_core.query_answer.generate_grounded import (
 )
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.native_blocks import attach_native_evidence
+from smart_rag_core.query_answer.paragraphs import citation_free_refusal
+from smart_rag_core.query_answer.query_coverage import salvage_question_coverage
 from smart_rag_core.query_answer.release import render_verified_company_answer
+from smart_rag_core.query_answer.source_syntax import missing_requested_definition
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 
@@ -31,8 +35,8 @@ def company_release_payload(
     """Render, salvage, and reshape one company answer.
 
     Validation and answer errors keep the last successful payload.
-    Any other exception propagates so the caller can release the
-    generated draft instead of aborting the graph.
+    Any other exception propagates to the fail-closed release boundary.
+    No caller may restore an unchecked generated draft.
 
     Args:
         checked: Answer after deterministic checks and the verifier.
@@ -59,8 +63,10 @@ def company_release_payload(
         pass
     if fusion.evidence:
         for salvage_fn in (
+            salvage_named_figure,
             salvage_named_code_definition,
             salvage_named_table_block,
+            salvage_question_coverage,
             salvage_anchor_claim_fill,
         ):
             try:
@@ -80,7 +86,7 @@ def company_release_payload(
                 # Keep the extractive salvage rather than dropping it.
                 checked = salvaged
     try:
-        checked = attach_native_evidence(checked, fusion)
+        checked = attach_native_evidence(checked, fusion, user_query=user_query)
     except (ValidationError, ValueError, AnswerError):
         pass
     try:
@@ -89,4 +95,6 @@ def company_release_payload(
         # Pipe-table / fence reshaping must not fail the verified path
         # after a successful extractive salvage.
         pass
+    if missing_requested_definition(checked, user_query=user_query):
+        return citation_free_refusal(checked)
     return checked

@@ -13,6 +13,7 @@ from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_CITATION_SPAN_CHARS,
+    MAX_CLAIM_CITATIONS,
 )
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 
@@ -380,6 +381,11 @@ def rebind_unique_claim_tokens(
             if extra_id in existing:
                 continue
             if len(citations) >= MAX_ANSWER_CITATIONS:
+                break
+            if (
+                sum(c.atomic_link_id == link.link_id for c in citations)
+                >= MAX_CLAIM_CITATIONS
+            ):
                 break
             extra_text = passages[extra_id]
             extra_span = _token_span(extra_text, tokens) or exact_source_span(

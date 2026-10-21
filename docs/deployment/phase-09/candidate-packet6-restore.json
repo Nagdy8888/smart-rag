@@ -22,16 +22,56 @@
   "live_database_overwritten": false,
   "schema_version": "phase09-candidate-packet6-restore-v1",
   "storage": {
+    "inventory_refresh": {
+      "buckets": [
+        {
+          "id": "documents-originals",
+          "public": false
+        },
+        {
+          "id": "documents-quarantine",
+          "public": false
+        },
+        {
+          "id": "exports",
+          "public": false
+        },
+        {
+          "id": "figure-artifacts",
+          "public": false
+        },
+        {
+          "id": "table-artifacts",
+          "public": false
+        },
+        {
+          "id": "web-snapshots",
+          "public": false
+        }
+      ],
+      "method": "read-only SELECT id, public FROM storage.buckets",
+      "object_integrity_verified": false,
+      "observed_at": "2026-10-21T07:46:28.373575+00:00",
+      "restore_performed": false
+    },
     "missing": [],
     "object_counts": {
       "documents-originals": 1,
       "documents-quarantine": 1,
       "table-artifacts": 1
     },
+    "original_present": [
+      "documents-originals",
+      "documents-quarantine",
+      "table-artifacts",
+      "web-snapshots"
+    ],
     "passed": true,
     "present": [
       "documents-originals",
       "documents-quarantine",
+      "exports",
+      "figure-artifacts",
       "table-artifacts",
       "web-snapshots"
     ],
@@ -39,7 +79,8 @@
       "documents-quarantine",
       "documents-originals",
       "web-snapshots",
-      "table-artifacts"
+      "table-artifacts",
+      "figure-artifacts"
     ]
   }
 }

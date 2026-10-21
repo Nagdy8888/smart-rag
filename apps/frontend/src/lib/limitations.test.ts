@@ -3,6 +3,17 @@ import { graphAclBlindnessCopy, graphLimitationDisplay } from "./graph-client";
 import { graphNotReadyCopy, limitationCopy, limitationTone } from "./limitations";
 
 describe("limitationCopy", () => {
+  it("warns about source code syntax without claiming it was repaired", () => {
+    const copy = limitationCopy("source_code_syntax_invalid");
+    expect(copy).toContain("did not pass a Python syntax check");
+    expect(copy).toContain("reproduced from the cited source");
+    expect(copy).not.toContain("fixed");
+  });
+  it("does not claim an unavailable verifier checked the answer", () => {
+    expect(limitationCopy("verification_unavailable")).toContain("was not released");
+    expect(limitationCopy("verifier_skipped")).not.toContain("passed citation checks");
+    expect(limitationCopy("verifier_skipped")).not.toContain("timed out");
+  });
   it("uses signed historical-graph language", () => {
     expect(limitationCopy("insufficient_evidence")).toBe(
       "Company sources could not support an answer. Narrow the question and try again.",

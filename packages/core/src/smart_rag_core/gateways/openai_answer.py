@@ -8,6 +8,8 @@ from typing import cast
 from openai import APIStatusError, APITimeoutError, AuthenticationError
 
 from smart_rag_core.observability.langsmith_tracing import traced_openai_client
+from smart_rag_core.query_answer.language import requested_answer_language
+from smart_rag_core.query_answer.query_coverage import narrative_claim_limit
 from smart_rag_core.query_answer.schemas import (
     answer_claims_json_schema,
     eval_judge_json_schema,
@@ -15,6 +17,7 @@ from smart_rag_core.query_answer.schemas import (
     verifier_json_schema,
     web_answer_json_schema,
 )
+from smart_rag_core.query_answer.verifier_output import normalize_keyed_verdicts
 from smart_rag_core.query_answer.versions import (
     ALLOWED_ANSWER_MODEL_IDS,
     ALLOWED_EVAL_JUDGE_MODEL_IDS,
@@ -98,18 +101,24 @@ def execute_openai_answer(
     client = traced_openai_client(
         api_key=api_key, max_retries=0, timeout=timeout_seconds
     )
-    user_payload = {"query": user_query, "sources": source_records}
+    claim_limit = narrative_claim_limit(user_query, source_records)
+    user_payload = {
+        "query": user_query,
+        "answer_language": requested_answer_language(user_query),
+        "claim_limit": claim_limit,
+        "sources": source_records,
+    }
     try:
         response = client.responses.create(
             model=model_id,
             instructions=prompt_text,
-            input=json.dumps(user_payload, separators=(",", ":")),
+            input=json.dumps(user_payload, ensure_ascii=False, separators=(",", ":")),
             text={
                 "format": {
                     "type": "json_schema",
                     "name": "canonical_answer_claims",
                     "strict": True,
-                    "schema": answer_claims_json_schema(),
+                    "schema": answer_claims_json_schema(max_claims=claim_limit),
                 }
             },
             max_output_tokens=ANSWER_MAX_OUTPUT_TOKENS,
@@ -252,7 +261,7 @@ def execute_openai_verifier(
         response = client.responses.create(
             model=model_id,
             instructions=prompt_text,
-            input=json.dumps(user_payload, separators=(",", ":")),
+            input=json.dumps(user_payload, ensure_ascii=False, separators=(",", ":")),
             text={
                 "format": {
                     "type": "json_schema",
@@ -272,7 +281,14 @@ def execute_openai_verifier(
         if error.status_code == 429:
             raise OpenAIAnswerError("verifier_budget_denied") from error
         raise OpenAIAnswerError("verifier_provider_error") from error
-    return _parse_response(response, kind="verifier")
+    payload, request_id, input_tokens, output_tokens = _parse_response(
+        response, kind="verifier"
+    )
+    try:
+        payload = normalize_keyed_verdicts(payload, link_ids)
+    except ValueError as error:
+        raise OpenAIAnswerError("verifier_schema_invalid") from error
+    return payload, request_id, input_tokens, output_tokens
 
 
 def execute_openai_eval_judge(
@@ -437,6 +453,14 @@ def _parse_response(
     request_id = str(getattr(response, "id", "") or "unknown")
     status = getattr(response, "status", None)
     if status not in {None, "completed"}:
+        if kind == "verifier":
+            detail = getattr(
+                getattr(response, "incomplete_details", None), "reason", None
+            )
+            if detail == "max_output_tokens":
+                raise OpenAIAnswerError("verifier_output_limit")
+            if detail == "content_filter":
+                raise OpenAIAnswerError("verifier_content_filter")
         raise OpenAIAnswerError(f"{kind}_incomplete")
     usage = getattr(response, "usage", None)
     if usage is None:
@@ -445,6 +469,15 @@ def _parse_response(
     output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
     text = getattr(response, "output_text", "") or ""
     if not text.strip():
+        if kind == "verifier":
+            refusal = any(
+                getattr(part, "type", None) == "refusal"
+                for item in (getattr(response, "output", None) or ())
+                for part in (getattr(item, "content", None) or ())
+            )
+            raise OpenAIAnswerError(
+                "verifier_refusal" if refusal else "verifier_empty_output"
+            )
         raise OpenAIAnswerError(f"{kind}_incomplete")
     try:
         loaded: object = json.loads(text)

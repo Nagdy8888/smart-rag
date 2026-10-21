@@ -105,7 +105,9 @@ def test_literal_anchor_ask_matches_reproduce_code_and_table() -> None:
     assert named_table_captions("reproduce Table 2-1 as a Markdown pipe table") == (
         "Table 2-1",
     )
-    assert literal_anchor_ask("Show the Python function parse_invoice from the document.")
+    assert literal_anchor_ask(
+        "Show the Python function parse_invoice from the document."
+    )
     assert named_code_definition_ids(
         "Show the Python function parse_invoice from the document."
     ) == ("parse_invoice",)

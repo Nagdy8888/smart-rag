@@ -411,9 +411,7 @@ def test_source_word_ask_appends_the_continuation() -> None:
     assert citation.span in text
     assert len(citation.span) <= 1000
     paragraph = next(
-        item
-        for item in salvaged.paragraphs
-        if openings[0].link_id in item.link_ids
+        item for item in salvaged.paragraphs if openings[0].link_id in item.link_ids
     )
     assert "The ledger records a final balance." in paragraph.text
     assert "a" * 1100 in paragraph.text
@@ -471,9 +469,7 @@ def test_code_block_keeps_the_continuation() -> None:
     assert len(openings) == 1
     assert openings[0].priority == 0
     paragraph = next(
-        item
-        for item in salvaged.paragraphs
-        if openings[0].link_id in item.link_ids
+        item for item in salvaged.paragraphs if openings[0].link_id in item.link_ids
     )
     assert "a" * 1100 in paragraph.text
 

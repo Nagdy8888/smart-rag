@@ -135,6 +135,9 @@ export function answerTerminalNote(
     return EMPTY_DEADLINE_PARTIAL_COPY;
   }
   if (terminal === "partial") {
+    if (status === "refused") {
+      return "An answer could not be verified.";
+    }
     return "Partial answer. Verified tokens are kept.";
   }
   if (terminal === "cancelled") {

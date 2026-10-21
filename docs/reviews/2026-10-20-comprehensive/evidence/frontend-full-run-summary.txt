@@ -1,0 +1,20 @@
+Summary transcribed from the original terminal-tool output; not a complete raw log.
+Command: pnpm --filter smart-rag-frontend test
+Result: 2 failed test files, 87 passed test files (89 total).
+Tests: 2 failed, 695 passed (697 total).
+
+Failure 1:
+src/components/core-rag-surfaces.test.tsx:358
+CitationDrawer > keeps the passage when the page image fails
+Expected: The book page could not be loaded.
+Observed DOM: Loading page... while Supporting passage and its text remained present.
+
+Failure 2:
+src/lib/architecture-budget.test.ts:26
+architecture budgets > keeps ChatApp and barrels within physical-line budgets
+Expected physical lines <= 320; actual 344.
+
+Focused repeat without source edits:
+1 failed, 17 passed (18 total).
+CitationDrawer test passed; architecture budget still failed.
+See frontend-failure-recheck.txt for the saved repeat output.

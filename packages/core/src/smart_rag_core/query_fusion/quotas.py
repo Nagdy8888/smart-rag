@@ -120,7 +120,9 @@ def reserve_native_passages(
     return tuple(chosen[:limit])
 
 
-def _native_drop_key(item: ScoredPassage, native_page: int | None) -> tuple[int, float, str]:
+def _native_drop_key(
+    item: ScoredPassage, native_page: int | None
+) -> tuple[int, float, str]:
     """Sort key for the prose passage a native block should replace.
 
     Args:

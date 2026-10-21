@@ -151,7 +151,9 @@ def download_object(
     except httpx.HTTPError as exc:
         raise StorageAdminError(f"storage download transport failure: {exc}") from exc
     if response.status_code != 200:
-        raise StorageAdminError(f"storage download failed status={response.status_code}")
+        raise StorageAdminError(
+            f"storage download failed status={response.status_code}"
+        )
     return response.content
 
 

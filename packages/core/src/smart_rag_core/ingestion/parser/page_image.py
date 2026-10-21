@@ -7,6 +7,7 @@ and never builds a Storage URL.
 from __future__ import annotations
 
 import math
+from typing import Protocol, cast
 
 import fitz
 
@@ -18,6 +19,45 @@ _BASE_ZOOM = 120 / 72
 
 class CitationPageImageError(ValueError):
     """The requested page cannot be rendered inside the size cap."""
+
+
+class _Pixmap(Protocol):
+    """Typed boundary for dynamically installed PyMuPDF image methods."""
+
+    def tobytes(self, output: str) -> object:
+        """Encode the rendered page."""
+        ...
+
+
+class _Rect(Protocol):
+    """Physical page dimensions supplied by the PDF renderer."""
+
+    width: float
+    height: float
+
+
+class _Page(Protocol):
+    """Page operations needed for bounded preview rendering."""
+
+    rect: _Rect
+
+    def get_pixmap(self, *, matrix: fitz.Matrix, alpha: bool) -> _Pixmap:
+        """Render at the caller's bounded scale."""
+        ...
+
+
+class _Document(Protocol):
+    """Minimal PDF reader contract independent of incomplete vendor stubs."""
+
+    page_count: int
+
+    def __getitem__(self, index: int) -> _Page:
+        """Read one page by physical index."""
+        ...
+
+    def close(self) -> None:
+        """Release the PDF handle."""
+        ...
 
 
 def render_pdf_page_png(pdf_bytes: bytes, page_number: int) -> bytes:
@@ -39,7 +79,7 @@ def render_pdf_page_png(pdf_bytes: bytes, page_number: int) -> bytes:
         raise CitationPageImageError("page_missing")
     if len(pdf_bytes) == 0 or len(pdf_bytes) > MAX_PDF_BYTES:
         raise CitationPageImageError("pdf_rejected")
-    document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    document = cast(_Document, fitz.open(stream=pdf_bytes, filetype="pdf"))
     try:
         if page_number > document.page_count:
             raise CitationPageImageError("page_missing")

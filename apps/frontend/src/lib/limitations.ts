@@ -42,7 +42,11 @@ const LIMITATION_COPY: Record<string, string> = {
   retrievers_unbound:
     "Retrieval was not attached to this run. Answers are not grounded in Hybrid or graph evidence.",
   verifier_skipped:
-    "The answer passed citation checks, but the final verification step timed out. Treat it as partial.",
+    "Final verification was unavailable. Treat this result as incomplete.",
+  verification_unavailable:
+    "The answer could not be verified and was not released. Try again.",
+  source_code_syntax_invalid:
+    "This code did not pass a Python syntax check. It is reproduced from the cited source; review it before running.",
   citation_leaf_unresolved:
     "Some citations could not be pinned to a single page and were left out. The remaining citations are verified.",
 };

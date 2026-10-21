@@ -229,9 +229,7 @@ class CanonicalRepository:
             path = paths.get(figure.figure_id)
             if not path:
                 continue
-            figure_uuid = uuid5(
-                NAMESPACE_URL, f"{version_id}:{figure.figure_id}"
-            )
+            figure_uuid = uuid5(NAMESPACE_URL, f"{version_id}:{figure.figure_id}")
             with self._connection.cursor() as cursor:
                 cursor.execute(
                     """

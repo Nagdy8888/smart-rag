@@ -8,6 +8,7 @@ supposedly releasable verified payload that is blank.
 from __future__ import annotations
 
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.query_answer.source_syntax import SOURCE_CODE_SYNTAX_INVALID
 from smart_rag_core.security.untrusted import isolate_untrusted_text
 
 from smart_rag_api.services.sse.mapping.citations import citation_preview
@@ -96,6 +97,10 @@ def _graceful_reason(
 
     raw_status = update.get("status")
     detail = update.get("detail")
+    if detail == SOURCE_CODE_SYNTAX_INVALID:
+        return SOURCE_CODE_SYNTAX_INVALID
+    if isinstance(detail, str) and detail.startswith("verification_unavailable:"):
+        return "verification_unavailable"
     if isinstance(detail, str) and detail in DEADLINE_REASONS:
         return DEADLINE_EXHAUSTED_DETAIL
     if isinstance(raw_status, str) and raw_status in DEADLINE_REASONS:
@@ -149,6 +154,8 @@ def emit_verified_events(
     if usage is not None:
         events.append(usage)
     if graceful_reason is not None:
+        if graceful_reason in {"verification_unavailable", SOURCE_CODE_SYNTAX_INVALID}:
+            events.append(("limitation", {"code": graceful_reason}))
         if graceful_reason == DEADLINE_EXHAUSTED_DETAIL:
             events.append(("deadline", {}))
         if graceful_reason in {"insufficient_evidence", "refused"}:

@@ -1,0 +1,237 @@
+unformatted: File would be reformatted
+   --> apps\agents\src\smart_rag_agents\ingestion\index_graph.py:580:17
+    |
+579 |         and governed_parse.format == "pdf"
+    -         and any(element.kind is ElementKind.FIGURE for element in governed_parse.elements)
+580 +         and any(
+581 +             element.kind is ElementKind.FIGURE for element in governed_parse.elements
+582 +         )
+583 |     ):
+    |
+
+unformatted: File would be reformatted
+  --> apps\agents\src\smart_rag_agents\query\nodes\organize.py:85:26
+   |
+84 |
+   - def organize_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
+85 + def organize_answer_node(
+86 +     state: QueryGraphState, deps: QueryGraphDeps
+87 + ) -> QueryGraphState:
+88 |     """Rewrite verified company prose after citation checks have finished.
+   |
+
+unformatted: File would be reformatted
+   --> apps\backend\src\smart_rag_api\storage_admin\objects.py:154:33
+    |
+153 |     if response.status_code != 200:
+    -         raise StorageAdminError(f"storage download failed status={response.status_code}")
+154 +         raise StorageAdminError(
+155 +             f"storage download failed status={response.status_code}"
+156 +         )
+157 |     return response.content
+    |
+
+unformatted: File would be reformatted
+   --> packages\core\src\smart_rag_core\ingestion\canonical\repository.py:232:33
+    |
+231 |                 continue
+    -             figure_uuid = uuid5(
+    -                 NAMESPACE_URL, f"{version_id}:{figure.figure_id}"
+    -             )
+232 +             figure_uuid = uuid5(NAMESPACE_URL, f"{version_id}:{figure.figure_id}")
+233 |             with self._connection.cursor() as cursor:
+    |
+
+unformatted: File would be reformatted
+  --> packages\core\src\smart_rag_core\ingestion\figures\materialize.py:72:16
+   |
+71 |         for element in parse_result.elements:
+   -             if element.kind is not ElementKind.FIGURE or kept >= FIGURE_MAX_PER_DOCUMENT:
+72 +             if (
+73 +                 element.kind is not ElementKind.FIGURE
+74 +                 or kept >= FIGURE_MAX_PER_DOCUMENT
+75 +             ):
+76 |                 updated.append(element)
+   |
+
+unformatted: File would be reformatted
+   --> packages\core\src\smart_rag_core\ingestion\parser\adapters\pdf_adapter.py:320:18
+    |
+319 |
+    - def _locator_for(page_index: int, bbox: tuple[float, float, float, float]) -> PdfLocator:
+320 + def _locator_for(
+321 +     page_index: int, bbox: tuple[float, float, float, float]
+322 + ) -> PdfLocator:
+323 |     """Build a rounded PDF locator for one box."""
+    |
+
+unformatted: File would be reformatted
+   --> packages\core\src\smart_rag_core\ingestion\tables\service.py:135:65
+    |
+134 |         sheet = _sheet_name(element)
+    -         headers.setdefault(sheet, {})[_column_index(element)] = (
+    -             element.text or ""
+    -         )
+135 +         headers.setdefault(sheet, {})[_column_index(element)] = element.text or ""
+136 |     return headers
+    |
+
+unformatted: File would be reformatted
+   --> packages\core\src\smart_rag_core\query_answer\native_blocks.py:72:19
+    |
+71  |
+    - def _native_block(item_kind: str, body: str, figure_id: str | None, existing: str) -> str:
+72  + def _native_block(
+73  +     item_kind: str, body: str, figure_id: str | None, existing: str
+74  + ) -> str:
+75  |     """Return the display block for one cited native passage.
+--------------------------------------------------------------------------------
+154 |
+    - def _figure_is_useful(query: str, answer: str, citation_text: str, *, alone: bool) -> bool:
+155 + def _figure_is_useful(
+156 +     query: str, answer: str, citation_text: str, *, alone: bool
+157 + ) -> bool:
+158 |     """Return whether this figure belongs in the visible answer.
+--------------------------------------------------------------------------------
+170 |
+    -     labels = {
+    -         re.sub(r"\s+", "", label)
+    -         for label in _FIGURE_LABEL.findall(query)
+    -     }
+171 +     labels = {re.sub(r"\s+", "", label) for label in _FIGURE_LABEL.findall(query)}
+172 |     caption = citation_text.casefold()
+--------------------------------------------------------------------------------
+207 |         for item in fusion.evidence
+    -         if item.content_kind == "figure" and item.figure_id and item.citation_text.strip()
+208 +         if item.content_kind == "figure"
+209 +         and item.figure_id
+210 +         and item.citation_text.strip()
+211 |     ]
+--------------------------------------------------------------------------------
+223 |         caption = " ".join(item.citation_text.split())[:240].strip()
+    -         text = f"{caption}\n[[figure:{figure_id}]]" if caption else f"[[figure:{figure_id}]]"
+224 +         text = (
+225 +             f"{caption}\n[[figure:{figure_id}]]"
+226 +             if caption
+227 +             else f"[[figure:{figure_id}]]"
+228 +         )
+229 |         if len(text) > _MAX_NATIVE_CHARS:
+--------------------------------------------------------------------------------
+455 |
+    -     needle = item.figure_id if item.content_kind == "figure" else item.citation_text.strip()
+456 +     needle = (
+457 +         item.figure_id if item.content_kind == "figure" else item.citation_text.strip()
+458 +     )
+459 |     if not needle:
+    |
+
+unformatted: File would be reformatted
+   --> packages\core\src\smart_rag_core\query_fusion\quotas.py:123:22
+    |
+122 |
+    - def _native_drop_key(item: ScoredPassage, native_page: int | None) -> tuple[int, float, str]:
+123 + def _native_drop_key(
+124 +     item: ScoredPassage, native_page: int | None
+125 + ) -> tuple[int, float, str]:
+126 |     """Sort key for the prose passage a native block should replace.
+    |
+
+unformatted: File would be reformatted
+   --> packages\core\src\smart_rag_core\query_fusion\ranking.py:318:54
+    |
+317 |                 statement_ids=strength_tuple[2] if strength_tuple is not None else (),
+    -                 content_kind=hybrid_item.content_kind if hybrid_item is not None else None,
+318 +                 content_kind=hybrid_item.content_kind
+319 +                 if hybrid_item is not None
+320 +                 else None,
+321 |                 figure_id=hybrid_item.figure_id if hybrid_item is not None else None,
+    |
+
+unformatted: File would be reformatted
+  --> tests\contract\test_pdf_figure_access.py:51:83
+   |
+50 |     application.include_router(figures_router.router)
+   -     application.dependency_overrides[figures_router.get_figure_service] = lambda: _Figures()
+51 +     application.dependency_overrides[figures_router.get_figure_service] = lambda: (
+52 +         _Figures()
+53 +     )
+54 |     application.dependency_overrides[resolve_caller_context] = lambda: CallerContext(
+   |
+
+unformatted: File would be reformatted
+   --> tests\unit\test_code_table_literal_salvage.py:108:31
+    |
+107 |     )
+    -     assert literal_anchor_ask("Show the Python function parse_invoice from the document.")
+108 +     assert literal_anchor_ask(
+109 +         "Show the Python function parse_invoice from the document."
+110 +     )
+111 |     assert named_code_definition_ids(
+    |
+
+unformatted: File would be reformatted
+   --> tests\unit\test_named_page_claim_fill.py:414:13
+    |
+413 |     paragraph = next(
+    -         item
+    -         for item in salvaged.paragraphs
+    -         if openings[0].link_id in item.link_ids
+414 +         item for item in salvaged.paragraphs if openings[0].link_id in item.link_ids
+415 |     )
+--------------------------------------------------------------------------------
+471 |     paragraph = next(
+    -         item
+    -         for item in salvaged.paragraphs
+    -         if openings[0].link_id in item.link_ids
+472 +         item for item in salvaged.paragraphs if openings[0].link_id in item.link_ids
+473 |     )
+    |
+
+unformatted: File would be reformatted
+   --> tests\unit\test_organize_answer.py:242:31
+    |
+241 |     state["user_query"] = "How does coordination work?"
+    -     state["fusion"] = _fusion("Orchestration coordinates every tool call in the diagram.")
+242 +     state["fusion"] = _fusion(
+243 +         "Orchestration coordinates every tool call in the diagram."
+244 +     )
+245 |     gateway = _Gateway("unused")
+    |
+
+unformatted: File would be reformatted
+   --> tests\unit\test_pdf_native_types.py:135:16
+    |
+134 |     cells = [
+    -         element
+    -         for element in parsed.elements
+    -         if element.kind is ElementKind.TABLE_CELL
+135 +         element for element in parsed.elements if element.kind is ElementKind.TABLE_CELL
+136 |     ]
+--------------------------------------------------------------------------------
+319 |         answer_text=fenced,
+    -         paragraphs=(
+    -             AnswerParagraph(paragraph_index=0, text=fenced, link_ids=("l1",)),
+    -         ),
+320 +         paragraphs=(AnswerParagraph(paragraph_index=0, text=fenced, link_ids=("l1",)),),
+321 |         atomic_links=(),
+--------------------------------------------------------------------------------
+349 |     prose = tuple(
+    -         AnswerParagraph(paragraph_index=index, text=f"Sentence {index}.", link_ids=("l1",))
+350 +         AnswerParagraph(
+351 +             paragraph_index=index, text=f"Sentence {index}.", link_ids=("l1",)
+352 +         )
+353 |         for index in range(6)
+    |
+
+unformatted: File would be reformatted
+   --> tests\unit\test_query_sse_mapping.py:282:23
+    |
+281 |     )
+    -     events = _release(
+    -         mapper, {"status": "verified", "answer": _payload("   ")}
+    -     )
+282 +     events = _release(mapper, {"status": "verified", "answer": _payload("   ")})
+283 |     assert events[-1] == ("error", {"code": "empty_answer"})
+    |
+
+16 files would be reformatted, 1297 files already formatted

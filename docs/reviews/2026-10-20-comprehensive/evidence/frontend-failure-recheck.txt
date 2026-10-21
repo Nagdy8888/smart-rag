@@ -1,0 +1,36 @@
+
+ RUN  v4.1.10 C:/Nagdy/Mustafa/Work/Upwork/Demo_Project_3/apps/frontend
+
+ ❯ src/lib/architecture-budget.test.ts (2 tests | 1 failed) 9ms
+     × keeps ChatApp and barrels within physical-line budgets 6ms
+node.exe : 
+At C:\Users\Nagdy\AppData\Local\fnm_multishells\33848_1792449779601\pnpm.ps1:16 char:5
++     & "$basedir/node$exe"  "$basedir/node_modules/corepack/dist/pnpm. ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/architecture-budget.test.ts > architecture budgets > keeps ChatApp and barrels within physical-line 
+budgets
+AssertionError: expected 344 to be less than or equal to 320
+ ❯ src/lib/architecture-budget.test.ts:26:59
+     24| describe("architecture budgets", () => {
+     25|   it("keeps ChatApp and barrels within physical-line budgets", () => {
+     26|     expect(physicalLines("components/chat/chat-app.tsx")).toBeLessThan…
+       |                                                           ^
+     27|     expect(physicalLines("lib/api.ts")).toBeLessThanOrEqual(100);
+     28|     expect(physicalLines("lib/types.ts")).toBeLessThanOrEqual(100);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 17 passed (18)
+   Start at  01:43:01
+   Duration  7.78s (transform 1.64s, setup 0ms, import 5.31s, tests 1.07s, environment 1.18s)
+
+undefined
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "vitest" not found

@@ -1,0 +1,40 @@
+.agents\skills\impeccable\scripts\impeccable.cmd : 
+At line:2 char:1
++ .agents\skills\impeccable\scripts\impeccable.cmd detect apps/frontend ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend\src\app\globals.css (imported by layout.tsx)
+  line 142: [bounce-easing] cubic-bezier(0.34, 1.36, 0.64, 1)
+    → Bounce and elastic easing feel dated and tacky. Real objects decelerate smoothly — use exponential easing 
+(ease-out-quart/quint/expo) instead.
+
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend\src\components\chat\chat-transcript.module.css (imported by 
+answer-code-block.tsx, answer-figure.tsx, answer-format-gallery.tsx, answer-surface.tsx, chat-session-gate.tsx, 
+chat-stage.tsx, citation-drawer.tsx, citation-sheet.tsx, feedback-popover.tsx, run-details-sheet.tsx, 
+verified-answer-reveal.tsx)
+  line 820: [bounce-easing] animation: var(--ease-bounce)
+    → Bounce and elastic easing feel dated and tacky. Real objects decelerate smoothly — use exponential easing 
+(ease-out-quart/quint/expo) instead.
+  line 886: [bounce-easing] animation: var(--ease-bounce)
+    → Bounce and elastic easing feel dated and tacky. Real objects decelerate smoothly — use exponential easing 
+(ease-out-quart/quint/expo) instead.
+
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend\src\lib\design-tokens.ts (imported by contrast.test.ts, 
+design-tokens.test.ts, geometry.test.ts)
+  line 282: [bounce-easing] cubic-bezier(0.34, 1.36, 0.64, 1)
+    → Bounce and elastic easing feel dated and tacky. Real objects decelerate smoothly — use exponential easing 
+(ease-out-quart/quint/expo) instead.
+
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend\src\lib\run-details.test.ts
+  line 106: [broken-image] <img>
+    → <img> tags with empty src, missing src, or placeholder values ship as broken-image boxes. Use real images, 
+generated assets, or remove the tag.
+
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend\src\lib\safe-text.test.ts
+  line 15: [broken-image] <img>
+    → <img> tags with empty src, missing src, or placeholder values ship as broken-image boxes. Use real images, 
+generated assets, or remove the tag.
+
+6 anti-patterns found.

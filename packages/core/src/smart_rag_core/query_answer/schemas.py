@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from smart_rag_core.query_answer.verifier_output import keyed_verifier_schema
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_ANSWER_PARAGRAPHS,
@@ -148,19 +149,29 @@ def answer_json_schema() -> dict[str, object]:
     }
 
 
-def answer_claims_json_schema() -> dict[str, object]:
+def answer_claims_json_schema(
+    *, max_claims: int = MAX_VERIFIER_LINKS
+) -> dict[str, object]:
     """Return the strict answer claims structured-output schema.
 
-    The schema is the same for every request so the provider can reuse
-    its processed form. ``source_id`` is a plain string; application code
+    The bounded claim limit may reserve room for a requested artifact.
+    ``source_id`` is a plain string; application code
     drops any citation whose ID was not sent in the request. Length caps
     are enforced by application code, not by string keywords.
+
+    Args:
+        max_claims: Existing six-claim ceiling, or a lower artifact reservation.
 
     Returns:
         OpenAI ``json_schema`` document. The model writes no link IDs,
         paragraph indices, or ``answer_text``.
+
+    Raises:
+        ValueError: When the requested limit exceeds the existing ceiling.
     """
 
+    if not 0 <= max_claims <= MAX_VERIFIER_LINKS:
+        raise ValueError("answer_claim_limit_invalid")
     citation = {
         "type": "object",
         "additionalProperties": False,
@@ -202,7 +213,7 @@ def answer_claims_json_schema() -> dict[str, object]:
         "properties": {
             "claims": {
                 "type": "array",
-                "maxItems": MAX_VERIFIER_LINKS,
+                "maxItems": max_claims,
                 "items": claim,
             },
             "conclusion": {"anyOf": [{"type": "null"}, conclusion]},
@@ -307,32 +318,7 @@ def verifier_json_schema(link_ids: tuple[str, ...]) -> dict[str, object]:
         OpenAI ``json_schema`` document.
     """
 
-    enum_ids = list(link_ids) or ["none"]
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["link_verdicts"],
-        "properties": {
-            "link_verdicts": {
-                "type": "array",
-                "maxItems": MAX_VERIFIER_LINKS,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["link_id", "supported", "reason"],
-                    "properties": {
-                        "link_id": {"type": "string", "enum": enum_ids},
-                        "supported": {"type": "boolean"},
-                        "reason": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128,
-                        },
-                    },
-                },
-            }
-        },
-    }
+    return keyed_verifier_schema(link_ids)
 
 
 def eval_judge_json_schema() -> dict[str, object]:

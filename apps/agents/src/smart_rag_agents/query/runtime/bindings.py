@@ -40,7 +40,7 @@ class QueryGraphProcessBindings:
         graph_retriever: Process LightRAG adapter, or None when unbound.
         table_executor: Structured-table path using ``app_api`` ACL.
         answer_prompt_text: Pinned ``answer_v2`` body.
-        organize_prompt_text: Pinned ``organize_v1`` body.
+        organize_prompt_text: Deprecated compatibility field; no live prompt binding.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body.
         verifier_prompt_text: Pinned ``verifier_v1`` body.
         query_profile_prompt_text: Pinned ``query_profile_v1`` body.

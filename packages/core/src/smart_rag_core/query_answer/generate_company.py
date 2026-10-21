@@ -26,11 +26,13 @@ from smart_rag_core.query_answer.models import (
     AtomicLink,
     ComposedConclusion,
 )
+from smart_rag_core.query_answer.ownership_shape import shape_ownership_matrix_draft
 from smart_rag_core.query_answer.paragraphs import (
     exact_source_span,
     join_paragraph_text,
     with_derived_answer_text,
 )
+from smart_rag_core.query_answer.query_coverage import salvage_question_coverage
 from smart_rag_core.query_answer.release import bind_company_atomic_links
 from smart_rag_core.query_answer.sanitize import empty_no_retrieval, filter_invented_ids
 from smart_rag_core.query_answer.versions import (
@@ -212,6 +214,7 @@ def generate_grounded_answer(
         payload = mock_answer_payload(fusion, tables, user_query=user_query)
     else:
         payload = caller(records, fusion, tables)
+    payload = shape_ownership_matrix_draft(payload, fusion, user_query=user_query)
     filtered = bind_company_atomic_links(
         filter_invented_ids(payload, fusion, tables),
         fusion=fusion,
@@ -221,6 +224,7 @@ def generate_grounded_answer(
     for salvage_fn in (
         salvage_named_code_definition,
         salvage_named_table_block,
+        salvage_question_coverage,
         salvage_anchor_claim_fill,
     ):
         salvaged = salvage_fn(derived, fusion, user_query=user_query)

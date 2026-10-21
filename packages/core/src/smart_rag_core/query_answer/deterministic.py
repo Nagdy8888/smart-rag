@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from smart_rag_core.query_answer.comparative_guard import explicit_comparative_conflict
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload, AtomicLink
 from smart_rag_core.query_answer.paragraphs import apply_paragraph_contract
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
@@ -134,7 +135,13 @@ def deterministic_check_answer(
     kept_links: list[AtomicLink] = []
     refused: list[str] = list(payload.refused_links)
     for link in payload.atomic_links:
-        if _link_supported(link, passages, tables_by_id, web_ids=frozenset(excerpts)):
+        contradiction = (
+            explicit_comparative_conflict(link, passages) if not excerpts else False
+        )
+        if contradiction:
+            refused.append(link.link_id)
+            failures.append("unsupported_comparative_direction")
+        elif _link_supported(link, passages, tables_by_id, web_ids=frozenset(excerpts)):
             kept_links.append(link)
         else:
             refused.append(link.link_id)

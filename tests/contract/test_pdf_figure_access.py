@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
+import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from smart_rag_api.dependencies.identity import resolve_caller_context
@@ -31,14 +34,20 @@ def test_figure_migration_keeps_the_bucket_private() -> None:
 
 
 def test_figure_route_streams_png_only_for_an_authorized_key(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The route returns image/png and hides missing or forbidden figures."""
 
-    monkeypatch.setattr(figures_router, "enforce_rate_limit", lambda *_a, **_k: None)
+    def allow_fixture_read(*_args: object, **_kwargs: object) -> None:
+        """Leave rate-limit behavior to its dedicated contract tests."""
+
+    monkeypatch.setattr(figures_router, "enforce_rate_limit", allow_fixture_read)
 
     class _Figures:
+        """Serve fixture bytes with explicit authorization outcomes."""
+
         def read_png(self, caller: CallerContext, figure_key: str) -> bytes | None:
+            """Read only an authorized fixture figure."""
             assert caller.role is UserRole.MEMBER
             if figure_key == "abc123":
                 return b"\x89PNG\r\n"
@@ -48,13 +57,15 @@ def test_figure_route_streams_png_only_for_an_authorized_key(
 
     application = FastAPI()
     application.include_router(figures_router.router)
-    application.dependency_overrides[figures_router.get_figure_service] = lambda: _Figures()
+    application.dependency_overrides[figures_router.get_figure_service] = lambda: (
+        _Figures()
+    )
     application.dependency_overrides[resolve_caller_context] = lambda: CallerContext(
         user_id="11111111-1111-1111-1111-111111111111",
         role=UserRole.MEMBER,
         authorization_version=1,
     )
-    client = TestClient(application)
+    client = cast(httpx.Client, TestClient(application))
     ok = client.get("/figures/abc123")
     assert ok.status_code == 200
     assert ok.headers["content-type"].startswith("image/png")

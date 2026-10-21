@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import fitz
 from smart_rag_core.ingestion.parser.page_image import (
     CitationPageImageError,
     render_pdf_page_png,
 )
 
+from tests.support.pdf_fixture import empty_pdf
+
 
 def _two_page_pdf() -> bytes:
-    document = fitz.open()
+    document = empty_pdf()
     try:
         document.new_page()
         document.new_page()

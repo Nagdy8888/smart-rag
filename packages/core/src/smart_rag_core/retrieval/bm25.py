@@ -468,13 +468,14 @@ class Bm25Retriever:
                     )
             scope_sql, scope_params = bm25_key_scope_sql(scope_ids)
             for ordinal, text in enumerate(unique_texts):
+                variant_branches: list[sql.Composed] = []
                 for field in fields:
                     structured = build_bm25_query(
                         query_text=text,
                         operator=operator,
                         field=field,
                     )
-                    branches.append(
+                    variant_branches.append(
                         sql.SQL(
                             """
                             SELECT {ordinal}::integer AS variant_ordinal,
@@ -505,11 +506,31 @@ class Bm25Retriever:
                             *scope_params,
                         ]
                     )
+                # Bound each variant before the shared scan cap. Raw scores from
+                # different query texts are not comparable; a broad sentence's
+                # heading hits must not evict an exact identifier's body hits.
+                branches.append(
+                    sql.SQL(
+                        """(SELECT variant_ordinal, field_tier, chunk_id, score
+                        FROM ({union}) AS variant_rows
+                        ORDER BY field_tier ASC, score DESC, chunk_id ASC
+                        LIMIT {quota})"""
+                    ).format(
+                        union=sql.SQL(" UNION ALL ").join(variant_branches),
+                        quota=sql.Literal(BM25_SCAN_ID_CAP // len(unique_texts)),
+                    )
+                )
             statement = sql.SQL(
                 """
                 SELECT variant_ordinal, field_tier, chunk_id, score
-                FROM ({union}) AS unioned
-                ORDER BY field_tier ASC, score DESC, chunk_id ASC
+                FROM (
+                  SELECT *, row_number() OVER (
+                    PARTITION BY variant_ordinal
+                    ORDER BY field_tier ASC, score DESC, chunk_id ASC
+                  ) AS variant_rank
+                  FROM ({union}) AS unioned
+                ) AS ranked_variants
+                ORDER BY variant_rank ASC, variant_ordinal ASC
                 LIMIT %s
                 """
             ).format(union=sql.SQL(" UNION ALL ").join(branches))

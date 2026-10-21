@@ -317,7 +317,9 @@ def _typed_kind(text: str) -> str:
     return "string"
 
 
-def _locator_for(page_index: int, bbox: tuple[float, float, float, float]) -> PdfLocator:
+def _locator_for(
+    page_index: int, bbox: tuple[float, float, float, float]
+) -> PdfLocator:
     """Build a rounded PDF locator for one box."""
 
     x0, y0, x1, y1 = bbox

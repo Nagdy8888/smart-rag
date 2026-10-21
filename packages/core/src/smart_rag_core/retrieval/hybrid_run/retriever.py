@@ -110,9 +110,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         ``RETRIEVAL_SLICE_SECONDS`` (10s) covers parallel channels plus
         rerank after the embedding batch. The 8000 ms statement timeout
         stays the per-SQL bound. Embedding time is not subtracted from
-        that slice. The 25s
-        ``HYBRID_DEADLINE_SECONDS`` value is the Phase 6 full-run budget
-        and is not used here.
+        that slice. ``HYBRID_DEADLINE_SECONDS`` is the 25s Phase 6 full-run
+        budget and is not used here.
         Channels wait only ``channel_phase_deadline_seconds(slice)`` so rerank keeps its reserve.
 
     Failure/fallback:

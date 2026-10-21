@@ -379,8 +379,8 @@ def create_app() -> FastAPI:
     from smart_rag_api.routers.auth_team import router as auth_team_router
     from smart_rag_api.routers.conversations import router as conversations_router
     from smart_rag_api.routers.documents import router as documents_router
-    from smart_rag_api.routers.figures import router as figures_router
     from smart_rag_api.routers.entity_rules import router as entity_rules_router
+    from smart_rag_api.routers.figures import router as figures_router
     from smart_rag_api.routers.glossary import router as glossary_router
     from smart_rag_api.routers.governance_reviews import (
         router as governance_reviews_router,

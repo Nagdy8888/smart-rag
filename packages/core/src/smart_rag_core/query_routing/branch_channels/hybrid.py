@@ -522,6 +522,6 @@ def hybrid_evidence(
 def _content_kind(value: str | None) -> Literal["code", "table", "figure"] | None:
     """Keep only the three stored modalities."""
 
-    if value in {"code", "table", "figure"}:
+    if value in ("code", "table", "figure"):
         return value
     return None

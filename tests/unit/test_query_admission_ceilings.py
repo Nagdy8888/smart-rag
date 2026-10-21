@@ -268,7 +268,7 @@ def test_retrieve_kind_caps_fail_closed_when_remaining_cannot_cover() -> None:
     assert completion == 2000
     with pytest.raises(QueryCeilingError, match="answer_stage_reserve_exhausted"):
         assert_retrieve_kind_available(
-            remaining_model_calls=3,
+            remaining_model_calls=2,
             remaining_usd=Decimal("0.20"),
             usage_kind="rerank",
         )

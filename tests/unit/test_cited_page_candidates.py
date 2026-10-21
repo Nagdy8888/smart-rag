@@ -60,6 +60,7 @@ def test_term_failure_still_returns_the_cited_page_hit() -> None:
 
         raise RuntimeError("term_rpc_down")
 
+    result = None
     try:
         _failing_term()
     except RuntimeError:

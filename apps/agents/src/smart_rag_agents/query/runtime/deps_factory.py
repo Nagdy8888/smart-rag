@@ -31,7 +31,6 @@ from smart_rag_core.settings.postgres_connect import connect_postgres
 from smart_rag_agents.prompts import (
     answer_prompt_text,
     general_chat_prompt_text,
-    organize_prompt_text,
     query_profile_prompt_text,
     rerank_prompt_text,
     verifier_prompt_text,
@@ -186,7 +185,6 @@ def build_query_process_bindings(
         graph_retriever=graph_retriever,
         table_executor=bind_table_executor(dsn),
         answer_prompt_text=answer_prompt_text(),
-        organize_prompt_text=organize_prompt_text(),
         general_chat_prompt_text=general_chat_prompt_text(),
         verifier_prompt_text=verifier_prompt_text(),
         query_profile_prompt_text=query_profile_prompt_text(),
@@ -257,7 +255,6 @@ def build_query_graph_deps(
         query_profile_prompt_text=bindings.query_profile_prompt_text,
         profile_model_id=bindings.profile_model_id,
         answer_prompt_text=bindings.answer_prompt_text,
-        organize_prompt_text=bindings.organize_prompt_text or None,
         general_chat_prompt_text=bindings.general_chat_prompt_text,
         verifier_prompt_text=bindings.verifier_prompt_text,
         web_critique_prompt_text=bindings.web_critique_prompt_text or None,

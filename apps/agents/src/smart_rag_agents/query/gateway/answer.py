@@ -6,7 +6,10 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
-from smart_rag_core.query_answer.assembly import fit_source_records
+from smart_rag_core.query_answer.assembly import (
+    assemble_source_records,
+    fit_source_records,
+)
 from smart_rag_core.query_answer.claims import parse_provider_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
@@ -17,8 +20,11 @@ from smart_rag_core.query_answer.generate_grounded import (
     salvage_named_table_block,
 )
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.query_answer.ownership_shape import shape_ownership_matrix_draft
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
+from smart_rag_core.query_answer.query_coverage import salvage_question_coverage
 from smart_rag_core.query_answer.release import bind_company_atomic_links
+from smart_rag_core.query_answer.source_focus import prioritize_answer_sources
 from smart_rag_core.query_answer.versions import (
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
@@ -62,6 +68,7 @@ def _apply_code_table_salvages(
     for salvage_fn in (
         salvage_named_code_definition,
         salvage_named_table_block,
+        salvage_question_coverage,
         salvage_anchor_claim_fill,
     ):
         salvaged = salvage_fn(working, fusion, user_query=query)
@@ -126,9 +133,11 @@ def gateway_answer(
     )
     if fit.trim_reason == "input_bound_exceeded":
         raise AnswerError("input_bound_exceeded")
-    records = fit.records
     fusion = fit.fusion
     typed_tables = fit.tables
+    records = assemble_source_records(
+        prioritize_answer_sources(fusion, query), typed_tables
+    )
     timeout_seconds = attempt_timeout_seconds(context, ANSWER_ATTEMPT_CAP_SECONDS)
     request = AnswerModelRequest(
         query=query or "query",
@@ -156,6 +165,7 @@ def gateway_answer(
         chunk_ids=request.chunk_ids,
         tables=typed_tables,
     )
+    payload = shape_ownership_matrix_draft(payload, fusion, user_query=query)
     filtered = bind_company_atomic_links(
         filter_invented_ids(payload, fusion, typed_tables),
         fusion=fusion,

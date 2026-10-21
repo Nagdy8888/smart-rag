@@ -101,17 +101,18 @@ def _rebuild_paragraphs_and_citations(
 
     passages = {item.chunk_id: item for item in fusion.evidence}
     tables_by_id = {item.table_id: item for item in tables}
-    original_spans: dict[tuple[str | None, str | None, str], AnswerCitation] = {}
+    original_spans: dict[tuple[str | None, str | None, str], list[AnswerCitation]] = {}
     for citation in (*original.citations, *original.table_citations):
         if citation.atomic_link_id is None:
             continue
-        original_spans[
-            (citation.chunk_id, citation.table_id, citation.atomic_link_id)
-        ] = citation
+        original_spans.setdefault(
+            (citation.chunk_id, citation.table_id, citation.atomic_link_id), []
+        ).append(citation)
     paragraphs: list[AnswerParagraph] = []
     citations: list[AnswerCitation] = []
     table_citations: list[AnswerCitation] = []
-    seen_pairs: set[tuple[str | None, str | None, str]] = set()
+    seen_passages: set[tuple[str, str, str]] = set()
+    seen_tables: set[tuple[str, str]] = set()
     all_links_by_claim: dict[str, tuple[str, ...]] = {}
     for item in original.atomic_links:
         key = release_normalize_text(item.claim)
@@ -134,38 +135,50 @@ def _rebuild_paragraphs_and_citations(
         for live in original.atomic_links:
             if live.link_id not in link_ids:
                 continue
+            has_owned_citations = any(
+                citation.atomic_link_id == live.link_id
+                and citation.chunk_id is not None
+                and citation.chunk_id in passages
+                and citation.span
+                and citation.span in passages[citation.chunk_id].citation_text
+                for citation in original.citations
+            )
             for chunk_id in live.chunk_ids:
                 pair = (chunk_id, None, live.link_id)
-                if pair in seen_pairs:
+                reused_spans = original_spans.get(pair, [])
+                if has_owned_citations and live.kind == "fact" and not reused_spans:
+                    # Link IDs may include bookkeeping holders added by binding.
+                    # They do not authorize synthesizing extra prefix citations.
                     continue
-                seen_pairs.add(pair)
-                reused = original_spans.get(pair)
-                span = reused.span if reused is not None else None
                 passage = passages.get(chunk_id)
                 if passage is None:
                     continue
-                if not span or span not in passage.citation_text:
-                    span = exact_source_span(passage.citation_text)
-                if not span:
-                    continue
-                citations.append(
-                    AnswerCitation(
-                        chunk_id=chunk_id,
-                        span=span,
-                        atomic_link_id=live.link_id,
-                        paragraph_index=index,
-                        inference=live.kind == "inference_link",
+                spans = [c.span for c in reused_spans] or [None]
+                for span in spans:
+                    if not span or span not in passage.citation_text:
+                        span = exact_source_span(passage.citation_text)
+                    if not span or (chunk_id, live.link_id, span) in seen_passages:
+                        continue
+                    seen_passages.add((chunk_id, live.link_id, span))
+                    citations.append(
+                        AnswerCitation(
+                            chunk_id=chunk_id,
+                            span=span,
+                            atomic_link_id=live.link_id,
+                            paragraph_index=index,
+                            inference=live.kind == "inference_link",
+                        )
                     )
-                )
             if live.table_id:
                 pair = (None, live.table_id, live.link_id)
-                if pair in seen_pairs:
+                if (live.table_id, live.link_id) in seen_tables:
                     continue
-                seen_pairs.add(pair)
+                seen_tables.add((live.table_id, live.link_id))
                 record = tables_by_id.get(live.table_id)
                 if record is None:
                     continue
-                reused = original_spans.get(pair)
+                reused_spans = original_spans.get(pair, [])
+                reused = reused_spans[0] if reused_spans else None
                 table_citations.append(
                     AnswerCitation(
                         table_id=live.table_id,

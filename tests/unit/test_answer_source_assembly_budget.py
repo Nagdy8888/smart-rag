@@ -443,5 +443,5 @@ def test_run_coro_maps_model_input_bound_error_without_string_matching() -> None
 def test_answer_stage_reserve_constants() -> None:
     """Company answer plus verifier still consume two reserved calls."""
 
-    assert ANSWER_STAGE_RESERVED_MODEL_CALLS == 3
+    assert ANSWER_STAGE_RESERVED_MODEL_CALLS == 2
     assert ANSWER_STAGE_MIN_SECONDS == 8.0

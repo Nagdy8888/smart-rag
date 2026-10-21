@@ -355,7 +355,7 @@ describe("CitationDrawer", () => {
       />,
     );
     expect(await screen.findByText("Refunds close in thirty calendar days.")).toBeInTheDocument();
-    expect(screen.getByText(CITATION_PAGE_FAILED)).toBeInTheDocument();
+    expect(await screen.findByText(CITATION_PAGE_FAILED)).toBeInTheDocument();
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.queryByText(CITATION_PAGE_LOADING)).not.toBeInTheDocument();
   });

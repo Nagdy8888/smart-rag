@@ -279,9 +279,7 @@ def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
     mapper.consume_chunk(
         {GENERATE_ANSWER_NODE: {"status": "drafted", "answer": _payload("held")}}
     )
-    events = _release(
-        mapper, {"status": "verified", "answer": _payload("   ")}
-    )
+    events = _release(mapper, {"status": "verified", "answer": _payload("   ")})
     assert events[-1] == ("error", {"code": "empty_answer"})
     assert "completed" not in {item[0] for item in events}
 

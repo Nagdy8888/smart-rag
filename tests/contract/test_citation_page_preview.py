@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
+import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from smart_rag_api.dependencies.identity import resolve_caller_context
@@ -40,13 +43,18 @@ def test_citation_page_migration_has_no_signed_url() -> None:
 
 
 def test_citation_page_route_returns_png_only_for_an_owned_page(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An owned page is image/png. Foreign and unavailable citations are 404."""
 
-    monkeypatch.setattr(query_runs_router, "enforce_rate_limit", lambda *_a, **_k: None)
+    def allow_fixture_read(*_args: object, **_kwargs: object) -> None:
+        """Leave rate-limit behavior to its dedicated contract tests."""
+
+    monkeypatch.setattr(query_runs_router, "enforce_rate_limit", allow_fixture_read)
 
     class _Pages:
+        """Serve fixture bytes with explicit authorization outcomes."""
+
         def read_png(
             self,
             caller: CallerContext,
@@ -54,6 +62,7 @@ def test_citation_page_route_returns_png_only_for_an_owned_page(
             run_id: UUID,
             citation_id: UUID,
         ) -> bytes:
+            """Read only an owned fixture page."""
             assert caller.role is UserRole.MEMBER
             assert run_id == _RUN
             if citation_id == _OWNED:
@@ -72,7 +81,7 @@ def test_citation_page_route_returns_png_only_for_an_owned_page(
         role=UserRole.MEMBER,
         authorization_version=1,
     )
-    client = TestClient(application)
+    client = cast(httpx.Client, TestClient(application))
     ok = client.get(f"/runs/{_RUN}/citations/{_OWNED}/page")
     assert ok.status_code == 200
     assert ok.headers["content-type"].startswith("image/png")

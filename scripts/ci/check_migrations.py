@@ -102,6 +102,10 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260921150000_sync_document_title_search_terms_v1.sql",
     "20260922100000_find_visible_document_by_content_hash_v1.sql",
     "20261013140000_citation_leaf_cited_chunk_v1.sql",
+    "20261014143000_figure_artifacts_v1.sql",
+    "20261015153000_citation_page_object_v1.sql",
+    "20261015163000_citation_page_object_v2.sql",
+    "20261016150000_composite_rewrite_deadline_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

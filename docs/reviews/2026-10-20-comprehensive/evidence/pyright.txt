@@ -1,0 +1,162 @@
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\agents\src\smart_rag_agents\query\gateway\organize.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\agents\src\smart_rag_agents\query\gateway\organize.py:90:5 - error: Type of "claims" is partially unknown
+    Type of "claims" is "Unknown | None" (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\agents\src\smart_rag_agents\query\gateway\organize.py:90:14 - error: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\agents\src\smart_rag_agents\query\gateway\organize.py:93:5 - error: Type of "first" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\agents\src\smart_rag_agents\query\gateway\organize.py:96:5 - error: Type of "text" is partially unknown
+    Type of "text" is "Unknown | None" (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\agents\src\smart_rag_agents\query\gateway\organize.py:96:12 - error: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py:44:26 - error: Type of "page_count" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py:52:9 - error: Type of "pixmap" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py:52:18 - error: Type of "get_pixmap" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py:52:23 - error: Cannot access attribute "get_pixmap" for class "Page"
+    Attribute "get_pixmap" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py:53:9 - error: Type of "payload" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\ingestion\parser\page_image.py:53:19 - error: Type of "tobytes" is unknown (reportUnknownMemberType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\query_routing\branch_channels\hybrid.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\packages\core\src\smart_rag_core\query_routing\branch_channels\hybrid.py:526:16 - error: Type "str" is not assignable to return type "Literal['code', 'table', 'figure'] | None"
+    Type "str" is not assignable to type "Literal['code', 'table', 'figure'] | None"
+      "str" is not assignable to "None"
+      "str" is not assignable to type "Literal['code']"
+      "str" is not assignable to type "Literal['table']"
+      "str" is not assignable to type "Literal['figure']" (reportReturnType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:43:5 - error: Type of parameter "monkeypatch" is unknown (reportUnknownParameterType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:43:5 - error: Type annotation is missing for parameter "monkeypatch" (reportMissingParameterType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:47:5 - error: Type of "setattr" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:47:74 - error: Type of parameter "_a" is partially unknown (reportUnknownLambdaType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:47:80 - error: Type of parameter "_k" is partially unknown (reportUnknownLambdaType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:76:5 - error: Type of "ok" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:76:10 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:77:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:78:12 - error: Type of "headers" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:78:12 - error: Type of "startswith" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:79:12 - error: Type of "content" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:79:12 - error: Type of "startswith" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:80:26 - error: Type of "text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:80:26 - error: Type of "lower" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:81:5 - error: Type of "foreign" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:81:15 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:82:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:83:12 - error: Type of "content" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:83:52 - error: Type of "content" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:84:5 - error: Type of "unavailable" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:84:19 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:87:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_citation_page_preview.py:88:30 - error: Type of "content" is unknown (reportUnknownMemberType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:34:5 - error: Type of parameter "monkeypatch" is unknown (reportUnknownParameterType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:34:5 - error: Type annotation is missing for parameter "monkeypatch" (reportMissingParameterType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:38:5 - error: Type of "setattr" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:38:71 - error: Type of parameter "_a" is partially unknown (reportUnknownLambdaType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:38:77 - error: Type of parameter "_k" is partially unknown (reportUnknownLambdaType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:58:5 - error: Type of "ok" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:58:10 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:59:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:60:12 - error: Type of "headers" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:60:12 - error: Type of "startswith" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:61:12 - error: Type of "content" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:61:12 - error: Type of "startswith" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:62:12 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:62:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:63:12 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:63:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:64:12 - error: Type of "get" is partially unknown
+    Type of "get" is "(url: Unknown, *, params: Unknown | None = None, headers: Unknown | None = None, cookies: Unknown | None = None, auth: Unknown = httpx._client.USE_CLIENT_DEFAULT, follow_redirects: bool | Unknown = httpx._client.USE_CLIENT_DEFAULT, timeout: Unknown = httpx._client.USE_CLIENT_DEFAULT, extensions: dict[str, Any] | None = None) -> Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\contract\test_pdf_figure_access.py:64:12 - error: Type of "status_code" is unknown (reportUnknownMemberType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_answer_citations_persist.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_answer_citations_persist.py:932:5 - error: Type of "inserts" is partially unknown
+    Type of "inserts" is "list[tuple[Unknown, ...]]" (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_answer_citations_persist.py:937:16 - error: Argument type is partially unknown
+    Argument corresponds to parameter "obj" in function "len"
+    Argument type is "list[tuple[Unknown, ...]]" (reportUnknownArgumentType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_answer_citations_persist.py:938:5 - error: Type of "retarget" is partially unknown
+    Type of "retarget" is "tuple[Unknown, ...]" (reportUnknownVariableType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_citation_page_image.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_citation_page_image.py:15:9 - error: Type of "new_page" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_citation_page_image.py:15:18 - error: Cannot access attribute "new_page" for class "open"
+    Attribute "new_page" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_citation_page_image.py:16:9 - error: Type of "new_page" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_citation_page_image.py:16:18 - error: Cannot access attribute "new_page" for class "open"
+    Attribute "new_page" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_citation_page_image.py:17:19 - error: Type of "tobytes" is partially unknown
+    Type of "tobytes" is "(garbage: bool = False, clean: bool = False, deflate: bool = False, deflate_images: bool = False, deflate_fonts: bool = False, incremental: bool = False, ascii: bool = False, expand: bool = False, linear: bool = False, no_new_id: bool = False, appearance: bool = False, pretty: bool = False, encryption: int = 1, permissions: int = 4095, owner_pw: Unknown | None = None, user_pw: Unknown | None = None, preserve_metadata: int = 1, use_objstms: int = 0, compression_effort: int = 0) -> bytes" (reportUnknownMemberType)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_cited_page_candidates.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_cited_page_candidates.py:67:23 - error: "result" is possibly unbound (reportPossiblyUnboundVariable)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py:117:12 - error: Type of "startswith" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py:117:34 - error: Cannot access attribute "startswith" for class "object"
+    Attribute "startswith" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py:118:12 - error: Operator "in" not supported for types "Literal['Beta']" and "object" (reportOperatorIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py:152:12 - error: Type of "startswith" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py:152:34 - error: Cannot access attribute "startswith" for class "object"
+    Attribute "startswith" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_organize_answer.py:153:12 - error: Operator "in" not supported for types "Literal['executes']" and "object" (reportOperatorIssue)
+c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:31:5 - error: Type of "page" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:31:12 - error: Type of "new_page" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:31:21 - error: Cannot access attribute "new_page" for class "open"
+    Attribute "new_page" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:32:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:33:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:34:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:35:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:36:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:37:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:38:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:39:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:40:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:41:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:42:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:43:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:45:5 - error: Type of "clear_with" is partially unknown
+    Type of "clear_with" is "(value: Unknown | None = None, bbox: Unknown | None = None) -> None" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:46:5 - error: Type of "insert_image" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:48:5 - error: Type of "insert_image" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:49:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:50:15 - error: Type of "tobytes" is partially unknown
+    Type of "tobytes" is "(garbage: bool = False, clean: bool = False, deflate: bool = False, deflate_images: bool = False, deflate_fonts: bool = False, incremental: bool = False, ascii: bool = False, expand: bool = False, linear: bool = False, no_new_id: bool = False, appearance: bool = False, pretty: bool = False, encryption: int = 1, permissions: int = 4095, owner_pw: Unknown | None = None, user_pw: Unknown | None = None, preserve_metadata: int = 1, use_objstms: int = 0, compression_effort: int = 0) -> bytes" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:106:5 - error: Type of "first" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:106:13 - error: Type of "new_page" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:106:22 - error: Cannot access attribute "new_page" for class "open"
+    Attribute "new_page" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:107:5 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:114:13 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:115:5 - error: Type of "second" is unknown (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:115:14 - error: Type of "new_page" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:115:23 - error: Cannot access attribute "new_page" for class "open"
+    Attribute "new_page" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:121:13 - error: Type of "insert_text" is unknown (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:122:15 - error: Type of "tobytes" is partially unknown
+    Type of "tobytes" is "(garbage: bool = False, clean: bool = False, deflate: bool = False, deflate_images: bool = False, deflate_fonts: bool = False, incremental: bool = False, ascii: bool = False, expand: bool = False, linear: bool = False, no_new_id: bool = False, appearance: bool = False, pretty: bool = False, encryption: int = 1, permissions: int = 4095, owner_pw: Unknown | None = None, user_pw: Unknown | None = None, preserve_metadata: int = 1, use_objstms: int = 0, compression_effort: int = 0) -> bytes" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:139:5 - error: Type of "pages" is partially unknown
+    Type of "pages" is "set[int | Unknown]" (reportUnknownVariableType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:9 - error: Type of "page_index" is partially unknown
+    Type of "page_index" is "int | Unknown" (reportUnknownMemberType)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "DocxLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "PptxLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "XlsxLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "CsvLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "HtmlLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "MarkdownLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+  c:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\tests\unit\test_pdf_native_types.py:140:25 - error: Cannot access attribute "page_index" for class "TextLocator"
+    Attribute "page_index" is unknown (reportAttributeAccessIssue)
+107 errors, 0 warnings, 0 informations
+WARNING: there is a new pyright version available (v1.1.411 -> v1.1.414).
+Please install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`
+

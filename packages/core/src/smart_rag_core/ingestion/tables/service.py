@@ -132,9 +132,7 @@ def _collect_headers(parse_result: ParseResult) -> dict[str | None, dict[int, st
         if element.kind is not ElementKind.TABLE_HEADER:
             continue
         sheet = _sheet_name(element)
-        headers.setdefault(sheet, {})[_column_index(element)] = (
-            element.text or ""
-        )
+        headers.setdefault(sheet, {})[_column_index(element)] = element.text or ""
     return headers
 
 

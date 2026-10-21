@@ -12,7 +12,7 @@ from smart_rag_core.ingestion.chunking.service import chunk_parse_result
 from smart_rag_core.ingestion.figures.materialize import materialize_pdf_figures
 from smart_rag_core.ingestion.parser.adapters import parse_file
 from smart_rag_core.ingestion.parser.limits import PDF_PARSER_VERSION
-from smart_rag_core.ingestion.parser.types import ElementKind
+from smart_rag_core.ingestion.parser.types import ElementKind, PdfLocator
 from smart_rag_core.ingestion.tables.parquet_io import read_parquet_artifact
 from smart_rag_core.query_answer.models import AnswerParagraph, AnswerPayload
 from smart_rag_core.query_answer.native_blocks import attach_native_evidence
@@ -23,11 +23,13 @@ from smart_rag_core.query_fusion.models import (
     ScoredPassage,
 )
 
+from tests.support.pdf_fixture import empty_pdf, fill_pixmap
+
 
 def _pdf_bytes() -> bytes:
     """Build a one-page PDF with a captioned table, code, and a large image."""
 
-    document = fitz.open()
+    document = empty_pdf()
     page = document.new_page()
     page.insert_text((72, 72), "Table 1. Rates", fontsize=12)
     page.insert_text((72, 100), "Name", fontsize=11)
@@ -42,7 +44,7 @@ def _pdf_bytes() -> bytes:
     page.insert_text((72, 200), "def run():", fontname="cour", fontsize=10)
     page.insert_text((72, 214), "    return 1", fontname="cour", fontsize=10)
     pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 120, 80), 1)
-    pixmap.clear_with(255)
+    fill_pixmap(pixmap, 255)
     page.insert_image(fitz.Rect(72, 280, 192, 360), pixmap=pixmap)
     tiny = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 8, 8), 1)
     page.insert_image(fitz.Rect(400, 20, 408, 28), pixmap=tiny)
@@ -102,7 +104,7 @@ def test_pdf_emits_code_table_and_figure(tmp_path: Path) -> None:
 def _continued_pdf_bytes() -> bytes:
     """Build a two-page captioned table that continues with the same columns."""
 
-    document = fitz.open()
+    document = empty_pdf()
     first = document.new_page()
     first.insert_text((72, 72), "Table 2. Inventory", fontsize=12)
     for y, cells in (
@@ -132,14 +134,12 @@ def test_pdf_table_continues_on_the_next_page(tmp_path: Path) -> None:
     path.write_bytes(payload)
     parsed = parse_file(path, hashlib.sha256(payload).hexdigest(), "pdf")
     cells = [
-        element
-        for element in parsed.elements
-        if element.kind is ElementKind.TABLE_CELL
+        element for element in parsed.elements if element.kind is ElementKind.TABLE_CELL
     ]
     pages = {
         element.locator.page_index
         for element in cells
-        if hasattr(element.locator, "page_index")
+        if isinstance(element.locator, PdfLocator)
     }
     names = {str(element.metadata.get("table_name")) for element in cells}
     texts = {element.text for element in cells}
@@ -319,9 +319,7 @@ def test_attach_skips_code_already_inside_a_fence() -> None:
     fenced = f"```\n{listing}\n```"
     payload = AnswerPayload(
         answer_text=fenced,
-        paragraphs=(
-            AnswerParagraph(paragraph_index=0, text=fenced, link_ids=("l1",)),
-        ),
+        paragraphs=(AnswerParagraph(paragraph_index=0, text=fenced, link_ids=("l1",)),),
         atomic_links=(),
     )
     fusion = FusionResult(
@@ -347,11 +345,13 @@ def test_attach_skips_code_already_inside_a_fence() -> None:
     assert released.answer_text == fenced
 
 
-def test_attach_replaces_trailing_prose_when_six_paragraphs_are_full() -> None:
-    """A figure and a pipe table still release after the draft filled six slots."""
+def test_attach_preserves_checked_prose_when_six_paragraphs_are_full() -> None:
+    """Adding native evidence cannot silently evict already checked claims."""
 
     prose = tuple(
-        AnswerParagraph(paragraph_index=index, text=f"Sentence {index}.", link_ids=("l1",))
+        AnswerParagraph(
+            paragraph_index=index, text=f"Sentence {index}.", link_ids=("l1",)
+        )
         for index in range(6)
     )
     table = "| Name | Note |\n| --- | --- |\n| Alpha | First |"
@@ -393,6 +393,6 @@ def test_attach_replaces_trailing_prose_when_six_paragraphs_are_full() -> None:
     released = attach_native_evidence(payload, fusion)
     assert len(released.paragraphs) == 6
     assert released.paragraphs[0].text == "Sentence 0."
-    assert "[[figure:abc123]]" in released.answer_text
-    assert table in released.answer_text
-    assert "Sentence 5." not in released.answer_text
+    assert released.paragraphs == prose
+    assert "Sentence 5." in released.answer_text
+    assert released.status == "partial"

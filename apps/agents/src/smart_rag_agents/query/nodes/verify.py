@@ -10,9 +10,13 @@ from pydantic import ValidationError
 from smart_rag_core.query_admission.ceilings import assert_call_available
 from smart_rag_core.query_admission.exceptions import (
     QueryAdmissionError,
+    QueryBudgetError,
     QueryCeilingError,
 )
-from smart_rag_core.query_admission.service import summarize_run_usage
+from smart_rag_core.query_admission.service import (
+    ReservationConsumeResult,
+    summarize_run_usage,
+)
 from smart_rag_core.query_answer.citations import (
     drop_skipped_citations,
     maybe_persist_verified_citations,
@@ -34,6 +38,10 @@ from smart_rag_core.query_answer.release import (
     company_release_applies,
     render_verified_company_answer,
 )
+from smart_rag_core.query_answer.source_syntax import (
+    SOURCE_CODE_SYNTAX_INVALID,
+    has_source_code_syntax_issue,
+)
 from smart_rag_core.query_answer.verifier import run_verifier_batch
 from smart_rag_core.query_routing.constants import (
     FALLBACK_RETRIEVERS_UNBOUND,
@@ -46,9 +54,17 @@ from smart_rag_core.query_routing.serde import plan_from_state
 from smart_rag_core.web_research.models import WebSourceRecord
 
 from smart_rag_agents.query.deps import QueryGraphDeps
-from smart_rag_agents.query.gateway.verifier import gateway_verifier
+from smart_rag_agents.query.gateway.verifier import (
+    VerifierAttemptError,
+    gateway_verifier,
+)
+from smart_rag_agents.query.nodes.release_safety import (
+    refresh_refusal_usage,
+    refuse_release,
+)
 from smart_rag_agents.query.nodes.shared import (
     route_needs_retrieval,
+    runtime_after_consume,
     runtime_from_state,
     skip_closed_nodes,
 )
@@ -62,69 +78,35 @@ from smart_rag_agents.query.state import QueryGraphState
 
 
 def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
-    """Deterministic citation checks, then at most one six-link verifier call.
-
-    State inputs:
-        ``answer``, ``fusion``, ``table_composition``,
-        ``remaining_model_calls``, ``verifier_call_count``.
-
-    State outputs:
-        ``verification`` (including ``verifier_skipped_reason`` when the
-        verifier call failed), accumulated ``prompt_tokens`` /
-        ``completion_tokens``, and possibly decremented remaining calls.
-
-    Persistence writes:
-        Counted ``verifier`` usage when a connection and gateway are bound.
-        Bound citation persistence failure degrades to
-        ``insufficient_evidence`` and never streams a verified uncited
-        answer. Unbound Studio graphs skip persistence.
-
-    External/model calls:
-        Zero or one small verifier call covering at most six material
-        links. A seventh link is omitted. Never a second verifier call.
-
-    Budget/deadline behavior:
-        Deadline/step exhaustion emits verified partial, not fake success.
-
-    Failure/fallback route:
-        After release rendering, only the named code-definition and named
-        table-block extractive repairs may replace the claims.
-        Unsupported links are removed or refused. A fact whose
-        whitespace-collapsed claim is already in a cited passage stays
-        even when the verifier marks it unsupported. A rejected fact whose
-        quoted literals and identifiers already occur in the cited passage
-        is kept as a verbatim excerpt of that passage. Unsupported chains
-        drop the composed conclusion.
-        Inspection/NoRetrieval stay refused.
-        Missing gateway, omitted verifier links, or a schema-invalid
-        verifier payload never terminate ``verified``. Omitted IDs force
-        ``verified_partial`` and ``verifier_omitted_links``.         Invalid
-        verifier JSON degrades to ``verified_partial`` with the
-        already-generated answer. A verifier timeout or gateway failure
-        degrades to ``verified_partial`` with detail
-        ``verifier_skipped:<reason>`` and still persists citations.
-        Any other unexpected exception releases that generated draft as
-        ``verified_partial`` with ``verifier_skipped:<ExceptionType>``
-        and does not abort the graph. ``CancelledError`` and
-        ``GeneratorExit`` still propagate.
-        A skipped citation whose span is an exact slice of a fused
-        passage keeps its paragraph and is retried with the leading
-        sentence.
-        Leaf-unresolved citations are skipped: some remaining citations
-        become ``verified_partial`` with ``citation_leaf_unresolved``;
-        zero persisted citations stay ``insufficient_evidence``.
-        Company answers without valid paragraph
-        mappings become a citation-free refusal; fusion passages are never
-        backfilled as citations.
+    """Verify and persist the final answer, refusing unexpected checker failures.
 
     Args:
-        state: State after answer generation.
-        deps: Optional gateway and connection.
+        state: Generated answer and canonical evidence under admitted ceilings.
+        deps: Bound gateways, authorization-scoped connection, and prompts.
 
     Returns:
-        Terminal verified state.
+        A checked answer or a citation-free verification-unavailable refusal.
+        Cancellation and generator shutdown propagate to normal cleanup.
     """
+    try:
+        result = _verify_answer(state, deps)
+    except Exception as exc:
+        result = refuse_release(state, type(exc).__name__)
+    if str(result.get("detail") or "").startswith("verification_unavailable:"):
+        return refresh_refusal_usage(result, deps)
+    return result
 
+
+def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
+    """Run deterministic checks, one bounded verifier, and citation persistence.
+
+    Args:
+        state: Generated answer with canonical passages/table results.
+        deps: Optional gateway and scoped connection.
+
+    Returns:
+        Final release state. No checker exception restores the model draft.
+    """
     if skip_closed_nodes(state):
         return state
     raw_answer = state.get("answer")
@@ -139,19 +121,13 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         tables = tables_from_state(state.get("table_composition"))
         payload = AnswerPayload.model_validate(raw_answer)
     except ValidationError:
-        preserved = raw_answer
-        return {
-            **state,
-            "status": "verified_partial",
-            "detail": "payload_schema_invalid",
-            "answer": preserved,
-        }
+        return refuse_release(state, "payload_schema_invalid")
     plan = None
     if state.get("retrieval_plan") is not None:
         try:
             plan = plan_from_state(state["retrieval_plan"])
         except ValueError:
-            plan = None
+            return refuse_release(state, "retrieval_plan_invalid")
     web_records: list[WebSourceRecord] = []
     web_excerpts: dict[str, str] = {}
     for raw_source in state.get("web_sources") or []:
@@ -165,12 +141,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         plan is not None and plan.knowledge_scope is KnowledgeScope.WEB
     )
     if is_web and not web_excerpts:
-        return {
-            **state,
-            "status": "insufficient_evidence",
-            "detail": "web_evidence_insufficient",
-            "answer": payload.model_dump(mode="json"),
-        }
+        return refuse_release(state, "web_evidence_insufficient")
     try:
         prepared = (
             payload
@@ -182,7 +153,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             )
         )
     except (ValidationError, ValueError, AnswerError):
-        prepared = payload
+        return refuse_release(state, "claim_binding_failed")
     try:
         checked, failures = deterministic_check_answer(
             prepared,
@@ -193,15 +164,14 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             require_paragraphs=route_needs_retrieval(plan) and not is_web,
         )
     except (ValidationError, ValueError, AnswerError):
-        checked = prepared
-        failures = ()
+        return refuse_release(state, "deterministic_check_failed")
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
     omitted: tuple[str, ...] = ()
     added_prompt_tokens = 0
     added_completion_tokens = 0
     verifier_skipped_reason: str | None = None
-    release_generated_draft = False
+    release_failure: str | None = None
     pre_verifier = checked
     verifier_started = time.perf_counter()
     verifier_timed = bool(checked.atomic_links) and not is_web
@@ -219,13 +189,28 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     Structured verifier payload.
                 """
 
-                nonlocal added_prompt_tokens, added_completion_tokens
+                nonlocal added_prompt_tokens, added_completion_tokens, verifier_calls
+                context = runtime_from_state(state)
+
+                def on_consumed(consumed: ReservationConsumeResult) -> None:
+                    """Keep later settlement on the consumed reservation version."""
+                    nonlocal state
+                    if context is not None:
+                        state = {
+                            **state,
+                            "authorized_runtime": runtime_after_consume(
+                                context, consumed
+                            ).model_dump(mode="json"),
+                        }
+
+                verifier_calls = 1
                 payload, prompt_tokens, completion_tokens = gateway_verifier(
                     deps,
                     links=links,
                     fusion=fusion,
                     tables=tables.records,
-                    context=runtime_from_state(state),
+                    context=context,
+                    on_consumed=on_consumed,
                 )
                 added_prompt_tokens += prompt_tokens
                 added_completion_tokens += completion_tokens
@@ -250,13 +235,16 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             except (ValidationError, ValueError, AnswerError):
                 # Identifier realignment must not abort verify as run_failed.
                 pass
-        except (AnswerError, QueryCeilingError) as exc:
+        except (AnswerError, QueryCeilingError, QueryBudgetError) as exc:
             reason = getattr(exc, "reason", None) or str(exc) or "verifier_failed"
             verifier_skipped_reason = str(reason)[:64]
+            release_failure = verifier_skipped_reason
+        except VerifierAttemptError as exc:
+            verifier_skipped_reason = exc.reason
+            release_failure = exc.reason
         except Exception as exc:
             verifier_skipped_reason = type(exc).__name__[:64]
-            checked = payload
-            release_generated_draft = True
+            release_failure = verifier_skipped_reason
     verifier_timing = (
         with_verifier_timing(
             state,
@@ -266,7 +254,16 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         if verifier_timed
         else {}
     )
-    if not release_generated_draft and company_release_applies(checked, is_web=is_web):
+    if release_failure is not None:
+        return refuse_release(
+            cast(QueryGraphState, {**state, **verifier_timing}),
+            release_failure,
+            remaining_model_calls=remaining,
+            verifier_call_count=verifier_calls,
+            prompt_tokens=added_prompt_tokens,
+            completion_tokens=added_completion_tokens,
+        )
+    if company_release_applies(checked, is_web=is_web):
         user_query = state["user_query"] or ""
         try:
             checked = company_release_payload(
@@ -275,17 +272,18 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 tables=tables.records,
                 user_query=user_query,
             )
-        except Exception as exc:
-            verifier_skipped_reason = type(exc).__name__[:64]
-            checked = payload
-            release_generated_draft = True
+        except Exception:
+            return refuse_release(
+                cast(QueryGraphState, {**state, **verifier_timing}),
+                "answer_release_failed",
+                remaining_model_calls=remaining,
+                verifier_call_count=verifier_calls,
+                prompt_tokens=added_prompt_tokens,
+                completion_tokens=added_completion_tokens,
+            )
     knowledge_scope = plan.knowledge_scope if plan is not None else None
     terminal = "verified_partial"
-    if release_generated_draft:
-        detail = (
-            f"{VERIFIER_SKIPPED_DETAIL_PREFIX}{verifier_skipped_reason or 'Exception'}"
-        )[:128]
-    elif (
+    if (
         checked.status == "refused"
         and not fusion.evidence
         and not tables.records
@@ -349,9 +347,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
         )
     skipped_citation_count = 0
-    if release_generated_draft:
-        pass
-    elif is_web:
+    if is_web:
         checked = checked.model_copy(
             update={
                 "citations": (),
@@ -372,8 +368,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     answer=checked,
                 )
             except (QueryAdmissionError, psycopg.Error, ValueError):
-                terminal = "insufficient_evidence"
-                detail = "web_evidence_insufficient"
+                return refuse_release(state, "web_citation_persist_failed")
     else:
         try:
             persisted = maybe_persist_verified_citations(
@@ -383,18 +378,15 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 fusion=fusion,
                 answer=checked,
             )
-        except (QueryAdmissionError, psycopg.Error):
-            if deps.connection is not None and context is not None:
-                terminal = "insufficient_evidence"
-                detail = "citation_persist_failed"
-        except Exception as exc:
-            verifier_skipped_reason = type(exc).__name__[:64]
-            checked = payload
-            terminal = "verified_partial"
-            detail = (f"{VERIFIER_SKIPPED_DETAIL_PREFIX}{verifier_skipped_reason}")[
-                :128
-            ]
-            skipped_citation_count = 0
+        except Exception:
+            return refuse_release(
+                cast(QueryGraphState, {**state, **verifier_timing}),
+                "citation_persist_failed",
+                remaining_model_calls=remaining,
+                verifier_call_count=verifier_calls,
+                prompt_tokens=added_prompt_tokens,
+                completion_tokens=added_completion_tokens,
+            )
         else:
             if persisted.skipped:
                 shortened = shorten_contained_skipped_spans(
@@ -420,7 +412,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                         persisted = shortened_persisted
             if persisted.skipped:
                 skipped_citation_count = len(persisted.skipped)
-                if not persisted.ids and fusion.evidence:
+                if fusion.evidence:
                     repaired = repair_leaf_citations(checked, fusion, persisted.skipped)
                     if repaired is not checked:
                         try:
@@ -462,11 +454,19 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                             persisted = retried
                         else:
                             checked = drop_skipped_citations(checked, persisted.skipped)
-                            terminal = "insufficient_evidence"
+                            terminal = (
+                                "verified_partial"
+                                if persisted.ids
+                                else "insufficient_evidence"
+                            )
                             detail = "citation_leaf_unresolved"
                     else:
                         checked = drop_skipped_citations(checked, persisted.skipped)
-                        terminal = "insufficient_evidence"
+                        terminal = (
+                            "verified_partial"
+                            if persisted.ids
+                            else "insufficient_evidence"
+                        )
                         detail = "citation_leaf_unresolved"
                 elif not persisted.ids:
                     checked = drop_skipped_citations(checked, persisted.skipped)
@@ -477,6 +477,14 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     if terminal in {"verified", "verified_partial"}:
                         terminal = "verified_partial"
                         detail = "citation_leaf_unresolved"
+    if (
+        not is_web
+        and terminal in {"verified", "verified_partial"}
+        and has_source_code_syntax_issue(checked, user_query=state["user_query"] or "")
+    ):
+        checked = checked.model_copy(update={"status": "partial"})
+        terminal = "verified_partial"
+        detail = SOURCE_CODE_SYNTAX_INVALID
     verification_dump: dict[str, Any]
     answer_dump: dict[str, Any]
     try:
@@ -495,22 +503,14 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         verification_dump = result.model_dump(mode="json")
         answer_dump = checked.model_dump(mode="json")
     except (ValidationError, ValueError):
-        # Schema-invalid terminal payload must not abort the graph as
-        # ``run_failed`` after a successful salvage/release path.
-        terminal = "verified_partial"
-        detail = "payload_schema_invalid"
-        failure_rows: list[object] = []
-        omitted_ids: list[str] = []
-        verification_dump = {
-            "answer": raw_answer,
-            "deterministic_failures": failure_rows,
-            "verifier_call_count": 0,
-            "omitted_link_ids": omitted_ids,
-            "verifier_skipped_reason": None,
-            "skipped_citation_count": 0,
-            "status": terminal,
-        }
-        answer_dump = checked.model_dump(mode="json")
+        return refuse_release(
+            cast(QueryGraphState, {**state, **verifier_timing}),
+            "payload_schema_invalid",
+            remaining_model_calls=remaining,
+            verifier_call_count=verifier_calls,
+            prompt_tokens=added_prompt_tokens,
+            completion_tokens=added_completion_tokens,
+        )
     return cast(
         QueryGraphState,
         {

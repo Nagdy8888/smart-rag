@@ -9,10 +9,15 @@ from __future__ import annotations
 
 import re
 
+from smart_rag_core.query_answer.figure_placement import place_owned_figures
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
     AnswerPayload,
+)
+from smart_rag_core.query_answer.native_selection import (
+    relevant_native_fusion,
+    requested_artifact_labels,
 )
 from smart_rag_core.query_answer.versions import MAX_ANSWER_CITATIONS
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
@@ -69,7 +74,9 @@ def _listing_in_fence(existing: str, body: str) -> bool:
     return any(body in match.group(1) for match in _FENCE_BODY.finditer(existing))
 
 
-def _native_block(item_kind: str, body: str, figure_id: str | None, existing: str) -> str:
+def _native_block(
+    item_kind: str, body: str, figure_id: str | None, existing: str
+) -> str:
     """Return the display block for one cited native passage.
 
     Args:
@@ -150,7 +157,9 @@ def _content_words(text: str) -> set[str]:
     }
 
 
-def _figure_is_useful(query: str, answer: str, citation_text: str, *, alone: bool) -> bool:
+def _figure_is_useful(
+    query: str, answer: str, citation_text: str, *, alone: bool
+) -> bool:
     """Return whether this figure belongs in the visible answer.
 
     Args:
@@ -164,10 +173,7 @@ def _figure_is_useful(query: str, answer: str, citation_text: str, *, alone: boo
         or when the answer already uses the figure's distinctive words.
     """
 
-    labels = {
-        re.sub(r"\s+", "", label)
-        for label in _FIGURE_LABEL.findall(query)
-    }
+    labels = {re.sub(r"\s+", "", label) for label in _FIGURE_LABEL.findall(query)}
     caption = citation_text.casefold()
     folded_caption = caption.replace(" ", "")
     label_hit = any(label.replace(" ", "") in folded_caption for label in labels)
@@ -204,7 +210,9 @@ def insert_useful_figures(
     figures = [
         item
         for item in fusion.evidence
-        if item.content_kind == "figure" and item.figure_id and item.citation_text.strip()
+        if item.content_kind == "figure"
+        and item.figure_id
+        and item.citation_text.strip()
     ]
     if not figures:
         return payload
@@ -218,7 +226,11 @@ def insert_useful_figures(
         if not _figure_is_useful(query, existing, item.citation_text, alone=alone):
             continue
         caption = " ".join(item.citation_text.split())[:240].strip()
-        text = f"{caption}\n[[figure:{figure_id}]]" if caption else f"[[figure:{figure_id}]]"
+        text = (
+            f"{caption}\n[[figure:{figure_id}]]"
+            if caption
+            else f"[[figure:{figure_id}]]"
+        )
         if len(text) > _MAX_NATIVE_CHARS:
             text = f"[[figure:{figure_id}]]"
         blocks.append(text)
@@ -226,11 +238,19 @@ def insert_useful_figures(
     if not blocks:
         return payload
     kept = list(payload.paragraphs)
-    while len(kept) + len(blocks) > _MAX_PARAGRAPHS and kept:
-        kept.pop()
-    blocks = blocks[: _MAX_PARAGRAPHS - len(kept)]
+    selected: list[str] = []
+    length = len(payload.answer_text)
+    for block in blocks:
+        if len(kept) + len(selected) >= _MAX_PARAGRAPHS:
+            continue
+        if length + len(block) + 2 > 16_384:
+            continue
+        selected.append(block)
+        length += len(block) + 2
+    omitted = len(selected) < len(blocks)
+    blocks = selected
     if not blocks:
-        return payload
+        return payload.model_copy(update={"status": "partial"}) if omitted else payload
     paragraphs = [
         paragraph.model_copy(update={"paragraph_index": index})
         for index, paragraph in enumerate(kept)
@@ -244,25 +264,28 @@ def insert_useful_figures(
     return payload.model_copy(
         update={
             "paragraphs": tuple(paragraphs),
-            "answer_text": answer_text[:16384],
+            "answer_text": answer_text,
+            "status": "partial" if omitted else payload.status,
         }
     )
 
 
 def attach_native_evidence(
-    payload: AnswerPayload, fusion: FusionResult
+    payload: AnswerPayload, fusion: FusionResult, *, user_query: str | None = None
 ) -> AnswerPayload:
     """Append cited code, pipe tables, and figure marks missing from the prose.
 
-    Native blocks take paragraph slots ahead of trailing prose. A full
+    Native blocks use only free slots; checked paragraphs are never evicted. A full
     listing, pipe table, or figure id that is already present is not
     repeated. A body longer than one paragraph is omitted rather than cut.
+    When bounds omit a new block, the answer is explicitly partial.
     Each placed block gains one citation when that chunk is not already
     cited. The span is a prefix of the chunk text, at most 500 characters.
 
     Args:
         payload: Released company answer.
         fusion: Canonical evidence for this run.
+        user_query: Original question for requested/cited artifact selection.
 
     Returns:
         The same payload when nothing native is missing and every placed
@@ -272,6 +295,24 @@ def attach_native_evidence(
 
     if not fusion.evidence or not payload.paragraphs:
         return payload
+    if user_query is not None:
+        if requested_artifact_labels(user_query, "table") and any(
+            link.link_id.startswith("table-block-") for link in payload.atomic_links
+        ):
+            return payload
+        fusion = relevant_native_fusion(payload, fusion, user_query)
+        if any(
+            link.link_id.startswith(("cited-table-", "table-block-"))
+            for link in payload.atomic_links
+        ):
+            fusion = fusion.model_copy(
+                update={
+                    "evidence": tuple(
+                        item for item in fusion.evidence if item.content_kind != "table"
+                    )
+                }
+            )
+    payload = place_owned_figures(payload, fusion)
     placed = _append_missing_native_blocks(payload, fusion)
     return _cite_placed_native_blocks(placed, fusion)
 
@@ -310,11 +351,19 @@ def _append_missing_native_blocks(
     if not blocks:
         return payload
     kept = list(payload.paragraphs)
-    while len(kept) + len(blocks) > _MAX_PARAGRAPHS and kept:
-        kept.pop()
-    blocks = blocks[: _MAX_PARAGRAPHS - len(kept)]
+    selected: list[str] = []
+    length = len(payload.answer_text)
+    for block in blocks:
+        if len(kept) + len(selected) >= _MAX_PARAGRAPHS:
+            continue
+        if length + len(block) + 2 > 16_384:
+            continue
+        selected.append(block)
+        length += len(block) + 2
+    omitted = len(selected) < len(blocks)
+    blocks = selected
     if not blocks:
-        return payload
+        return payload.model_copy(update={"status": "partial"}) if omitted else payload
     paragraphs = [
         paragraph.model_copy(update={"paragraph_index": index})
         for index, paragraph in enumerate(kept)
@@ -341,7 +390,8 @@ def _append_missing_native_blocks(
             "paragraphs": tuple(paragraphs),
             "citations": citations,
             "table_citations": table_citations,
-            "answer_text": answer_text[:16384],
+            "answer_text": answer_text,
+            "status": "partial" if omitted else payload.status,
         }
     )
 
@@ -446,7 +496,9 @@ def _owning_paragraph(
         holds the block.
     """
 
-    needle = item.figure_id if item.content_kind == "figure" else item.citation_text.strip()
+    needle = (
+        item.figure_id if item.content_kind == "figure" else item.citation_text.strip()
+    )
     if not needle:
         return None
     for paragraph in paragraphs:

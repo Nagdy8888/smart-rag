@@ -65,10 +65,10 @@ from tests.support.query_runtime import RefusingHybridRetriever
 def test_answer_and_verifier_prompt_hashes() -> None:
     """Pinned hashes match LF-normalized prompt files."""
 
-    assert ANSWER_PROMPT_VERSION == "answer_v6"
-    assert VERIFIER_PROMPT_VERSION == "verifier_v2"
+    assert ANSWER_PROMPT_VERSION == "answer_v11"
+    assert VERIFIER_PROMPT_VERSION == "verifier_v5"
     assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v1"
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v6.md")
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v11.md")
     assert verifier_prompt_digest("answer_v5.md") == (
         "5a46305ccb915ec1a7a01c9303556453f20dcc30b7219c5d3b5578ca680b24da"
     )
@@ -81,7 +81,7 @@ def test_answer_and_verifier_prompt_hashes() -> None:
     assert verifier_prompt_digest("answer_v1.md") == (
         "696eb47095c2194e70b486b5756906f4e09b6c296a1952c410353c1fd60234f2"
     )
-    assert VERIFIER_PROMPT_SHA256 == verifier_prompt_digest("verifier_v2.md")
+    assert VERIFIER_PROMPT_SHA256 == verifier_prompt_digest("verifier_v5.md")
     assert verifier_prompt_digest("answer_v2.md") == (
         "20d55af652815a9829e477ed9d791d49386923da3c11d5dbdf1faa8081a37765"
     )

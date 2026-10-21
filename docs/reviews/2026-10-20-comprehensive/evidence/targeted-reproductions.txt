@@ -1,0 +1,10 @@
+Original: Alpha runs first. Beta runs second.
+Accepted rewrite: **Alpha**
+Alpha never runs first. Beta runs second.
+Status: complete
+Exact blocks supplied: 7 exact blocks retained: 5
+Unrelated Arabic rewrite accepted: **???????**
+?? ????? ???? ??????? ???????.
+After 1000 dropped runs: inputs= 1000 live= 0
+Actual Arabic Unicode accepted: True status: complete
+Unknown kid requests: 10 JWKS refresh calls: 10 network used: False

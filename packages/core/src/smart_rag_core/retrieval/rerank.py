@@ -79,6 +79,8 @@ _CODE_DEF_ASK = re.compile(
     r"|\b@tool\b"
     r"|\b(?:async\s+)?def\s+[A-Za-z_][\w]*"
     r"|\bfunction\b.{0,40}\b[A-Za-z]+_[A-Za-z0-9_]+"
+    r"|\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b.{0,120}"
+    r"\b(?:function|implementation|definition|snippet|code|python)\b"
 )
 # Capture names after ``def`` / ``@tool def`` only. Bare ``@tool and`` in
 # prose must not become an identifier; snake_case tokens still match below.
@@ -92,8 +94,9 @@ _TABLE_REPRO_ASK = re.compile(
     r"|\btable\b.{0,80}\b(?:markdown|pipe)\b"
     r"|\bMarkdown\s+pipe\s+table\b"
     r"|\bTable\s+\d+-\d+\b"
+    r"|(?:ال)?جدول\s+\d+-\d+"
 )
-_TABLE_CAPTION_FROM_QUERY = re.compile(r"(?i)\bTable\s+(\d+-\d+)\b")
+_TABLE_CAPTION_FROM_QUERY = re.compile(r"(?i)(?:\bTable|(?:ال)?جدول)\s+(\d+-\d+)\b")
 _PASCAL_TYPE_STOP = frozenset({"typeddict", "python", "markdown"})
 # Explicit page cites only (``page 27``, ``pages 10-12``, ``p. 3``). Bare
 # ``this page`` without a number is ignored so content-free asks stay closed.

@@ -1,0 +1,37 @@
+
+> smart-rag-frontend@0.1.0 lint C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend
+> eslint
+
+node.exe : 
+At C:\Users\Nagdy\AppData\Local\fnm_multishells\32820_1792449779574\pnpm.ps1:16 char:5
++     & "$basedir/node$exe"  "$basedir/node_modules/corepack/dist/pnpm. ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Oops! Something went wrong! :(
+
+ESLint: 9.39.5
+
+Error: ENOENT: no such file or directory, scandir 
+'C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend\test-results'
+    at async Object.readdir (node:internal/fs/promises:950:18)
+    at async NodeHfsImpl.list (file:///C:/Nagdy/Mustafa/Work/Upwork/Demo_Project_3/node_modules/.pnpm/@humanfs+node@0.1
+6.8/node_modules/@humanfs/node/src/node-hfs.js:304:19)
+    at async NodeHfs.<anonymous> (file:///C:/Nagdy/Mustafa/Work/Upwork/Demo_Project_3/node_modules/.pnpm/@humanfs+core@
+0.19.2/node_modules/@humanfs/core/src/hfs.js:560:21)
+    at async NodeHfs.<anonymous> (file:///C:/Nagdy/Mustafa/Work/Upwork/Demo_Project_3/node_modules/.pnpm/@humanfs+core@
+0.19.2/node_modules/@humanfs/core/src/hfs.js:604:6)
+    at async NodeHfs.walk (file:///C:/Nagdy/Mustafa/Work/Upwork/Demo_Project_3/node_modules/.pnpm/@humanfs+core@0.19.2/
+node_modules/@humanfs/core/src/hfs.js:614:3)
+    at async globSearch (C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\node_modules\.pnpm\eslint@9.39.5_jiti@2.7.0\node_m
+odules\eslint\lib\eslint\eslint-helpers.js:364:20)
+    at async Promise.allSettled (index 0)
+    at async globMultiSearch (C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\node_modules\.pnpm\eslint@9.39.5_jiti@2.7.0\n
+ode_modules\eslint\lib\eslint\eslint-helpers.js:455:18)
+    at async Promise.all (index 0)
+    at async findFiles (C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\node_modules\.pnpm\eslint@9.39.5_jiti@2.7.0\node_mo
+dules\eslint\lib\eslint\eslint-helpers.js:635:25)
+C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  smart-rag-frontend@0.1.0 lint: `eslint`
+Exit status 2

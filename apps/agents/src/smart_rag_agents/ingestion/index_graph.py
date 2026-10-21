@@ -577,7 +577,9 @@ def index_hybrid_content(
     if (
         source_bytes
         and governed_parse.format == "pdf"
-        and any(element.kind is ElementKind.FIGURE for element in governed_parse.elements)
+        and any(
+            element.kind is ElementKind.FIGURE for element in governed_parse.elements
+        )
     ):
         governed_parse, figure_assets = materialize_pdf_figures(
             governed_parse,

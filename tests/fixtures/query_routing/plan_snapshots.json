@@ -2597,51 +2597,75 @@
     },
     "query": "What is the status of INV-SR-1001?"
   },
-  "media_scoped_refusal": {
+  "media_caption_retrieval": {
     "plan": {
-      "branch_concurrency": 2,
+      "requested_route": "composite",
+      "effective_route": "hybrid",
+      "corrected_route": null,
       "branches": [
         {
-          "branch_id": "media-0",
-          "family": "scoped_refusal",
-          "graph_as_evidence": false,
-          "hl_keywords": [],
-          "inherit_reservation": true,
-          "inherit_run_id": true,
-          "kind": "scoped_refusal",
-          "ll_keywords": [],
-          "max_graph_expansions": 3,
-          "parallel_group": 0,
+          "branch_id": "hyb-0",
+          "kind": "hybrid",
+          "family": "hybrid",
           "query_text": "Describe the unlabeled chart in the figure",
+          "parallel_group": 0,
+          "hl_keywords": [
+            "factual"
+          ],
+          "ll_keywords": [
+            "Describe"
+          ],
+          "table_plan": null,
           "reuse_hybrid_ranked_ids": [],
-          "table_plan": null
+          "graph_as_evidence": false,
+          "max_graph_expansions": 3,
+          "inherit_run_id": true,
+          "inherit_reservation": true,
+          "bypass_retrieval_cache": false
+        },
+        {
+          "branch_id": "cite-0",
+          "kind": "citation_lookup",
+          "family": "hybrid",
+          "query_text": "Describe the unlabeled chart in the figure",
+          "parallel_group": 1,
+          "hl_keywords": [
+            "factual"
+          ],
+          "ll_keywords": [
+            "Describe"
+          ],
+          "table_plan": null,
+          "reuse_hybrid_ranked_ids": [],
+          "graph_as_evidence": false,
+          "max_graph_expansions": 3,
+          "inherit_run_id": true,
+          "inherit_reservation": true,
+          "bypass_retrieval_cache": false
         }
       ],
-      "catalog_llm_call_count": 0,
-      "company_claim_forbidden": false,
-      "corrected_route": null,
-      "coverage_threshold": 0.65,
-      "effective_route": "scoped_refusal",
-      "fallback_reason": null,
-      "graph_as_answer_forbidden": false,
+      "limitations": [],
       "historical_relationship": false,
-      "hybrid_prose_composition": false,
-      "knowledge_scope": "company_documents",
-      "limitations": [
-        "media_limitation"
-      ],
-      "manual_mode": false,
-      "max_subquestions": 3,
-      "media_answer_forbidden": true,
-      "no_retrieval_answer_mode": null,
-      "prove_complement": false,
-      "relationship_signal_retained": false,
-      "requested_route": "composite",
-      "routing_surface": "production",
-      "scope_degradation_reason": null,
-      "section_coverage_required": 1.0,
       "temporal_graph_limitation": false,
-      "whole_document_summary": false
+      "whole_document_summary": false,
+      "section_coverage_required": 1.0,
+      "coverage_threshold": 0.65,
+      "company_claim_forbidden": false,
+      "graph_as_answer_forbidden": false,
+      "prove_complement": false,
+      "media_answer_forbidden": false,
+      "manual_mode": false,
+      "routing_surface": "production",
+      "hybrid_prose_composition": false,
+      "relationship_signal_retained": false,
+      "fallback_reason": null,
+      "branch_concurrency": 2,
+      "max_subquestions": 3,
+      "catalog_llm_call_count": 0,
+      "knowledge_scope": "company_documents",
+      "no_retrieval_answer_mode": null,
+      "scope_degradation_reason": null,
+      "requested_search_scope": "auto"
     },
     "preparation": {
       "approved_aliases": [],

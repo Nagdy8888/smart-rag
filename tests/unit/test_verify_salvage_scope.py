@@ -17,7 +17,9 @@ def test_verify_salvage_loop_names_are_general() -> None:
     assert names == {
         "salvage_named_code_definition",
         "salvage_named_table_block",
+        "salvage_named_figure",
         "salvage_anchor_claim_fill",
+        "salvage_question_coverage",
     }
 
 

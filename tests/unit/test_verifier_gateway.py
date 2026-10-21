@@ -219,11 +219,15 @@ def test_verifier_json_schema_bounds_reason() -> None:
     schema = verifier_json_schema(("l1",))
     properties = _object_map(schema["properties"])
     verdicts = _object_map(properties["link_verdicts"])
-    items = _object_map(verdicts["items"])
+    keyed = _object_map(verdicts["properties"])
+    items = _object_map(keyed["l1"])
     item_properties = _object_map(items["properties"])
     reason = _object_map(item_properties["reason"])
-    assert reason["minLength"] == 1
-    assert reason["maxLength"] == 128
+    codes = cast(list[object], reason["enum"])
+    assert isinstance(codes, list)
+    assert codes and all(
+        isinstance(code, str) and 1 <= len(code) <= 128 for code in codes
+    )
 
 
 def test_gateway_verifier_keeps_truncated_reason() -> None:
@@ -252,8 +256,8 @@ def test_gateway_verifier_keeps_truncated_reason() -> None:
     assert completion_tokens == 2
 
 
-def test_verify_answer_node_invalid_verifier_is_partial() -> None:
-    """Schema-invalid verifier JSON must not emit a generic Ask run failure."""
+def test_verify_answer_node_invalid_verifier_refuses() -> None:
+    """Schema-invalid verifier JSON refuses instead of releasing the draft."""
 
     verified = verify_answer_node(
         _answered_state(),
@@ -262,17 +266,19 @@ def test_verify_answer_node_invalid_verifier_is_partial() -> None:
             verifier_prompt_text=verifier_prompt_text(),
         ),
     )
-    assert verified["status"] == "verified_partial"
-    assert verified["detail"] == "verifier_skipped:verifier_schema_invalid"
+    assert verified["status"] == "refused"
+    assert verified["detail"] == "verification_unavailable:verifier_schema_invalid"
     verification = verified["verification"]
     assert isinstance(verification, dict)
     assert verification["verifier_skipped_reason"] == "verifier_schema_invalid"
     answer = AnswerPayload.model_validate(verified["answer"])
-    assert answer.answer_text == "The refund period is 30 days."
+    assert answer.status == "refused"
+    assert "refund period is 30 days" not in answer.answer_text.lower()
+    assert not answer.citations
 
 
-def test_verify_answer_node_invalid_answer_payload_is_partial() -> None:
-    """A stored answer that fails extra=forbid still closes as partial."""
+def test_verify_answer_node_invalid_answer_payload_refuses() -> None:
+    """An invalid answer cannot fall back to unvalidated original text."""
 
     state = pending_query_state(user_query="What is the refund period?")
     state["status"] = "answered"
@@ -280,8 +286,9 @@ def test_verify_answer_node_invalid_answer_payload_is_partial() -> None:
     state["fusion"] = _fusion().model_dump(mode="json")
     state["answer"] = {"answer_text": "kept", "unexpected": True}
     verified = verify_answer_node(state, QueryGraphDeps())
-    assert verified["status"] == "verified_partial"
-    assert verified["detail"] == "payload_schema_invalid"
+    assert verified["status"] == "refused"
+    assert verified["detail"] == "verification_unavailable:payload_schema_invalid"
     answer = verified["answer"]
     assert isinstance(answer, dict)
-    assert answer["answer_text"] == "kept"
+    assert answer["answer_text"] != "kept"
+    assert answer["status"] == "refused"

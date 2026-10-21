@@ -38,6 +38,7 @@ def execute_counted_model_call(
     actual_cost_usd: Decimal | None = None,
     usage_from_result: Callable[[T], tuple[int | None, int | None, Decimal | None]]
     | None = None,
+    on_consumed: Callable[[ReservationConsumeResult], None] | None = None,
 ) -> tuple[T, ReservationConsumeResult, UUID]:
     """Consume the run-local reservation, invoke one provider attempt, record usage.
 
@@ -64,6 +65,8 @@ def execute_counted_model_call(
             ``send``. Non-null extracted values override the ``actual_*``
             arguments. Timeout-after-send still records the conservative
             cap and does not call this extractor.
+        on_consumed: Receive the new reservation version before provider work,
+            including attempts whose output cannot be parsed.
 
     Returns:
         Provider result, consume snapshot, and ``llm_usage.id``.
@@ -90,6 +93,8 @@ def execute_counted_model_call(
         prompt_tokens=prompt_cap,
         completion_tokens=completion_cap,
     )
+    if on_consumed is not None:
+        on_consumed(consumed)
     try:
         result = send()
     except TimeoutAfterSendError:

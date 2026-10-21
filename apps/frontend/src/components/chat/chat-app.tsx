@@ -34,14 +34,13 @@ import { useChatSelection } from "./hooks/use-chat-selection";
 import { useConversationActions, ConversationDeleteDialog } from "./hooks/use-conversation-actions";
 import { useConversationScroll } from "./hooks/use-conversation-scroll";
 import { toSaveToQuizSheetProps, useQuizCapture } from "./hooks/use-quiz-capture";
-import { useVerifiedAnswerReveal } from "./hooks/use-verified-answer-reveal";
+import { useChatPresentation } from "./hooks/use-chat-presentation";
 import chatStyles from "./chat.module.css";
 
 export { CitationDrawer } from "./citation-drawer";
 
 /**
  * Ask: sessions, composer, transcript, diagnostics, feedback.
- *
  * @returns Chat surface. Fetch and SSE live in extracted hooks.
  */
 export function ChatApp() {
@@ -76,31 +75,8 @@ export function ChatApp() {
     sourcesOpen: selection.sourcesOpen,
     selectedCitationId: selection.selectedCitationId,
   });
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [compactAsk, setCompactAsk] = useState(false);
-  const presentationKey = `${selection.conversationId ?? "none"}:${run.chat.runId ?? "none"}`;
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const compact = window.matchMedia("(max-width: 1279px)");
-    const sync = (): void => {
-      setReducedMotion(motion.matches);
-      setCompactAsk(compact.matches);
-    };
-    sync();
-    motion.addEventListener("change", sync);
-    compact.addEventListener("change", sync);
-    return () => {
-      motion.removeEventListener("change", sync);
-      compact.removeEventListener("change", sync);
-    };
-  }, []);
-  const reveal = useVerifiedAnswerReveal({
-    presentationKey,
-    authoritativeText: run.chat.answerText,
-    animate: run.liveRunCreated,
-    reducedMotion,
-  });
+  const { compactAsk, presentationKey, reveal } =
+    useChatPresentation(selection.conversationId, run.chat, run.liveRunCreated);
   const resetRun = run.resetRun;
   const resetSession = useCallback(() => resetRun("conversation-switch"), [resetRun]);
   const [loadingEarlier, setLoadingEarlier] = useState(false);

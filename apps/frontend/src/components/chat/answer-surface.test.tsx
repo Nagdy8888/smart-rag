@@ -711,6 +711,11 @@ describe("AnswerSurface paragraph citations", () => {
 });
 
 describe("answerTerminalNote", () => {
+  it("does not describe a refused answer as verified tokens", () => {
+    expect(answerTerminalNote("partial", "Please try again.", "refused")).toBe(
+      "An answer could not be verified.",
+    );
+  });
   it("explains an empty deadline partial instead of kept-token copy", () => {
     expect(answerTerminalNote("partial", "", "deadline_exhausted")).toBe(
       EMPTY_DEADLINE_PARTIAL_COPY,

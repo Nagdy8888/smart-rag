@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import base64
 
-from openai import APIStatusError, APITimeoutError, AuthenticationError, OpenAI
+from openai import APIStatusError, APITimeoutError, AuthenticationError
 
 from smart_rag_core.ingestion.figures.limits import (
     FIGURE_DESCRIPTION_MAX_CHARS,
     FIGURE_MAX_PNG_BYTES,
 )
 from smart_rag_core.models.env_pins import ALLOWED_ANSWER_MODEL_IDS
+from smart_rag_core.observability.figure_tracing import figure_responses_traceable
+from smart_rag_core.observability.langsmith_tracing import traced_openai_client
 
 FIGURE_PROMPT = (
     "Describe only what is visible in this figure. Do not invent labels, "
@@ -33,6 +35,7 @@ class FigureDescriptionError(RuntimeError):
         self.reason = reason
 
 
+@figure_responses_traceable
 def execute_figure_description(
     *,
     api_key: str,
@@ -63,7 +66,9 @@ def execute_figure_description(
     if timeout_seconds <= 0 or not image_png or len(image_png) > FIGURE_MAX_PNG_BYTES:
         raise FigureDescriptionError("figure_budget_denied")
     encoded = base64.standard_b64encode(image_png).decode("ascii")
-    client = OpenAI(api_key=api_key, max_retries=0, timeout=timeout_seconds)
+    client = traced_openai_client(
+        api_key=api_key, max_retries=0, timeout=timeout_seconds, trace_payload=False
+    )
     try:
         response = client.responses.create(
             model=model_id,

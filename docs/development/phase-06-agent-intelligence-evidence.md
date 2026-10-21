@@ -128,3 +128,20 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | Cleanup packet 9 — Tests, docs, and dead-code closure (2026-08-26) | [phase-06/cleanup-packet-9-tests-docs-dead-code-2026-08-26.md](./phase-06/cleanup-packet-9-tests-docs-dead-code-2026-08-26.md) | 52 |
 | Cleanup final-gates — Architecture, work counts, and repository gates (2026-08-26) | [phase-06/cleanup-final-gates-2026-08-26.md](./phase-06/cleanup-final-gates-2026-08-26.md) | 88 |
 | Overlay PDF Hybrid P13/P15/P16 (2026-09-09, blocked live gates) | [phase-06/overlay-pdf-hybrid-packets.md](./phase-06/overlay-pdf-hybrid-packets.md) | 86 |
+
+## Agent release integrity follow-up (20 October 2026)
+
+The user approved the review's agent remediation and a fixed test set. Local
+implementation and evidence are in the
+[agent fix handoff](../reviews/2026-10-20-comprehensive/12-agent-fix-results.md),
+with the [release decision](../adr/ADR-agent-release-integrity.md) and
+[test specification](../evaluation/AGENT_RELEASE_TESTSET.md).
+This records local evidence only; live corpus evaluation is unavailable and
+existing repository blockers remain. It does not close Phase 6 or change prior
+phase checkboxes.
+
+The user subsequently requested actual app questions with terminal progress.
+The [live user-flow follow-up](../reviews/2026-10-20-comprehensive/13-live-user-flow-results.md)
+records 25 valid authenticated live-provider runs, the four excluded encoding
+attempts, text/history parity, and observed quality failures. No accuracy
+promotion or phase completion is claimed.

@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import re
 
+from smart_rag_core.query_answer.code_continuation import restore_code_continuation
+from smart_rag_core.query_answer.code_selection import (
+    CODE_SECTION_BREAK,
+    NEXT_CODE_DEF,
+    best_code_definition_match,
+)
 from smart_rag_core.query_answer.generate_literals import (
     claim_text_corpus,
     is_empty_refusal,
@@ -15,9 +21,12 @@ from smart_rag_core.query_answer.models import (
     AnswerPayload,
     AtomicLink,
 )
+from smart_rag_core.query_answer.native_selection import relevant_native_fusion
+from smart_rag_core.query_answer.table_copy import copy_pipe_table
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_CITATION_SPAN_CHARS,
+    MAX_CLAIM_CHARS,
 )
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.retrieval.rerank import (
@@ -64,19 +73,13 @@ _STOP_LITERALS = frozenset(
     }
 )
 
-_NEXT_CODE_DEF = re.compile(
-    r"(?<![A-Za-z0-9_])(?:@tool\b|(?:async\s+)?def\s+\w+|class\s+\w+)"
-)
-
-_CODE_SECTION_BREAK = re.compile(r"#\s*--\s*\d+")
-
-_LLM_ASSIGN_LOOKBACK = re.compile(r"(?i)(?:llm\s*=\s*)?ChatOpenAI\s*\([^)]*\)\s*")
 
 _TABLE_CAPTION_ANY = re.compile(r"(?i)Table\s+(\d+)-(\d+)")
 
 _CHAPTER_FOOTER = re.compile(
     r"(?m)(?:^|\n)\s*\d+\s*\|\s*Chapter\s+\d+",
 )
+_RUNNING_FOOTER = re.compile(r"(?m)^[A-Z][A-Za-z -]{3,}\s+\|\s+\d+[ \t]*$")
 
 _TABLE_PROSE_INTRO = re.compile(
     r"(?i)\b(?:a small selection|are shown along|at a glance|you can adapt|"
@@ -100,6 +103,11 @@ def _table_body_score(text: str, captions: tuple[str, ...]) -> int:
     if not text:
         return -100
     score = 0
+    pipe_rows = re.findall(r"(?m)^\s*\|[^\n]+\|\s*$", text)
+    if len(pipe_rows) >= 3:
+        # A caption and a caption-plus-real-rows passage can otherwise tie.
+        # Prefer actual table evidence, not prose that only names the table.
+        score += 40 + min(12, len(pipe_rows) - 2)
     lowered = text.casefold()
     titled = False
     for caption in captions:
@@ -137,62 +145,6 @@ def _table_body_score(text: str, captions: tuple[str, ...]) -> int:
     if alpha > 0 and len(digits) >= 4 and len(digits) / max(1, alpha / 40) > 0.8:
         score += 6
     return score
-
-
-def _best_code_definition_match(
-    fusion: FusionResult,
-    pattern: re.Pattern[str],
-    *,
-    user_query: str | None = None,
-) -> tuple[ScoredPassage, re.Match[str], str] | None:
-    """Return the best definition hit and its extractable block.
-
-    Prefers an earlier ``def`` offset in the passage (primary definition
-    over a reprint), then ``YOUR_*`` placeholders, better hybrid rank,
-    and longer bodies.
-
-    Args:
-        fusion: Fitted canonical evidence.
-        pattern: Compiled ``def`` / ``@tool def`` pattern.
-        user_query: Original user text for overlap ranking. Untrusted.
-
-    Returns:
-        Passage, match, and exact block, or ``None``.
-    """
-
-    ranked: list[tuple[int, int, int, int, ScoredPassage, re.Match[str], str]] = []
-    for item in fusion.evidence:
-        text = item.citation_text or ""
-        match = pattern.search(text)
-        if match is None:
-            continue
-        span = _extract_code_definition_block(text, match)
-        if not span:
-            continue
-        ranked.append(
-            (
-                match.start(),
-                1 if "YOUR_" in span else 0,
-                item.hybrid_rank or 10_000,
-                len(span),
-                item,
-                match,
-                span,
-            )
-        )
-    if not ranked:
-        return None
-    ranked.sort(
-        key=lambda row: (
-            row[0],
-            -row[1],
-            row[2],
-            -row[3],
-            row[4].chunk_id,
-        )
-    )
-    _offset, _your, _rank, _length, item, match, span = ranked[0]
-    return item, match, span
 
 
 def _extract_table_block(text: str, match: re.Match[str]) -> str:
@@ -290,7 +242,7 @@ def replace_with_extractive_block(
     """
 
     # Citation span must remain an exact evidence substring.
-    exact = span.strip()[:MAX_CITATION_SPAN_CHARS]
+    exact = span.strip()[: MAX_CLAIM_CHARS - 20]
     if not exact:
         return payload
     # Keep newlines for table/code readability, but never emit the
@@ -300,6 +252,9 @@ def replace_with_extractive_block(
         "\n",
         exact.replace("\r\n", "\n").replace("\r", "\n"),
     ).strip()
+    if link_id == "code-def-1":
+        display = _RUNNING_FOOTER.sub("", display)
+        display = re.sub(r"\n{2,}", "\n", display).strip()
     if not display:
         return payload
     paragraph = AnswerParagraph(
@@ -307,11 +262,14 @@ def replace_with_extractive_block(
         text=display[:4000],
         link_ids=(link_id,),
     )
-    citation = AnswerCitation(
-        chunk_id=chunk_id,
-        span=exact,
-        atomic_link_id=link_id,
-        paragraph_index=0,
+    citations = tuple(
+        AnswerCitation(
+            chunk_id=chunk_id,
+            span=exact[offset : offset + MAX_CITATION_SPAN_CHARS],
+            atomic_link_id=link_id,
+            paragraph_index=0,
+        )
+        for offset in range(0, len(exact), MAX_CITATION_SPAN_CHARS)
     )
     link = AtomicLink(
         link_id=link_id,
@@ -324,10 +282,10 @@ def replace_with_extractive_block(
         update={
             "answer_text": display[:8000],
             "paragraphs": (paragraph,),
-            "citations": (citation,),
+            "citations": citations,
             "atomic_links": (link,),
             "composed_conclusion": None,
-            "status": "complete",
+            "status": "partial" if len(span.strip()) > len(exact) else "complete",
             "refused_links": (),
         }
     )
@@ -431,6 +389,15 @@ def salvage_named_table_block(
     if gold is None:
         return payload
     item, match = gold
+    copied = copy_pipe_table(payload, item, caption=captions[0])
+    if copied is not None:
+        return copied
+    selected = relevant_native_fusion(payload, fusion, user_query)
+    for native in selected.evidence:
+        if native.content_kind == "table":
+            copied = copy_pipe_table(payload, native, caption="")
+            if copied is not None:
+                return copied
     span = _extract_table_block(item.citation_text, match)
     if not span:
         return payload
@@ -470,7 +437,10 @@ def salvage_named_code_definition(
     pattern = code_definition_gold_pattern(named_code_definition_ids(user_query))
     if pattern is None:
         return payload
-    gold = _best_code_definition_match(fusion, pattern, user_query=user_query)
+    continuation = restore_code_continuation(payload, fusion, pattern)
+    if continuation is not None:
+        return continuation
+    gold = best_code_definition_match(fusion, pattern, user_query=user_query)
     if gold is None:
         return payload
     item, _match, span = gold
@@ -545,6 +515,14 @@ def extractive_block_already_released(
     compact = re.sub(r"\s+", " ", span).casefold().strip()
     if not compact:
         return True
+    if re.search(r"(?m)^(?:async\s+)?def\s+", span):
+        # Compare the whole implementation: changed tail literals can share
+        # both short anchors. Only known footer/blank-line layout is removed.
+        expected_display = re.sub(
+            r"\n{2,}", "\n", _RUNNING_FOOTER.sub("", span)
+        ).strip()
+        if expected_display not in claim_text_corpus(payload):
+            return False
     if len(compact) <= 80:
         covered = compact in corpus
     else:
@@ -570,62 +548,11 @@ def extractive_block_already_released(
     # Code bodies: a matching def that still trails sibling defs / section
     # markers must be re-salvaged so the UI does not show neighbor junk.
     payload_text = claim_text_corpus(payload)
-    if _CODE_SECTION_BREAK.search(payload_text) and not _CODE_SECTION_BREAK.search(
-        span
-    ):
+    if CODE_SECTION_BREAK.search(payload_text) and not CODE_SECTION_BREAK.search(span):
         return False
-    if _NEXT_CODE_DEF.search(payload_text):
-        gold_defs = list(_NEXT_CODE_DEF.finditer(span))
-        payload_defs = list(_NEXT_CODE_DEF.finditer(payload_text))
+    if NEXT_CODE_DEF.search(payload_text):
+        gold_defs = list(NEXT_CODE_DEF.finditer(span))
+        payload_defs = list(NEXT_CODE_DEF.finditer(payload_text))
         if len(payload_defs) > max(1, len(gold_defs)):
             return False
     return True
-
-
-def _extract_code_definition_block(text: str, match: re.Match[str]) -> str:
-    """Copy a bounded ``def`` / ``@tool`` block from ``text``.
-
-    Continues through blank lines inside the body so docstring-separated
-    assignments (for example ``YOUR_*`` placeholders) stay in the span.
-    Stops before a sibling ``def`` / ``@tool`` / ``class`` even when OCR
-    flattened the page onto one line, and before book section markers
-    like ``# -- 2)``. When the definition is ``call_model``, includes a
-    preceding ``ChatOpenAI(...)`` assignment in the lookback window.
-    ``replace_with_extractive_block`` collapses blank lines for the
-    paragraph contract while keeping this exact span for citations.
-
-    Args:
-        text: Passage citation text.
-        match: Match for the definition line inside ``text``.
-
-    Returns:
-        Exact substring of ``text``, capped at ``MAX_CITATION_SPAN_CHARS``.
-    """
-
-    start = match.start()
-    lookback = text[max(0, start - 40) : start]
-    tool_at = lookback.rfind("@tool")
-    if tool_at >= 0:
-        start = max(0, start - 40) + tool_at
-    # Include preceding ChatOpenAI assignment for call_model nodes.
-    if re.search(r"(?i)def\s+call_model\s*\(", match.group(0)):
-        prefix = text[max(0, start - 220) : start]
-        llm = None
-        for candidate in _LLM_ASSIGN_LOOKBACK.finditer(prefix):
-            llm = candidate
-        if llm is not None:
-            start = max(0, start - 220) + llm.start()
-    rest = text[match.end() :]
-    end = match.end() + len(rest)
-    next_def = _NEXT_CODE_DEF.search(rest)
-    if next_def is not None:
-        end = min(end, match.end() + next_def.start())
-    section = _CODE_SECTION_BREAK.search(rest)
-    if section is not None:
-        end = min(end, match.end() + section.start())
-    block = text[start:end].strip()
-    if not block or block not in text:
-        block = match.group(0).strip()
-    if not block or block not in text:
-        return ""
-    return block[:MAX_CITATION_SPAN_CHARS]

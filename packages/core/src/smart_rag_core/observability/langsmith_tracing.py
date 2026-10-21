@@ -220,6 +220,7 @@ def traced_openai_client(
     api_key: str,
     max_retries: int = 0,
     timeout: float | None = None,
+    trace_payload: bool = True,
 ) -> OpenAI:
     """Construct the only production OpenAI client.
 
@@ -227,6 +228,7 @@ def traced_openai_client(
         api_key: Provider credential. Never logged.
         max_retries: SDK retry count. Production rerank uses ``0``.
         timeout: Client timeout in seconds.
+        trace_payload: False for image calls with a dedicated metadata-only span.
 
     Returns:
         An ``OpenAI`` client. When tracing is enabled the client is wrapped
@@ -239,7 +241,7 @@ def traced_openai_client(
     """
 
     client = OpenAI(api_key=api_key, max_retries=max_retries, timeout=timeout)
-    if not tracing_is_enabled():
+    if not trace_payload or not tracing_is_enabled():
         return client
     from langsmith.wrappers import wrap_openai
 

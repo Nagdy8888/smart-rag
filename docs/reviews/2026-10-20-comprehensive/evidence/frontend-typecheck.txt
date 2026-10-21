@@ -1,0 +1,4 @@
+
+> smart-rag-frontend@0.1.0 typecheck C:\Nagdy\Mustafa\Work\Upwork\Demo_Project_3\apps\frontend
+> tsc --noEmit
+

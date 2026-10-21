@@ -52,6 +52,8 @@ def main() -> int:
         "/runs/{run_id}/cancel",
         "/runs/{run_id}/citations",
         "/runs/{run_id}/citations/{citation_id}",
+        "/runs/{run_id}/citations/{citation_id}/page",
+        "/figures/{figure_key}",
         "/runs/{run_id}/events",
         "/runs/{run_id}/feedback",
         "/ingestion/crawls",
@@ -97,7 +99,7 @@ def main() -> int:
     if current != rendered:
         SNAPSHOT.write_text(rendered, encoding="utf-8")
         print(
-            "openapi.foundation.json drifted; snapshot updated — re-run and commit",
+            "openapi.foundation.json drifted; snapshot updated â€” re-run and commit",
             file=sys.stderr,
         )
         return 1

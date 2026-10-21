@@ -18,6 +18,7 @@ from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.query_admission.usage import execute_counted_model_call
 from smart_rag_core.query_answer.exceptions import AnswerError
 
+from smart_rag_agents.query.nodes.shared import runtime_after_consume
 from smart_rag_agents.query.run_timings import (
     classify_attempt_outcome,
     with_answer_attempt,
@@ -33,6 +34,15 @@ ANSWER_RETRY_MIN_REMAINING_SECONDS = 8.0
 _RETRYABLE = frozenset({"answer_timeout", "answer_provider_error", "gateway_failed"})
 
 T = TypeVar("T")
+
+
+class _CountedAnswerFailure(TimeoutAfterSendError):
+    """Invalid received provider output still represents a charged attempt."""
+
+    def __init__(self, reason: str) -> None:
+        """Preserve a stable error code without raw provider output."""
+        super().__init__(reason)
+        self.reason = reason
 
 
 def run_answer_attempts(
@@ -81,6 +91,30 @@ def run_answer_attempts(
     """
 
     remaining = remaining_model_calls
+
+    def consumed_snapshot(consumed: ReservationConsumeResult) -> None:
+        """Keep retry and fallback verification on the consumed version."""
+        nonlocal expected_version
+        expected_version = consumed.optimistic_version
+        if context is not None:
+            state["authorized_runtime"] = runtime_after_consume(
+                context, consumed
+            ).model_dump(mode="json")
+        state["remaining_model_calls"] = remaining
+
+    def counted_send() -> T:
+        """Charge received-but-invalid answers conservatively without retrying."""
+        try:
+            return send()
+        except AnswerError as exc:
+            if exc.reason in {
+                "answer_incomplete",
+                "answer_schema_invalid",
+                "answer_unknown_usage",
+            }:
+                raise _CountedAnswerFailure(exc.reason) from exc
+            raise
+
     last: BaseException | None = None
     for index in range(2):
         if index:
@@ -101,12 +135,20 @@ def run_answer_attempts(
                 usage_kind="answer",
                 model_id=model_id,
                 provider_attempt_id=str(uuid4()),
-                send=send,
+                send=counted_send,
                 usage_from_result=usage_from_result,  # type: ignore[arg-type]
+                on_consumed=consumed_snapshot,
             )
         except TimeoutAfterSendError as exc:
-            _record(state, started, "timeout_after_send", "timeout_after_send")
+            reason = (
+                exc.reason
+                if isinstance(exc, _CountedAnswerFailure)
+                else "timeout_after_send"
+            )
+            _record(state, started, "timeout_after_send", reason)
             last = exc
+            if isinstance(exc, _CountedAnswerFailure):
+                break
             continue
         except AnswerError as exc:
             outcome = classify_attempt_outcome(exc.reason)

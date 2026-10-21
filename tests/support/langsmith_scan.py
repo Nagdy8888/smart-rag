@@ -20,6 +20,7 @@ ALLOWED_OPENAI_CTOR = {
 }
 
 ALLOWED_RESPONSES_CREATE = {
+    Path("packages/core/src/smart_rag_core/gateways/openai_figure.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_rerank.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_answer.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_lightrag.py"),

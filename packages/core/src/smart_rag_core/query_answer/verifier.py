@@ -147,6 +147,10 @@ def run_verifier_batch(
     verdicts = caller(selected)
     if len(verdicts.link_verdicts) > MAX_VERIFIER_LINKS:
         raise AnswerError("verifier_batch_cap")
+    selected_ids = {link.link_id for link in selected}
+    verdict_ids = [verdict.link_id for verdict in verdicts.link_verdicts]
+    if len(verdict_ids) != len(set(verdict_ids)) or set(verdict_ids) != selected_ids:
+        raise AnswerError("verifier_verdict_mismatch")
     updated = apply_verifier_payload(payload, verdicts, fusion=fusion)
     if updated.paragraphs:
         updated = drop_unsupported_paragraphs(updated, frozenset(omitted))

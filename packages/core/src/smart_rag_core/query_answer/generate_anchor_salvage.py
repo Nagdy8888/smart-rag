@@ -24,6 +24,7 @@ from smart_rag_core.query_answer.models import (
     AnswerPayload,
     AtomicLink,
 )
+from smart_rag_core.query_answer.native_selection import requested_artifact_labels
 from smart_rag_core.query_answer.paragraphs import (
     with_derived_answer_text,
 )
@@ -68,9 +69,15 @@ def salvage_anchor_claim_fill(
 
     if any(link.link_id == _TABLE_BLOCK_LINK_ID for link in payload.atomic_links):
         return payload
+    if requested_artifact_labels(user_query, "figure") and not named_page_numbers(
+        user_query
+    ):
+        return payload
     opened = fill_cited_page_opening(payload, fusion, user_query=user_query)
     if opened is not None:
         return opened
+    if any(link.link_id == "code-def-1" for link in payload.atomic_links):
+        return payload
     if any(link.link_id in _ANCHOR_CLAIM_LINK_IDS for link in payload.atomic_links):
         return payload
     anchors = _page_claim_anchors(user_query)
@@ -280,7 +287,12 @@ def _allows_fill_link_id(link_id: str) -> bool:
     if link_id in _ANCHOR_CLAIM_LINK_IDS:
         return True
     head, sep, tail = link_id.rpartition("-")
-    return bool(sep) and head == "page-opening" and tail.isdigit() and int(tail) >= 1
+    return (
+        bool(sep)
+        and head in {"page-opening", "query-facet"}
+        and tail.isdigit()
+        and int(tail) >= 1
+    )
 
 
 def append_anchor_claim(

@@ -103,7 +103,7 @@ def execute_openai_rerank(
         response = client.responses.create(
             model=model_id,
             instructions=prompt_text,
-            input=json.dumps(user_payload, separators=(",", ":")),
+            input=json.dumps(user_payload, ensure_ascii=False, separators=(",", ":")),
             text={
                 "format": {
                     "type": "json_schema",

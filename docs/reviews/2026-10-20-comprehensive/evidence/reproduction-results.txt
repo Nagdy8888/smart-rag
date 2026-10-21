@@ -1,0 +1,6 @@
+AG-01: contradictory rewrite accepted with complete status
+AG-01: unrelated actual Arabic Unicode accepted
+AG-05: 7 exact blocks supplied; 5 retained
+BE-01: 1000 dropped runs retain 1000 inputs and zero live handles
+SEC-03: 10 unknown-kid resolutions cause 10 fake refreshes
+Network calls: 0. Application/database mutations: 0.
