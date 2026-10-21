@@ -340,7 +340,6 @@ function renderAnswerParagraphBody(
                 styles.answerList,
                 styles.answerInlineCode,
                 styles.answerHeading,
-                complete,
               )
             : null}
           <AnswerCodeBlock code={listing.code} language={listing.language} />
@@ -354,7 +353,6 @@ function renderAnswerParagraphBody(
     styles.answerList,
     styles.answerInlineCode,
     styles.answerHeading,
-    complete,
   );
 }
 
@@ -471,18 +469,6 @@ function AnswerParagraphs({
   const leftover = unmappedCitations(visibleCitations, paragraphs.length);
   const seenTables: AnswerTableModel[] = [];
 
-  const titled = paragraphs.some((paragraph) =>
-    paragraph.split("\n").some((line) =>
-      /^\s*(?:\*\*[^*]+\*\*|#{1,3}\s+\S)/.test(line),
-    ),
-  );
-  const mixedFormats = paragraphs.some((paragraph) => {
-    const decoded = proseFromDecorativeFence(displayText(paragraph));
-    return splitFigureMark(decoded).figureId !== null || isCodeSnippet(decoded) || isAnswerTable(decoded);
-  });
-  const grouped = paragraphs.length > 1 && !titled && !mixedFormats;
-  const Group = grouped ? "ol" : "div";
-  const Item = grouped ? "li" : "div";
   return (
     <div
       className={styles.answerBody}
@@ -490,25 +476,21 @@ function AnswerParagraphs({
         showChips && visibleCitations.length > 0 ? "answer-citations" : undefined
       }
     >
-      <Group
-        className={grouped ? styles.answerGroups : undefined}
-        data-answer-groups={grouped ? "true" : undefined}
-      >
-      {paragraphs.map((_, index) => {
-        const slice = visibleParagraphSlice(paragraphs, index, visibleText);
-        if (slice.text === "") {
-          return null;
-        }
-        const mapped = slice.complete
-          ? citationsForParagraph(visibleCitations, index)
-          : [];
-        return (
-          <Item
-            className={grouped ? styles.answerGroupItem : styles.paragraphBlock}
-            data-paragraph-index={String(index)}
-            key={`p-${String(index)}`}
-          >
-            <div className={grouped ? styles.paragraphBlock : undefined}>
+      <div className={styles.answerSections}>
+        {paragraphs.map((_, index) => {
+          const slice = visibleParagraphSlice(paragraphs, index, visibleText);
+          if (slice.text === "") {
+            return null;
+          }
+          const mapped = slice.complete
+            ? citationsForParagraph(visibleCitations, index)
+            : [];
+          return (
+            <div
+              className={styles.paragraphBlock}
+              data-paragraph-index={String(index)}
+              key={`p-${String(index)}`}
+            >
               {renderAnswerParagraphBody(slice.text, slice.complete, seenTables)}
               <ParagraphCitations
                 citations={mapped}
@@ -516,10 +498,9 @@ function AnswerParagraphs({
                 onSelectCitation={onSelectCitation}
               />
             </div>
-          </Item>
-        );
-      })}
-      </Group>
+          );
+        })}
+      </div>
       {showChips && leftover.length > 0 && visibleText === answerText ? (
         <div className={styles.legacySources}>
           <p className={styles.legacySourcesLabel}>{LEGACY_RUN_SOURCES_LABEL}</p>

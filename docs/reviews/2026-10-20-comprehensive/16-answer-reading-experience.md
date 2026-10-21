@@ -49,3 +49,25 @@ evaluation or a claim that all original review findings are resolved.
 
 Private response text, screenshots, and local logs remain outside Git. Production
 publication and final check status must be verified against the resulting commit.
+
+## Long text follow-up, October 21
+
+Two questions were submitted through the signed-in app: one company-document
+question and one general explanation requesting six sections. The latter
+returned six headings and a substantial text answer. Inspection exposed sentence
+splitting that made connected prose look like isolated steps, including an
+automatically numbered conclusion.
+
+The renderer now preserves authored paragraphs, headings, bullets, and numbered
+lists. It does not invent numbered steps from sentence punctuation or paragraph
+boundaries. Paragraph spacing, a bounded reading width, and mobile line spacing
+provide hierarchy without modifying answer wording or citation indices.
+
+Regression coverage includes multi-sentence paragraphs, headings with body text,
+explicit lists, paragraph boundaries, and existing citation ownership/reveal
+behavior. The local frontend suite passed 709 tests; type checking, production
+build, and the action inventory passed. Lint retained five existing warnings.
+
+The company-document response was incomplete in coverage and ended mid-word.
+That is an answer-content issue observed during this UI check; this presentation
+change does not claim to repair it or to constitute a new 25-question agent gate.

@@ -495,16 +495,18 @@ describe("AnswerSurface paragraph citations", () => {
     cleanup();
   });
 
-  it("numbers several claims and several sentences in one claim", () => {
+  it("preserves prose paragraph boundaries without inventing numbered steps", () => {
     const { container, unmount } = renderSurface({
       answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
     });
-    expect(container.querySelectorAll("ol[data-answer-groups='true'] > li")).toHaveLength(2);
+    expect(container.querySelector("ol")).toBeNull();
+    expect(container.querySelectorAll("[data-paragraph-index]")).toHaveLength(2);
     unmount();
     const view = renderSurface({
       answer: "The window is 30 days. The request must be in writing.",
     });
-    expect(view.container.querySelectorAll("ol li")).toHaveLength(2);
+    expect(view.container.querySelector("ol")).toBeNull();
+    expect(view.container.querySelectorAll("[data-paragraph-index]")).toHaveLength(1);
     expect(view.container.querySelector("[data-answer-groups='true']")).toBeNull();
   });
 

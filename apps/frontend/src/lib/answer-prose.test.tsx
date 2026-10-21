@@ -102,7 +102,7 @@ describe("answer prose markdown-lite", () => {
     expect(container.querySelectorAll("ol.list li")).toHaveLength(2);
   });
 
-  it("numbers several sentences and leaves one sentence as text", () => {
+  it("keeps connected sentences together as readable prose", () => {
     const { container } = render(
       <>
         {renderAnswerProse(
@@ -111,17 +111,17 @@ describe("answer prose markdown-lite", () => {
           "list",
           "inline",
           "heading",
-          true,
         )}
       </>,
     );
-    const items = container.querySelectorAll("ol.list li");
-    expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent("The window is 30 days.");
-    expect(items[1]).toHaveTextContent("The request must be in writing.");
+    expect(container.querySelector("ol")).toBeNull();
+    expect(container.querySelectorAll("p.prose")).toHaveLength(1);
+    expect(container.querySelector("p.prose")).toHaveTextContent(
+      "The window is 30 days. The request must be in writing.",
+    );
   });
 
-  it("splits sentences under a title into paragraphs and does not number them", () => {
+  it("preserves a multi-sentence paragraph under its heading", () => {
     const { container } = render(
       <>
         {renderAnswerProse(
@@ -132,15 +132,13 @@ describe("answer prose markdown-lite", () => {
           "list",
           "inline",
           "heading",
-          true,
         )}
       </>,
     );
     expect(screen.getByRole("heading", { level: 3, name: "Setup" })).toBeInTheDocument();
     expect(container.querySelector("ol")).toBeNull();
-    expect(container.querySelectorAll("p.prose")).toHaveLength(2);
-    expect(screen.getByText("The window is 30 days.")).toBeInTheDocument();
-    expect(screen.getByText("The request must be in writing.")).toBeInTheDocument();
+    expect(container.querySelectorAll("p.prose")).toHaveLength(1);
+    expect(screen.getByText("The window is 30 days. The request must be in writing.")).toBeInTheDocument();
   });
 
   it("leaves a one-sentence paragraph as text", () => {
@@ -171,5 +169,28 @@ describe("answer prose markdown-lite", () => {
       </>,
     );
     expect(container.querySelectorAll("ol.list li")).toHaveLength(2);
+  });
+
+  it("keeps a long explanation organized by authored headings and paragraphs", () => {
+    const explanation = [
+      "## Understanding the request",
+      "The agent identifies the goal. It uses context to resolve ambiguity.",
+      "",
+      "It asks for clarification when the missing information affects the result.",
+      "",
+      "**Choosing tools**",
+      "The agent selects a tool. It checks the result before continuing.",
+      "",
+      "- Check the inputs",
+      "- Confirm the outcome",
+    ].join("\n");
+    const { container } = render(
+      <>{renderAnswerProse(explanation, "prose", "list", "inline", "heading")}</>,
+    );
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
+    expect(container.querySelectorAll("p.prose")).toHaveLength(3);
+    expect(container.querySelectorAll("ul li")).toHaveLength(2);
+    expect(container.querySelector("ol")).toBeNull();
+    expect(screen.getByText("The agent identifies the goal. It uses context to resolve ambiguity.")).toBeInTheDocument();
   });
 });
