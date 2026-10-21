@@ -163,7 +163,7 @@ describe("RunProgressTimeline", () => {
     expect(screen.queryByText("Preparing query")).not.toBeInTheDocument();
   });
 
-  it("marks the active started row as the current step", () => {
+  it("shows current work once above the completed activity history", () => {
     render(
       <RunProgressTimeline
         items={COMPANY_ITEMS}
@@ -173,11 +173,10 @@ describe("RunProgressTimeline", () => {
         collapsed={false}
       />,
     );
-    const current = screen
-      .getAllByText("Writing your answer")
-      .map((node) => node.closest("[role='listitem']"))
-      .find((node) => node !== null);
-    expect(current).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Writing your answer")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Working" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getByText("Writing your answer").closest("[role='listitem']")).toBeNull();
   });
 });
 

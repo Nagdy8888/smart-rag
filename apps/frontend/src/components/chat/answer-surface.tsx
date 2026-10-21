@@ -584,7 +584,7 @@ export const AnswerSurface = memo(function AnswerSurface({
     statusLine !== null ||
     (chat !== null && chat.terminal === null && chat.runId !== null);
   const showLiveAssistant =
-    (showProgress || answer !== "") &&
+    (answer !== "" || (terminal !== null && note !== null) || showClarification) &&
     !transcriptTextMatches(lastHistAssistant?.content, answer);
   const empty =
     !messagesPending &&

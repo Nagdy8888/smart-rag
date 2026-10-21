@@ -100,11 +100,12 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
   }
   const open = userOpen ?? !props.collapsed;
   const summary = progressSummary(props);
-  const showList = open && props.items.length > 0;
   const showStarting = props.starting === true && props.items.length === 0 && props.terminal === null;
   const working = props.terminal === null && !props.verificationCompleted;
   const activities = publicActivities(props.items);
   const currentActivity = [...activities].reverse().find((item) => item.phase === "started");
+  const history = working ? activities.filter((item) => item.phase !== "started") : activities;
+  const showList = open && history.length > 0;
   return (
     <div className={styles.progressTimeline} data-testid="run-progress-timeline">
       <LiveRegion aria-label="Run progress" politeness="polite">
@@ -121,7 +122,7 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
           </p>
         ) : null}
       </LiveRegion>
-      {props.items.length > 0 ? (
+      {history.length > 0 ? (
         <button
           type="button"
           className={styles.progressToggle}
@@ -136,7 +137,7 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
       ) : null}
       {showList ? (
         <ol className={styles.progressList} role="list">
-          {activities.map((item) => {
+          {history.map((item) => {
             const label = item.label;
             const active = working && item.phase === "started";
             return (
