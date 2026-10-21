@@ -8,6 +8,7 @@ import { createChatViewState } from "../../lib/chat-view";
 import { EMPTY_DEADLINE_PARTIAL_COPY } from "../../lib/run-details";
 import type { RunProgressItem } from "../../lib/run-progress";
 import { runStatusLine } from "./run-progress";
+import { publicActivities, runActivity } from "./run-activity";
 import {
   progressSummary,
   RunProgressTimeline,
@@ -50,6 +51,29 @@ describe("RunProgressTimeline", () => {
     cleanup();
   });
 
+  it("updates public activity from real stage events and stops at a terminal", () => {
+    const props = {
+      items: [item({ key: "prepare_query", phase: "started" })],
+      terminal: null,
+      verificationCompleted: false,
+      answerAvailable: false,
+      collapsed: false,
+    } as const;
+    const view = render(<RunProgressTimeline {...props} />);
+    expect(screen.getByTestId("run-activity")).toHaveTextContent("Understanding your question");
+    view.rerender(<RunProgressTimeline {...props} items={COMPANY_ITEMS} />);
+    expect(screen.getByTestId("run-activity")).toHaveTextContent("Drafting your answer");
+    view.rerender(<RunProgressTimeline {...props} items={COMPANY_ITEMS} terminal="cancelled" />);
+    expect(screen.queryByTestId("run-activity")).not.toBeInTheDocument();
+    expect(view.container.querySelector('[aria-current="step"]')).toBeNull();
+  });
+
+  it("does not imply more thinking while a verified answer is displayed", () => {
+    render(<RunProgressTimeline items={COMPANY_ITEMS} terminal={null}
+      verificationCompleted answerAvailable collapsed revealing />);
+    expect(screen.queryByTestId("run-activity")).not.toBeInTheDocument();
+  });
+
   it("renders only company fixture stages and tools that were emitted", () => {
     render(
       <RunProgressTimeline
@@ -60,11 +84,11 @@ describe("RunProgressTimeline", () => {
         collapsed={false}
       />,
     );
-    expect(screen.getByText(/Company retrieval/)).toBeInTheDocument();
-    expect(screen.getByText(/Optional tools/)).toBeInTheDocument();
-    expect(screen.getByText(/Searching/)).toBeInTheDocument();
-    expect(screen.getByText("web_search")).toBeInTheDocument();
-    expect(screen.getAllByText("Generating…").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Finding information/)).toHaveLength(2);
+    expect(screen.getByText(/Preparing your answer/)).toBeInTheDocument();
+    expect(screen.queryByText("Searching")).not.toBeInTheDocument();
+    expect(screen.queryByText("web_search")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Writing your answer").length).toBeGreaterThan(0);
     expect(screen.queryByText("General answer")).not.toBeInTheDocument();
     expect(screen.queryByText("%")).not.toBeInTheDocument();
     expect(screen.queryByText(/ms|seconds|timestamp/i)).not.toBeInTheDocument();
@@ -80,7 +104,7 @@ describe("RunProgressTimeline", () => {
         collapsed={false}
       />,
     );
-    expect(screen.getAllByText("General answer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Writing your answer").length).toBeGreaterThan(0);
     expect(screen.queryByText("Company retrieval")).not.toBeInTheDocument();
     expect(screen.queryByText("web_search")).not.toBeInTheDocument();
   });
@@ -95,8 +119,8 @@ describe("RunProgressTimeline", () => {
         collapsed={false}
       />,
     );
-    expect(screen.getAllByText("Working: future_stage").length).toBeGreaterThan(0);
-    expect(screen.getByText("future_stage")).toBeInTheDocument();
+    expect(screen.getAllByText("Working on your request").length).toBeGreaterThan(0);
+    expect(screen.queryByText("future_stage")).not.toBeInTheDocument();
   });
 
   it("expands and collapses from the keyboard", async () => {
@@ -110,12 +134,12 @@ describe("RunProgressTimeline", () => {
         collapsed={true}
       />,
     );
-    const toggle = screen.getByRole("button", { name: "Show steps" });
+    const toggle = screen.getByRole("button", { name: "Show activity" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     toggle.focus();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("button", { name: "Hide steps" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Hide activity" })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -150,10 +174,41 @@ describe("RunProgressTimeline", () => {
       />,
     );
     const current = screen
-      .getAllByText("Generating…")
+      .getAllByText("Writing your answer")
       .map((node) => node.closest("[role='listitem']"))
       .find((node) => node !== null);
     expect(current).toHaveAttribute("aria-current", "step");
+  });
+});
+
+describe("public activity copy", () => {
+  it("groups technical stages and preserves a real search retry", () => {
+    const rows = publicActivities([
+      item({ key: "load_memory" }), item({ key: "prepare_query" }),
+      item({ key: "compile_plan" }), item({ key: "company_scope" }),
+      item({ key: "apply_correction" }),
+      item({ key: "company_scope", id: "retry", phase: "started" }),
+    ]);
+    expect(rows.map((row) => row.label)).toEqual([
+      "Understanding your question", "Finding information", "Refining the search",
+      "Finding information",
+    ]);
+    expect(rows.at(-1)?.phase).toBe("started");
+    expect(JSON.stringify(rows)).not.toContain("compile_plan");
+  });
+
+  it("uses only the open stage and does not claim a completed action is ongoing", () => {
+    expect(runActivity([item({ key: "generate_answer" })])).toBe(
+      "Waiting for the next progress update.",
+    );
+    expect(runActivity([item({ key: "verify_answer", phase: "started" })])).toContain(
+      "Checking the draft",
+    );
+  });
+
+  it("keeps unknown tool names and outcomes out of the activity summary", () => {
+    expect(runActivity([item({ key: "private-tool", kind: "tool", phase: "started",
+      outcome: "private model text" })])).toBe("Waiting for the current tool to finish.");
   });
 });
 

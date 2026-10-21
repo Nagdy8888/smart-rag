@@ -323,7 +323,7 @@ describe("AnswerSurface origin chrome", () => {
         onSelectCitation={vi.fn()}
       />,
     );
-    expect(screen.getAllByText("Generating…").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Writing your answer").length).toBeGreaterThan(0);
     expect(screen.queryByText("The refund period is 30 days.")).not.toBeInTheDocument();
     expect(screen.queryByTestId("verified-answer-reveal")).not.toBeInTheDocument();
   });

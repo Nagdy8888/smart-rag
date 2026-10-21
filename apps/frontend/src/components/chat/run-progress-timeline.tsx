@@ -15,6 +15,7 @@ import {
 import { LiveRegion } from "../ui/live-region";
 import { Spinner } from "../ui/spinner";
 import { progressLabel, runStatusLine } from "./run-progress";
+import { publicActivities, runActivity } from "./run-activity";
 import styles from "./run-progress-timeline.module.css";
 
 export type RunProgressTimelineProps = {
@@ -101,13 +102,24 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
   const summary = progressSummary(props);
   const showList = open && props.items.length > 0;
   const showStarting = props.starting === true && props.items.length === 0 && props.terminal === null;
+  const working = props.terminal === null && !props.verificationCompleted;
+  const activities = publicActivities(props.items);
+  const currentActivity = [...activities].reverse().find((item) => item.phase === "started");
   return (
     <div className={styles.progressTimeline} data-testid="run-progress-timeline">
       <LiveRegion aria-label="Run progress" politeness="polite">
         <p className={styles.statusLine} role="status">
           {showStarting ? <Spinner label="Starting" /> : null}
-          {summary}
+          {working && props.items.length > 0 ? <Spinner label="Working" /> : null}
+          {working && props.items.length > 0
+            ? currentActivity?.label ?? "Working on your request"
+            : summary}
         </p>
+        {working && props.items.length > 0 ? (
+          <p className={styles.activity} data-testid="run-activity">
+            {runActivity(props.items)}
+          </p>
+        ) : null}
       </LiveRegion>
       {props.items.length > 0 ? (
         <button
@@ -119,27 +131,27 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
             setUserOpen(!open);
           }}
         >
-          {showList ? "Hide steps" : "Show steps"}
+          {showList ? "Hide activity" : "Show activity"}
         </button>
       ) : null}
       {showList ? (
         <ol className={styles.progressList} role="list">
-          {props.items.map((item) => {
-            const label = progressLabel(item.key);
-            const active = item.phase === "started";
+          {activities.map((item) => {
+            const label = item.label;
+            const active = working && item.phase === "started";
             return (
               <li
                 key={item.id}
                 className={styles.progressItem}
                 role="listitem"
+                data-phase={item.phase}
                 aria-current={active ? "step" : undefined}
               >
                 {active ? <Spinner label={label} /> : null}
                 <span>
                   {label}
-                  {item.phase === "failed" ? " failed" : item.phase === "completed" ? " done" : ""}
+                  {item.phase === "failed" ? " — encountered an issue" : item.phase === "completed" ? " — done" : ""}
                 </span>
-                <span className={styles.progressKey}>{item.key}</span>
               </li>
             );
           })}

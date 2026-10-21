@@ -979,7 +979,7 @@ describe("ChatApp Ask workspace", () => {
       message: "latest public briefing",
       search_scope: "web",
     });
-    expect(await screen.findAllByText("Searching…")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Finding information")).not.toHaveLength(0);
   });
 
   it("shows Web origin URL chips and keeps company citations non-clickable", async () => {
@@ -1396,13 +1396,13 @@ describe("ChatApp Ask workspace", () => {
     streamCtl.send(
       'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"running","phase":"started"}\n\n',
     );
-    expect((await screen.findAllByText("Generating…")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Writing your answer")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Verified policy summary.")).toBeNull();
     expect(document.querySelector(".typewriter, [data-caret]")).toBeNull();
     streamCtl.send(
       'event: status\nid: 2\ndata: {"stage":"verify_answer","status":"running","phase":"started"}\n\n',
     );
-    expect((await screen.findAllByText("Verifying…")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Checking the answer")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Verified policy summary.")).toBeNull();
     streamCtl.send(
       'event: status\nid: 3\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',

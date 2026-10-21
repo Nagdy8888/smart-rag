@@ -71,3 +71,22 @@ build, and the action inventory passed. Lint retained five existing warnings.
 The company-document response was incomplete in coverage and ended mid-word.
 That is an answer-content issue observed during this UI check; this presentation
 change does not claim to repair it or to constitute a new 25-question agent gate.
+
+## Familiar live activity
+
+Replaced the technical graph rows in the answer workspace with familiar activity
+summaries: understanding the question, finding information, preparing an answer,
+writing, and checking. Adjacent related stages become one activity; genuine
+retries preserve their order. Internal node/tool keys and event outcomes are not
+rendered in this feed.
+
+Descriptions change only from actual open stage/tool events. No additional model
+call, simulated reasoning text, timer-driven narrative, percentage, or estimated
+completion is introduced. Completed and cancelled runs stop the busy indicator;
+verified answer display retains its existing delivery boundary. Activity history
+can be collapsed or reopened with a keyboard-accessible control.
+
+The local frontend suite passed 714 tests. Coverage includes live transitions,
+terminal cleanup, grouped stages, retries, unknown tool privacy, and the existing
+assertion that answer prose stays hidden until verification. Type checking,
+production build, lint (five existing warnings), and action inventory passed.
