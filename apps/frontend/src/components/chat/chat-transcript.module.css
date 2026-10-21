@@ -38,7 +38,7 @@
 .answer {
   flex: 0 1 auto;
   width: 100%;
-  max-width: 44rem;
+  max-width: 52rem;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
@@ -281,7 +281,7 @@
 
 .answerTable {
   width: 100%;
-  min-width: 100%;
+  min-width: 36rem;
   max-width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
@@ -441,7 +441,8 @@
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 2);
-  max-width: min(40rem, 85%);
+  width: 100%;
+  max-width: 48rem;
   min-width: 0;
   padding: 0.75rem 0.95rem;
   background: var(--color-surface);
@@ -974,3 +975,39 @@
     transform: scaleY(0);
   }
 }
+
+/* Reading tools use the existing console palette and safe text rendering. */
+.figureExpand {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  cursor: zoom-in;
+}
+.figureExpandHint {
+  display: block;
+  padding: 0.45rem 0.75rem;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: end;
+  background: var(--color-surface-muted);
+}
+.figureDescription { font-size: 0.9rem; line-height: 1.65; }
+.figureDescription summary { cursor: pointer; color: var(--color-text-muted); }
+.figureDescription p { margin-block: 0.5rem 0; white-space: pre-wrap; }
+.figureReader[role="dialog"] { width: min(68rem, 100%); }
+.figureReaderImage { display: block; width: 100%; height: auto; }
+.tableScrollHint { display: none; }
+@media (max-width: 640px) {
+  .tableScrollHint { display: block; font-size: 0.8rem; color: var(--color-text-muted); }
+  .assistantBlock { padding: 0.75rem; }
+  .messageMeta { flex-wrap: wrap; }
+}
+
+.figureExpand .answerFigureImage { margin-inline: auto; border: 0; border-radius: 0; max-height: 32rem; object-fit: contain; }
+.figureDescription { align-self: stretch; }

@@ -5,6 +5,9 @@ Review date: **20 October 2026, Africa/Cairo**. Reviewed commit: `a2164952a3ea4b
 See [CI repair follow-up](15-ci-repair-follow-up.md) for subsequent publication
 checks and the boundary between historical live evaluation and the pushed build.
 
+The [answer reading follow-up](16-answer-reading-experience.md) records the next
+signed-in user review and improvements to sources, diagrams, copying, and history.
+
 ## Overall assessment
 
 Implementation update: the review below describes the original snapshot. See

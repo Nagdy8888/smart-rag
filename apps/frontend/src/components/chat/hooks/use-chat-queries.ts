@@ -57,6 +57,9 @@ export type UseChatQueriesResult = {
   citationDetail: CitationResponse | null;
   /** True while the selected citation's detail request has not resolved. */
   citationDetailPending: boolean;
+  sourcesPending: boolean;
+  sourcesError: boolean;
+  retrySources: () => void;
   usage: UsageResponse | null;
   meta: Awaited<ReturnType<typeof fetchMeta>> | undefined;
   metaPending: boolean;
@@ -164,6 +167,9 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     viewingCitations: viewingCitationsQuery.data ?? [],
     citationDetail: citationDetailQuery.data ?? null,
     citationDetailPending,
+    sourcesPending: viewingRunId !== null ? viewingCitationsQuery.isLoading : citationsQuery.isLoading,
+    sourcesError: viewingRunId !== null ? viewingCitationsQuery.isError : citationsQuery.isError,
+    retrySources: () => { void (viewingRunId !== null ? viewingCitationsQuery.refetch() : citationsQuery.refetch()); },
     usage: usageQuery.data ?? null,
     meta: metaQuery.data,
     metaPending: metaQuery.isPending,

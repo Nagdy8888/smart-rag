@@ -156,7 +156,7 @@ describe("AnswerSurface origin chrome", () => {
     expect(snippet.textContent).toContain("def multiply");
     expect(snippet.textContent).toContain("\n");
     expect(snippet.textContent).toMatch(/python/i);
-    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy python snippet" })).toBeInTheDocument();
     expect(container.querySelector("img")).toBeNull();
   });
 

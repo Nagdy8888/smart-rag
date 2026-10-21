@@ -9,7 +9,6 @@ import { isClassifiedApiError, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
 import { hrefForCitationRecord } from "../../lib/citation-drawer";
-import { isCompanyPdfCitation } from "../../lib/citation-label";
 import { overlaySettledTurns } from "../../lib/chat-history";
 import { showSaveToQuizConvenience } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
@@ -34,6 +33,7 @@ import { useChatSelection } from "./hooks/use-chat-selection";
 import { useConversationActions, ConversationDeleteDialog } from "./hooks/use-conversation-actions";
 import { useConversationScroll } from "./hooks/use-conversation-scroll";
 import { toSaveToQuizSheetProps, useQuizCapture } from "./hooks/use-quiz-capture";
+import { useCitationPageSource } from "./hooks/use-citation-page-source";
 import { useChatPresentation } from "./hooks/use-chat-presentation";
 import chatStyles from "./chat.module.css";
 
@@ -146,33 +146,12 @@ export function ChatApp() {
   const pageRunId =
     selection.viewingRunId ??
     (run.chat.terminal !== null ? run.chat.runId : null);
-  const selectedForPage = restore.selectedCitation;
-  const pageSource = useMemo(() => {
-    if (
-      liveQueries.citationDetailPending ||
-      liveQueries.auth === null ||
-      pageRunId === null ||
-      selectedForPage === null ||
-      selectedForPage.source_unavailable ||
-      !isCompanyPdfCitation(selectedForPage)
-    ) {
-      return null;
-    }
-    const page = selectedForPage.pdf_page_number;
-    if (typeof page !== "number" || !Number.isInteger(page) || page < 1) {
-      return null;
-    }
-    return {
-      auth: liveQueries.auth,
-      runId: pageRunId,
-      citationId: selectedForPage.citation_id,
-    };
-  }, [
-    liveQueries.auth,
-    liveQueries.citationDetailPending,
-    pageRunId,
-    selectedForPage,
-  ]);
+  const pageSource = useCitationPageSource({
+    auth: liveQueries.auth,
+    runId: pageRunId,
+    citation: restore.selectedCitation,
+    pending: liveQueries.citationDetailPending,
+  });
   const paradeDbDown =
     liveQueries.ready?.dependencies.some(
       (item) => item.name === "paradedb" && item.status === "down",
@@ -265,7 +244,7 @@ export function ChatApp() {
             revealing={reveal.isRevealing}
             presentationKey={presentationKey}
             onShowFullAnswer={reveal.showFullAnswer}
-            citations={restore.sheetCitations}
+            citations={liveQueries.citations}
             conversationRef={scroll.containerRef}
             pinned={scroll.pinned}
             onJumpToLatest={scroll.jumpToLatest}
@@ -295,6 +274,9 @@ export function ChatApp() {
         open={selection.sourcesOpen}
         onClose={() => selection.setSourcesOpen(false)}
         citations={[...restore.sheetCitations]}
+        pending={liveQueries.sourcesPending}
+        error={liveQueries.sourcesError}
+        onRetry={liveQueries.retrySources}
         hrefForCitation={hrefForCitationRecord}
         onSelectCitation={(citation, trigger) => {
           restore.handleSelectCitation(citation, trigger);

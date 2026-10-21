@@ -476,7 +476,7 @@ describe("CitationSheet", () => {
     expect(
       screen.queryByText("a035e243-03dd-4987-b7ed-fe00c0b9336c"),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(SOURCE_PREVIEW_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.getByText("Select a citation to inspect its supporting passage and available page.")).toBeInTheDocument();
   });
 });
 

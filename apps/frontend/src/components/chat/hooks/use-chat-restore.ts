@@ -161,6 +161,9 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
     liveVisible,
     viewingCitations,
   );
+  const sourceTarget = viewingRunId ?? activeRunId ?? settledRunId;
+  const sourceMessage = [...historyMessages].reverse().find((item) => item.role === "assistant" && item.run_id === sourceTarget);
+  const sourcesCount = sheetCitations.length || (sourceMessage?.citation_count ?? 0);
   const selectedCitation = selectedCitationRecord(
     sheetCitations,
     selectedCitationId,
@@ -174,6 +177,12 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
     },
     [setSelectedCitationId],
   );
+  const handleSelectLiveCitation = useCallback(
+    (citation: CitationResponse, trigger: HTMLButtonElement) => {
+      setViewingRunId(null);
+      handleSelectCitation(citation, trigger);
+    }, [setViewingRunId, handleSelectCitation],
+  );
   const openTurnSources = useCallback(
     (runId: string) => {
       setViewingRunId(runId);
@@ -183,9 +192,10 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
     [setSelectedCitationId, setSourcesOpen, setViewingRunId],
   );
   const openLiveSources = useCallback(() => {
-    setViewingRunId(null);
+    setViewingRunId(activeRunId === null ? settledRunId : null);
+    setSelectedCitationId(null);
     setSourcesOpen(true);
-  }, [setSourcesOpen, setViewingRunId]);
+  }, [activeRunId, settledRunId, setSelectedCitationId, setSourcesOpen, setViewingRunId]);
   const sendFeedback = useCallback(async () => {
     if (auth === null || feedbackRunId === null) {
       return;
@@ -220,7 +230,7 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
     sheetCitations,
     selectedCitation,
     showSources: showSourcesControl(answerOrigin, viewingRunId),
-    sourcesCount: sheetCitations.length,
+    sourcesCount,
     citationTriggerRef,
     handleSelectCitation,
     openTurnSources,
@@ -236,10 +246,10 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
     sendFeedback,
     stage: {
       onSourcesOpen: openLiveSources,
-      onSelectCitation: handleSelectCitation,
+      onSelectCitation: handleSelectLiveCitation,
       onOpenTurnSources: openTurnSources,
       showSources: showSourcesControl(answerOrigin, viewingRunId),
-      sourcesCount: sheetCitations.length,
+      sourcesCount,
       feedbackRunId,
       thumbsUp: feedback.thumbsUp,
       onThumbs: setThumbsUp,

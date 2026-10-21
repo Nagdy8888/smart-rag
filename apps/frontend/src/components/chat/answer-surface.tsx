@@ -51,6 +51,7 @@ import { LimitationCallout } from "../ui/limitation-callout";
 import { LiveRegion } from "../ui/live-region";
 import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
+import { CopyAnswerButton } from "./copy-answer-button";
 import { AnswerCodeBlock } from "./answer-code-block";
 import { RunProgressTimeline } from "./run-progress-timeline";
 import { VerifiedAnswerReveal } from "./verified-answer-reveal";
@@ -385,7 +386,8 @@ function AnswerTableView({ table }: { table: AnswerTableModel }): ReactNode {
           {renderAnswerInline(table.caption, styles.answerInlineCode)}
         </figcaption>
       ) : null}
-      <div className={styles.answerTableScroll}>
+      <div className={styles.tableScrollHint}>Scroll to see all columns</div>
+      <div className={styles.answerTableScroll} role="region" aria-label="Answer table" tabIndex={0}>
         <table className={styles.answerTable}>
           <thead>
             <tr>
@@ -474,7 +476,11 @@ function AnswerParagraphs({
       /^\s*(?:\*\*[^*]+\*\*|#{1,3}\s+\S)/.test(line),
     ),
   );
-  const grouped = paragraphs.length > 1 && !titled;
+  const mixedFormats = paragraphs.some((paragraph) => {
+    const decoded = proseFromDecorativeFence(displayText(paragraph));
+    return splitFigureMark(decoded).figureId !== null || isCodeSnippet(decoded) || isAnswerTable(decoded);
+  });
+  const grouped = paragraphs.length > 1 && !titled && !mixedFormats;
   const Group = grouped ? "ol" : "div";
   const Item = grouped ? "li" : "div";
   return (
@@ -659,14 +665,15 @@ export const AnswerSurface = memo(function AnswerSurface({
               <AnswerParagraphs
                 answerText={item.content}
                 visibleText={item.content}
-                citations={[]}
-                answerOrigin={null}
+                citations={item.run_id === chat?.runId ? citations : []}
+                answerOrigin={item.run_id === chat?.runId ? answerOrigin : null}
                 hrefForCitation={hrefForCitation}
                 onSelectCitation={onSelectCitation}
               />
             </LiveRegion>
             <p className={styles.messageMeta}>
-              {formatRelativeTime(item.created_at)}
+              <CopyAnswerButton text={item.content} />
+              <span>{formatRelativeTime(item.created_at)}</span>
               {(item.citation_count ?? 0) > 0 && item.run_id ? (
                 <>
                   {" · "}
@@ -752,6 +759,7 @@ export const AnswerSurface = memo(function AnswerSurface({
             <LimitationCallout tone="warning">{MIXED_SCOPE_CLARIFICATION}</LimitationCallout>
           ) : null}
           <p className={styles.messageMeta}>
+            {!revealing && answer.trim() !== "" ? <CopyAnswerButton text={answer} /> : null}
             {liveCreatedAt ? formatRelativeTime(liveCreatedAt) : null}
             {routeName ? ` · ${routeName}` : null}
             {usageLabel !== null ? (

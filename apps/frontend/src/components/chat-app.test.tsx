@@ -1255,9 +1255,10 @@ describe("ChatApp Ask workspace", () => {
     });
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("button", { name: "Chat" }));
-    const turnSources = await screen.findByRole("button", { name: "Sources (2)" });
+    const [turnSources] = await screen.findAllByRole("button", { name: "Sources (2)" });
+    expect(screen.queryByRole("button", {name: "Run details"})).not.toBeInTheDocument();
     expect(fetchCitationDetail).not.toHaveBeenCalled();
-    await user.click(turnSources);
+    await user.click(turnSources!);
     await waitFor(() => {
       expect(listCitations).toHaveBeenCalledWith(
         { accessToken: "jwt-token" },

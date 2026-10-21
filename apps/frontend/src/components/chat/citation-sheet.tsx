@@ -9,7 +9,7 @@ import {
   citationSourceLabel,
 } from "../../lib/citation-label";
 import type { CitationResponse } from "../../lib/types";
-import { SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
+import { Button } from "../ui/button";
 import { CitationChip } from "../ui/citation-chip";
 import { Sheet } from "../ui/sheet";
 import styles from "./chat-transcript.module.css";
@@ -17,6 +17,9 @@ import styles from "./chat-transcript.module.css";
 export type CitationSheetProps = {
   /** Whether the sheet is open. */
   open: boolean;
+  pending?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
   /** Close handler. */
   onClose: () => void;
   /** Citations for the current run. */
@@ -24,7 +27,10 @@ export type CitationSheetProps = {
   /** Safe href builder. */
   hrefForCitation: (citation: CitationResponse) => string | undefined;
   /** Open the existing citation drawer from a chip. */
-  onSelectCitation: (citation: CitationResponse, trigger: HTMLButtonElement) => void;
+  onSelectCitation: (
+    citation: CitationResponse,
+    trigger: HTMLButtonElement,
+  ) => void;
 };
 
 /**
@@ -35,6 +41,9 @@ export type CitationSheetProps = {
  */
 export function CitationSheet({
   open,
+  pending = false,
+  error = false,
+  onRetry,
   onClose,
   citations,
   hrefForCitation,
@@ -44,8 +53,26 @@ export function CitationSheet({
     return null;
   }
   return (
-    <Sheet title={`Sources (${String(citations.length)})`} onClose={onClose}>
-      {citations.length === 0 ? (
+    <Sheet
+      title={
+        pending || error ? "Sources" : `Sources (${String(citations.length)})`
+      }
+      onClose={onClose}
+    >
+      {pending ? (
+        <p role="status" className={styles.muted}>
+          Loading sources…
+        </p>
+      ) : error ? (
+        <div role="alert">
+          <p>Sources could not be loaded. Your answer is still available.</p>
+          {onRetry ? (
+            <Button type="button" variant="secondary" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      ) : citations.length === 0 ? (
         <p className={styles.muted}>No citations for this run yet.</p>
       ) : (
         <ul className={styles.citationList}>
@@ -65,7 +92,12 @@ export function CitationSheet({
           ))}
         </ul>
       )}
-      <p className={styles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
+      {!pending && !error && citations.length > 0 ? (
+        <p className={styles.muted}>
+          Select a citation to inspect its supporting passage and available
+          page.
+        </p>
+      ) : null}
     </Sheet>
   );
 }

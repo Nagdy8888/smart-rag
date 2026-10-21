@@ -213,13 +213,13 @@ export function ChatStage(props: ChatStageProps) {
               Sources ({String(headerCount)})
             </Button>
           ) : null}
-          <RunDetailsSheet
+          {historyMessages.length > 0 && chat.runId === null ? null : <RunDetailsSheet
             open={detailsOpen}
             onOpen={() => onDetailsOpen(true)}
             onClose={() => onDetailsOpen(false)}
             chat={chat}
             companyUsd={companyUsd}
-          />
+          />}
         </div>
       </div>
       <div
