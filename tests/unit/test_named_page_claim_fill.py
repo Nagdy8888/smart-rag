@@ -19,6 +19,36 @@ from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from tests.support.answer_verifier import verifier_fusion, verifier_passage
 
 
+def test_anchor_excerpt_never_ends_at_the_character_cap_mid_sentence() -> None:
+    """Keep only the complete source sentence before an oversized continuation."""
+    text = (
+        "Orchestration coordinates tasks. "
+        + "A long explanation of orchestration " * 60
+    )
+    passage = verifier_passage(1, text=text)
+    payload = _payload("General context.", chunk=passage.chunk_id)
+    result = salvage_anchor_claim_fill(
+        payload,
+        verifier_fusion(passage),
+        user_query="Explain Orchestration and explanation.",
+    )
+    assert result.paragraphs[-1].text == "Orchestration coordinates tasks."
+    span = result.citations[-1].span
+    assert span is not None
+    assert span in text
+
+
+def test_anchor_excerpt_rejects_a_single_oversized_unfinished_sentence() -> None:
+    """Omit an extractive addition when no complete sentence fits the cap."""
+    text = "Orchestration " + "continues " * 200
+    passage = verifier_passage(1, text=text)
+    payload = _payload("General context.", chunk=passage.chunk_id)
+    result = salvage_anchor_claim_fill(
+        payload, verifier_fusion(passage), user_query="Explain Orchestration."
+    )
+    assert result is payload
+
+
 def _payload(text: str, *, chunk: str) -> AnswerPayload:
     """Build a one-claim answer citing ``chunk``.
 

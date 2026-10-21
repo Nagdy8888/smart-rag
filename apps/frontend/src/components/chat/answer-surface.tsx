@@ -11,12 +11,9 @@ import {
   shouldShowCitations,
 } from "../../lib/answer-origin";
 import {
-  LEGACY_RUN_SOURCES_LABEL,
   citationChipName,
   citationSourceLabel,
-  citationsForParagraph,
   splitVerifiedParagraphs,
-  unmappedCitations,
 } from "../../lib/citation-label";
 import type { RunProgressItem } from "../../lib/run-progress";
 import type { ChatViewState } from "../../lib/chat-view";
@@ -139,7 +136,7 @@ export function answerTerminalNote(
     if (status === "refused") {
       return "An answer could not be verified.";
     }
-    return "Partial answer. Verified tokens are kept.";
+    return "This answer is partial. Only verified content is shown.";
   }
   if (terminal === "cancelled") {
     return "Cancelled. Received tokens are kept.";
@@ -440,7 +437,7 @@ export function AnswerContentPreview({ text }: { text: string }) {
 }
 
 /**
- * Render verified paragraphs with inline chips and a legacy footer.
+ * Render verified paragraphs with a separate authorized Sources section.
  *
  * @param props - Full answer, visible prefix, citations, and chip handlers.
  * @returns Paragraph blocks. Chips wait until their paragraph is fully visible.
@@ -466,8 +463,14 @@ function AnswerParagraphs({
   const paragraphs = splitVerifiedParagraphs(answerText);
   const showChips = shouldShowCitations(answerOrigin);
   const visibleCitations = showChips ? [...citations] : [];
-  const leftover = unmappedCitations(visibleCitations, paragraphs.length);
   const seenTables: AnswerTableModel[] = [];
+  const points = paragraphs.length > 1 && !paragraphs.some((paragraph) => {
+    const text = proseFromDecorativeFence(displayText(paragraph));
+    return /(^|\n)\s*(?:#{1,3}\s|\*\*[^*\n]{1,80}\*\*|[-*]\s+|\d+\.\s+)/.test(text)
+      || isCodeSnippet(text) || isAnswerTable(text) || splitFigureMark(text).figureId !== null;
+  });
+  const Group = points ? "ul" : "div";
+  const Item = points ? "li" : "div";
 
   return (
     <div
@@ -476,41 +479,33 @@ function AnswerParagraphs({
         showChips && visibleCitations.length > 0 ? "answer-citations" : undefined
       }
     >
-      <div className={styles.answerSections}>
+      <Group className={points ? styles.answerPoints : styles.answerSections} dir="auto">
         {paragraphs.map((_, index) => {
           const slice = visibleParagraphSlice(paragraphs, index, visibleText);
           if (slice.text === "") {
             return null;
           }
-          const mapped = slice.complete
-            ? citationsForParagraph(visibleCitations, index)
-            : [];
           return (
-            <div
-              className={styles.paragraphBlock}
+            <Item
+              className={points ? styles.answerPoint : styles.paragraphBlock}
               data-paragraph-index={String(index)}
               key={`p-${String(index)}`}
             >
               {renderAnswerParagraphBody(slice.text, slice.complete, seenTables)}
-              <ParagraphCitations
-                citations={mapped}
-                hrefForCitation={hrefForCitation}
-                onSelectCitation={onSelectCitation}
-              />
-            </div>
+            </Item>
           );
         })}
-      </div>
-      {showChips && leftover.length > 0 && visibleText === answerText ? (
-        <div className={styles.legacySources}>
-          <p className={styles.legacySourcesLabel}>{LEGACY_RUN_SOURCES_LABEL}</p>
+      </Group>
+      {showChips && visibleCitations.length > 0 && visibleText === answerText ? (
+        <section className={styles.answerSources} aria-label="Answer sources">
+          <p className={styles.answerSourcesLabel}>Sources</p>
           <CitationRow
-            citations={leftover}
+            citations={visibleCitations}
             hrefForCitation={hrefForCitation}
             onSelectCitation={onSelectCitation}
-            testId="legacy-citations"
+            testId="answer-source-list"
           />
-        </div>
+        </section>
       ) : null}
     </div>
   );

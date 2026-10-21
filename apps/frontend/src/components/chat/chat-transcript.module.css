@@ -350,22 +350,35 @@
   gap: calc(var(--space) * 5);
 }
 
+.answerPoints {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.answerPoint {
+  min-width: 0;
+  padding-inline-start: var(--space);
+}
+
 .paragraphBlock {
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 2);
 }
 
-.legacySources {
+.answerSources {
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 2);
   margin-block-start: calc(var(--space) * 2);
-  border-inline-start: 2px solid var(--color-evidence);
-  padding-inline-start: calc(var(--space) * 2);
+  border-block-start: 1px solid var(--color-border);
+  padding-block-start: calc(var(--space) * 3);
 }
 
-.legacySourcesLabel {
+.answerSourcesLabel {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-label-size);

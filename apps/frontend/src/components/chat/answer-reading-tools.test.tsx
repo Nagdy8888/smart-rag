@@ -111,7 +111,7 @@ describe("Answer reading tools", () => {
     const { rerender } = render(
       <AnswerSurface {...props} messages={[message]} />,
     );
-    expect(screen.getByTestId("paragraph-citations")).toBeInTheDocument();
+    expect(screen.getByTestId("answer-source-list")).toBeInTheDocument();
     rerender(
       <AnswerSurface
         {...props}
@@ -119,7 +119,7 @@ describe("Answer reading tools", () => {
         messages={[{ ...message, run_id: "foreign-run" }]}
       />,
     );
-    expect(screen.queryByTestId("paragraph-citations")).toBeNull();
+    expect(screen.queryByTestId("answer-source-list")).toBeNull();
   });
 
   it("separates the printed figure caption without changing the source wording", () => {

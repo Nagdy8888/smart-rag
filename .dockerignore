@@ -32,6 +32,7 @@
 **/htmlcov
 
 # Reports, local dumps, keys
+.private-eval
 prev_review
 docs/reviews
 *.pem

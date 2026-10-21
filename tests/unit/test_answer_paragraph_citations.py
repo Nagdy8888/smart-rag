@@ -141,14 +141,14 @@ def test_answer_v3_remains_registered_and_hashed() -> None:
     assert "paragraphs" in required
 
 
-def test_answer_v11_is_current_and_hashed() -> None:
-    """Pinned answer_v11 hash matches the immutable prompt file."""
+def test_answer_v12_is_current_and_hashed() -> None:
+    """Pinned answer_v12 hash matches the immutable prompt file."""
 
-    entry = load_prompt("answer_v11", environment="dev")
-    assert ANSWER_PROMPT_VERSION == "answer_v11"
+    entry = load_prompt("answer_v12", environment="dev")
+    assert ANSWER_PROMPT_VERSION == "answer_v12"
     assert entry.sha256 == ANSWER_PROMPT_SHA256
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v11.md")
-    body = prompt_text("answer_v11")
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v12.md")
+    body = prompt_text("answer_v12")
     assert "Do not write `answer_text`" in body
     assert "first claim answers the question directly" in body.lower()
     assert "fenced" in body.lower()

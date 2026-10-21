@@ -36,12 +36,16 @@ CLAIM_LINK_PREFIX = "claim-"
 _CODE_CLAIM = re.compile(
     r"(?m)(?:^|\s)(?:@\w+|def\s+\w+\s*\(|class\s+\w+|import\s+\w+|from\s+\w+)"
 )
+_STRUCTURED_CLAIM = re.compile(
+    r"(?m)^\s*(?:#{1,3}\s+|\*\*[^*\n]+\*\*\s*$|[-*]\s+|\d+\.\s+|```|\|)"
+)
 
 
 def normalize_claim_text(text: str) -> str:
-    """Collapse claim whitespace while keeping source-code line breaks.
+    """Normalize whitespace while preserving code and structured prose lines.
 
-    Prose becomes one sentence. A multiline code claim keeps each
+    Unstructured wrapped prose becomes one line. Headings, lists, and native
+    blocks retain their line boundaries. A multiline code claim keeps each
     non-empty line, including leading indentation, and drops blank lines
     so the paragraph delimiter never appears inside the claim.
 
@@ -54,7 +58,10 @@ def normalize_claim_text(text: str) -> str:
 
     flattened = " ".join(text.split())
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    if "\n" not in normalized or _CODE_CLAIM.search(normalized) is None:
+    if "\n" not in normalized or (
+        _CODE_CLAIM.search(normalized) is None
+        and _STRUCTURED_CLAIM.search(normalized) is None
+    ):
         return flattened
     cleaned: list[str] = []
     for line in normalized.split("\n"):

@@ -500,6 +500,7 @@ describe("AnswerSurface paragraph citations", () => {
       answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
     });
     expect(container.querySelector("ol")).toBeNull();
+    expect(container.querySelectorAll("ul > li[data-paragraph-index]")).toHaveLength(2);
     expect(container.querySelectorAll("[data-paragraph-index]")).toHaveLength(2);
     unmount();
     const view = renderSurface({
@@ -510,7 +511,7 @@ describe("AnswerSurface paragraph citations", () => {
     expect(view.container.querySelector("[data-answer-groups='true']")).toBeNull();
   });
 
-  it("puts each mapped citation after its own paragraph", () => {
+  it("keeps all citations in a Sources section outside the answer paragraphs", () => {
     renderSurface({
       answerOrigin: "company_documents",
       answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
@@ -537,18 +538,16 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    const blocks = screen.getAllByTestId("paragraph-citations");
-    expect(blocks).toHaveLength(2);
+    const sources = screen.getByRole("region", { name: "Answer sources" });
+    expect(sources.querySelectorAll("button")).toHaveLength(2);
+    expect(document.querySelector("[data-paragraph-index] button")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Citation 0, AI Agents · PDF page 25" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Citation 1, AI Agents · PDF page 40" }),
     ).toBeInTheDocument();
-    expect(blocks[0]).toHaveTextContent("PDF page 25");
-    expect(blocks[0]).not.toHaveTextContent("PDF page 40");
-    expect(blocks[1]).toHaveTextContent("PDF page 40");
-    expect(blocks[1]).not.toHaveTextContent("PDF page 25");
+
   });
 
   it("can show two source chips on one paragraph", () => {
@@ -578,7 +577,7 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    const row = screen.getByTestId("paragraph-citations");
+    const row = screen.getByTestId("answer-source-list");
     expect(
       screen.getByRole("button", { name: "Citation 0, Policy · PDF page 10" }),
     ).toBeInTheDocument();
@@ -606,7 +605,7 @@ describe("AnswerSurface paragraph citations", () => {
       ],
     });
     expect(
-      screen.getByText("Legacy run sources (not mapped to a paragraph)"),
+      screen.getByText("Sources"),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("paragraph-citations")).not.toBeInTheDocument();
     expect(
@@ -723,10 +722,10 @@ describe("answerTerminalNote", () => {
       EMPTY_DEADLINE_PARTIAL_COPY,
     );
     expect(answerTerminalNote("partial", "Hello.", "deadline_exhausted")).toBe(
-      "Partial answer. Verified tokens are kept.",
+      "This answer is partial. Only verified content is shown.",
     );
     expect(answerTerminalNote("partial", "")).toBe(
-      "Partial answer. Verified tokens are kept.",
+      "This answer is partial. Only verified content is shown.",
     );
   });
 });

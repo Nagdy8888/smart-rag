@@ -10,6 +10,25 @@ describe("answer prose markdown-lite", () => {
     cleanup();
   });
 
+  it("gives long explanations reading breaks without dropping or cutting sentences", () => {
+    const text = Array.from({ length: 7 }, (_, index) =>
+      `Stage ${String(index)} checks the available context and uses the relevant evidence to prepare a clear and complete explanation for the reader.`,
+    ).join(" ");
+    const { container } = render(
+      <>{renderAnswerProse(text, "prose", "list", "inline")}</>,
+    );
+    const paragraphs = Array.from(container.querySelectorAll("p.prose"));
+    expect(paragraphs).toHaveLength(3);
+    expect(paragraphs.map((paragraph) => paragraph.textContent).join(" ")).toBe(text);
+    expect(container.querySelector("ol")).toBeNull();
+  });
+
+  it("places an authored bold lead label above its complete body", () => {
+    render(<>{renderAnswerProse("**Tool selection** Choose the appropriate tool and check its result.", "prose", "list", "inline", "heading")}</>);
+    expect(screen.getByRole("heading", { name: "Tool selection" })).toBeInTheDocument();
+    expect(screen.getByText("Choose the appropriate tool and check its result.")).toBeInTheDocument();
+  });
+
   it("renders bold, inline code, and a bullet list", () => {
     const { container } = render(
       <>

@@ -90,3 +90,32 @@ The local frontend suite passed 714 tests. Coverage includes live transitions,
 terminal cleanup, grouped stages, retries, unknown tool privacy, and the existing
 assertion that answer prose stays hidden until verification. Type checking,
 production build, lint (five existing warnings), and action inventory passed.
+
+## Global answer integrity follow-up
+
+The shared answer renderer now puts citations in a separate Sources section.
+Plain multi-part answers use readable points, while long narrative blocks gain
+reading breaks at complete sentence boundaries. Authored headings, lists, native
+code, tables, figures, and original paragraph ownership remain intact. This is
+shared rendering behavior for future answers, rather than a special template
+for one example question.
+
+Checkpoint inspection identified two separate defects: prose claim normalization
+flattened structural newlines, and an extractive anchor fallback promoted a
+1,000-character citation slice into answer prose even when the slice ended
+mid-sentence. Claim normalization now preserves structured lines before
+verification. Capped narrative fallback text ends at a complete sentence, or is
+omitted when no complete sentence fits. Two observed source cases were replayed
+without changing historical messages or weakening citation validation.
+
+New versioned company and general prompts request readable explanations by
+default. The company prompt retains original source labels for translated
+explanations and forbids treating an unsupported translation as an exact quote.
+The post-verification organizer remains immutable. Private evaluation artifacts
+are also excluded from Docker build context.
+
+The frontend suite passed 716 tests. Added backend regressions cover preserved
+headings/lists/tables and sentence-safe source bounds. Live acceptance results
+must be recorded against the final prompt hash; interim diagnostic batches are
+not a release score. The clean-checkout contract run passed 288 tests and skipped
+269 environment-dependent cases; this does not certify production readiness.

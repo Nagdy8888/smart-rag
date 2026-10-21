@@ -146,7 +146,15 @@ def _contiguous_anchor_span(text: str, anchors: tuple[str, ...]) -> str:
         end += 1
         if end - start >= MAX_CITATION_SPAN_CHARS:
             break
-    span = text[start:end].strip()
+    # A citation-size cap is not a display boundary. Never promote a cut
+    # source word/sentence into an apparently complete answer paragraph.
+    capped_end = min(end, start + MAX_CITATION_SPAN_CHARS)
+    if capped_end < len(text) and text[capped_end - 1 : capped_end] not in ".!?":
+        boundaries = list(re.finditer(r"[.!?](?=\s|$)", text[start:capped_end]))
+        if not boundaries:
+            return ""
+        capped_end = start + boundaries[-1].end()
+    span = text[start:capped_end].strip()
     if not span:
         return ""
     return span[:MAX_CITATION_SPAN_CHARS]

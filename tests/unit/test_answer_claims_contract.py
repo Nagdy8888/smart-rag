@@ -39,6 +39,21 @@ from tests.support.answer_verifier import (
     verifier_table,
 )
 
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "**Memory**\nMemory stores context.\n- Retain the conversation\n- Recall relevant facts",
+        "## Tool selection\nChoose the appropriate tool.",
+        "1. Inspect the request\n2. Check the result",
+        "| Stage | Purpose |\n| --- | --- |\n| Verify | Check |",
+    ],
+)
+def test_claim_normalization_preserves_readable_structure(text: str) -> None:
+    """Do not flatten headings, lists, or tables before verification."""
+    assert normalize_claim_text(text) == text
+
+
 FIRST_TEXT = "Atlas Controller ships in Q3."
 SECOND_TEXT = "North revenue is 10 USD."
 

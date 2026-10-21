@@ -1499,7 +1499,7 @@ describe("ChatApp Ask workspace", () => {
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(
-      await screen.findByText("Partial answer. Verified tokens are kept."),
+      await screen.findByText("This answer is partial. Only verified content is shown."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Run error/)).toBeNull();
     expect(screen.queryByText(/Something went wrong/)).toBeNull();

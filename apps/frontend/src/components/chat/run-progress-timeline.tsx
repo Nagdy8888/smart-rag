@@ -64,7 +64,7 @@ export function progressSummary(props: RunProgressTimelineProps): string {
     if (props.answerAvailable) {
       return "Partial";
     }
-    return "Partial answer. Verified tokens are kept.";
+    return "This answer is partial. Only verified content is shown.";
   }
   if (props.verificationCompleted && props.answerAvailable && props.collapsed) {
     return "Verified answer";

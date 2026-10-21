@@ -38,7 +38,10 @@ export function renderAnswerProse(
   inlineCodeClassName: string,
   headingClassName = "heading",
 ): ReactNode {
-  const source = text.replace(/\r\n/g, "\n");
+  const source = text.replace(/\r\n/g, "\n").replace(
+    /^(\s*\*\*[^*\n]{1,80}\*\*)[ \t]+(?=\S)/gm,
+    "$1\n",
+  );
   const blocks = splitProseBlocks(source);
   if (blocks.length === 0) {
     return null;
@@ -132,6 +135,17 @@ function splitProseBlocks(source: string): ProseBlock[] {
     paragraphLines = [];
     if (!text) {
       return;
+    }
+    // Long plain explanations need reading pauses even without model markup.
+    // Split only at sentence boundaries; never cut words or inline code.
+    if (text.length > 500 && !text.includes("`")) {
+      const sentences = text.split(/(?<=[a-zA-Z]{3}[.!?])\s+(?=[A-Z])/);
+      if (sentences.length > 3) {
+        for (let index = 0; index < sentences.length; index += 3) {
+          blocks.push({ kind: "p", text: sentences.slice(index, index + 3).join(" ") });
+        }
+        return;
+      }
     }
     blocks.push({ kind: "p", text });
   };
