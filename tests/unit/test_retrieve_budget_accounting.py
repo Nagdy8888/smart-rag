@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -175,6 +177,69 @@ def test_retrieve_budget_binds_run_connection() -> None:
     assert budget.reservation_id == runtime.reservation_id
 
 
+def test_parallel_branches_cannot_consume_the_same_reservation_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run's durable connection/version stays exclusive through settlement."""
+    seen: list[int] = []
+    durable_version = 1
+
+    def consume(
+        *args: object, **kwargs: object
+    ) -> tuple[object, ReservationConsumeResult, UUID]:
+        """Model an atomic database consume with a slow provider response."""
+        nonlocal durable_version
+        del args
+        version = kwargs["expected_version"]
+        if version != durable_version:
+            raise QueryBudgetError("optimistic_version_conflict")
+        assert isinstance(version, int)
+        seen.append(version)
+        durable_version += 1
+        time.sleep(0.03)
+        send = kwargs["send"]
+        assert callable(send)
+        return (
+            send(),
+            ReservationConsumeResult(
+                reservation_id=uuid4(),
+                optimistic_version=durable_version,
+                remaining_usd=Decimal("0.9"),
+                remaining_prompt_tokens=100000,
+                remaining_completion_tokens=10000,
+            ),
+            uuid4(),
+        )
+
+    monkeypatch.setattr(
+        "smart_rag_core.query_admission.usage.execute_counted_model_call", consume
+    )
+    budget = QueryRetrieveBudget(
+        remaining_model_calls=6,
+        remaining_usd=Decimal("1"),
+        connection=_FakeAppApiConnection(),
+        caller=_caller(),
+        run_id=uuid4(),
+        reservation_id=uuid4(),
+    )
+
+    def branch() -> object:
+        """Send an independently scheduled branch against the shared ledger."""
+        return counted_retrieve_send(
+            budget,
+            usage_kind="embedding",
+            model_id="text-embedding-3-large",
+            send=lambda: None,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(branch) for _ in range(2)]
+        assert [future.result() for future in futures] == [None, None]
+    assert seen == [1, 2]
+    assert budget.expected_version == 3
+    assert budget.remaining_model_calls == 4
+
+
 def test_rerank_reserve_is_inside_retrieval_slice_not_answer_stage() -> None:
     """Rerank time comes from the 10s retrieve slice, not the answer reserve."""
 
@@ -250,3 +315,68 @@ def test_select_hybrid_context_skips_rerank_when_reserve_unmet() -> None:
     assert selected.fallback_reason is RerankFallbackReason.TIMEOUT
     assert selected.usage is None
     assert selected.skipped_counterfactual is False
+
+
+@pytest.mark.parametrize("prompt,completion", [(23999, 10000), (100000, 4999)])
+def test_retrieval_preserves_answer_and_verifier_tokens(
+    prompt: int, completion: int
+) -> None:
+    """Optional reranking cannot consume the two mandatory answer-stage holds."""
+    budget = QueryRetrieveBudget(
+        6,
+        Decimal("2"),
+        remaining_prompt_tokens=prompt,
+        remaining_completion_tokens=completion,
+    )
+    with pytest.raises(QueryBudgetError, match="answer_reserve_required"):
+        counted_retrieve_send(
+            budget,
+            usage_kind="rerank",
+            model_id="test",
+            send=lambda: pytest.fail("provider must not be called"),
+        )
+    assert budget.usage_kinds == []
+
+
+def test_failed_retrieval_keeps_consumed_reservation_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A provider failure cannot leave the next branch using an already spent version."""
+
+    def execute(*args: object, **kwargs: object) -> object:
+        """Exercise the bounded callback using the supplied test or runtime inputs."""
+        del args
+        callback = kwargs["on_consumed"]
+        assert callable(callback)
+        callback(
+            ReservationConsumeResult(
+                reservation_id=uuid4(),
+                optimistic_version=2,
+                remaining_usd=Decimal("1.98"),
+                remaining_prompt_tokens=42000,
+                remaining_completion_tokens=10000,
+            )
+        )
+        raise TimeoutError("provider failed after consumption")
+
+    monkeypatch.setattr(
+        "smart_rag_core.query_admission.usage.execute_counted_model_call", execute
+    )
+    budget = QueryRetrieveBudget(
+        6,
+        Decimal("2"),
+        connection=_FakeAppApiConnection(),
+        caller=_caller(),
+        run_id=uuid4(),
+        reservation_id=uuid4(),
+        remaining_prompt_tokens=50000,
+        remaining_completion_tokens=10000,
+    )
+    with pytest.raises(TimeoutError):
+        counted_retrieve_send(
+            budget, usage_kind="embedding", model_id="test", send=lambda: None
+        )
+    assert budget.expected_version == 2
+    assert budget.remaining_model_calls == 5
+    assert budget.remaining_prompt_tokens == 42000
+    assert budget.usage_kinds == ["embedding"]

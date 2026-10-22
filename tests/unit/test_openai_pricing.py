@@ -46,8 +46,40 @@ def test_estimate_usage_cost_routes_by_kind() -> None:
     ) == Decimal("0.00021000")
 
 
+def test_configured_model_uses_its_own_rate_and_unknown_models_fail_conservative() -> (
+    None
+):
+    """Role overrides must not silently inherit a cheaper model's price."""
+    assert estimate_usage_cost_usd(
+        usage_kind="answer",
+        model_id="gpt-4.1-mini",
+        prompt_tokens=1000,
+        completion_tokens=100,
+    ) == Decimal("0.00056000")
+    assert (
+        estimate_usage_cost_usd(
+            usage_kind="answer",
+            model_id="unpriced-model",
+            prompt_tokens=1000,
+            completion_tokens=100,
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("model_id", "expected_cost"),
+    [
+        ("gpt-4o-mini", Decimal("0.00058185")),
+        ("gpt-4.1-mini", Decimal("0.00155160")),
+        ("gpt-5.4-mini", Decimal("0.00312975")),
+        ("unpriced-model", Decimal("0.40")),
+    ],
+)
 def test_execute_counted_model_call_records_token_priced_usd(
     monkeypatch: pytest.MonkeyPatch,
+    model_id: str,
+    expected_cost: Decimal,
 ) -> None:
     """Successful sends record list-price USD instead of the answer cap."""
 
@@ -103,7 +135,7 @@ def test_execute_counted_model_call_records_token_priced_usd(
         reservation_id=object(),  # type: ignore[arg-type]
         expected_version=1,
         usage_kind="answer",
-        model_id="gpt-4o-mini",
+        model_id=model_id,
         provider_attempt_id="attempt-1",
         send=lambda: "ok",
         usage_from_result=lambda _result: (3291, 147, None),
@@ -111,4 +143,4 @@ def test_execute_counted_model_call_records_token_priced_usd(
 
     assert recorded["prompt_tokens"] == 3291
     assert recorded["completion_tokens"] == 147
-    assert recorded["cost_usd"] == Decimal("0.00058185")
+    assert recorded["cost_usd"] == expected_cost

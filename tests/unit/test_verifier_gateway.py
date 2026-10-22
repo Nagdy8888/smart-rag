@@ -292,3 +292,43 @@ def test_verify_answer_node_invalid_answer_payload_refuses() -> None:
     assert isinstance(answer, dict)
     assert answer["answer_text"] != "kept"
     assert answer["status"] == "refused"
+
+
+@pytest.mark.parametrize(
+    "reason,stored",
+    [
+        ("literal_mismatch", "literal_mismatch"),
+        ("insufficient_evidence", "insufficient_evidence"),
+        ("private free text", "unspecified"),
+    ],
+)
+def test_checkpoint_preserves_only_bounded_verifier_reason_codes(
+    monkeypatch: pytest.MonkeyPatch, reason: str, stored: str
+) -> None:
+    """A refusal checkpoint explains its stage without storing provider prose."""
+    from smart_rag_agents.query.nodes import verify as verify_module
+    from smart_rag_core.query_answer.models import VerifierLinkVerdict, VerifierPayload
+
+    def verdict(*args: object, **kwargs: object) -> tuple[VerifierPayload, int, int]:
+        """Exercise the bounded callback using the supplied test or runtime inputs."""
+        return (
+            VerifierPayload(
+                link_verdicts=(
+                    VerifierLinkVerdict(link_id="l1", supported=False, reason=reason),
+                )
+            ),
+            3,
+            2,
+        )
+
+    monkeypatch.setattr(verify_module, "gateway_verifier", verdict)
+    result = verify_answer_node(
+        _answered_state(),
+        QueryGraphDeps(
+            model_gateway=_LongReasonVerifierGateway(), verifier_prompt_text="fixture"
+        ),
+    )
+    verification = _object_map(result["verification"])
+    assert verification["verifier_link_verdicts"] == [
+        {"link_id": "l1", "supported": False, "reason": stored}
+    ]

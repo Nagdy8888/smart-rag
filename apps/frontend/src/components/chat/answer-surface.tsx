@@ -4,7 +4,8 @@
 
 "use client";
 
-import { memo, type ReactNode } from "react";
+import { Fragment, memo, type ReactNode } from "react";
+import { splitAnswerFences } from "../../lib/answer-fences";
 import {
   MIXED_SCOPE_CLARIFICATION,
   answerOriginLabel,
@@ -38,7 +39,7 @@ import {
   proseFromDecorativeFence,
   splitTrailingSourceListing,
 } from "../../lib/code-snippet";
-import { AnswerFigure, splitFigureMark } from "./answer-figure";
+import { AnswerFigure, figureIdsInText, stripFigureMarks } from "./answer-figure";
 import { displayText } from "../../lib/safe-text";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -133,6 +134,9 @@ export function answerTerminalNote(
     return EMPTY_DEADLINE_PARTIAL_COPY;
   }
   if (terminal === "partial") {
+    if (status === "source_code_syntax_invalid") {
+      return "The cited code example contains a syntax error. Its original text is preserved; check the source before running it.";
+    }
     if (status === "refused") {
       return "An answer could not be verified.";
     }
@@ -299,11 +303,25 @@ function renderAnswerParagraphBody(
   text: string,
   complete: boolean,
   seenTables: AnswerTableModel[],
+  alreadyDecoded = false,
+  seenFigures = new Set<string>(),
 ): ReactNode {
-  const decoded = proseFromDecorativeFence(displayText(text));
-  const figure = splitFigureMark(decoded);
-  if (complete && figure.figureId !== null) {
-    return <AnswerFigure figureId={figure.figureId} caption={figure.prose} />;
+  const source = alreadyDecoded ? text : displayText(text);
+  const segments = complete ? splitAnswerFences(source) : null;
+  if (segments !== null) {
+    return <>{segments.map((segment, index) => (
+      <Fragment key={index}>{renderAnswerParagraphBody(segment, true, seenTables, true, seenFigures)}</Fragment>
+    ))}</>;
+  }
+  const decoded = proseFromDecorativeFence(source);
+  const figureIds = figureIdsInText(decoded);
+  if (complete && figureIds.length > 0 && !isCodeSnippet(decoded)) {
+    const unseen = figureIds.filter((id) => !seenFigures.has(id));
+    unseen.forEach((id) => seenFigures.add(id));
+    const prose = stripFigureMarks(decoded);
+    return unseen.length === 0 ? renderAnswerProse(prose, styles.answerProse, styles.answerList, styles.answerInlineCode, styles.answerHeading) : (
+      <>{unseen.map((id, index) => <AnswerFigure key={id} figureId={id} caption={index === 0 ? prose : ""} />)}</>
+    );
   }
   // Lone fence markers left after a bad split stay out of the transcript.
   if (/^\s*```[a-zA-Z0-9_+-]*\s*$/.test(decoded.trim())) {
@@ -464,13 +482,7 @@ function AnswerParagraphs({
   const showChips = shouldShowCitations(answerOrigin);
   const visibleCitations = showChips ? [...citations] : [];
   const seenTables: AnswerTableModel[] = [];
-  const points = paragraphs.length > 1 && !paragraphs.some((paragraph) => {
-    const text = proseFromDecorativeFence(displayText(paragraph));
-    return /(^|\n)\s*(?:#{1,3}\s|\*\*[^*\n]{1,80}\*\*|[-*]\s+|\d+\.\s+)/.test(text)
-      || isCodeSnippet(text) || isAnswerTable(text) || splitFigureMark(text).figureId !== null;
-  });
-  const Group = points ? "ul" : "div";
-  const Item = points ? "li" : "div";
+  const seenFigures = new Set<string>();
 
   return (
     <div
@@ -479,23 +491,30 @@ function AnswerParagraphs({
         showChips && visibleCitations.length > 0 ? "answer-citations" : undefined
       }
     >
-      <Group className={points ? styles.answerPoints : styles.answerSections} dir="auto">
+      <div className={styles.answerSections} dir="auto">
         {paragraphs.map((_, index) => {
           const slice = visibleParagraphSlice(paragraphs, index, visibleText);
           if (slice.text === "") {
             return null;
           }
           return (
-            <Item
-              className={points ? styles.answerPoint : styles.paragraphBlock}
+            <div
+              className={styles.paragraphBlock}
               data-paragraph-index={String(index)}
               key={`p-${String(index)}`}
             >
-              {renderAnswerParagraphBody(slice.text, slice.complete, seenTables)}
-            </Item>
+              {renderAnswerParagraphBody(slice.text, slice.complete, seenTables, false, seenFigures)}
+            </div>
           );
         })}
-      </Group>
+      </div>
+      {visibleText === answerText ? visibleCitations.map((citation) => {
+        const id = citation.provenance.figure_id;
+        if (citation.source_unavailable || citation.provenance.content_kind !== "figure" ||
+            typeof id !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(id) || seenFigures.has(id)) return null;
+        seenFigures.add(id);
+        return <AnswerFigure key={`cited-${id}`} figureId={id} caption="" />;
+      }) : null}
       {showChips && visibleCitations.length > 0 && visibleText === answerText ? (
         <section className={styles.answerSources} aria-label="Answer sources">
           <p className={styles.answerSourcesLabel}>Sources</p>
@@ -567,12 +586,16 @@ export const AnswerSurface = memo(function AnswerSurface({
           : terminal === "deadline"
             ? styles.terminalDeadline
             : styles.terminalNote;
-  const lastHistUser = [...messages].reverse().find((item) => item.role === "user");
-  const lastHistAssistant = [...messages]
+  const liveRunId = chat?.runId;
+  const currentHistory = liveRunId
+    ? messages.filter((item) => item.run_id === liveRunId)
+    : messages;
+  const lastHistUser = [...currentHistory].reverse().find((item) => item.role === "user");
+  const lastHistAssistant = [...currentHistory]
     .reverse()
     .find((item) => item.role === "assistant");
   const showLiveUser =
-    question !== "" && !transcriptTextMatches(lastHistUser?.content, question);
+    question !== "" && (starting || !transcriptTextMatches(lastHistUser?.content, question));
   const showProgress =
     starting ||
     progressItems.length > 0 ||

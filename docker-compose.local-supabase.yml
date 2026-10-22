@@ -1,0 +1,28 @@
+# Temporary laptop-only Supabase. Use with .env.local-supabase, never hosted env.
+networks:
+  supabase-local:
+    external: true
+    name: smart-rag-supabase-local
+
+services:
+  api:
+    env_file: !override
+      - .env.local-supabase
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    networks:
+      - supabase-local
+    environment:
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010
+      PYTHONDONTWRITEBYTECODE: "1"
+    # Local development code only. Dependencies remain pinned in the image;
+    # source mounts are read-only and do not include env files or private data.
+    volumes:
+      - ./packages/core/src/smart_rag_core:/app/packages/core/src/smart_rag_core:ro
+      - ./apps/agents/src/smart_rag_agents:/app/apps/agents/src/smart_rag_agents:ro
+      - ./apps/backend/src/smart_rag_api:/app/apps/backend/src/smart_rag_api:ro
+  worker:
+    env_file: !override
+      - .env.local-supabase
+    networks:
+      - supabase-local

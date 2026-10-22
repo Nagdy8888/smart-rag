@@ -55,6 +55,16 @@ def runtime_after_retrieve_budget(
         update={
             "optimistic_version": budget.expected_version,
             "remaining_usd": budget.remaining_usd,
+            "remaining_prompt_tokens": (
+                budget.remaining_prompt_tokens
+                if budget.remaining_prompt_tokens is not None
+                else context.remaining_prompt_tokens
+            ),
+            "remaining_completion_tokens": (
+                budget.remaining_completion_tokens
+                if budget.remaining_completion_tokens is not None
+                else context.remaining_completion_tokens
+            ),
         }
     )
 
@@ -122,6 +132,8 @@ def retrieve_budget(
         run_id=context.run_id,
         reservation_id=context.reservation_id,
         expected_version=context.optimistic_version,
+        remaining_prompt_tokens=context.remaining_prompt_tokens,
+        remaining_completion_tokens=context.remaining_completion_tokens,
     )
 
 

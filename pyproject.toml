@@ -47,6 +47,10 @@ xfail_strict = true
 target-version = "py311"
 line-length = 88
 extend-exclude = [
+    # Vendored skill tools retain upstream formatting; application checks stay strict.
+    ".agents/skills/security-audit",
+    ".agents/skills/skill-creator",
+    ".agents/skills/ui-ux-pro-max",
     ".venv",
     "node_modules",
     "prev_review",

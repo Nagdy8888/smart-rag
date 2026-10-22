@@ -24,6 +24,10 @@ async function capture(page: Page, name: string): Promise<void> {
       "nextjs-portal,[data-next-badge],[data-next-badge-root],[data-next-mark]{display:none!important}",
   });
   await expect(page.locator("#main")).toBeVisible();
+  const readiness = page.getByRole("button", { name: "Service readiness" });
+  if (await readiness.isVisible()) {
+    await expect(readiness).toContainText("Ready");
+  }
   // GitHub ubuntu-latest looks for `*-linux.png`. The committed baselines
   // are Windows Chromium. Comparing them cross-OS fails on antialiasing;
   // generating Linux PNGs needs the Playwright Docker image. Layout is

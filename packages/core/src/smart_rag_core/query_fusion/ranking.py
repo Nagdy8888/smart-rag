@@ -276,6 +276,7 @@ def score_resolved_path_fusion(
                 document_id=document_id,
                 version_id=version_id,
                 citation_text=citation,
+                parent_chunk_id=hybrid_item.parent_chunk_id if hybrid_item else None,
                 hybrid_rank=hybrid_rank,
                 graph_rank=graph_rank,
                 graph_passage_strength=(

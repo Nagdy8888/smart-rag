@@ -7,8 +7,8 @@
 import { createElement, type ReactNode } from "react";
 import { displayText, isSafeHttpUrl } from "./safe-text";
 
-const BULLET = /^\s*[-*]\s+(.+)$/;
-const ORDERED = /^\s*(\d+)\.\s+(.+)$/;
+const BULLET = /^\s*[-*•]\s+(.+)$/;
+const ORDERED = /^\s*(\d+)[.)]\s+(.+)$/;
 /** A markdown title of one to three hashes, or a line that is only bold. */
 const ATX_HEADING = /^\s{0,3}#{1,3}\s+(\S.*?)\s*$/;
 const BOLD_HEADING = /^\s*\*\*([^*]+)\*\*\s*$/;
@@ -105,7 +105,7 @@ type ProseBlock =
  * @param line - One source line.
  * @returns Title text, or null when the line is body or a list item.
  */
-function headingText(line: string): string | null {
+function headingText(line: string, following = ""): string | null {
   const atx = line.match(ATX_HEADING);
   if (atx) {
     return (atx[1] ?? "").trim();
@@ -113,6 +113,16 @@ function headingText(line: string): string | null {
   const bold = line.match(BOLD_HEADING);
   if (bold) {
     return (bold[1] ?? "").trim();
+  }
+  // Native PDF excerpts often retain a standalone title without Markdown.
+  // Recognize its existing words; never invent sections or reinterpret a
+  // complete sentence, code, bullet, or wrapped body line as a heading.
+  const plain = line.trim();
+  const words = plain.replace(/:$/, "").split(/\s+/);
+  if (following.trim() && plain.length <= 75 && words.length <= 8 &&
+      !/[.!?؟{}=<>|`]/u.test(plain) && !BULLET.test(plain) && !ORDERED.test(plain) &&
+      (plain.endsWith(":") || words.every((word) => /^[A-Z][\p{L}\p{N}’'-]*$/u.test(word)))) {
+    return plain.replace(/:$/, "");
   }
   return null;
 }
@@ -139,7 +149,7 @@ function splitProseBlocks(source: string): ProseBlock[] {
     // Long plain explanations need reading pauses even without model markup.
     // Split only at sentence boundaries; never cut words or inline code.
     if (text.length > 500 && !text.includes("`")) {
-      const sentences = text.split(/(?<=[a-zA-Z]{3}[.!?])\s+(?=[A-Z])/);
+      const sentences = text.split(/(?<=[\p{L}]{3}[.!?؟])\s+(?=[\p{Lu}\p{Script=Arabic}])/u);
       if (sentences.length > 3) {
         for (let index = 0; index < sentences.length; index += 3) {
           blocks.push({ kind: "p", text: sentences.slice(index, index + 3).join(" ") });
@@ -158,8 +168,8 @@ function splitProseBlocks(source: string): ProseBlock[] {
     listItems = [];
   };
 
-  for (const line of lines) {
-    const title = headingText(line);
+  for (const [lineIndex, line] of lines.entries()) {
+    const title = headingText(line, lines[lineIndex + 1]);
     if (title) {
       flushParagraph();
       flushList();

@@ -137,7 +137,7 @@ def execute_counted_model_call(
             prompt_tokens=resolved_prompt,
             completion_tokens=resolved_completion,
         )
-        if recorded_cost > usd_cap:
+        if recorded_cost is not None and recorded_cost > usd_cap:
             recorded_cost = usd_cap
     usage_id = record_query_llm_usage(
         connection,

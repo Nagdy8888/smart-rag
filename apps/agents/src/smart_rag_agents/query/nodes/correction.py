@@ -24,6 +24,7 @@ from smart_rag_core.query_routing.serde import (
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes.shared import (
     retrieve_budget,
+    runtime_after_retrieve_budget,
     runtime_from_state,
     skip_closed_nodes,
 )
@@ -168,6 +169,14 @@ def apply_correction_node(
                         "remaining_corrections": decision.remaining_corrections,
                         "correction_applied": True,
                         "remaining_model_calls": query_budget.remaining_model_calls,
+                        "authorized_runtime": runtime_after_retrieve_budget(
+                            context, query_budget
+                        ).model_dump(mode="json"),
+                        **accumulated_tokens(
+                            state,
+                            query_budget.prompt_tokens,
+                            query_budget.completion_tokens,
+                        ),
                     },
                 )
     combined = (*results, *extra)
@@ -216,6 +225,9 @@ def apply_correction_node(
             ),
             "catalog_llm_call_count": 0,
             "remaining_model_calls": query_budget.remaining_model_calls,
+            "authorized_runtime": runtime_after_retrieve_budget(
+                context, query_budget
+            ).model_dump(mode="json"),
             **accumulated_tokens(
                 state, query_budget.prompt_tokens, query_budget.completion_tokens
             ),

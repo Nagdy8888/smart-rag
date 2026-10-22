@@ -118,50 +118,9 @@ class AnswerPersistenceMixin:
                 admission/routing rejection.
         """
 
-        if terminal_status in {"admission_rejected", "routing_rejected"}:
-            return
-        if self._store is None:
-            return
-        from smart_rag_core.memory.summary import maybe_generate_conversation_summary
-        from smart_rag_core.query_routing.preparation import caller_from_runtime
-
-        db_url = getattr(settings, "supabase_db_url", None)
-        postgres_url = db_url.get_secret_value() if db_url is not None else None
-        if postgres_url is None:
-            return
-        store = self._store
-
-        def _put(
-            namespace: tuple[str, str, str],
-            key: str,
-            payload: dict[str, object],
-        ) -> None:
-            """Write one compacted store item.
-
-            Args:
-                namespace: Store namespace tuple.
-                key: Item key.
-                payload: JSON-compatible value.
-            """
-
-            store.put_compact(namespace, key, payload)
-
-        with connect_postgres(postgres_url) as connection:
-            connection.execute("SET ROLE app_api")
-            maybe_generate_conversation_summary(
-                connection,
-                caller=caller_from_runtime(context),
-                run_id=context.run_id,
-                reservation_id=context.reservation_id,
-                expected_version=context.optimistic_version,
-                remaining_model_calls=remaining_model_calls,
-                remaining_usd=context.remaining_usd,
-                conversation_id=context.conversation_id,
-                user_id=str(context.user_id),
-                memory_records=(),
-                store_put=_put,
-            )
-            connection.commit()
+        # Rolling summaries run in the admitted load_memory node before prompt
+        # construction. Never charge a placeholder after the terminal event.
+        return
 
     def _persist_assistant_answer(
         self,

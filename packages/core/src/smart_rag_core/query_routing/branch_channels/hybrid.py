@@ -460,6 +460,9 @@ def hybrid_evidence(
                         record.version_id if record is not None else unit.version_id
                     ),
                     citation_text=text,
+                    parent_chunk_id=str(record.parent_chunk_id)
+                    if record and record.parent_chunk_id
+                    else None,
                     hybrid_rank=index,
                     section_path=tuple(
                         record.section_path
@@ -506,6 +509,9 @@ def hybrid_evidence(
                 document_id=str(record.document_id),
                 version_id=str(record.version_id),
                 citation_text=text,
+                parent_chunk_id=str(record.parent_chunk_id)
+                if record.parent_chunk_id
+                else None,
                 hybrid_rank=index,
                 section_path=record.section_path,
                 page_number=record.page_number,

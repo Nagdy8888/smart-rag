@@ -27,6 +27,7 @@ ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_general_chat.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_profile.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_conversation_title.py"),
+    Path("packages/core/src/smart_rag_core/gateways/summary_model.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_page_ocr.py"),
 }
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import cast
 
 from smart_rag_core.gateways.embedding import (
@@ -21,6 +22,8 @@ from smart_rag_core.query_admission.retrieve_budget import QueryRetrieveBudget
 from smart_rag_core.retrieval.hybrid_run.budget import counted_retrieve_send
 from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.runtime.async_bridge import run_coro_blocking
+
+LOGGER = logging.getLogger(__name__)
 
 
 def embed_query_texts(
@@ -72,9 +75,13 @@ def embed_query_texts(
                 send=_send,
             ),
         )
-    except (QueryBudgetError, QueryCeilingError):
+    except (QueryBudgetError, QueryCeilingError) as exc:
+        LOGGER.warning("retrieval_embedding_denied", extra={"reason": exc.reason})
         return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
-    except Exception:
+    except Exception as exc:
+        LOGGER.warning(
+            "retrieval_embedding_failed", extra={"error_type": type(exc).__name__}
+        )
         return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
     if len(response.vectors) != len(texts):
         return None, RetrievalFallbackReason.DENSE_UNAVAILABLE

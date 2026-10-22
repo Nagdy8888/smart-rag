@@ -105,6 +105,7 @@ class QueryGraphState(TypedDict):
     user_query: str
     routing_surface: str
     requested_manual_route: str | None
+    memory_summary_status: str
     memory_records: list[dict[str, object]]
     preparation: dict[str, object] | None
     retrieval_plan: dict[str, object] | None
@@ -194,6 +195,7 @@ def pending_query_state(
         "routing_surface": routing_surface,
         "requested_manual_route": requested_manual_route,
         "memory_records": [],
+        "memory_summary_status": "not_needed",
         "preparation": None,
         "retrieval_plan": None,
         "branch_results": [],

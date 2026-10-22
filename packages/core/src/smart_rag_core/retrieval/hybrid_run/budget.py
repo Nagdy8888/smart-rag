@@ -18,7 +18,9 @@ from smart_rag_core.query_admission.exceptions import (
 from smart_rag_core.query_admission.retrieve_budget import (
     QueryRetrieveBudget,
     add_recorded_tokens,
+    assert_retrieve_answer_reserve,
 )
+from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.retrieval.context import RerankFn
 from smart_rag_core.retrieval.profiles import RERANK_MODEL_ID
 from smart_rag_core.retrieval.rerank import (
@@ -116,6 +118,23 @@ def counted_retrieve_send(
 
     if budget is None:
         return send()
+    # Independent branches share this run's connection, optimistic version,
+    # and counters. A whole consume/send/settle must own that ledger; otherwise
+    # concurrent calls can spend the same version or interleave transactions.
+    with budget.send_lock:
+        return _counted_retrieve_send_locked(
+            budget, usage_kind=usage_kind, model_id=model_id, send=send
+        )
+
+
+def _counted_retrieve_send_locked(
+    budget: QueryRetrieveBudget,
+    *,
+    usage_kind: str,
+    model_id: str,
+    send: Callable[[], object],
+) -> object:
+    """Consume and settle one call while holding the run-local ledger lock."""
     from smart_rag_core.query_admission.ceilings import (
         assert_retrieve_kind_available,
         debit_retrieve_budget,
@@ -129,6 +148,7 @@ def counted_retrieve_send(
     durable_required = isinstance(run_id, UUID) and isinstance(reservation_id, UUID)
     if durable_required and not isinstance(connection, psycopg.Connection):
         raise QueryBudgetError("retrieve_accounting_connection_missing")
+    assert_retrieve_answer_reserve(budget, usage_kind)
     if (
         isinstance(connection, psycopg.Connection)
         and isinstance(caller, CallerContext)
@@ -139,6 +159,19 @@ def counted_retrieve_send(
             remaining_usd=budget.remaining_usd,
             usage_kind=usage_kind,
         )
+        updated = False
+
+        def on_consumed(consumed: ReservationConsumeResult) -> None:
+            """Keep the ledger current even when the provider fails after send."""
+            nonlocal updated
+            debit_retrieve_budget(
+                budget, usage_kind, remaining_usd=consumed.remaining_usd
+            )
+            budget.expected_version = consumed.optimistic_version
+            budget.remaining_prompt_tokens = consumed.remaining_prompt_tokens
+            budget.remaining_completion_tokens = consumed.remaining_completion_tokens
+            updated = True
+
         result, consumed, _usage_id = execute_counted_model_call(
             cast("psycopg.Connection[tuple[Any, ...]]", connection),
             caller=caller,
@@ -150,12 +183,20 @@ def counted_retrieve_send(
             provider_attempt_id=str(uuid4()),
             send=send,
             usage_from_result=tokens_from_retrieve_result,
+            on_consumed=on_consumed,
         )
-        budget.expected_version = consumed.optimistic_version
-        debit_retrieve_budget(budget, usage_kind, remaining_usd=consumed.remaining_usd)
+        if not updated:
+            on_consumed(consumed)
         _accumulate_retrieve_tokens(budget, result)
         return result
     debit_retrieve_budget(budget, usage_kind)
+    from smart_rag_core.query_admission.usage_caps import usage_kind_caps
+
+    _, prompt_cap, completion_cap = usage_kind_caps(usage_kind)
+    if budget.remaining_prompt_tokens is not None:
+        budget.remaining_prompt_tokens -= prompt_cap
+    if budget.remaining_completion_tokens is not None:
+        budget.remaining_completion_tokens -= completion_cap
     result = send()
     _accumulate_retrieve_tokens(budget, result)
     return result
@@ -222,12 +263,15 @@ def counted_rerank(
 
             return inner(query, pool, remaining_deadline_seconds)
 
-        counted = counted_retrieve_send(
-            budget,
-            usage_kind="rerank",
-            model_id=RERANK_MODEL_ID,
-            send=_send,
-        )
+        try:
+            counted = counted_retrieve_send(
+                budget,
+                usage_kind="rerank",
+                model_id=RERANK_MODEL_ID,
+                send=_send,
+            )
+        except (QueryBudgetError, QueryCeilingError):
+            return (), None, RerankFallbackReason.BUDGET_DENIED
         return cast(
             tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason],
             counted,

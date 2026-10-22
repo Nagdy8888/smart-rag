@@ -7,9 +7,9 @@ from smart_rag_core.models.env_pins import (
     PROFILE_MODEL_ID,
 )
 
-PROFILE_PROMPT_VERSION = "query_profile_v1"
+PROFILE_PROMPT_VERSION = "query_profile_v3"
 PROFILE_PROMPT_SHA256 = (
-    "cdbd53097306afda12de8be4be247ce45d525a1f889bbfd47f48c223ab20ccbd"
+    "321d341485493fc99269c8e5e64c948c57f0f1ae39c0d05cf16cc165b7e8c152"
 )
 PROFILE_MAX_OUTPUT_TOKENS = 1500
 PROFILE_MODEL_VERSION = "query-profile-mock-v1"

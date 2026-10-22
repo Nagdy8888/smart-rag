@@ -70,6 +70,7 @@ class HybridPassage(BaseModel):
     bm25_snippet: Literal[False] = False
     content_kind: Literal["code", "table", "figure"] | None = None
     figure_id: str | None = None
+    parent_chunk_id: str | None = None
 
 
 class GraphPathInput(BaseModel):
@@ -266,6 +267,7 @@ class ScoredPassage(BaseModel):
     statement_ids: tuple[str, ...] = ()
     content_kind: Literal["code", "table", "figure"] | None = None
     figure_id: str | None = None
+    parent_chunk_id: str | None = None
 
 
 class FusionResult(BaseModel):

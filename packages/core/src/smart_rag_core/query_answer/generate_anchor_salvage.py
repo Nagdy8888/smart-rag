@@ -18,6 +18,7 @@ from smart_rag_core.query_answer.generate_literals import (
 from smart_rag_core.query_answer.generate_page_openings import (
     fill_cited_page_opening,
 )
+from smart_rag_core.query_answer.language import requested_answer_language
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -69,6 +70,17 @@ def salvage_anchor_claim_fill(
 
     if any(link.link_id == _TABLE_BLOCK_LINK_ID for link in payload.atomic_links):
         return payload
+    if not named_page_numbers(user_query) and not re.search(
+        r"(?i)\b(?:verbatim|quote|wording|reproduce|exact words)\b", user_query
+    ):
+        # A supported answer does not need an unrelated quote appended merely
+        # because another passage shares two broad question words.
+        if payload.atomic_links and not is_empty_refusal(payload):
+            return payload
+        if re.search(
+            r"(?i)\b(?:that|those|it|its|them|same|you just showed)\b", user_query
+        ):
+            return payload
     if requested_artifact_labels(user_query, "figure") and not named_page_numbers(
         user_query
     ):
@@ -80,16 +92,31 @@ def salvage_anchor_claim_fill(
         return payload
     if any(link.link_id in _ANCHOR_CLAIM_LINK_IDS for link in payload.atomic_links):
         return payload
+    if requested_answer_language(user_query) != "en":
+        return payload
     anchors = _page_claim_anchors(user_query)
     if not anchors:
         return payload
     strong_keys = _strong_anchor_keys(user_query)
+    # A shared topic word cannot substitute for the explicitly named entity
+    # or year. In particular, never turn an absent-date refusal into a quote
+    # from an unrelated example containing words such as "price" or "company".
+    corpus = "\n".join(item.citation_text for item in fusion.evidence).casefold()
+    anchor_keys = {anchor.casefold() for anchor in anchors}
+    if any(key not in corpus for key in strong_keys & anchor_keys):
+        return payload
     for item in _ranked_fill_passages(fusion, user_query=user_query):
         text = item.citation_text or ""
+        if item.content_kind == "figure":
+            from smart_rag_core.query_answer.figure_placement import figure_caption_text
+
+            text = figure_caption_text(text)
         if not _passage_satisfies_anchor_gate(text, anchors, strong_keys=strong_keys):
             continue
         span = _contiguous_anchor_span(text, anchors)
         if not span:
+            continue
+        if not _passage_satisfies_anchor_gate(span, anchors, strong_keys=strong_keys):
             continue
         if extractive_block_already_released(payload, span):
             continue
@@ -118,12 +145,19 @@ def _contiguous_anchor_span(text: str, anchors: tuple[str, ...]) -> str:
 
     Returns:
         Exact evidence substring capped at ``MAX_CITATION_SPAN_CHARS``, or
-        empty when fewer than one anchor hits.
+        empty when anchors or their leading sentence context cannot fit.
     """
 
     if not text or not anchors:
         return ""
     lowered = text.casefold()
+    # Case folding can expand characters (for example, sharp-s into two
+    # letters). Match offsets must map back to the original citation text.
+    source_offsets = (
+        [index for index, char in enumerate(text) for _ in char.casefold()]
+        if len(lowered) != len(text)
+        else None
+    )
     hit_ranges: list[tuple[int, int]] = []
     for anchor in anchors:
         needle = anchor.casefold()
@@ -132,16 +166,25 @@ def _contiguous_anchor_span(text: str, anchors: tuple[str, ...]) -> str:
         start = lowered.find(needle)
         if start < 0:
             continue
-        hit_ranges.append((start, start + len(anchor)))
+        if source_offsets is None:
+            hit_ranges.append((start, start + len(needle)))
+        else:
+            hit_ranges.append(
+                (source_offsets[start], source_offsets[start + len(needle) - 1] + 1)
+            )
     if not hit_ranges:
         return ""
     start = min(item[0] for item in hit_ranges)
     end = max(item[1] for item in hit_ranges)
+    if end - start > MAX_CITATION_SPAN_CHARS:
+        return ""
     # Expand to nearby line/sentence boundaries for a readable claim.
     while start > 0 and text[start - 1] not in ".\n!?":
         start -= 1
         if end - start >= MAX_CITATION_SPAN_CHARS:
             break
+    if start > 0 and text[start - 1] not in ".\n!?":
+        return ""
     while end < len(text) and text[end - 1 : end] not in ".\n!?":
         end += 1
         if end - start >= MAX_CITATION_SPAN_CHARS:

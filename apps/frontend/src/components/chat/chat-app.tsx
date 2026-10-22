@@ -9,7 +9,7 @@ import { isClassifiedApiError, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
 import { hrefForCitationRecord } from "../../lib/citation-drawer";
-import { overlaySettledTurns } from "../../lib/chat-history";
+import { chronologicalMessages, overlaySettledTurns } from "../../lib/chat-history";
 import { showSaveToQuizConvenience } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
 import { webSearchCapability } from "../../lib/web-search";
@@ -122,7 +122,7 @@ export function ChatApp() {
   const historyMessages = useMemo(
     () =>
       overlaySettledTurns(
-        [...actions.olderMessages, ...[...liveQueries.messages].reverse()],
+        chronologicalMessages([...actions.olderMessages, ...liveQueries.messages]),
         run.settledTurns,
       ),
     [actions.olderMessages, liveQueries.messages, run.settledTurns],

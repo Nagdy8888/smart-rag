@@ -106,6 +106,7 @@ def _from_hybrid(
         source_url=item.source_url,
         content_kind=item.content_kind,
         figure_id=item.figure_id,
+        parent_chunk_id=item.parent_chunk_id,
     )
 
 

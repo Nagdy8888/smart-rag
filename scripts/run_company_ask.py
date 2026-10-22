@@ -63,6 +63,7 @@ from scripts.eval_ask_stage_export import (  # noqa: E402
 _RUN_TIMEOUT_S = 125.0
 _CLIENT_VERSION = "0.1.0"
 _SEARCH_SCOPE = "company_documents"
+_search_scope_override: str | None = None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -570,7 +571,7 @@ def _ask_one(
             json={
                 "message": question,
                 "idempotency_key": idempotency,
-                "search_scope": _SEARCH_SCOPE,
+                "search_scope": _search_scope_override or _SEARCH_SCOPE,
             },
             timeout=60.0,
         )
@@ -1545,3 +1546,23 @@ def _measured_source_resolution(value: object) -> SourceResolutionStage:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def set_search_scope(scope: str) -> None:
+    """Select the client source preference for reusable conversation probes."""
+    if scope not in {"auto", "company_documents", "general_knowledge", "web"}:
+        raise ValueError("invalid_search_scope")
+    global _search_scope_override
+    _search_scope_override = scope
+
+
+def create_conversation(client: httpx.Client, base_url: str, token: str) -> str:
+    """Create one authorized conversation for multi-turn probes."""
+    return _create_conversation(client, base_url, token)
+
+
+def ask_one(
+    client: httpx.Client, base_url: str, token: str, conversation_id: str, question: str
+) -> dict[str, object]:
+    """Send one user turn through the normal admission and SSE path."""
+    return _ask_one(client, base_url, token, conversation_id, question)

@@ -11,7 +11,7 @@ from smart_rag_core.query_profile.versions import PROFILE_PROMPT_VERSION
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 DEFAULT_FEWSHOT_PATH = (
-    REPO_ROOT / "tests" / "fixtures" / "evaluation" / "phase4" / "fewshots.json"
+    REPO_ROOT / "tests" / "fixtures" / "evaluation" / "phase4" / "fewshots-v3.json"
 )
 HOLDOUT_MANIFEST_PATH = (
     REPO_ROOT

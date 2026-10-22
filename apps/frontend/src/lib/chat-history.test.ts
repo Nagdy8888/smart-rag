@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { createChatViewState } from "./chat-view";
 import {
+  chronologicalMessages,
   overlaySettledTurns,
   snapshotSettledTurn,
   type SettledChatTurn,
 } from "./chat-history";
 import type { ConversationMessage } from "./types";
+
+describe("chronologicalMessages", () => {
+  it.each([false, true])("places every question before its answer for either API page order (%s)", (reverse) => {
+    const rows: ConversationMessage[] = [
+      {message_id:"u1",role:"user",content:"First question",created_at:"2026-10-22T01:00:00Z",run_id:"r1"},
+      {message_id:"a1",role:"assistant",content:"First answer",created_at:"2026-10-22T01:00:10Z",run_id:"r1"},
+      {message_id:"u2",role:"user",content:"Second question",created_at:"2026-10-22T01:00:20Z",run_id:"r2"},
+      {message_id:"a2",role:"assistant",content:"Second answer",created_at:"2026-10-22T01:00:30Z",run_id:"r2"},
+    ];
+    expect(chronologicalMessages(reverse ? [...rows].reverse() : rows).map(m=>m.message_id)).toEqual(["u1","a1","u2","a2"]);
+  });
+  it("puts the user first for equal timestamps and deduplicates page overlap", () => {
+    const user: ConversationMessage={message_id:"u",role:"user",content:"Question",created_at:"2026-10-22T01:00:00Z",run_id:"r"};
+    const answer: ConversationMessage={...user,message_id:"a",role:"assistant",content:"Answer"};
+    expect(chronologicalMessages([answer,user,answer]).map(m=>m.role)).toEqual(["user","assistant"]);
+  });
+});
 
 function msg(
   id: string,

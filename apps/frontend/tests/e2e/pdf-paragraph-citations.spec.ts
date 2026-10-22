@@ -19,6 +19,27 @@ const CONVERSATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
  * @param page - Playwright page after live sign-in.
  */
 async function stubCitedConversation(page: Page): Promise<void> {
+  await page.route(`**/conversations/${CONVERSATION_ID}`, async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      conversation_id: CONVERSATION_ID, creator_user_id: "user-1", title: "AI Agents refunds",
+      created_at: "2026-09-15T00:00:00Z",
+    }) });
+  });
+  const citation = {
+    citation_id: "cite-1", citation_index: 0, chunk_id: "chunk-1",
+    source_kind: "company_document", paragraph_index: 0, document_title: "AI Agents",
+    pdf_page_number: 25, evidence_excerpt: AI_AGENTS_UNIQUE_SPAN,
+    provenance: { page_label: "12", page_number: 12 }, source_unavailable: false,
+  };
+  await page.route("**/runs/run-1/citations**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    await route.fulfill({
+      status: path.endsWith("/page") ? 404 : 200,
+      contentType: "application/json",
+      body: JSON.stringify(path.endsWith("/page") ? { detail: "not_found" } :
+        path.endsWith("/cite-1") ? citation : [citation]),
+    });
+  });
   await page.route("**/conversations", async (route) => {
     if (route.request().method() !== "GET") {
       await route.continue();
@@ -61,6 +82,8 @@ async function stubCitedConversation(page: Page): Promise<void> {
             content: AI_AGENTS_UNIQUE_SPAN,
             created_at: "2026-09-15T00:00:10Z",
             run_id: "run-1",
+            citation_count: 1,
+            source_kind: "company_document",
             citations: [
               {
                 citation_id: "cite-1",
@@ -95,6 +118,8 @@ test("historical company PDF chip uses Acrobat label 12 not file page 25", async
     await expandSessions.click();
   }
   await page.getByRole("button", { name: "AI Agents refunds" }).click();
+  await page.getByRole("region", { name: "Conversation", exact: true })
+    .getByRole("button", { name: "Sources (1)", exact: true }).click();
   const chip = page.getByRole("button", { name: `Citation 0, ${AI_AGENTS_CHIP_LABEL}` });
   await expect(chip).toBeVisible();
   await expect(page.getByText(AI_AGENTS_FORBIDDEN_FILE_PAGE)).toHaveCount(0);

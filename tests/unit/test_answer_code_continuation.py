@@ -4,6 +4,7 @@ import ast
 import re
 
 import pytest
+from smart_rag_core.query_answer.bind_links import bind_company_atomic_links
 from smart_rag_core.query_answer.code_continuation import restore_code_continuation
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
 from smart_rag_core.query_answer.generate_code_salvage import (
@@ -86,6 +87,81 @@ def test_adjacent_native_fragments_restore_only_the_function_base_indent() -> No
     assert code is not None
     ast.parse(code.group(1))
     assert salvage_named_code_definition(shown, fusion, user_query=QUERY) is shown
+
+
+def test_code_source_ownership_survives_incidental_method_name_matches() -> None:
+    """A prose call site cannot replace proven code continuation citations."""
+    fusion = _fusion()
+    draft = salvage_named_code_definition(AnswerPayload(), fusion, user_query=QUERY)
+    unrelated = verifier_passage(
+        704,
+        text="The helper build_graph() displays pending tasks in a dashboard.",
+        rank=1,
+    )
+    fusion = fusion.model_copy(update={"evidence": (unrelated, *fusion.evidence)})
+    rebound = bind_company_atomic_links(draft, fusion=fusion, user_query=QUERY)
+    assert rebound.atomic_links[0].chunk_ids == draft.atomic_links[0].chunk_ids
+    assert {c.chunk_id for c in rebound.citations} == {
+        c.chunk_id for c in draft.citations
+    }
+    assert unrelated.chunk_id not in rebound.atomic_links[0].chunk_ids
+
+
+def test_canonical_parent_can_supply_missing_continuation_child() -> None:
+    """The fitted parent proves the page break without another retrieval call."""
+    head, _tail, parent = _fusion().evidence
+    head = head.model_copy(update={"parent_chunk_id": parent.chunk_id})
+    fusion = verifier_fusion(head, parent)
+    result = salvage_named_code_definition(AnswerPayload(), fusion, user_query=QUERY)
+    ast.parse(result.answer_text)
+    assert BODY.splitlines()[-1] in result.answer_text
+    assert {c.chunk_id for c in result.citations} == {head.chunk_id, parent.chunk_id}
+    assert result.citations[1].span is not None
+    assert result.citations[1].span in parent.citation_text
+
+
+def test_shared_canonical_parent_proves_join_without_loading_parent_text() -> None:
+    """Compact fitted child metadata retains continuity without extra retrieval."""
+    fusion = _fusion()
+    head, tail = (
+        source.model_copy(update={"parent_chunk_id": "canonical-section-parent"})
+        for source in fusion.evidence[:2]
+    )
+    result = salvage_named_code_definition(
+        AnswerPayload(
+            answer_text="Insufficient authorized evidence.", status="refused"
+        ),
+        fusion.model_copy(update={"evidence": (head, tail)}),
+        user_query=QUERY,
+    )
+    ast.parse(result.answer_text)
+    assert len(result.citations) == 2
+    assert "return graph.compile()" in result.answer_text
+
+
+def test_parent_and_child_copies_of_same_body_are_not_ambiguous() -> None:
+    """Three-space source indentation and four-space display represent one join."""
+    head, tail, parent = _fusion().evidence
+    head = head.model_copy(update={"parent_chunk_id": parent.chunk_id})
+    result = salvage_named_code_definition(
+        AnswerPayload(), verifier_fusion(head, tail, parent), user_query=QUERY
+    )
+    ast.parse(result.answer_text)
+    assert result.answer_text.count(SIGNATURE) == 1
+    assert len(result.citations) == 2
+
+
+def test_provider_failure_still_releases_proven_source_function() -> None:
+    """A failed prose call cannot hide an already retrieved complete example."""
+    from smart_rag_agents.query.nodes.answer import company_model_failure_payload
+
+    fusion = _fusion()
+    result, status = company_model_failure_payload(
+        fusion, user_query=QUERY, reason="answer_timeout"
+    )
+    assert status == "answered"
+    ast.parse(result.answer_text)
+    assert len(result.citations) == 2
 
 
 @pytest.mark.parametrize(

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _EXCLUDED_PARTS = {
+    ".private-eval",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
@@ -72,12 +73,19 @@ def iter_authored_python_files(repo_root: Path) -> list[Path]:
     """
 
     found: list[Path] = []
+    # Imported tools are checksum-pinned upstream code, not application Python.
+    # Keep custom project skills and identically named application modules covered.
+    vendored_skill_roots = {
+        repo_root / ".agents" / "skills" / name
+        for name in ("security-audit", "skill-creator", "ui-ux-pro-max")
+    }
     for current, dirnames, filenames in os.walk(repo_root, followlinks=False):
         dirnames[:] = [
             name
             for name in dirnames
             if (
                 name not in _EXCLUDED_PARTS
+                and Path(current) / name not in vendored_skill_roots
                 and not name.startswith(".tmp")
                 and not name.startswith("_tmp")
             )

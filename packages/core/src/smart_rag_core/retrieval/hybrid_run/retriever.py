@@ -20,6 +20,10 @@ from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
 )
+from smart_rag_core.retrieval.conversation_context import (
+    contextual_ranking_query,
+    profile_cache_query,
+)
 from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
 from smart_rag_core.retrieval.coverage_score import (
     attach_numeric_coverage,
@@ -46,6 +50,7 @@ from smart_rag_core.retrieval.hybrid_run.budget import (
 from smart_rag_core.retrieval.hybrid_run.cache_lookup import HybridCacheLookupMixin
 from smart_rag_core.retrieval.hybrid_run.channel_rerun import should_rerun_channels
 from smart_rag_core.retrieval.hybrid_run.channels import (
+    channel_pass_is_empty,
     compose_fallback,
     flatten_channel_candidates,
     identity_rerank,
@@ -234,6 +239,8 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         if query_check is not None:
             return closed_result(query_check, started=started)
         query_normalized = normalize_arabic_v1(query)[:MAX_NORMALIZED_QUERY_CHARS]
+        cache_query = profile_cache_query(query_normalized, profile)
+        ranking_query = contextual_ranking_query(query, profile)
         profile_id = HYBRID_DEFAULT_PROFILE_ID
         if self._retrieval_profile is not None:
             profile_id = self._retrieval_profile.profile_id
@@ -241,7 +248,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         if not bypass_cache:
             cached = self._cached_result(
                 caller=caller,
-                query_normalized=query_normalized,
+                query_normalized=cache_query,
                 visibility_generation=visibility_generation,
                 started=started,
                 profile_id=profile_id,
@@ -284,7 +291,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 deadline_seconds=channel_phase_deadline_seconds(slice_seconds),
                 durations_ms=channel_ms,
             )
-            if reran or not _channel_pass_is_empty(completed):
+            if reran or not channel_pass_is_empty(completed):
                 break
             if not should_rerun_channels(
                 True,
@@ -421,7 +428,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         timings["rerank_gate_remaining_ms"] = int(remaining * 1000)
         preload_started = time.perf_counter()
         preload_ids, pinned_ids = build_pool_ids(
-            query=query,
+            query=ranking_query,
             fused=assembled.fused,
             fused_ids=fused_ids,
             dense_ids=dense_ids,
@@ -455,7 +462,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         if assembled.fused:
             selection_started = time.perf_counter()
             selection = select_hybrid_context(
-                query=query,
+                query=ranking_query,
                 profile=resolved_profile,
                 fused=assembled.fused,
                 contexts=contexts,
@@ -544,7 +551,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         ):
             self._retrieval_cache.put_results(
                 principal_scope_hash=scope_hash,
-                query_normalized=query_normalized,
+                query_normalized=cache_query,
                 visibility_generation=visibility_generation,
                 chunk_ids=ranked,
                 ranks=tuple(range(1, len(ranked) + 1)),
@@ -581,19 +588,3 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
             rerank_appended_count=rerank_appended_count,
             channel_timed_out=tuple(sorted(timed)),
         )
-
-
-def _channel_pass_is_empty(completed: dict[str, object]) -> bool:
-    """Return whether a channel pass produced no candidate IDs.
-
-    Args:
-        completed: Channel name to job result for one parallel pass.
-
-    Returns:
-        True when dense, BM25, and term are all missing or empty.
-    """
-
-    dense_lists, _dense_reason = unpack_dense(completed.get("dense"))
-    bm25_result = unpack_bm25(completed.get("bm25"))
-    term_lists, _term_reason = unpack_term(completed.get("term"))
-    return not any(dense_lists) and not bm25_result.candidates and not any(term_lists)

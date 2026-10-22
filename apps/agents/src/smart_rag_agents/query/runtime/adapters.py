@@ -34,6 +34,7 @@ from smart_rag_core.tables.refusals import TableQueryRefusal
 from smart_rag_core.tables.resolver import PostgresTableResolver, TableResolveError
 from smart_rag_core.tables.service import StructuredTableError, structured_table_query
 
+from smart_rag_agents.query.nodes.state_codec import memory_text_from_state
 from smart_rag_agents.query.runtime.adapters_hybrid import (
     DsnBm25Retriever,
     ProcessHybridRetriever,
@@ -316,7 +317,9 @@ class BoundProfileModelCaller:
         self.last_prompt_tokens = 0
         self.last_completion_tokens = 0
         profile_gateway = cast(_ProfileGatewayLike, self._gateway)
-        recent_memory = "\n".join(item.delimited for item in memory)[:4000]
+        recent_memory = memory_text_from_state(
+            [item.model_dump(mode="json") for item in memory], max_chars=6000
+        )
         request = QueryProfileModelRequest(
             query=query[:2000] or "query",
             prompt_text=self._prompt_text,

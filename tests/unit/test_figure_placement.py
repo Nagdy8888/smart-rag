@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from smart_rag_core.query_answer.figure_placement import place_owned_figures
+from smart_rag_core.query_answer.figure_placement import (
+    figure_caption_text,
+    place_owned_figures,
+)
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -14,6 +17,13 @@ from smart_rag_core.query_answer.native_blocks import attach_native_evidence
 from smart_rag_core.query_fusion.models import FusionResult
 
 from tests.support.answer_verifier import verifier_fusion, verifier_passage
+
+
+def test_figure_caption_excludes_a_preceding_pdf_code_comment() -> None:
+    """An exact caption suffix survives without unrelated page contents."""
+    caption = "Figure 3-2. Agent control.\nA labeled diagram."
+    assert figure_caption_text("# helper for completions\n" + caption) == caption
+    assert figure_caption_text(caption) == caption
 
 
 def fixture_answer() -> tuple[AnswerPayload, FusionResult]:

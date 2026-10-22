@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import NAMESPACE_URL, uuid5
 
 from smart_rag_core.memory.payload import memory_store_namespace
+from smart_rag_core.memory.preferences import summary_with_preferences
 from smart_rag_core.query_routing.constants import FALLBACK_MEMORY_UNAVAILABLE
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.memory import load_authorized_memory
@@ -73,7 +75,7 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
             "detail": exc.reason,
             "memory_records": [],
         }
-    dumped = [item.model_dump(mode="json") for item in records]
+    stored: dict[str, object] = {}
     detail = "memory loaded as untrusted delimited records"
     if deps.store_get is not None:
         try:
@@ -82,24 +84,33 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
                 user_id=str(context.user_id),
                 conversation_id=str(context.conversation_id),
             )
-            stored = deps.store_get(namespace, "summary")
+            candidate = deps.store_get(namespace, "summary")
+            if isinstance(candidate, dict):
+                stored = candidate
         except Exception:
-            stored = None
             detail = FALLBACK_MEMORY_UNAVAILABLE
-        summary_text = stored.get("summary") if isinstance(stored, dict) else None
-        if isinstance(summary_text, str) and summary_text:
-            summary_record = delimit_memory_record(
-                message_id=str(
-                    uuid5(NAMESPACE_URL, f"summary:{context.conversation_id}")
-                ),
-                role="system",
-                content=summary_text,
-                created_at="1970-01-01T00:00:00+00:00",
-            )
-            dumped = [summary_record.model_dump(mode="json"), *dumped]
-    return {
-        **state,
-        "status": "memory_loaded",
-        "memory_records": dumped,
-        "detail": detail,
-    }
+    from smart_rag_agents.query.nodes.memory_compaction import compact_loaded_memory
+
+    recent, summary, updates = compact_loaded_memory(
+        state, deps, context, records, stored
+    )
+    dumped = [item.model_dump(mode="json") for item in recent]
+    summary_text = summary_with_preferences(summary)
+    if summary_text:
+        summary_record = delimit_memory_record(
+            message_id=str(uuid5(NAMESPACE_URL, f"summary:{context.conversation_id}")),
+            role="system",
+            content=summary_text,
+            created_at="1970-01-01T00:00:00+00:00",
+        )
+        dumped = [summary_record.model_dump(mode="json"), *dumped]
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            **updates,
+            "status": "memory_loaded",
+            "memory_records": dumped,
+            "detail": detail,
+        },
+    )

@@ -6,6 +6,7 @@ import "@testing-library/jest-dom/vitest";
 import { MIXED_SCOPE_CLARIFICATION } from "../../lib/answer-origin";
 import { EMPTY_DEADLINE_PARTIAL_COPY } from "../../lib/run-details";
 import type { CitationResponse } from "../../lib/types";
+import { createChatViewState } from "../../lib/chat-view";
 import { AnswerSurface, answerTerminalNote, transcriptTextMatches } from "./answer-surface";
 
 const CITATION: CitationResponse = {
@@ -433,6 +434,20 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.queryByTestId("answer-route")).not.toBeInTheDocument();
   });
 
+  it("keeps a repeated question above its new answer instead of deduplicating another run", () => {
+    renderSurface({
+      messages: [
+        {message_id:"old-user",role:"user",content:"Explain memory",created_at:"2026-10-22T01:00:00Z",run_id:"old"},
+        {message_id:"old-answer",role:"assistant",content:"Prior explanation.",created_at:"2026-10-22T01:00:01Z",run_id:"old"},
+      ],
+      chat:{...createChatViewState("key"),runId:"new"},
+      question:"Explain memory", answer:"Updated explanation.", terminal:"completed",
+    });
+    const questions=screen.getAllByText("Explain memory");
+    expect(questions).toHaveLength(2);
+    expect(questions[1]!.compareDocumentPosition(screen.getByText("Updated explanation.")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("does not duplicate the user bubble when the persisted question is escaped", () => {
     renderSurface({
       messages: [
@@ -495,12 +510,48 @@ describe("AnswerSurface paragraph citations", () => {
     cleanup();
   });
 
-  it("preserves prose paragraph boundaries without inventing numbered steps", () => {
+  it("renders the explanation after a code fence inside the same paragraph", () => {
+    renderSurface({answer:"Introduction to the example:\n```python\ndef widget():\n    return 1\n```\n**Explanation**\nThe function returns the integer one. This is the final sentence.",citations:[]});
+    expect(screen.getByText("Introduction to the example:")).toBeInTheDocument();
+    expect(screen.getByTestId("answer-code-snippet").querySelector("code")?.textContent).toContain("def widget");
+    expect(screen.getByRole("heading",{name:"Explanation"})).toBeInTheDocument();
+    expect(screen.getByText(/This is the final sentence/)).toBeInTheDocument();
+  });
+
+  it("decodes escaped code literals only once when splitting a mixed paragraph", () => {
+    renderSurface({answer:'Example:\n```javascript\nconst entity = "&amp;amp;";\n```\nThe literal remains encoded.',citations:[]});
+    expect(screen.getByTestId("answer-code-snippet").querySelector("code")?.textContent).toBe('const entity = "&amp;";');
+  });
+
+  it("renders every distinct figure, including UUIDs, without dropping surrounding prose", () => {
+    const id = "a1111111-1111-4111-8111-111111111111";
+    renderSurface({ answer: `First diagram. [[figure:${id}]]\nSecond diagram. [[figure:bbbb]]\n\nRepeated reference. [[figure:${id}]]`, citations: [] });
+    expect(screen.getAllByTestId("answer-figure")).toHaveLength(2);
+    expect(screen.getByText(/First diagram/)).toBeInTheDocument();
+    expect(screen.getByText(/Second diagram/)).toBeInTheDocument();
+    expect(screen.getByText(/Repeated reference/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("[[figure:");
+  });
+
+  it("shows a cited image even when the answer omitted its figure marker", () => {
+    renderSurface({ answerOrigin: "company_documents", answer: "The diagram shows the controller.", citations: [{ ...CITATION, provenance: { content_kind: "figure", figure_id: "abcd" } }] });
+    expect(screen.getByTestId("answer-figure")).toBeInTheDocument();
+  });
+
+  it("never treats marker examples inside code as images or accepts a model URL", () => {
+    const { container } = renderSurface({ answer: '```python\nexample = "[[figure:abcd]]"\n```\n\n[[figure:https://evil.example/image.png]]', citations: [] });
+    expect(screen.queryByTestId("answer-figure")).not.toBeInTheDocument();
+    expect(container.querySelector("code")?.textContent).toContain("[[figure:abcd]]");
+    expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("preserves prose paragraphs without turning explanations into list items", () => {
     const { container, unmount } = renderSurface({
       answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
     });
     expect(container.querySelector("ol")).toBeNull();
-    expect(container.querySelectorAll("ul > li[data-paragraph-index]")).toHaveLength(2);
+    expect(container.querySelectorAll("ul > li[data-paragraph-index]")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-paragraph-index] p")).toHaveLength(2);
     expect(container.querySelectorAll("[data-paragraph-index]")).toHaveLength(2);
     unmount();
     const view = renderSurface({

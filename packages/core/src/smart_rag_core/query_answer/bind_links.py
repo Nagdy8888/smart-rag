@@ -6,6 +6,7 @@ from smart_rag_core.query_answer.bind_definitions import (
     leaf_in_evidence,
     rebind_named_definitions,
 )
+from smart_rag_core.query_answer.bind_prose import rebind_high_coverage_prose
 from smart_rag_core.query_answer.bind_tokens import rebind_unique_claim_tokens
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
@@ -93,7 +94,7 @@ def bind_company_atomic_links(
     rebound = rebind_named_definitions(aligned, fusion, user_query=user_query)
     token_bound = rebind_unique_claim_tokens(rebound, fusion, user_query=user_query)
     contained = rebind_contained_claims(token_bound, fusion)
-    return _repair_link_chunk_ids(contained)
+    return _repair_link_chunk_ids(rebind_high_coverage_prose(contained, fusion))
 
 
 def _collapse_bounds(text: str) -> tuple[str, list[int]]:
@@ -427,6 +428,23 @@ def _align_citation_spans(
             continue
         text = passages[chunk_id].citation_text
         span = citation.span
+        if span and span.strip() in passages[chunk_id].section_path:
+            # A repeated section label has no claim-local content and can map
+            # to several leaves. Use the following exact source paragraph;
+            # ordinary grounding still verifies the claim against this source.
+            at = text.find(span)
+            if at >= 0:
+                body = text[at + len(span) :].lstrip()
+                # PDF extraction may repeat the chapter heading. Advance past
+                # those identical standalone lines before choosing body text.
+                while body:
+                    first, _, rest = body.partition("\n")
+                    if first.strip() != span.strip():
+                        break
+                    body = rest.lstrip()
+                replacement = exact_source_span(body)
+                if replacement and replacement in text:
+                    span = replacement
         if not (span and span in text):
             replacement = exact_source_span(text)
             if not replacement:

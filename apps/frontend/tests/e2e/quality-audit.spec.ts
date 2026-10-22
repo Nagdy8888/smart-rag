@@ -178,7 +178,7 @@ async function measureAskScrollIndependence(page: Page): Promise<AskScrollProbe>
     }
     const sessions =
       Array.from(
-        document.querySelectorAll('[role="listbox"][aria-label="Sessions"]'),
+        document.querySelectorAll('[aria-label="Sessions"][role="list"], ul[aria-label="Sessions"]'),
       ).find(isVisible) ?? null;
     const main = document.getElementById("main");
 
@@ -249,7 +249,7 @@ test("authenticated Ask splits Sessions and conversation scroll when signed in",
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Ask", level: 1 })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Answer", exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "Conversation" })).toBeVisible();
     const probe = await measureAskScrollIndependence(page);
     expect(probe.conversationCanScroll).toBe(true);

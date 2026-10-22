@@ -26,10 +26,20 @@ from smart_rag_core.gateways.model_types import (
     WebAnswerModelRequest,
     WebAnswerModelResponse,
 )
+from smart_rag_core.gateways.summary_model import (
+    SummaryModelRequest,
+    SummaryModelResponse,
+)
 
 
 class ModelAdapter(Protocol):
     """Protocol implemented by model provider adapters."""
+
+    async def generate_summary(
+        self, request: SummaryModelRequest
+    ) -> SummaryModelResponse:
+        """Produce one bounded conversation summary."""
+        ...
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
         """Generate a bounded response for one validated request.

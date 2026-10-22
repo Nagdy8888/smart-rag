@@ -223,6 +223,8 @@ class VerificationResult(BaseModel):
         answer: Answer after unsupported-link removal.
         deterministic_failures: Reason codes from current/ACL/span checks.
         verifier_call_count: ``0`` or ``1``. Never 2.
+        verifier_link_verdicts: Bounded raw support decisions and safe reason
+            codes for checkpoint diagnosis, not new authorization decisions.
         omitted_link_ids: Lower-priority links excluded from the batch.
         verifier_skipped_reason: Verifier failure code when the call was
             skipped and the checked answer was still released.
@@ -236,6 +238,9 @@ class VerificationResult(BaseModel):
     answer: AnswerPayload
     deterministic_failures: tuple[str, ...] = ()
     verifier_call_count: Literal[0, 1] = 0
+    verifier_link_verdicts: tuple[VerifierLinkVerdict, ...] = Field(
+        default=(), max_length=MAX_VERIFIER_LINKS
+    )
     omitted_link_ids: tuple[str, ...] = ()
     verifier_skipped_reason: str | None = Field(default=None, max_length=64)
     skipped_citation_count: int = Field(default=0, ge=0)

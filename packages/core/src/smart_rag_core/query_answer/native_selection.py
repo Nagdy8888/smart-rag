@@ -56,11 +56,18 @@ def relevant_native_fusion(
     labels = {
         kind: requested_artifact_labels(query, kind) for kind in ("table", "figure")
     }
+    # A response can introduce a numbered diagram even when the user did not
+    # explicitly request one. Resolve that exact label against canonical assets;
+    # a broad topical overlap never selects an image. Explicit requests retain
+    # their existing priority over other retrieved figures.
+    answer_figures = requested_artifact_labels(payload.answer_text, "figure")
 
     def requested(item: ScoredPassage) -> bool:
         """Use a caption at the artifact, or a bounded preceding table caption."""
         kind = item.content_kind or ""
         targets = labels.get(kind, frozenset())
+        if kind == "figure" and not targets:
+            targets = answer_figures
         own = {
             (str(int(m[2])), str(int(m[3])))
             for m in _CAPTION.finditer(item.citation_text)
@@ -91,6 +98,9 @@ def relevant_native_fusion(
         kind = item.content_kind
         if kind not in {"code", "table", "figure"}:
             selected.append(item)
+        elif kind == "figure" and not labels["figure"] and answer_figures:
+            if requested(item):
+                selected.append(item)
         elif (labels["table"] or labels["figure"]) and not labels.get(kind or ""):
             continue
         elif kind == "code" and named_code:

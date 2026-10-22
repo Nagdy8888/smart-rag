@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
@@ -552,7 +553,10 @@ def test_claims_schema_is_strict_and_the_same_for_every_request() -> None:
         assert f'"{keyword}"' not in encoded
 
 
-def test_execute_openai_answer_sends_the_fixed_claims_schema() -> None:
+@pytest.mark.parametrize("table_request", [False, True])
+def test_execute_openai_answer_sends_the_fixed_claims_schema(
+    table_request: bool,
+) -> None:
     """One Responses call, no retries, no tools, the fixed claims schema."""
 
     captured: dict[str, Any] = {}
@@ -602,11 +606,22 @@ def test_execute_openai_answer_sends_the_fixed_claims_schema() -> None:
             prompt_sha256=ANSWER_PROMPT_SHA256,
             prompt_version=ANSWER_PROMPT_VERSION,
             model_id=ANSWER_MODEL_ID,
-            user_query="q",
-            source_records=" ",
+            user_query="\u0627\u0634\u0631\u062d \u0630\u0644\u0643 \u0628\u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+            + (" Table 8-1" if table_request else ""),
+            resolved_query="Explain the indexing limitation of object storage.",
+            source_records="| A | B |\n| --- | --- |\n| one | two |"
+            if table_request
+            else " ",
             timeout_seconds=5.0,
         )
     create = captured["create"]
+    request_body = json.loads(create["input"])
+    assert request_body["answer_language"] == "ar"
+    assert (
+        request_body["resolved_question"]
+        == "Explain the indexing limitation of object storage."
+    )
+    assert request_body["query"] != request_body["resolved_question"]
     assert captured["client"]["max_retries"] == 0
     assert create["store"] is False
     assert "tools" not in create
@@ -614,7 +629,18 @@ def test_execute_openai_answer_sends_the_fixed_claims_schema() -> None:
         "type": "json_schema",
         "name": "canonical_answer_claims",
         "strict": True,
-        "schema": answer_claims_json_schema(),
+        "schema": answer_claims_json_schema(max_claims=1, require_table=True)
+        if table_request
+        else answer_claims_json_schema(),
     }
+    assert request_body["claim_limit"] == (1 if table_request else 6)
     assert payload == {"claims": [], "conclusion": None, "status": "refused"}
     assert (request_id, input_tokens, output_tokens) == ("resp_claims", 21, 9)
+
+
+def test_requested_table_schema_excludes_a_heading_only_claim() -> None:
+    """The table request requires a header, separator, and actual data row."""
+    schema = cast(dict[str, Any], answer_claims_json_schema(require_table=True))
+    pattern = schema["properties"]["claims"]["items"]["properties"]["text"]["pattern"]
+    assert re.search(pattern, "**A comparison heading**") is None
+    assert re.search(pattern, "| A | B |\n| --- | --- |\n| one | two |") is not None
