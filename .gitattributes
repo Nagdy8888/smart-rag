@@ -3,3 +3,24 @@ apps/agents/src/smart_rag_agents/prompts/*.md text eol=lf
 # Exa envelope pins and the OpenAPI snapshot hash LF bytes.
 tests/fixtures/exa/*.json text eol=lf
 docs/api/openapi.foundation.json text eol=lf
+
+# Preserve imported skill bytes for upstream checksum verification on all platforms.
+.agents/skills/code-review/** -text
+.agents/skills/codebase-design/** -text
+.agents/skills/find-skills/** -text
+.agents/skills/frontend-design/** -text
+.agents/skills/git-guardrails-claude-code/** -text
+.agents/skills/implement/** -text
+.agents/skills/improve-codebase-architecture/** -text
+.agents/skills/ios-design/** -text
+.agents/skills/react-best-practices/** -text
+.agents/skills/resolving-merge-conflicts/** -text
+.agents/skills/scaffold-exercises/** -text
+.agents/skills/security-audit/** -text
+.agents/skills/setup-pre-commit/** -text
+.agents/skills/skill-creator/** -text
+.agents/skills/to-spec/** -text
+.agents/skills/ui-taste/** -text
+.agents/skills/ui-ux-pro-max/** -text
+.agents/skills/web-design-guidelines/** -text
+.agents/skills/_licenses/** -text

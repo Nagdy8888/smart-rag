@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from pydantic import ValidationError
@@ -11,6 +13,7 @@ from smart_rag_core.query_answer.assembly import (
     fit_source_records,
 )
 from smart_rag_core.query_answer.claims import parse_provider_answer
+from smart_rag_core.query_answer.comparison_coverage import fill_comparison_coverage
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.format_shape import format_requested_answer_shape
 from smart_rag_core.query_answer.generate import filter_invented_ids
@@ -32,6 +35,7 @@ from smart_rag_core.query_answer.versions import (
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import TableEvidenceRecord
+from smart_rag_core.retrieval.rerank import named_code_definition_ids
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.sync_bridge import (
@@ -68,6 +72,7 @@ def _apply_code_table_salvages(
     for salvage_fn in (
         salvage_named_code_definition,
         salvage_named_table_block,
+        fill_comparison_coverage,
         salvage_question_coverage,
         salvage_anchor_claim_fill,
     ):
@@ -80,6 +85,11 @@ def _apply_code_table_salvages(
             user_query=query,
         )
         working = with_derived_answer_text(working)
+    from smart_rag_core.query_answer.code_explanation import (
+        with_source_code_explanation,
+    )
+
+    working = with_source_code_explanation(working, fusion, query=query)
     # Formatting is applied once by the caller after salvage returns.
     return working
 
@@ -91,10 +101,14 @@ def gateway_answer(
     fusion: FusionResult,
     tables: tuple[object, ...],
     context: AuthorizedRuntimeContext | None,
+    recent_memory: str = "",
+    resolved_query: str = "",
 ) -> tuple[AnswerPayload, int, int]:
     """Run one async gateway answer call from the sync graph.
 
     Args:
+        recent_memory: Bounded untrusted context for resolving follow-up references.
+        resolved_query: Proposed standalone question; never source evidence.
         deps: Bound gateway and prompt.
         query: User query.
         fusion: Canonical evidence.
@@ -125,10 +139,10 @@ def gateway_answer(
     except ValidationError as exc:
         raise AnswerError("answer_schema_invalid") from exc
     fit = fit_source_records(
-        user_query=query,
+        user_query=resolved_query or query,
         fusion=fusion,
         tables=typed_tables,
-        max_input_chars=deps.model_input_max_chars,
+        max_input_chars=deps.model_input_max_chars - len(recent_memory) - len(query),
         route=fusion.effective_route,
     )
     if fit.trim_reason == "input_bound_exceeded":
@@ -136,11 +150,24 @@ def gateway_answer(
     fusion = fit.fusion
     typed_tables = fit.tables
     records = assemble_source_records(
-        prioritize_answer_sources(fusion, query), typed_tables
+        prioritize_answer_sources(fusion, resolved_query or query), typed_tables
     )
-    timeout_seconds = attempt_timeout_seconds(context, ANSWER_ATTEMPT_CAP_SECONDS)
+    complex_code = bool(named_code_definition_ids(query)) and bool(
+        re.search(r"(?i)\b(?:explain|describe|how|why)\b|اشرح", query)
+    )
+    timeout_seconds = attempt_timeout_seconds(
+        context, 20.0 if complex_code else ANSWER_ATTEMPT_CAP_SECONDS
+    )
+    if context is not None:
+        # Use the existing envelope, leaving verification time after a long snippet.
+        timeout_seconds = min(
+            timeout_seconds,
+            max(0.1, (context.deadline_at - datetime.now(UTC)).total_seconds() - 5.0),
+        )
     request = AnswerModelRequest(
         query=query or "query",
+        recent_memory=recent_memory,
+        resolved_query=resolved_query,
         prompt_version=ANSWER_PROMPT_VERSION,
         prompt_sha256=ANSWER_PROMPT_SHA256,
         prompt_text=str(deps.answer_prompt_text or "answer"),

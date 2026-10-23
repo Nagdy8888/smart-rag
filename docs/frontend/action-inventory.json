@@ -1474,6 +1474,20 @@
       "idempotency": "request",
       "disposition": "keep",
       "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "ask.copy_code",
+      "route": "/",
+      "label": "Copy code snippet",
+      "control_kind": "local-state",
+      "contract_owner": "frontend",
+      "contract": "navigator.clipboard.writeText",
+      "role": "authenticated",
+      "success_state": "Copied",
+      "failure_state": "Copy failed",
+      "idempotency": "same source text",
+      "disposition": "keep",
+      "test_id": "src/components/chat/answer-code-block.test.tsx"
     }
   ]
 }

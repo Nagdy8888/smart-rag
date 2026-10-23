@@ -88,5 +88,5 @@ def test_live_general_chat_adapter_keeps_store_false() -> None:
     assert "GENERAL_CHAT_PROMPT_SHA256" in source
     assert "source_records" not in source
     assert ANSWER_MODEL_ID == OPENAI_CHAT_MODEL_ID
-    assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v2"
+    assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v3"
     assert len(GENERAL_CHAT_PROMPT_SHA256) == 64

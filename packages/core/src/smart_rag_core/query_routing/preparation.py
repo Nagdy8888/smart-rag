@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from uuid import UUID, uuid4
 
@@ -12,6 +13,7 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import (
     QueryBudgetError,
     QueryCeilingError,
+    TimeoutAfterSendError,
 )
 from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.query_admission.usage import execute_counted_model_call
@@ -114,7 +116,18 @@ def _needs_model(
     extract = extract_deterministic(query)
     if is_product_help(query) and not company_intent_signal(query, extract):
         return False
+    if extract.language in {"ar", "mixed"}:
+        # One counted preparation call can bridge source-language vocabulary;
+        # the original query and requested answer language remain unchanged.
+        return True
     if extract.rewrite_justified:
+        return True
+    if any(record.role in {"assistant", "system"} for record in memory) and re.search(
+        r"(?i)\b(?:it|its|those|these|that|them|former|latter|same|previous|earlier|above|second|continue)\b|ذلك|هذه|تلك|السابق|ذكرت|نفس|الثاني|هذا",
+        query,
+    ):
+        # Resolving a follow-up shares the existing structured profile call;
+        # neither history nor a summary becomes company factual evidence.
         return True
     if memory and extract.query_type.value == "factual" and len(query.split()) <= 4:
         return True
@@ -245,7 +258,20 @@ def prepare_query(
                     Combined rewrite-plus-profile payload.
                 """
 
-                return model_caller(original, tuple(memory))
+                nonlocal model_calls
+                model_calls = 1
+                try:
+                    return model_caller(original, tuple(memory))
+                except ModelGatewayUnavailableError as exc:
+                    raise TimeoutAfterSendError("profile_attempt_failed") from exc
+
+            consumed_snapshots: list[ReservationConsumeResult] = []
+
+            def _on_consumed(consumed: ReservationConsumeResult) -> None:
+                """Advance reservation state before a provider attempt can fail."""
+                consumed_snapshots.append(consumed)
+                if on_reservation_consume is not None:
+                    on_reservation_consume(consumed)
 
             def _usage_from_result(
                 _result: PreparationModelPayload,
@@ -296,9 +322,10 @@ def prepare_query(
                         provider_attempt_id=str(uuid4()),
                         send=_send,
                         usage_from_result=_usage_from_result,
+                        on_consumed=_on_consumed,
                     )
-                    if on_reservation_consume is not None:
-                        on_reservation_consume(consumed)
+                    if not consumed_snapshots:
+                        _on_consumed(consumed)
                     model_calls = 1
                     fallback = "none"
             except ValueError:
@@ -310,6 +337,7 @@ def prepare_query(
                 ModelGatewayUnavailableError,
                 QueryBudgetError,
                 QueryCeilingError,
+                TimeoutAfterSendError,
             ):
                 payload = None
                 fallback = "profile_budget_denied"
@@ -350,10 +378,14 @@ def prepare_query(
                 )
             }
         )
-    decomposition = profile_strings(profile.subquestions)
+    decomposition = profile_strings(profile.subquestions) or explicit_subquestions(
+        original
+    )
+    if not decomposition and accepted is not None:
+        decomposition = resolved_comparison_parts(original, accepted)
     if len(decomposition) > 3:
         raise QueryRoutingError("fourth_subquestion")
-    comparison = original.lower().startswith("compare ")
+    comparison = bool(decomposition) or original.lower().startswith("compare ")
     scope = classify_knowledge_scope(
         original,
         memory=memory,
@@ -458,6 +490,52 @@ def _prep_value_error(exc: ValueError) -> str:
     if "original_query_loss" in text:
         return "original_query_loss"
     return "profile_schema_omission"
+
+
+def resolved_comparison_parts(original: str, resolved: str) -> tuple[str, ...]:
+    """Split a resolved pronoun comparison into two bounded retrieval topics.
+
+    Args:
+        original: Unmodified user question.
+        resolved: Rewrite already accepted by the entity fidelity guards.
+
+    Returns:
+        Two explicit topics, or no decomposition for other question forms.
+    """
+    if not re.match(
+        r"^how (?:does|do) (?:that|this|it|they) differ from ", original, re.I
+    ):
+        return ()
+    match = re.fullmatch(
+        r"how (?:does|do) (.{3,160}?) differ from (.{3,160}?)\??",
+        resolved.strip(),
+        re.I,
+    )
+    if match is None:
+        return ()
+    parts = tuple(part.strip().rstrip("?.") for part in match.groups())
+    if any(
+        re.search(r"[;\n]|\b(?:except|unless|excluding|without)\b", part, re.I)
+        for part in parts
+    ):
+        return ()
+    if parts[0].lower() in {"that", "this", "it", "they"}:
+        return ()
+    return tuple(f"Explain {part}." for part in parts)
+
+
+def explicit_subquestions(query: str) -> tuple[str, ...]:
+    """Keep two explicitly ordered source questions as separate retrieval inputs.
+
+    This does not infer new questions or rewrite entities. The original query
+    remains the answer input and every branch inherits its authorization scope.
+    """
+    match = re.search(
+        r"(?is)\bfirst\s+((?:explain|describe|compare|list|summarize)\b.+?)"
+        r";\s*then\s+((?:explain|describe|compare|list|summarize)\b.+)$",
+        query,
+    )
+    return (match.group(1).strip(), match.group(2).strip()) if match else ()
 
 
 def _page_scope_from_query(query: str) -> str:

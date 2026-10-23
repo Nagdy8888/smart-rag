@@ -26,6 +26,7 @@ import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { CHAT_RUN_POINTER_KEY } from "../lib/chat-pointer";
 import { MIXED_SCOPE_CLARIFICATION } from "../lib/answer-origin";
+import type { ConversationMessage } from "../lib/types";
 import { handshakeBelowMinCopy, QUERY_NOT_READY_COPY } from "../lib/handshake";
 import { WEB_SEARCH_DISABLED_COPY } from "../lib/failure-copy";
 import { limitationCopy } from "../lib/limitations";
@@ -1181,12 +1182,11 @@ describe("ChatApp Ask workspace", () => {
     );
   });
 
-  it("renders fetched transcript messages in ascending order", async () => {
+  it.each([false, true])("renders question before answer for either transcript API order (%s)", async (oldestFirst) => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
-    vi.mocked(fetchConversationMessages).mockResolvedValue({
-      items: [
+    const transcript: ConversationMessage[] = [
         {
           message_id: "m2",
           role: "assistant",
@@ -1199,7 +1199,9 @@ describe("ChatApp Ask workspace", () => {
           content: "First question",
           created_at: "2026-08-17T00:00:00Z",
         },
-      ],
+      ];
+    vi.mocked(fetchConversationMessages).mockResolvedValue({
+      items: oldestFirst ? [...transcript].reverse() : transcript,
       next_before_id: null,
     });
     renderChat(<ChatApp />);

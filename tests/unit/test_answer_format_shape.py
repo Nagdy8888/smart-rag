@@ -26,6 +26,34 @@ from tests.support.answer_verifier import (
 )
 
 
+def test_repeated_bold_records_become_a_complete_pipe_table() -> None:
+    """Display conversion preserves every original value without inventing cells."""
+    text = "**Approach**\nStorage A\n**Benefit**\nDurable\n**Approach**\nStorage B\n**Benefit**\nQueryable"
+    table = ensure_markdown_pipe_table(text)
+    assert (
+        table
+        == "| Approach | Benefit |\n| --- | --- |\n| Storage A | Durable |\n| Storage B | Queryable |"
+    )
+
+
+def test_incomplete_stacked_record_is_not_guessed() -> None:
+    """A missing value cannot be filled or silently dropped to manufacture a row."""
+    from smart_rag_core.query_answer.stacked_table import stacked_records_to_table
+
+    assert (
+        stacked_records_to_table("**Name**\nA\n**Value**\n1\n**Name**\nB\n**Value**")
+        is None
+    )
+
+
+def test_missing_row_label_header_cannot_hide_the_last_data_column() -> None:
+    """A rectangular table preserves both comparison values instead of dropping one."""
+    text = "| A | B |\n| --- | --- |\n| Benefit | Value A | Value B |\n| Drawback | Cost A | Cost B |"
+    expected = "| | A | B |\n| --- | --- | --- |\n| Benefit | Value A | Value B |\n| Drawback | Cost A | Cost B |"
+    assert ensure_markdown_pipe_table(text) == expected
+    assert ensure_markdown_pipe_table(expected) == expected
+
+
 def _payload(text: str, *, chunk_n: int = 1) -> AnswerPayload:
     """Build a one-claim company payload for format tests."""
 

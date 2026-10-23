@@ -187,6 +187,7 @@ export function ChatStage(props: ChatStageProps) {
                   key={scope}
                   type="button"
                   role="radio"
+                  data-action-id="ask.scope"
                   className={chatStyles.scopeSegment}
                   aria-checked={selected}
                   data-selected={selected ? "true" : "false"}

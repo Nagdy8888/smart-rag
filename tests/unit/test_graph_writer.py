@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 from smart_rag_core.jobs.graph_writer import (
     ADVISORY_LOCK_NAMESPACE,
     allowed_index_from_states,
@@ -13,6 +16,26 @@ from smart_rag_core.retrieval.graph import (
     opaque_graph_source_basename,
 )
 from smart_rag_core.schema.enums import GraphWorkspaceState
+
+
+def test_provider_model_alias_does_not_select_the_local_tokenizer() -> None:
+    """All-Luna inference must start without changing the qualified chunk encoding."""
+    probe = """
+import os
+os.environ['OPENAI_CHAT_MODEL_ID'] = 'gpt-6-luna'
+os.environ['OPENAI_LIGHTRAG_MODEL_ID'] = 'gpt-6-luna'
+from tiktoken.model import encoding_name_for_model
+from smart_rag_core.retrieval.graph import LIGHTRAG_LLM_MODEL_ID, LIGHTRAG_TIKTOKEN_MODEL
+assert LIGHTRAG_LLM_MODEL_ID == 'gpt-6-luna'
+assert encoding_name_for_model(LIGHTRAG_TIKTOKEN_MODEL) == 'o200k_base'
+"""
+    result = subprocess.run(  # noqa: S603 - fixed interpreter and import-only probe
+        (sys.executable, "-c", probe),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_advisory_lock_keys_are_stable_and_positive() -> None:

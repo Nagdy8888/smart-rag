@@ -559,3 +559,19 @@ def identity_rerank(
         for index, item in enumerate(pool)
     )
     return rankings, None, RerankFallbackReason.NONE
+
+
+def channel_pass_is_empty(completed: dict[str, object]) -> bool:
+    """Return whether a channel pass produced no candidate IDs.
+
+    Args:
+        completed: Channel name to job result for one parallel pass.
+
+    Returns:
+        True when dense, BM25, and term are all missing or empty.
+    """
+
+    dense_lists, _dense_reason = unpack_dense(completed.get("dense"))
+    bm25_result = unpack_bm25(completed.get("bm25"))
+    term_lists, _term_reason = unpack_term(completed.get("term"))
+    return not any(dense_lists) and not bm25_result.candidates and not any(term_lists)

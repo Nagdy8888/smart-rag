@@ -8,6 +8,10 @@ from typing import cast
 from openai import APIStatusError, APITimeoutError, AuthenticationError
 
 from smart_rag_core.observability.langsmith_tracing import traced_openai_client
+from smart_rag_core.query_answer.format_shape import (
+    answer_has_markdown_pipe_table,
+    requested_answer_shape,
+)
 from smart_rag_core.query_answer.language import requested_answer_language
 from smart_rag_core.query_answer.query_coverage import narrative_claim_limit
 from smart_rag_core.query_answer.schemas import (
@@ -64,16 +68,20 @@ def execute_openai_answer(
     user_query: str,
     source_records: str,
     timeout_seconds: float,
+    recent_memory: str = "",
+    resolved_query: str = "",
 ) -> tuple[dict[str, object], str, int, int]:
     """Make exactly one structured answer Responses call.
 
     Args:
+        recent_memory: Bounded untrusted context for resolving follow-up references.
         api_key: Provider credential. Never logged.
         prompt_text: Pinned answer prompt body.
         prompt_sha256: Expected prompt digest.
         prompt_version: Expected prompt version.
         model_id: Allow-listed model.
         user_query: Original user text.
+        resolved_query: Untrusted reference resolution; original controls language.
         source_records: Delimited untrusted source records.
         timeout_seconds: Client timeout. SDK retries are disabled.
 
@@ -101,12 +109,24 @@ def execute_openai_answer(
     client = traced_openai_client(
         api_key=api_key, max_retries=0, timeout=timeout_seconds
     )
-    claim_limit = narrative_claim_limit(user_query, source_records)
+    require_table = requested_answer_shape(
+        user_query
+    ) == "pipe_table" and answer_has_markdown_pipe_table(source_records)
+    # A requested comparison belongs in one complete table claim. Requiring a
+    # table in every one of six claims invites duplicated tables and prose.
+    claim_limit = (
+        1 if require_table else narrative_claim_limit(user_query, source_records)
+    )
     user_payload = {
         "query": user_query,
+        "resolved_question": resolved_query or user_query,
         "answer_language": requested_answer_language(user_query),
         "claim_limit": claim_limit,
+        "required_format": "markdown_table"
+        if require_table
+        else "requested_prose_or_code",
         "sources": source_records,
+        "untrusted_conversation_context": recent_memory,
     }
     try:
         response = client.responses.create(
@@ -118,7 +138,9 @@ def execute_openai_answer(
                     "type": "json_schema",
                     "name": "canonical_answer_claims",
                     "strict": True,
-                    "schema": answer_claims_json_schema(max_claims=claim_limit),
+                    "schema": answer_claims_json_schema(
+                        max_claims=claim_limit, require_table=require_table
+                    ),
                 }
             },
             max_output_tokens=ANSWER_MAX_OUTPUT_TOKENS,
@@ -244,6 +266,8 @@ def execute_openai_verifier(
         One HTTPS Responses request. ``max_retries=0``. No tools.
     """
 
+    from openai import omit
+
     if (
         prompt_version != VERIFIER_PROMPT_VERSION
         or prompt_sha256 != VERIFIER_PROMPT_SHA256
@@ -271,6 +295,7 @@ def execute_openai_verifier(
                 }
             },
             max_output_tokens=VERIFIER_MAX_OUTPUT_TOKENS,
+            reasoning={"effort": "low"} if model_id == "gpt-6-luna" else omit,
             store=False,
         )
     except APITimeoutError as error:
@@ -486,3 +511,10 @@ def _parse_response(
     if not isinstance(loaded, dict):
         raise OpenAIAnswerError(f"{kind}_schema_invalid")
     return cast(dict[str, object], loaded), request_id, input_tokens, output_tokens
+
+
+def parse_structured_response(
+    response: object, *, kind: str
+) -> tuple[dict[str, object], str, int, int]:
+    """Share strict completion, JSON, and measured-usage checks with other operations."""
+    return _parse_response(response, kind=kind)

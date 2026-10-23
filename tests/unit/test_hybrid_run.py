@@ -917,7 +917,7 @@ def test_retrieve_embed_and_rerank_debit_remaining() -> None:
 
 
 def test_retrieve_rerank_fails_closed_when_reservation_short() -> None:
-    """Rerank is not invoked when remaining USD cannot cover the kind cap."""
+    """Embedding fits, but rerank cannot consume answer and verifier reserves."""
 
     one = _candidate(rank=1)
     two = _candidate(rank=2)
@@ -929,7 +929,7 @@ def test_retrieve_rerank_fails_closed_when_reservation_short() -> None:
     retriever = _retriever(contexts=contexts, rerank_calls=rerank_calls)
     budget = QueryRetrieveBudget(
         remaining_model_calls=7,
-        remaining_usd=Decimal("0.10"),
+        remaining_usd=Decimal("0.70"),
     )
     retriever.query_budget = budget
     profile = profile_query_sync("annual leave policy").profile
@@ -943,7 +943,7 @@ def test_retrieve_rerank_fails_closed_when_reservation_short() -> None:
     assert "embedding" in budget.usage_kinds
     assert "rerank" not in budget.usage_kinds
     assert rerank_calls == []
-    assert budget.remaining_usd == Decimal("0.08")
+    assert budget.remaining_usd == Decimal("0.68")
     assert result.rerank_call_count == 0
 
 

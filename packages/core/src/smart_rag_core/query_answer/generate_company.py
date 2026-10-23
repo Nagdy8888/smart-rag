@@ -9,6 +9,7 @@ from smart_rag_core.query_answer.assembly import (
     company_input_bound_payload,
     fit_source_records,
 )
+from smart_rag_core.query_answer.comparison_coverage import fill_comparison_coverage
 from smart_rag_core.query_answer.generate_anchor_salvage import (
     salvage_anchor_claim_fill,
 )
@@ -224,6 +225,7 @@ def generate_grounded_answer(
     for salvage_fn in (
         salvage_named_code_definition,
         salvage_named_table_block,
+        fill_comparison_coverage,
         salvage_question_coverage,
         salvage_anchor_claim_fill,
     ):

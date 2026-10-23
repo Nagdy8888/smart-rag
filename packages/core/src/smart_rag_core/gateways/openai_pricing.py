@@ -1,7 +1,7 @@
 """OpenAI list-price estimates for billed usage rows.
 
-Rates follow https://openai.com/api/pricing/ for the pinned models:
-``gpt-4o-mini`` chat calls and ``text-embedding-3-large`` embeddings.
+Rates follow https://developers.openai.com/api/docs/pricing for supported models.
+GPT-4.1 mini rates were verified 2026-10-22 against its official model page.
 Provider invoices remain canonical; these values power Run Details and
 ``app.llm_usage`` when measured USD is unavailable.
 """
@@ -79,7 +79,7 @@ def estimate_usage_cost_usd(
     model_id: str,
     prompt_tokens: int,
     completion_tokens: int,
-) -> Decimal:
+) -> Decimal | None:
     """Estimate USD for one ``app.llm_usage`` row.
 
     Args:
@@ -90,12 +90,35 @@ def estimate_usage_cost_usd(
         completion_tokens: Completion or output tokens.
 
     Returns:
-        List-price USD estimate for the pinned chat or embedding model.
+        List-price USD estimate, or None for an unknown model. The caller must
+        use its conservative reserved cap instead of another model's rate.
     """
 
-    _ = model_id
     if usage_kind == "embedding":
+        if model_id != "text-embedding-3-large":
+            return None
         return estimate_embedding_cost_usd(prompt_tokens=prompt_tokens)
+    if model_id in {
+        "gpt-4.1-mini",
+        "gpt-4.1-mini-2025-04-14",
+        "gpt-5.4-mini",
+    }:
+        if min(prompt_tokens, completion_tokens) < 0:
+            raise ValueError("chat_usage_negative")
+        input_rate, output_rate = (
+            (Decimal("0.75"), Decimal("4.50"))
+            if model_id == "gpt-5.4-mini"
+            else (Decimal("0.40"), Decimal("1.60"))
+        )
+        return (
+            (
+                Decimal(prompt_tokens) * input_rate
+                + Decimal(completion_tokens) * output_rate
+            )
+            / _ONE_MILLION
+        ).quantize(Decimal("0.00000001"))
+    if model_id not in {"gpt-4o-mini", "gpt-4o-mini-2024-07-18"}:
+        return None
     return estimate_chat_cost_usd(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,

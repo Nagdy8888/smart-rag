@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from smart_rag_core.query_answer.generate_grounded import (
     salvage_anchor_claim_fill,
     salvage_named_code_definition,
@@ -30,7 +31,7 @@ def test_anchor_excerpt_never_ends_at_the_character_cap_mid_sentence() -> None:
     result = salvage_anchor_claim_fill(
         payload,
         verifier_fusion(passage),
-        user_query="Explain Orchestration and explanation.",
+        user_query="Quote the exact words about Orchestration and explanation.",
     )
     assert result.paragraphs[-1].text == "Orchestration coordinates tasks."
     span = result.citations[-1].span
@@ -47,6 +48,56 @@ def test_anchor_excerpt_rejects_a_single_oversized_unfinished_sentence() -> None
         payload, verifier_fusion(passage), user_query="Explain Orchestration."
     )
     assert result is payload
+
+
+@pytest.mark.parametrize("distance", [999, 1000, 1001, 1300])
+def test_distant_anchors_preserve_the_first_sentence_negation(distance: int) -> None:
+    """A span wider than the cap cannot discard the start of its first sentence."""
+    first = "Orchestration"
+    last = "OmegaControl"
+    middle = " bypasses validation. "
+    filler = "x" * (distance - len(first) - len(middle) - len(last))
+    text = f"It is not true that {first}{middle}{filler}{last} policy."
+    passage = verifier_passage(1, text=text)
+    payload = _payload("General context.", chunk=passage.chunk_id)
+    result = salvage_anchor_claim_fill(
+        payload,
+        verifier_fusion(passage),
+        user_query="Explain Orchestration and OmegaControl.",
+    )
+    assert result is payload
+
+
+def test_trimming_cannot_release_an_excerpt_with_no_requested_anchor() -> None:
+    """A complete but unrelated prefix is not a replacement for the asked topic."""
+    text = (
+        "General background. "
+        + "context " * 100
+        + "Orchestration "
+        + "continues " * 150
+    )
+    passage = verifier_passage(1, text=text)
+    payload = _payload("General context.", chunk=passage.chunk_id)
+    result = salvage_anchor_claim_fill(
+        payload,
+        verifier_fusion(passage),
+        user_query="Quote the exact words about Orchestration.",
+    )
+    assert result is payload
+
+
+def test_casefold_expansion_preserves_original_sentence_offsets() -> None:
+    """Unicode case-insensitive matches must retain original source offsets."""
+    text = "Straße. " * 40 + "Orchestration coordinates tasks. Unrelated background."
+    passage = verifier_passage(1, text=text)
+    payload = _payload("General context.", chunk=passage.chunk_id)
+    result = salvage_anchor_claim_fill(
+        payload,
+        verifier_fusion(passage),
+        user_query="Quote the exact words about Orchestration.",
+    )
+    assert result.paragraphs[-1].text == "Orchestration coordinates tasks."
+    assert result.citations[-1].span == "Orchestration coordinates tasks."
 
 
 def _payload(text: str, *, chunk: str) -> AnswerPayload:

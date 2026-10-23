@@ -42,6 +42,23 @@ def test_all_authored_python_definitions_have_docstrings() -> None:
     )
 
 
+def test_imported_skill_tools_are_not_application_authored_code(tmp_path: Path) -> None:
+    """Exclude only imported tool roots while retaining custom skills and app code."""
+    imported = [
+        tmp_path / ".agents" / "skills" / name / "tool.py"
+        for name in ("security-audit", "skill-creator", "ui-ux-pro-max")
+    ]
+    authored = [
+        tmp_path / ".agents" / "skills" / "project-helper" / "tool.py",
+        tmp_path / "apps" / "skill-creator" / "tool.py",
+    ]
+    for path in (*imported, *authored):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("VALUE = 1\n", encoding="utf8")
+    assert iter_authored_python_files(tmp_path) == sorted(authored)
+    assert {v.path for v in scan_repository_docstrings(tmp_path)} == set(authored)
+
+
 def test_docstring_scanner_rejects_intentional_negative_fixture() -> None:
     """The checker must detect the intentionally undocumented fixture function."""
 

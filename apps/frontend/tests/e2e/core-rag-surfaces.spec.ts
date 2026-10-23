@@ -54,7 +54,7 @@ test("authenticated Auto chrome when a session exists", async ({
 }) => {
   await signInLiveMember(page, request);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Ask" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask", exact: true, level: 1 })).toBeVisible();
   const source = page.getByTestId("answer-source");
   await expect(source).toBeVisible();
   await expect(source).toHaveAttribute("data-value", "auto");

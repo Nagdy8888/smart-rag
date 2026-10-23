@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
+from threading import RLock
 from uuid import UUID
 
 from smart_rag_core.query_admission.exceptions import (
@@ -52,9 +53,12 @@ class QueryRetrieveBudget:
     run_id: UUID | None = None
     reservation_id: UUID | None = None
     expected_version: int = 1
+    remaining_prompt_tokens: int | None = None
+    remaining_completion_tokens: int | None = None
     usage_kinds: list[str] = field(default_factory=lambda: list[str]())
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    send_lock: RLock = field(default_factory=RLock, repr=False, compare=False)
 
 
 def assert_retrieve_kind_available(
@@ -120,6 +124,25 @@ def debit_retrieve_budget(
         remaining_usd if remaining_usd is not None else budget.remaining_usd - usd_cap
     )
     budget.usage_kinds.append(usage_kind)
+
+
+def assert_retrieve_answer_reserve(
+    budget: QueryRetrieveBudget, usage_kind: str
+) -> None:
+    """Preserve answer and verifier holds before an optional retrieval call."""
+    cost, prompt, completion = usage_kind_caps(usage_kind)
+    answer = usage_kind_caps("answer")
+    verifier = usage_kind_caps("verifier")
+    if budget.remaining_usd < cost + answer[0] + verifier[0]:
+        raise QueryBudgetError("answer_reserve_required")
+    if (
+        budget.remaining_prompt_tokens is not None
+        and budget.remaining_prompt_tokens < prompt + answer[1] + verifier[1]
+    ) or (
+        budget.remaining_completion_tokens is not None
+        and budget.remaining_completion_tokens < completion + answer[2] + verifier[2]
+    ):
+        raise QueryBudgetError("answer_reserve_required")
 
 
 def add_recorded_tokens(

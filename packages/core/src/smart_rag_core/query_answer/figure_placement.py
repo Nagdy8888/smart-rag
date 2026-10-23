@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import re
+
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_CITATION_SPAN_CHARS,
 )
 from smart_rag_core.query_fusion.models import FusionResult
+
+
+def figure_caption_text(raw: str) -> str:
+    """Keep the exact caption suffix while excluding preceding PDF code/footer text."""
+    match = re.search(r"(?im)^\s*Figure\s+\d+[-\u2013]\d+[.:]", raw)
+    return raw[match.start() :].strip() if match is not None else raw.strip()
 
 
 def place_owned_figures(payload: AnswerPayload, fusion: FusionResult) -> AnswerPayload:
@@ -30,7 +38,7 @@ def place_owned_figures(payload: AnswerPayload, fusion: FusionResult) -> AnswerP
         marker = f"[[figure:{item.figure_id}]]"
         if marker in existing:
             continue
-        caption = item.citation_text.strip()
+        caption = figure_caption_text(item.citation_text)
         if not caption or len(caption) > MAX_CITATION_SPAN_CHARS:
             continue
         for index, paragraph in enumerate(paragraphs):

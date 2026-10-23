@@ -10,6 +10,22 @@ describe("answer prose markdown-lite", () => {
     cleanup();
   });
 
+  it("renders native source headings, PDF bullets, and parenthesized steps", () => {
+    const {container}=render(<>{renderAnswerProse("Autonomy Slider\nUsers can choose the level of automation.\n• Manual control\n• Partial automation\n\nNext steps:\n1) Choose a level\n2) Confirm the action", "prose","list","inline","heading")}</>);
+    expect(screen.getByRole("heading",{name:"Autonomy Slider"})).toBeInTheDocument();
+    expect(screen.getByRole("heading",{name:"Next steps"})).toBeInTheDocument();
+    expect(container.querySelectorAll("ul li")).toHaveLength(2);
+    expect(container.querySelectorAll("ol li")).toHaveLength(2);
+  });
+
+  it("gives Arabic explanations reading breaks without losing the final sentence", () => {
+    const text=Array.from({length:7},(_,i)=>`تشرح هذه الفقرة الخطوة ${String(i)} وتوضح كيفية حفظ المعلومات واسترجاعها مع الحفاظ على سياق المحادثة وجودة الإجابة الكاملة للقارئ.`).join(" ");
+    const {container}=render(<>{renderAnswerProse(text,"prose","list","inline")}</>);
+    const paragraphs=Array.from(container.querySelectorAll("p.prose"));
+    expect(paragraphs.length).toBeGreaterThan(1);
+    expect(paragraphs.map(p=>p.textContent).join(" ")).toBe(text);
+  });
+
   it("gives long explanations reading breaks without dropping or cutting sentences", () => {
     const text = Array.from({ length: 7 }, (_, index) =>
       `Stage ${String(index)} checks the available context and uses the relevant evidence to prepare a clear and complete explanation for the reader.`,

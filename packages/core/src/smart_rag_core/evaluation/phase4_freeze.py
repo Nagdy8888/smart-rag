@@ -27,8 +27,6 @@ from smart_rag_core.ingestion.embeddings.policy import (
 from smart_rag_core.models.env_pins import EMBEDDING_MODEL as EMBEDDING_MODEL_PIN
 from smart_rag_core.query_profile.versions import (
     NORMALIZER_VERSION,
-    PROFILE_PROMPT_SHA256,
-    PROFILE_PROMPT_VERSION,
 )
 from smart_rag_core.retrieval.frozen_profile import (
     FROZEN_HYBRID_PROFILE_SHA256,
@@ -65,6 +63,12 @@ OPENAI_SDK_PIN = "2.26.0"
 LANGSMITH_SDK_PIN = "0.10.18"
 LAUNCH_DECISION_NO_GO = "no_go"
 INDEPENDENT_SME_STATUS = "independently_sealed"
+# This historical report predates conversational profiling. Production prompt
+# promotions must not relabel its recorded measurements as results of a new prompt.
+PHASE4_PROFILE_PROMPT_VERSION = "query_profile_v1"
+PHASE4_PROFILE_PROMPT_SHA256 = (
+    "cdbd53097306afda12de8be4be247ce45d525a1f889bbfd47f48c223ab20ccbd"
+)
 
 GateStatus = Literal[
     "pass",
@@ -582,7 +586,7 @@ def build_phase4_freeze_report() -> Phase4FreezeReport:
             cast(dict[str, Any], typed_meta["manifest_hashes"])["manifest_holdout"]
         ),
         "holdout_manifest_file": sha256_file(holdout_path),
-        "query_profile_prompt": PROFILE_PROMPT_SHA256,
+        "query_profile_prompt": PHASE4_PROFILE_PROMPT_SHA256,
         "rerank_prompt": RERANK_PROMPT_SHA256,
     }
     pins = {
@@ -594,7 +598,7 @@ def build_phase4_freeze_report() -> Phase4FreezeReport:
         "embedding_dimensions": str(EMBEDDING_DIMENSIONS_PIN),
         "rerank_model": RERANK_MODEL_VERSION,
         "rerank_prompt_version": RERANK_PROMPT_VERSION,
-        "query_profile_prompt_version": PROFILE_PROMPT_VERSION,
+        "query_profile_prompt_version": PHASE4_PROFILE_PROMPT_VERSION,
         "normalizer": NORMALIZER_VERSION,
         "rrf_k": str(RRF_K),
         "channel_weights": (

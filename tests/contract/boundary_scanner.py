@@ -11,7 +11,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-_SKIP_WALK_DIRS = frozenset({".venv", "node_modules", "__pycache__"})
+_SKIP_WALK_DIRS = frozenset({".venv", ".private-eval", "node_modules", "__pycache__"})
 
 FORBIDDEN_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (

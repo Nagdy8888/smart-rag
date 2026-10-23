@@ -37,7 +37,7 @@ def restore_code_continuation(
         two exact source citations, or None for absent/ambiguous continuity.
         No source text, inner indentation, token, or statement is rewritten.
     """
-    candidates: dict[str, tuple[ScoredPassage, str, ScoredPassage, str]] = {}
+    candidates: dict[str, tuple[str, ScoredPassage, str, ScoredPassage, str]] = {}
     for head in fusion.evidence:
         match = pattern.search(head.citation_text)
         if head.content_kind != "code" or head.page_number is None or match is None:
@@ -45,11 +45,38 @@ def restore_code_continuation(
         signature = head.citation_text[match.start() :].strip()
         if not _SIGNATURE.fullmatch(signature) or len(signature) > 1000:
             continue
+        # Parent expansion can retain the entire canonical section while its
+        # second native child falls outside the fitted evidence budget.
+        for parent in fusion.evidence:
+            if parent.chunk_id != head.parent_chunk_id:
+                continue
+            if (
+                parent.document_id != head.document_id
+                or parent.version_id != head.version_id
+            ):
+                continue
+            if parent.citation_text.count(signature) != 1:
+                continue
+            rest = parent.citation_text.split(signature, 1)[1].strip("\r\n")
+            blocks = rest.split("\n\n")
+            if len(blocks) < 2 or not _FOOTER.fullmatch(blocks[0].strip()):
+                continue
+            body = blocks[1].strip("\r\n")
+            display = signature + "\n" + textwrap.indent(body, "    ")
+            if _eligible_body(body) and len(display) <= 1980 and _one_function(display):
+                candidates.setdefault(
+                    signature + "\n" + body, (display, head, signature, parent, body)
+                )
         for tail in fusion.evidence:
             body = tail.citation_text.strip("\r\n")
             if not _adjacent(head, tail) or not _eligible_body(body):
                 continue
-            if not _parent_proves_join(fusion, head, signature, body):
+            shared_parent = bool(
+                head.parent_chunk_id and head.parent_chunk_id == tail.parent_chunk_id
+            )
+            if not shared_parent and not _parent_proves_join(
+                fusion, head, signature, body
+            ):
                 continue
             steps = re.findall(
                 r"(?m)^(?:async\s+)?def[^\n]+:\n([ \t]+)\S", head.citation_text
@@ -58,10 +85,12 @@ def restore_code_continuation(
             display = signature + "\n" + textwrap.indent(body, indent)
             if len(display) > 1980 or not _one_function(display):
                 continue
-            candidates.setdefault(display, (head, signature, tail, body))
+            candidates.setdefault(
+                signature + "\n" + body, (display, head, signature, tail, body)
+            )
     if len(candidates) != 1:
         return None
-    display, (head, signature, tail, body) = next(iter(candidates.items()))
+    display, head, signature, tail, body = next(iter(candidates.values()))
     if display in payload.answer_text:
         return payload
     link_id = "code-def-1"

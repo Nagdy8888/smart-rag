@@ -11,7 +11,16 @@ import { Sheet } from "../ui/sheet";
 import { renderAnswerInline } from "../../lib/answer-prose";
 import styles from "./chat-transcript.module.css";
 
-const FIGURE_MARK = /\[\[figure:([A-Za-z0-9]{1,64})\]\]/;
+const FIGURE_MARK = /\[\[figure:([A-Za-z0-9-]{1,64})\]\]/;
+
+/** All explicit assets in a paragraph, including UUIDs; never model URLs. */
+export function figureIdsInText(text: string): string[] {
+  return [...new Set([...text.matchAll(new RegExp(FIGURE_MARK.source, "g"))].map((m) => m[1]))];
+}
+
+export function stripFigureMarks(text: string): string {
+  return text.replace(new RegExp(FIGURE_MARK.source, "g"), "").trim();
+}
 
 /**
  * Split a paragraph into prose and an optional figure id.

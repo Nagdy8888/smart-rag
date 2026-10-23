@@ -30,6 +30,7 @@ from smart_rag_core.query_answer.models import (
     AnswerPayload,
     AtomicLink,
     VerificationResult,
+    VerifierLinkVerdict,
     VerifierPayload,
 )
 from smart_rag_core.query_answer.release import (
@@ -167,6 +168,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         return refuse_release(state, "deterministic_check_failed")
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
+    verifier_link_verdicts: tuple[VerifierLinkVerdict, ...] = ()
     omitted: tuple[str, ...] = ()
     added_prompt_tokens = 0
     added_completion_tokens = 0
@@ -190,6 +192,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
                 """
 
                 nonlocal added_prompt_tokens, added_completion_tokens, verifier_calls
+                nonlocal verifier_link_verdicts
                 context = runtime_from_state(state)
 
                 def on_consumed(consumed: ReservationConsumeResult) -> None:
@@ -214,6 +217,23 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
                 )
                 added_prompt_tokens += prompt_tokens
                 added_completion_tokens += completion_tokens
+                reason_codes = {
+                    "supported",
+                    "unsupported",
+                    "literal_mismatch",
+                    "invalid_inference",
+                    "insufficient_evidence",
+                }
+                verifier_link_verdicts = tuple(
+                    verdict.model_copy(
+                        update={
+                            "reason": verdict.reason
+                            if verdict.reason in reason_codes
+                            else "unspecified"
+                        }
+                    )
+                    for verdict in payload.link_verdicts
+                )
                 return payload
 
             caller = _verifier_caller
@@ -492,6 +512,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             answer=checked,
             deterministic_failures=failures,
             verifier_call_count=1 if verifier_calls else 0,
+            verifier_link_verdicts=verifier_link_verdicts,
             omitted_link_ids=omitted,
             verifier_skipped_reason=verifier_skipped_reason,
             skipped_citation_count=skipped_citation_count,

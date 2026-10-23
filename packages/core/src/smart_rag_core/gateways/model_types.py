@@ -257,6 +257,8 @@ class AnswerModelRequest(BaseModel):
 
     operation: Literal["answer"] = "answer"
     query: str = Field(min_length=1, max_length=2000)
+    recent_memory: str = Field(default="", max_length=8000)
+    resolved_query: str = Field(default="", max_length=2000)
     prompt_version: str = ANSWER_PROMPT_VERSION
     prompt_sha256: str = ANSWER_PROMPT_SHA256
     prompt_text: str = Field(min_length=1, max_length=16_384)

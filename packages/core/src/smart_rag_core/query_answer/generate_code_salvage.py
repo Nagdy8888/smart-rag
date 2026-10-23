@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from smart_rag_core.query_answer.code_continuation import restore_code_continuation
+from smart_rag_core.query_answer.code_explanation import keep_code_explanation
 from smart_rag_core.query_answer.code_selection import (
     CODE_SECTION_BREAK,
     NEXT_CODE_DEF,
@@ -15,6 +16,7 @@ from smart_rag_core.query_answer.generate_literals import (
     is_empty_refusal,
     passage_query_overlap,
 )
+from smart_rag_core.query_answer.language import requested_answer_language
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -22,6 +24,7 @@ from smart_rag_core.query_answer.models import (
     AtomicLink,
 )
 from smart_rag_core.query_answer.native_selection import relevant_native_fusion
+from smart_rag_core.query_answer.native_table_parts import copy_native_table_parts
 from smart_rag_core.query_answer.table_copy import copy_pipe_table
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
@@ -380,6 +383,20 @@ def salvage_named_table_block(
     """
 
     captions = named_table_captions(user_query)
+    if requested_answer_language(user_query) != "en" and not re.search(
+        r"(?i)\b(?:verbatim|copy|reproduce exactly)\b", user_query
+    ):
+        return payload
+    # Naming a table as evidence is not a request to replace the answer with
+    # its English rows. Preserve explanations, translations and comparisons.
+    # Explicit reproduction still uses the native source rather than model
+    # copies of cells.
+    reproduce = re.search(
+        r"(?i)\b(?:reproduce|copy|verbatim|render|markdown|pipe table|as a table)\b",
+        user_query,
+    )
+    if payload.paragraphs and not reproduce:
+        return payload
     gold_pattern = table_caption_gold_pattern(captions)
     if gold_pattern is None:
         return payload
@@ -393,6 +410,12 @@ def salvage_named_table_block(
     if copied is not None:
         return copied
     selected = relevant_native_fusion(payload, fusion, user_query)
+    native_parts = tuple(
+        native for native in selected.evidence if native.content_kind == "table"
+    )
+    copied_parts = copy_native_table_parts(payload, native_parts)
+    if copied_parts is not None:
+        return copied_parts
     for native in selected.evidence:
         if native.content_kind == "table":
             copied = copy_pipe_table(payload, native, caption="")
@@ -439,7 +462,7 @@ def salvage_named_code_definition(
         return payload
     continuation = restore_code_continuation(payload, fusion, pattern)
     if continuation is not None:
-        return continuation
+        return keep_code_explanation(payload, continuation, query=user_query)
     gold = best_code_definition_match(fusion, pattern, user_query=user_query)
     if gold is None:
         return payload
@@ -448,12 +471,13 @@ def salvage_named_code_definition(
         payload, span
     ):
         return _cite_shown_definition(payload, chunk_id=item.chunk_id, span=span)
-    return replace_with_extractive_block(
+    replacement = replace_with_extractive_block(
         payload,
         chunk_id=item.chunk_id,
         span=span,
         link_id="code-def-1",
     )
+    return keep_code_explanation(payload, replacement, query=user_query)
 
 
 def _cite_shown_definition(

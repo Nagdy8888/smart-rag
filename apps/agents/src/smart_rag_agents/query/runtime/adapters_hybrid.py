@@ -20,6 +20,7 @@ from smart_rag_core.retrieval.context_loader import (
 )
 from smart_rag_core.retrieval.frozen_profile import load_frozen_profile
 from smart_rag_core.retrieval.hybrid_run import HybridRetriever
+from smart_rag_core.retrieval.native_neighbors import with_named_table_neighbors
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.reranker import rerank_pool
 from smart_rag_core.retrieval.source_scope import (
@@ -267,6 +268,9 @@ class ProcessHybridRetriever:
                 restrict_version_id=restrict_version_id,
                 cache_mode=cache_mode,
                 source_selectors=scope.selector_texts if scope is not None else (),
+            )
+            result = with_named_table_neighbors(
+                result, context_connection, caller, ranking_query
             )
         resolution = (
             scope.resolution.value

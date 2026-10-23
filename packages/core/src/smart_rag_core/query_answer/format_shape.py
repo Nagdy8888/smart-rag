@@ -16,6 +16,10 @@ from smart_rag_core.query_answer.models import (
     AtomicLink,
 )
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
+from smart_rag_core.query_answer.stacked_table import (
+    repair_missing_row_header,
+    stacked_records_to_table,
+)
 from smart_rag_core.query_answer.versions import MAX_CLAIM_CHARS
 from smart_rag_core.retrieval.rerank import (
     named_code_definition_ids,
@@ -158,7 +162,18 @@ def ensure_fenced_code(display: str, *, language: str = "python") -> str:
     if existing is not None:
         inner = existing.group(2).strip()
         lang = (existing.group(1) or language).strip() or language
-        return f"```{lang}\n{inner}\n```"
+        block = f"```{lang}\n{inner}\n```"
+        # One provider claim may contain an introduction, code and its
+        # explanation. Finding a fence must never discard its surrounding text.
+        return "\n".join(
+            part
+            for part in (
+                body[: existing.start()].strip(),
+                block,
+                body[existing.end() :].strip(),
+            )
+            if part
+        )
     if not _CODE_LOOKS.search(body) and "return " not in body:
         # Still wrap when the ask requested a fence; body may be dense OCR.
         pass
@@ -182,7 +197,10 @@ def ensure_markdown_pipe_table(display: str) -> str:
         return display
     normalized = _expand_compact_pipe_rows(text)
     if answer_has_markdown_pipe_table(normalized):
-        return normalized
+        return repair_missing_row_header(normalized)
+    stacked = stacked_records_to_table(normalized)
+    if stacked is not None:
+        return stacked
     return _ocr_body_to_pipe_table(normalized)
 
 
@@ -210,6 +228,42 @@ def format_requested_answer_shape(
         return payload
     if payload.status == "refused" and not payload.atomic_links:
         return payload
+    if len(payload.paragraphs) > 1:
+        # Shape artifacts individually. Formatting the joined answer used to
+        # extract its first fence, dropping every explanation after the code
+        # and collapsing citation ownership onto paragraph zero.
+        paragraphs: list[AnswerParagraph] = []
+        replacements: dict[str, str] = {}
+        for paragraph in payload.paragraphs:
+            text = paragraph.text
+            artifact = (
+                bool(_CODE_LOOKS.search(text) or _FENCE_ANY.search(text))
+                if shape == "code_fence"
+                else answer_has_markdown_pipe_table(text)
+            )
+            if artifact:
+                formatted = (
+                    ensure_fenced_code(text)
+                    if shape == "code_fence"
+                    else ensure_markdown_pipe_table(text)
+                )
+                if len(formatted) <= MAX_CLAIM_CHARS:
+                    text = formatted
+                    replacements.update(dict.fromkeys(paragraph.link_ids, text))
+            paragraphs.append(paragraph.model_copy(update={"text": text}))
+        return with_derived_answer_text(
+            payload.model_copy(
+                update={
+                    "paragraphs": tuple(paragraphs),
+                    "atomic_links": tuple(
+                        link.model_copy(update={"claim": replacements[link.link_id]})
+                        if link.link_id in replacements
+                        else link
+                        for link in payload.atomic_links
+                    ),
+                }
+            )
+        )
     body = (payload.answer_text or "").strip()
     if not body and payload.paragraphs:
         body = payload.paragraphs[0].text.strip()
@@ -237,8 +291,10 @@ def format_requested_answer_shape(
         elif formatted == body:
             return payload
 
-    claim_text = formatted[:MAX_CLAIM_CHARS]
-    paragraph_text = formatted[:4000]
+    if len(formatted) > MAX_CLAIM_CHARS:
+        return payload.model_copy(update={"status": "partial"})
+    claim_text = formatted
+    paragraph_text = formatted
     link_ids = (
         payload.paragraphs[0].link_ids
         if payload.paragraphs

@@ -30,6 +30,10 @@ from smart_rag_core.gateways.model_types import (
     reject_oversize_model_input,
     string_tuple,
 )
+from smart_rag_core.gateways.summary_model import (
+    SummaryModelRequest,
+    SummaryModelResponse,
+)
 from smart_rag_core.query_answer.models import AtomicLink
 from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.verifier import mock_verifier_payload
@@ -110,6 +114,15 @@ def _mock_organize_response(
 
 class MockModelAdapter:
     """Frozen adapter that performs no provider or retrieval work."""
+
+    async def generate_summary(
+        self, request: SummaryModelRequest
+    ) -> SummaryModelResponse:
+        """Deterministic bounded fixture; no provider or network."""
+        text = (request.previous_summary + "\n" + request.messages).strip()
+        return SummaryModelResponse(
+            summary=text[:1400] or "No pending topic.", input_tokens=0, output_tokens=0
+        )
 
     def __init__(self, *, fixture_id: str, max_input_chars: int) -> None:
         """Initialize deterministic fixture metadata and input bound.
@@ -276,7 +289,12 @@ class MockModelAdapter:
             or request.prompt_sha256 != ANSWER_PROMPT_SHA256
         ):
             raise ValueError("answer_prompt_version_mismatch")
-        joined = request.query + request.source_records
+        joined = (
+            request.query
+            + request.source_records
+            + request.recent_memory
+            + request.resolved_query
+        )
         reject_oversize_model_input(joined, self._max_input_chars)
         sources = _parse_untrusted_sources(request.source_records)
         fallback_span = next(

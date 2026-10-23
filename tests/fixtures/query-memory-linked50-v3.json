@@ -1,0 +1,345 @@
+{
+  "dataset_id": "query-memory-linked50-v3",
+  "purpose": "single conversation development regression, not holdout; recall values are synthetic user preferences",
+  "turns": [
+    {
+      "id": "m01",
+      "scope": "general_knowledge",
+      "question": "For this chat, remember that my project nickname is Harbor Maple and the rollout requires seven reviewers. Prefer concise English unless I ask for Arabic. Repeat these preferences back to me.",
+      "check": "recall7"
+    },
+    {
+      "id": "m02",
+      "scope": "general_knowledge",
+      "question": "What project nickname and reviewer requirement did I just give you?",
+      "check": "recall7"
+    },
+    {
+      "id": "m03",
+      "scope": "company_documents",
+      "question": "Using the uploaded book, explain the difference between an agent's knowledge and memory.",
+      "check": "text",
+      "required_patterns": [
+        "knowledge",
+        "memory"
+      ]
+    },
+    {
+      "id": "m04",
+      "scope": "company_documents",
+      "question": "How does that memory preserve continuity between sessions, rather than merely retrieving knowledge?",
+      "check": "text",
+      "required_patterns": [
+        "memory|session"
+      ]
+    },
+    {
+      "id": "m05",
+      "scope": "general_knowledge",
+      "question": "Before changing topics, recall my project nickname and rollout reviewer requirement.",
+      "check": "recall7"
+    },
+    {
+      "id": "m06",
+      "scope": "company_documents",
+      "question": "Compare relational databases such as PostgreSQL with object storage such as S3 for durable agent results.",
+      "check": "text"
+    },
+    {
+      "id": "m07",
+      "scope": "company_documents",
+      "question": "Which of those is best for archival outputs, and why?",
+      "check": "text"
+    },
+    {
+      "id": "m08",
+      "scope": "company_documents",
+      "question": "What disadvantages does the other storage approach have?",
+      "check": "text"
+    },
+    {
+      "id": "m09",
+      "scope": "general_knowledge",
+      "question": "What are my project nickname and reviewer requirement from the start of this chat?",
+      "check": "recall7"
+    },
+    {
+      "id": "m10",
+      "scope": "company_documents",
+      "question": "Show the storage comparison from Table 8-1 as a Markdown table.",
+      "check": "table"
+    },
+    {
+      "id": "m11",
+      "scope": "company_documents",
+      "question": "Which of those options lacks native indexing?",
+      "check": "text",
+      "required_patterns": [
+        "S3|object storage",
+        "index"
+      ]
+    },
+    {
+      "id": "m12",
+      "scope": "company_documents",
+      "question": "Why is that a problem when an agent needs frequent queries?",
+      "check": "text",
+      "required_patterns": [
+        "S3|object storage",
+        "index"
+      ]
+    },
+    {
+      "id": "m13",
+      "scope": "company_documents",
+      "question": "Explain hierarchical tool selection when an agent has many tools.",
+      "check": "text"
+    },
+    {
+      "id": "m14",
+      "scope": "company_documents",
+      "question": "What latency and maintenance tradeoffs does that approach introduce?",
+      "check": "text"
+    },
+    {
+      "id": "m15",
+      "scope": "company_documents",
+      "question": "How does semantic tool retrieval differ from that hierarchy?",
+      "check": "text"
+    },
+    {
+      "id": "m16",
+      "scope": "general_knowledge",
+      "question": "Recall the nickname and reviewer requirement I set before the storage and tool discussions.",
+      "check": "recall7"
+    },
+    {
+      "id": "m17",
+      "scope": "company_documents",
+      "question": "Explain Figure 2-1 showing the core components of an agent system and include the original image.",
+      "check": "figure"
+    },
+    {
+      "id": "m18",
+      "scope": "company_documents",
+      "question": "How does the memory component in that system differ from its knowledge base?",
+      "check": "text"
+    },
+    {
+      "id": "m19",
+      "scope": "company_documents",
+      "question": "Show that same core-components diagram again, with its source image.",
+      "check": "figure",
+      "required_patterns": [
+        "Figure\\s+2[-\\u2013]1"
+      ]
+    },
+    {
+      "id": "m20",
+      "scope": "general_knowledge",
+      "question": "Update my project preferences: Harbor Maple now requires nine reviewers, replacing the earlier seven. Keep the same language preference. Confirm the current requirement.",
+      "check": "recall9"
+    },
+    {
+      "id": "m21",
+      "scope": "company_documents",
+      "question": "Describe the agent archetypes in the book, including reflex agents and agents that reason in multiple steps.",
+      "check": "text"
+    },
+    {
+      "id": "m22",
+      "scope": "company_documents",
+      "question": "Which of those is faster, and what does it give up?",
+      "check": "text",
+      "required_patterns": [
+        "reflex"
+      ]
+    },
+    {
+      "id": "m23",
+      "scope": "company_documents",
+      "question": "Explain how LangGraph can persist an agent state between sessions.",
+      "check": "text"
+    },
+    {
+      "id": "m24",
+      "scope": "general_knowledge",
+      "question": "What is the current nickname and reviewer requirement, including the correction I made?",
+      "check": "recall9"
+    },
+    {
+      "id": "m25",
+      "scope": "company_documents",
+      "question": "Explain input validation for tool calls and how malformed tool inputs should be handled.",
+      "check": "text",
+      "required_patterns": [
+        "input|validat"
+      ]
+    },
+    {
+      "id": "m26",
+      "scope": "company_documents",
+      "question": "How does that differ from checking an HTTP response status?",
+      "check": "text",
+      "required_patterns": [
+        "HTTP|status",
+        "validat|input"
+      ]
+    },
+    {
+      "id": "m27",
+      "scope": "company_documents",
+      "question": "Reproduce the cancel_order tool from the book as a fenced Python block.",
+      "check": "code"
+    },
+    {
+      "id": "m28",
+      "scope": "company_documents",
+      "question": "Explain what the function you just showed does and what condition it checks.",
+      "check": "text",
+      "required_patterns": [
+        "cancel_order",
+        "ship"
+      ]
+    },
+    {
+      "id": "m29",
+      "scope": "general_knowledge",
+      "question": "After all these topics, what is the current project nickname and reviewer requirement?",
+      "check": "recall9"
+    },
+    {
+      "id": "m30",
+      "scope": "company_documents",
+      "question": "Explain the actor-critic pattern for generating and evaluating candidate plans.",
+      "check": "text"
+    },
+    {
+      "id": "m31",
+      "scope": "company_documents",
+      "question": "Show construct_actor_critic_graph in a fenced Python block and separately explain its actor and critic nodes.",
+      "check": "code_explanation"
+    },
+    {
+      "id": "m32",
+      "scope": "company_documents",
+      "question": "What causes that loop to regenerate instead of accepting a plan?",
+      "check": "text",
+      "required_patterns": [
+        "critic|score|rubric|threshold"
+      ]
+    },
+    {
+      "id": "m33",
+      "scope": "company_documents",
+      "question": "Reproduce Table 2-1 of selected open weight models as a Markdown table.",
+      "check": "table"
+    },
+    {
+      "id": "m34",
+      "scope": "company_documents",
+      "question": "Which of those models lists four A100 GPUs as sample hardware?",
+      "check": "text"
+    },
+    {
+      "id": "m35",
+      "scope": "company_documents",
+      "question": "\u0642\u0627\u0631\u0646 \u0628\u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0641\u064a \u062c\u062f\u0648\u0644 Markdown \u0628\u064a\u0646 PostgreSQL \u0648\u0627\u0644\u062a\u062e\u0632\u064a\u0646 \u0627\u0644\u0643\u0627\u0626\u0646\u064a S3 \u0643\u0645\u0627 \u0641\u064a Table 8-1\u060c \u0645\u0639 \u0627\u0644\u0645\u0632\u0627\u064a\u0627 \u0648\u0627\u0644\u0639\u064a\u0648\u0628 \u0648\u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0645\u0646\u0627\u0633\u0628.",
+      "check": "arabic_table"
+    },
+    {
+      "id": "m36",
+      "scope": "company_documents",
+      "question": "\u0644\u0645\u0627\u0630\u0627 \u064a\u0641\u062a\u0642\u0631 \u0627\u0644\u062a\u062e\u0632\u064a\u0646 \u0627\u0644\u0643\u0627\u0626\u0646\u064a \u0625\u0644\u0649 \u0627\u0644\u0641\u0647\u0631\u0633\u0629 \u0627\u0644\u0623\u0635\u0644\u064a\u0629\u060c \u0648\u0643\u064a\u0641 \u064a\u0624\u062b\u0631 \u0630\u0644\u0643 \u0639\u0644\u0649 \u0627\u0644\u0627\u0633\u062a\u0639\u0644\u0627\u0645\u0627\u062a \u0627\u0644\u0645\u062a\u0643\u0631\u0631\u0629\u061f \u0623\u062c\u0628 \u0628\u0627\u0644\u0639\u0631\u0628\u064a\u0629.",
+      "check": "arabic_text"
+    },
+    {
+      "id": "m37",
+      "scope": "general_knowledge",
+      "question": "\u0645\u0627 \u0627\u0633\u0645 \u0645\u0634\u0631\u0648\u0639\u064a \u0648\u0645\u0627 \u0639\u062f\u062f \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u064a\u0646 \u0627\u0644\u0645\u0637\u0644\u0648\u0628 \u062d\u0627\u0644\u064a\u0627\u064b \u0628\u0639\u062f \u0627\u0644\u062a\u0635\u062d\u064a\u062d \u0627\u0644\u0630\u064a \u0630\u0643\u0631\u062a\u0647\u061f \u0623\u062c\u0628 \u0628\u0627\u0644\u0639\u0631\u0628\u064a\u0629.",
+      "check": "recall9"
+    },
+    {
+      "id": "m38",
+      "scope": "company_documents",
+      "question": "What does Figure 3-4, the autonomy slider, show? Include the original image.",
+      "check": "figure"
+    },
+    {
+      "id": "m39",
+      "scope": "company_documents",
+      "question": "How can users move between those modes while retaining control?",
+      "check": "text",
+      "required_patterns": [
+        "autonomy|manual|slider|control"
+      ]
+    },
+    {
+      "id": "m40",
+      "scope": "general_knowledge",
+      "question": "Recall the project nickname and current reviewer requirement without reverting to the old value.",
+      "check": "recall9"
+    },
+    {
+      "id": "m41",
+      "scope": "company_documents",
+      "question": "Explain how an agent should be monitored in production.",
+      "check": "text"
+    },
+    {
+      "id": "m42",
+      "scope": "company_documents",
+      "question": "Who should own those monitoring metrics across engineering and operations roles?",
+      "check": "text"
+    },
+    {
+      "id": "m43",
+      "scope": "company_documents",
+      "question": "Show Table 10-3, the RACI matrix of monitoring metrics, as a Markdown table.",
+      "check": "table"
+    },
+    {
+      "id": "m44",
+      "scope": "company_documents",
+      "question": "Explain how the roles in that matrix divide responsibility for evaluating agent quality.",
+      "check": "text"
+    },
+    {
+      "id": "m45",
+      "scope": "general_knowledge",
+      "question": "Recall the project nickname and current reviewer requirement one more time.",
+      "check": "recall9"
+    },
+    {
+      "id": "m46",
+      "scope": "company_documents",
+      "question": "Describe the security threats that apply to agentic systems, including prompt injection.",
+      "check": "text"
+    },
+    {
+      "id": "m47",
+      "scope": "company_documents",
+      "question": "How should an agent treat those untrusted instructions and tool inputs?",
+      "check": "text"
+    },
+    {
+      "id": "m48",
+      "scope": "company_documents",
+      "question": "Using only the uploaded PDF, what is the exact annual salary of Smart RAG CEO Mustafa in 2026? Do not estimate.",
+      "check": "refusal"
+    },
+    {
+      "id": "m49",
+      "scope": "general_knowledge",
+      "question": "What language preference did I set at the beginning of this chat, and what exception did I allow?",
+      "check": "language_recall"
+    },
+    {
+      "id": "m50",
+      "scope": "general_knowledge",
+      "question": "Summarize my current project nickname, corrected reviewer requirement, and language preference in clear bullets. Preserve the corrected value.",
+      "check": "final_recall"
+    }
+  ],
+  "revision_note": "v2 preserved. m25 replaces absent ToolValidationError identifier with source-supported tool input validation; all other questions and checks retained."
+}

@@ -1,0 +1,6 @@
+{
+  "version": "query-profile-fewshots-v3",
+  "prompt_version": "query_profile_v3",
+  "approved_case_ids": [],
+  "notes": "No SME-approved few-shots. Holdout ids are forbidden."
+}

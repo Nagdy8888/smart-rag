@@ -40,6 +40,11 @@ from smart_rag_core.gateways.openai_general_chat import execute_openai_general_c
 from smart_rag_core.gateways.openai_lightrag import execute_openai_lightrag_llm
 from smart_rag_core.gateways.openai_profile import execute_openai_query_profile
 from smart_rag_core.gateways.openai_rerank import execute_openai_rerank
+from smart_rag_core.gateways.summary_model import (
+    SummaryModelRequest,
+    SummaryModelResponse,
+    execute_summary,
+)
 from smart_rag_core.retrieval.graph import (
     LIGHTRAG_LLM_MAX_INPUT_CHARS,
     LIGHTRAG_LLM_MODEL_ID,
@@ -50,6 +55,19 @@ from smart_rag_core.retrieval.rerank import rerank_input_hash
 
 class OpenAIRerankAdapter:
     """Live OpenAI adapter for counted profile, answer, and retrieval calls."""
+
+    async def generate_summary(
+        self, request: SummaryModelRequest
+    ) -> SummaryModelResponse:
+        """Enforce deployment input bounds before sending one summary call."""
+        if (
+            len(request.messages)
+            + len(request.previous_summary)
+            + len(request.previous_preferences)
+            > self._max_input_chars
+        ):
+            raise ValueError("summary_input_bound")
+        return execute_summary(self._api_key, request)
 
     def __init__(self, *, api_key: str, max_input_chars: int) -> None:
         """Store the credential for one-shot rerank calls.
@@ -183,7 +201,12 @@ class OpenAIRerankAdapter:
             One HTTPS call with ``max_retries=0``.
         """
 
-        joined = request.query + request.source_records
+        joined = (
+            request.query
+            + request.source_records
+            + request.recent_memory
+            + request.resolved_query
+        )
         reject_oversize_model_input(joined, self._max_input_chars)
         payload, request_id, input_tokens, output_tokens = execute_openai_answer(
             api_key=self._api_key,
@@ -192,7 +215,9 @@ class OpenAIRerankAdapter:
             prompt_version=request.prompt_version,
             model_id=request.model_id,
             user_query=request.query,
+            recent_memory=request.recent_memory,
             source_records=request.source_records,
+            resolved_query=request.resolved_query,
             timeout_seconds=request.remaining_deadline_seconds,
         )
         return AnswerModelResponse(

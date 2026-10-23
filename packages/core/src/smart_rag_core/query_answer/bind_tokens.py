@@ -305,6 +305,11 @@ def rebind_unique_claim_tokens(
         if link.kind != "fact":
             links.append(link)
             continue
+        # A complete definition owns its exact source fragments. Incidental
+        # method names in its body must not retarget it onto a prose call site.
+        if re.search(r"(?m)^\s*(?:async\s+)?def\s+\w+\s*\(", link.claim):
+            links.append(link)
+            continue
         tokens = _claim_anchor_tokens(link.claim)
         if not tokens:
             links.append(link)

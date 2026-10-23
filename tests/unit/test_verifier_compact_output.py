@@ -5,6 +5,7 @@ from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
+from openai import omit
 from smart_rag_core.gateways import openai_answer as adapter
 from smart_rag_core.gateways.openai_answer import OpenAIAnswerError
 from smart_rag_core.query_answer.verifier_output import (
@@ -53,6 +54,45 @@ def test_reason_schema_is_closed_and_compact_for_every_link() -> None:
             "enum": list(VERIFIER_REASON_CODES),
         }
     assert all(code.isascii() and len(code) <= 21 for code in VERIFIER_REASON_CODES)
+
+
+@pytest.mark.parametrize("model_id", ["gpt-6-luna", "gpt-4o-mini"])
+def test_verifier_effort_keeps_one_bounded_provider_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+    model_id: str,
+) -> None:
+    """Use low Luna effort without changing legacy model arguments or retry limits."""
+    response = SimpleNamespace(
+        status="completed",
+        id="verifier-test",
+        output_text='{"link_verdicts":{"claim-1":{"supported":true,"reason":"supported"}}}',
+        usage=SimpleNamespace(input_tokens=50, output_tokens=20),
+    )
+    create = MagicMock(return_value=response)
+    client = MagicMock(
+        return_value=SimpleNamespace(responses=SimpleNamespace(create=create))
+    )
+    monkeypatch.setattr(adapter, "traced_openai_client", client)
+    monkeypatch.setattr(adapter, "ALLOWED_VERIFIER_MODEL_IDS", frozenset({model_id}))
+    adapter.execute_openai_verifier(
+        api_key="synthetic-not-a-credential",
+        prompt_text="Synthetic verifier",
+        prompt_sha256=VERIFIER_PROMPT_SHA256,
+        prompt_version=VERIFIER_PROMPT_VERSION,
+        model_id=model_id,
+        source_records="Synthetic source",
+        link_payload=[{"link_id": "claim-1", "claim": "Synthetic claim"}],
+        link_ids=("claim-1",),
+        timeout_seconds=15,
+    )
+    assert create.call_count == 1
+    assert client.call_args.kwargs["max_retries"] == 0
+    assert client.call_args.kwargs["timeout"] == 15
+    assert (
+        create.call_args.kwargs["reasoning"] == {"effort": "low"}
+        if model_id == "gpt-6-luna"
+        else create.call_args.kwargs["reasoning"] is omit
+    )
 
 
 @pytest.mark.parametrize(

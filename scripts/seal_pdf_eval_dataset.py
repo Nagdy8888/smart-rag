@@ -163,7 +163,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     assert_holdout_path_hidden(args.input)
     cases = read_private_pdf_payload(args.input)
-    current_ids = _current_chunk_ids(args.ids)
     holdout_present = any(case.split == "holdout" for case in cases)
     access = HoldoutAccess.denied()
     if args.holdout_out is not None:
@@ -188,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
         print("holdout_opened=false")
         return 2
     try:
+        # Reject unsafe custody/labels before opening any database connection.
+        if any(case.generated_only or not case.human_approved for case in cases):
+            raise PrivatePdfSealError("generated_labels_cannot_self_seal")
+        current_ids = _current_chunk_ids(args.ids)
         sealed = seal_cases(
             cases,
             holdout_access=access,

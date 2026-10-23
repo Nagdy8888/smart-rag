@@ -6,6 +6,22 @@ import type { ChatViewState } from "./chat-view";
 import { displayText } from "./safe-text";
 import type { ConversationMessage } from "./types";
 
+/** Return a deduplicated oldest-first transcript, independent of API join order. */
+export function chronologicalMessages(
+  messages: readonly ConversationMessage[],
+): ConversationMessage[] {
+  const unique = [...new Map(messages.map((item) => [item.message_id, item])).values()];
+  return unique.sort((left, right) => {
+    const a = Date.parse(left.created_at);
+    const b = Date.parse(right.created_at);
+    if (Number.isFinite(a) && Number.isFinite(b) && a !== b) return a - b;
+    if (left.run_id && left.run_id === right.run_id && left.role !== right.role) {
+      return left.role === "user" ? -1 : 1;
+    }
+    return 0;
+  });
+}
+
 /** One locally settled question/answer pair from a finished live run. */
 export type SettledChatTurn = {
   runId: string | null;

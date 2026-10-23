@@ -30,7 +30,12 @@ from smart_rag_core.query_answer.generate import (
 from smart_rag_core.query_answer.generate_anchor_salvage import (
     salvage_anchor_claim_fill,
 )
+from smart_rag_core.query_answer.generate_code_salvage import (
+    salvage_named_code_definition,
+    salvage_named_table_block,
+)
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.query_answer.reproduction import canonical_reproduction_payload
 from smart_rag_core.query_answer.versions import ANSWER_MODEL_ID
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.constants import FALLBACK_RETRIEVERS_UNBOUND
@@ -181,6 +186,22 @@ def generate_answer_node(
                 },
             )
         clock = deps.now if deps.now is not None else (lambda: datetime.now(UTC))
+        literal = canonical_reproduction_payload(
+            working_fusion, str(state.get("user_query") or "")
+        )
+        if literal is not None and (
+            context is None or (context.deadline_at - clock()).total_seconds() >= 5
+        ):
+            return cast(
+                QueryGraphState,
+                {
+                    **state,
+                    **fit_update,
+                    "status": "answered",
+                    "detail": "canonical reproduction; no answer provider call",
+                    "answer": literal.model_dump(mode="json"),
+                },
+            )
         if context is not None:
             remaining_seconds = (context.deadline_at - clock()).total_seconds()
             if remaining_seconds < ANSWER_STAGE_MIN_SECONDS:
@@ -265,6 +286,12 @@ def generate_answer_node(
             return gateway_answer(
                 deps,
                 query=str(state.get("user_query") or ""),
+                resolved_query=str(
+                    (state.get("preparation") or {}).get("rewrite") or ""
+                ),
+                recent_memory=memory_text_from_state(state.get("memory_records"))[
+                    :8000
+                ],
                 fusion=working_fusion,
                 tables=working_tables,
                 context=context,
@@ -330,7 +357,7 @@ def generate_answer_node(
                 )
             )
             if needs_rag_model:
-                payload, status = _company_model_failure_payload(
+                payload, status = company_model_failure_payload(
                     working_fusion,
                     user_query=str(state.get("user_query") or ""),
                     reason=str(reason),
@@ -381,7 +408,7 @@ def generate_answer_node(
         except AnswerError as exc:
             reason = exc.reason
             if needs_rag_model:
-                payload, status = _company_model_failure_payload(
+                payload, status = company_model_failure_payload(
                     working_fusion,
                     user_query=str(state.get("user_query") or ""),
                     reason=reason,
@@ -440,7 +467,7 @@ def generate_answer_node(
     )
 
 
-def _company_model_failure_payload(
+def company_model_failure_payload(
     fusion: FusionResult,
     *,
     user_query: str,
@@ -472,8 +499,15 @@ def _company_model_failure_payload(
         status="refused",
         answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     )
+    from smart_rag_core.query_answer.code_explanation import (
+        with_source_code_explanation,
+    )
+
+    structural = salvage_named_code_definition(refusal, fusion, user_query=user_query)
+    structural = with_source_code_explanation(structural, fusion, query=user_query)
+    structural = salvage_named_table_block(structural, fusion, user_query=user_query)
     filled = salvage_anchor_claim_fill(
-        refusal,
+        structural,
         fusion,
         user_query=user_query,
     )

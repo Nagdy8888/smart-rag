@@ -35,6 +35,10 @@ from smart_rag_core.gateways.model_types import (
     WebAnswerModelResponse,
 )
 from smart_rag_core.gateways.openai_adapter import OpenAIRerankAdapter
+from smart_rag_core.gateways.summary_model import (
+    SummaryModelRequest,
+    SummaryModelResponse,
+)
 from smart_rag_core.observability.langsmith_tracing import (
     configure_langsmith,
     model_call_traceable,
@@ -44,6 +48,13 @@ from smart_rag_core.settings import SharedSettings
 
 class ModelGateway:
     """Single application-owned boundary for all model invocations."""
+
+    @model_call_traceable(name="model.summary")
+    async def generate_summary(
+        self, request: SummaryModelRequest
+    ) -> SummaryModelResponse:
+        """Use the same adapter and redacted tracing boundary as other calls."""
+        return await self._adapter.generate_summary(request)
 
     def __init__(self, adapter: ModelAdapter) -> None:
         """Initialize the gateway with one lifecycle-created adapter.

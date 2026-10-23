@@ -122,6 +122,35 @@ def test_caption_next_page_selects_correct_table_not_similar_section() -> None:
     assert wrong not in selected.evidence
 
 
+@pytest.mark.parametrize("reference", ["Figure 4-2", "Fig. 4-2", "الشكل 4-2"])
+def test_answer_figure_reference_places_exact_asset_without_explicit_request(
+    reference: str,
+) -> None:
+    """An answer's exact figure label displays the authorized matching image."""
+    state = verified_answer_state()
+    payload = AnswerPayload.model_validate(state["answer"])
+    paragraph = payload.paragraphs[0].model_copy(
+        update={"text": f"See {reference} for the lifecycle."}
+    )
+    payload = payload.model_copy(
+        update={"paragraphs": (paragraph,), "answer_text": paragraph.text}
+    )
+    base = FusionResult.model_validate(state["fusion"])
+    target = verifier_passage(30, text="Figure 4-2. Widget lifecycle.").model_copy(
+        update={"content_kind": "figure", "figure_id": "a" * 32}
+    )
+    other = verifier_passage(31, text="Figure 4-3. Other lifecycle.").model_copy(
+        update={"content_kind": "figure", "figure_id": "b" * 32}
+    )
+    fusion = base.model_copy(update={"evidence": (*base.evidence, target, other)})
+    result = attach_native_evidence(
+        payload, fusion, user_query="Explain the lifecycle."
+    )
+    assert "[[figure:" + "a" * 32 in result.answer_text
+    assert "[[figure:" + "b" * 32 not in result.answer_text
+    assert paragraph.text in result.answer_text
+
+
 def test_named_function_keeps_long_body_with_bounded_exact_citation_slices() -> None:
     """The citation span cap does not silently truncate a fitting code body."""
     state = verified_answer_state()

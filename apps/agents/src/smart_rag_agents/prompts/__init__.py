@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-QUERY_PROFILE_PROMPT_VERSION = "query_profile_v1"
-QUERY_PROFILE_PROMPT_PATH = Path(__file__).resolve().parent / "query_profile_v1.md"
+QUERY_PROFILE_PROMPT_VERSION = "query_profile_v3"
+QUERY_PROFILE_PROMPT_PATH = Path(__file__).resolve().parent / "query_profile_v3.md"
 RERANK_PROMPT_VERSION = "rerank_v2"
 RERANK_PROMPT_PATH = Path(__file__).resolve().parent / "rerank_v2.md"
-ANSWER_PROMPT_VERSION = "answer_v12"
-ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v12.md"
+ANSWER_PROMPT_VERSION = "answer_v20"
+ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v20.md"
 ORGANIZE_PROMPT_VERSION = "organize_v1"
 ORGANIZE_PROMPT_PATH = Path(__file__).resolve().parent / "organize_v1.md"
-GENERAL_CHAT_PROMPT_VERSION = "general_chat_v2"
-GENERAL_CHAT_PROMPT_PATH = Path(__file__).resolve().parent / "general_chat_v2.md"
-VERIFIER_PROMPT_VERSION = "verifier_v5"
-VERIFIER_PROMPT_PATH = Path(__file__).resolve().parent / "verifier_v5.md"
+GENERAL_CHAT_PROMPT_VERSION = "general_chat_v3"
+GENERAL_CHAT_PROMPT_PATH = Path(__file__).resolve().parent / "general_chat_v3.md"
+VERIFIER_PROMPT_VERSION = "verifier_v8"
+VERIFIER_PROMPT_PATH = Path(__file__).resolve().parent / "verifier_v8.md"
 OPTIONAL_CATALOG_PROMPT_VERSION = "optional_catalog_v1"
 OPTIONAL_CATALOG_PROMPT_PATH = (
     Path(__file__).resolve().parent / "optional_catalog_v1.md"

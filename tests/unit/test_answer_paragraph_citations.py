@@ -6,6 +6,7 @@ from pathlib import Path
 
 from smart_rag_agents.prompts.registry import load_prompt, prompt_text
 from smart_rag_agents.query.nodes import verify as verify_mod
+from smart_rag_core.query_answer.bind_links import bind_company_atomic_links
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.generate import mock_answer_payload
 from smart_rag_core.query_answer.models import (
@@ -141,14 +142,14 @@ def test_answer_v3_remains_registered_and_hashed() -> None:
     assert "paragraphs" in required
 
 
-def test_answer_v12_is_current_and_hashed() -> None:
-    """Pinned answer_v12 hash matches the immutable prompt file."""
+def test_answer_v20_is_current_and_hashed() -> None:
+    """Pinned answer_v20 hash matches the immutable prompt file."""
 
-    entry = load_prompt("answer_v12", environment="dev")
-    assert ANSWER_PROMPT_VERSION == "answer_v12"
+    entry = load_prompt("answer_v20", environment="dev")
+    assert ANSWER_PROMPT_VERSION == "answer_v20"
     assert entry.sha256 == ANSWER_PROMPT_SHA256
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v12.md")
-    body = prompt_text("answer_v12")
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v20.md")
+    body = prompt_text("answer_v20")
     assert "Do not write `answer_text`" in body
     assert "first claim answers the question directly" in body.lower()
     assert "fenced" in body.lower()
@@ -619,3 +620,34 @@ def test_exact_source_span_stays_substring_of_multiline_pdf_passage() -> None:
     assert span in text
     assert "\n\n" not in span
     assert span.startswith("Model Context Protocol")
+
+
+def test_repeated_source_heading_cites_body_instead_of_ambiguous_title() -> None:
+    """Repeated PDF titles cannot leave a supported explanation title-only cited."""
+    title = "Knowledge and Memory"
+    body = "Knowledge retrieves facts. Memory preserves previous exchanges across sessions."
+    source = verifier_passage(911, text=f"{title}\n\n{title}\n\n{body}").model_copy(
+        update={"section_path": (title,)}
+    )
+    claim = "Memory preserves exchanges across sessions."
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(AnswerParagraph(paragraph_index=0, text=claim, link_ids=("c1",)),),
+        atomic_links=(
+            AtomicLink(
+                link_id="c1", claim=claim, chunk_ids=(source.chunk_id,), kind="fact"
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=source.chunk_id,
+                span=title,
+                paragraph_index=0,
+                atomic_link_id="c1",
+            ),
+        ),
+        status="complete",
+    )
+    result = bind_company_atomic_links(payload, fusion=verifier_fusion(source))
+    assert result.citations[0].span == body
+    assert result.citations[0].span in source.citation_text

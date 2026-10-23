@@ -46,11 +46,12 @@ def tables_from_state(raw: object) -> TableComposition:
     return TableComposition.model_validate(raw)
 
 
-def memory_text_from_state(raw: object) -> str:
+def memory_text_from_state(raw: object, *, max_chars: int = 8000) -> str:
     """Format bounded untrusted memory for general chat.
 
     Args:
         raw: ``memory_records`` list from graph state.
+        max_chars: Prompt-specific bound, preserving summary and newest messages.
 
     Returns:
         Delimited memory text, or empty when none is present.
@@ -58,16 +59,29 @@ def memory_text_from_state(raw: object) -> str:
 
     if not isinstance(raw, list):
         return ""
-    parts: list[str] = []
-    for item in cast(list[object], raw)[:8]:
+    summaries: list[str] = []
+    recent: list[str] = []
+    for item in cast(list[object], raw):
         if not isinstance(item, dict):
             continue
         typed_item = {
             str(key): value for key, value in cast(dict[object, object], item).items()
         }
-        role = str(typed_item.get("role") or "unknown")[:32]
-        content = str(typed_item.get("content") or "")[:500]
+        role = str(typed_item.get("role") or "unknown").replace('"', "")[:32]
+        content = str(typed_item.get("content") or "")[:1500]
+        content = content.replace("<<", "").replace(">>", "")
         if not content:
             continue
-        parts.append(f'<<untrusted-memory role="{role}">>{content}</untrusted-memory>')
-    return "\n".join(parts)[:4000]
+        block = f'<<untrusted-memory role="{role}">>{content}</untrusted-memory>'
+        (summaries if role == "system" else recent).append(block)
+    # Preserve the complete compact summary, then the newest complete messages.
+    # A per-record 500-character cut used to erase late user constraints.
+    parts = summaries[:1]
+    size = sum(map(len, parts))
+    kept: list[str] = []
+    for block in reversed(recent):
+        if size + len(block) + 1 > max_chars:
+            break
+        kept.append(block)
+        size += len(block) + 1
+    return "\n".join([*parts, *reversed(kept)])

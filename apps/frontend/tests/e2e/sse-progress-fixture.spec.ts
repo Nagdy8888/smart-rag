@@ -111,12 +111,13 @@ test("company fixture shows waiting then verify then skippable verified answer",
   await signInLiveMember(page, request);
   await interceptCompanyProgress(page);
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
   await page.getByRole("textbox").fill("SYNTHETIC fixture question");
+  await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByTestId("run-progress-timeline")).toBeVisible();
   await expect(page.getByText("PUBLIC_FINAL")).toHaveCount(0);
-  await expect(page.getByText(/Verifying|Verified/)).toBeVisible();
+  await expect(page.getByTestId("run-progress-timeline").getByRole("status")
+    .filter({ hasText: /Verifying|Verified/ })).toBeVisible();
   await expect(page.getByTestId("verified-answer-reveal")).toBeVisible();
   const skip = page.getByRole("button", { name: "Show full answer" });
   if (await skip.isVisible()) {

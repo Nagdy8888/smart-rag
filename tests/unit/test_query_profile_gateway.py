@@ -178,7 +178,7 @@ def test_live_profile_adapter_keeps_store_false() -> None:
     assert "tools=" not in source
     assert PROFILE_MODEL_ID == OPENAI_CHAT_MODEL_ID
     assert PROFILE_MODEL_ID in ALLOWED_PROFILE_MODEL_IDS
-    assert PROFILE_PROMPT_VERSION == "query_profile_v1"
+    assert PROFILE_PROMPT_VERSION == "query_profile_v3"
     assert len(PROFILE_PROMPT_SHA256) == 64
 
 

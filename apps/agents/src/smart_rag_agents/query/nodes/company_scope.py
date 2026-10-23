@@ -97,6 +97,13 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 **state,
                 "status": "routing_rejected",
                 "detail": exc.reason,
+                "authorized_runtime": runtime_after_retrieve_budget(
+                    context, query_budget
+                ).model_dump(mode="json"),
+                "remaining_model_calls": query_budget.remaining_model_calls,
+                **accumulated_tokens(
+                    state, query_budget.prompt_tokens, query_budget.completion_tokens
+                ),
                 "keyword_extract_count": 0,
                 "catalog_llm_call_count": 0,
             },
@@ -109,6 +116,9 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 **state,
                 "status": "insufficient_evidence",
                 "detail": str(reason)[:128],
+                "authorized_runtime": runtime_after_retrieve_budget(
+                    context, query_budget
+                ).model_dump(mode="json"),
                 "branch_results": [],
                 "keyword_extract_count": 0,
                 "catalog_llm_call_count": 0,

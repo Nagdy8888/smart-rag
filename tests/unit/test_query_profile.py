@@ -54,7 +54,7 @@ PROMPT_PATH = (
     / "src"
     / "smart_rag_agents"
     / "prompts"
-    / "query_profile_v1.md"
+    / "query_profile_v3.md"
 )
 
 

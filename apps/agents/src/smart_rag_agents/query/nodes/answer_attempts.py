@@ -25,7 +25,7 @@ from smart_rag_agents.query.run_timings import (
 )
 from smart_rag_agents.query.state import QueryGraphState
 
-ANSWER_ATTEMPT_CAP_SECONDS = 10.0
+ANSWER_ATTEMPT_CAP_SECONDS = 15.0
 """Per-attempt cap until a measured 99th percentile replaces it."""
 
 ANSWER_RETRY_MIN_REMAINING_SECONDS = 8.0

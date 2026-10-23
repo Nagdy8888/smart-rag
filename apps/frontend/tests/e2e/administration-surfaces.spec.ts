@@ -403,7 +403,7 @@ test("stubbed owner Evaluation review queue hides private text until a case is o
   await expect(queue.getByText("SECRET_QUESTION_E2E")).toHaveCount(0);
   await expect(queue.getByText("SECRET_ANSWER_E2E")).toHaveCount(0);
   await queue.getByRole("button", { name: /Factual definition/ }).click();
-  await expect(page.getByLabel("Question")).toHaveValue("SECRET_QUESTION_E2E");
+  await expect(page.getByRole("textbox", { name: "Question", exact: true })).toHaveValue("SECRET_QUESTION_E2E");
   await expect(page.getByRole("heading", { name: "Required source passages" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Test this case" })).toBeVisible();
 });

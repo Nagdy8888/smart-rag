@@ -428,7 +428,11 @@ def test_insufficient_evidence_after_correction_ends() -> None:
     assert route_after_correction(state) == "fuse_evidence"
 
 
-def test_post_correction_coverage_is_recomputed_before_answer() -> None:
+@pytest.mark.parametrize("fail_retry", [False, True])
+def test_post_correction_coverage_is_recomputed_before_answer(
+    monkeypatch: pytest.MonkeyPatch,
+    fail_retry: bool,
+) -> None:
     """A retry that stays weak still proceeds when Hybrid already selected IDs."""
 
     from smart_rag_agents.query.deps import QueryGraphDeps
@@ -447,10 +451,49 @@ def test_post_correction_coverage_is_recomputed_before_answer() -> None:
     state["retrieval_plan"] = plan.model_dump(mode="json")
     state["preparation"] = prep.model_dump(mode="json")
     state["branch_results"] = [item.model_dump(mode="json") for item in results]
+
+    def _counted_retry(*args: object, **kwargs: object) -> tuple[BranchResult, ...]:
+        """Simulate a retry consuming two durable model reservations.
+
+        Args:
+            *args: Unused branch execution arguments.
+            **kwargs: Shared retrieve ledger passed to branch execution.
+
+        Returns:
+            Authorized retry evidence.
+        """
+        del args
+        budget = kwargs["query_budget"]
+        assert isinstance(budget, QueryRetrieveBudget)
+        budget.expected_version += 2
+        budget.remaining_model_calls -= 2
+        budget.remaining_usd = Decimal("3.20")
+        budget.remaining_prompt_tokens = 70000
+        budget.remaining_completion_tokens = 17000
+        budget.prompt_tokens = 120
+        budget.completion_tokens = 10
+        if fail_retry:
+            raise QueryRoutingError("retry_provider_unavailable")
+        return (_hybrid_result(runtime, coverage=0.30, query=query),)
+
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.correction.execute_branches", _counted_retry
+    )
     out = apply_correction_node(state, QueryGraphDeps(hybrid_retriever=_FakeHybrid()))
-    assert out["status"] == "correction_applied"
-    assert "fusion and answering follow" in str(out["detail"])
+    if fail_retry:
+        assert out["status"] == "insufficient_evidence"
+        assert out["detail"] == "retry_provider_unavailable"
+    else:
+        assert out["status"] == "correction_applied"
+        assert "fusion and answering follow" in str(out["detail"])
     assert plan.knowledge_scope.value != "general_knowledge"
+    refreshed = AuthorizedRuntimeContext.from_mapping(out["authorized_runtime"])
+    assert refreshed.optimistic_version == runtime.optimistic_version + 2
+    assert refreshed.remaining_usd == Decimal("3.20")
+    assert refreshed.remaining_prompt_tokens == 70000
+    assert refreshed.remaining_completion_tokens == 17000
+    assert out["remaining_model_calls"] == 4
+    assert out["prompt_tokens"] == 120
 
 
 def test_empty_hybrid_evidence_still_refuses_after_weak_retry() -> None:

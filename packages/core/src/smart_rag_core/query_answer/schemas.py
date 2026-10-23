@@ -150,7 +150,7 @@ def answer_json_schema() -> dict[str, object]:
 
 
 def answer_claims_json_schema(
-    *, max_claims: int = MAX_VERIFIER_LINKS
+    *, max_claims: int = MAX_VERIFIER_LINKS, require_table: bool = False
 ) -> dict[str, object]:
     """Return the strict answer claims structured-output schema.
 
@@ -161,6 +161,7 @@ def answer_claims_json_schema(
 
     Args:
         max_claims: Existing six-claim ceiling, or a lower artifact reservation.
+        require_table: Every nonempty claim must contain a real Markdown table.
 
     Returns:
         OpenAI ``json_schema`` document. The model writes no link IDs,
@@ -182,12 +183,17 @@ def answer_claims_json_schema(
             "source_ranges": {"type": "array", "items": {"type": "string"}},
         },
     }
+    claim_text: dict[str, object] = {"type": "string"}
+    if require_table:
+        claim_text["pattern"] = (
+            r"[\s\S]*\|[^\n]+\|\n[ \t]*\|[ \t:|\-]+\|\n[ \t]*\|[^\n]+\|[\s\S]*"
+        )
     claim = {
         "type": "object",
         "additionalProperties": False,
         "required": ["text", "kind", "citations"],
         "properties": {
-            "text": {"type": "string"},
+            "text": claim_text,
             "kind": {"type": "string", "enum": ["fact", "inference_link"]},
             "citations": {
                 "type": "array",

@@ -224,6 +224,26 @@
   font-family: inherit;
 }
 
+/* Token colors meet AA on the existing #EEF0F2 code surface. */
+.codeBlockBody :global(.hljs-keyword),
+.codeBlockBody :global(.hljs-selector-tag),
+.codeBlockBody :global(.hljs-literal) { color: #7337a6; }
+.codeBlockBody :global(.hljs-string),
+.codeBlockBody :global(.hljs-regexp),
+.codeBlockBody :global(.hljs-addition) { color: #17633c; }
+.codeBlockBody :global(.hljs-title),
+.codeBlockBody :global(.hljs-built_in),
+.codeBlockBody :global(.hljs-section) { color: #1756a1; }
+.codeBlockBody :global(.hljs-number),
+.codeBlockBody :global(.hljs-attr),
+.codeBlockBody :global(.hljs-symbol),
+.codeBlockBody :global(.hljs-type) { color: #9a3814; }
+.codeBlockBody :global(.hljs-comment),
+.codeBlockBody :global(.hljs-quote) { color: #53616a; font-style: italic; }
+.codeBlockBody :global(.hljs-meta),
+.codeBlockBody :global(.hljs-tag),
+.codeBlockBody :global(.hljs-deletion) { color: #a12743; }
+
 .answerFigure {
   margin: 0;
   display: flex;

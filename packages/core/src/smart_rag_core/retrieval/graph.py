@@ -19,7 +19,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from smart_rag_core.models.env_pins import (
     ALLOWED_LIGHTRAG_LLM_MODEL_IDS,
     LIGHTRAG_LLM_MODEL_ID,
-    OPENAI_CHAT_MODEL_ID,
 )
 
 if LIGHTRAG_LLM_MODEL_ID not in ALLOWED_LIGHTRAG_LLM_MODEL_IDS:
@@ -45,7 +44,10 @@ SELECTED_DOC_STATUS_STORAGE = "PGDocStatusStorage"
 FORBIDDEN_AGE_GRAPH_STORAGE = "PGGraphStorage"
 LIGHTRAG_CHUNK_TOKEN_SIZE = 1200
 LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE = 100
-LIGHTRAG_TIKTOKEN_MODEL = OPENAI_CHAT_MODEL_ID
+# Local chunk encoding is independent of the provider's inference alias. Keep
+# the qualified o200k_base tokenizer so model switches do not change graph chunks
+# or require tiktoken to recognize a provider-specific model name.
+LIGHTRAG_TIKTOKEN_MODEL = "gpt-4o-mini"
 LIGHTRAG_LLM_MAX_OUTPUT_TOKENS = 4000
 LIGHTRAG_LLM_MAX_INPUT_CHARS = 65_536
 LIGHTRAG_LLM_MAX_OUTPUT_CHARS = 32_768

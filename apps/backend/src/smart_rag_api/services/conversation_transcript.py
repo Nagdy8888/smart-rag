@@ -110,6 +110,7 @@ def list_conversation_messages(
                 FROM app.list_conversation_messages_v3(
                   %s::uuid, %s::text, %s::bigint, %s::uuid, %s::integer, %s::uuid
                 )
+                ORDER BY created_at DESC, message_id DESC
                 """,
                 (
                     caller.rpc_user_id(),

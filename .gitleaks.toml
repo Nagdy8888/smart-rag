@@ -4,6 +4,17 @@ title = "Smart RAG secret scanning"
 useDefault = true
 
 [[allowlists]]
+description = "Verified imported skill file SHA-256 values; contract tests bind these to file bytes"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)\.agents/skills/upstream-manifest\.json$''',
+]
+regexes = [
+  '''^\s*"[^"\r\n]+\.(?:md|json)": "[0-9a-f]{64}",?\s*$''',
+]
+
+[[allowlists]]
 description = "Canonical plan prose that names token and API concepts without values"
 condition = "AND"
 regexTarget = "line"

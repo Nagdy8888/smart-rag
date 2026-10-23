@@ -1,5 +1,15 @@
 # Smart RAG comprehensive review
 
+Follow-up: [local native ingestion and mixed50 results](19-local-native-ingestion-mixed50.md)
+records the 22 October local Supabase ingestion and 50-question diagnostic run.
+
+The 22 October follow-ups cover [agent failure repairs](20-agent-failure-repair.md)
+and [chronological chat order and shared response formatting](21-chat-order-and-reading.md).
+The next follow-up covers [code syntax colors and inline source images](22-code-colors-and-inline-images.md).
+See also the [insufficient-evidence checkpoint diagnosis](23-insufficient-evidence-diagnosis.md).
+The [connected memory and summarization follow-up](24-conversation-memory-and-summary.md)
+records the one-chat test and the automatic context compaction changes.
+
 Review date: **20 October 2026, Africa/Cairo**. Reviewed commit: `a2164952a3ea4bfd87879b2d6d6d0dadf5643f27`. The working tree was clean before this review. Only review documents, evidence, and generated local build/test artifacts were produced; application source was not changed.
 
 See [CI repair follow-up](15-ci-repair-follow-up.md) for subsequent publication

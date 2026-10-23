@@ -5,8 +5,6 @@ RUN apk upgrade --no-cache \
         tesseract-ocr \
         tesseract-ocr-data-eng \
         tesseract-ocr-data-ara \
-        mesa-gl \
-        glib \
     && adduser -D -u 10001 -s /sbin/nologin parseruser \
     && mkdir -p /app /input /output \
     && chown -R parseruser:parseruser /app /input /output

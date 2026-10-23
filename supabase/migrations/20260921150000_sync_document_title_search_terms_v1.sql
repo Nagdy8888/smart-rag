@@ -1,7 +1,9 @@
 -- Insert the current document title onto representative search terms.
 -- Does not re-parse, delete chunks, or change delete_visible_document.
 
-CREATE FUNCTION app.sync_document_title_search_terms(
+-- The preceding title-rename migration also defines this helper. Replace it
+-- during fresh replay while preserving the corrected implementation below.
+CREATE OR REPLACE FUNCTION app.sync_document_title_search_terms(
   p_document_id uuid,
   p_title text
 )

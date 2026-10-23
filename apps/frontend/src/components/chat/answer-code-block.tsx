@@ -5,12 +5,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { UserText } from "../ui/user-text";
 import { Button } from "../ui/button";
+import { HighlightedCode } from "./highlighted-code";
 import styles from "./chat-transcript.module.css";
 
 export type AnswerCodeBlockProps = {
-  /** Formatted source body. */
+  /** Formatted source body, already decoded by the answer renderer. */
   code: string;
   /** Optional language label for the header. */
   language?: string | null;
@@ -53,6 +53,7 @@ export function AnswerCodeBlock({
           variant="ghost"
           size="compact"
           aria-label={`Copy ${label} snippet`}
+          data-action-id="ask.copy_code"
           onClick={() => {
             void (async () => {
               if (navigator.clipboard?.writeText === undefined) {
@@ -70,10 +71,17 @@ export function AnswerCodeBlock({
         >
           {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
         </Button>
+        <span className={styles.srOnly} role="status" aria-live="polite" aria-atomic="true">
+          {state === "copied"
+            ? `${label} snippet copied.`
+            : state === "failed"
+              ? "Copy failed. Select the code and copy it manually."
+              : ""}
+        </span>
       </div>
       <pre className={styles.codeBlockBody}>
-        <code dir="ltr">
-          <UserText value={code} />
+        <code dir="ltr" translate="no">
+          <HighlightedCode code={code} language={language} />
         </code>
       </pre>
     </div>

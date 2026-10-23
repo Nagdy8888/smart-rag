@@ -9,7 +9,11 @@ from __future__ import annotations
 
 import re
 
-from smart_rag_core.query_answer.figure_placement import place_owned_figures
+from smart_rag_core.query_answer.figure_placement import (
+    figure_caption_text,
+    place_owned_figures,
+)
+from smart_rag_core.query_answer.format_shape import answer_has_markdown_pipe_table
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -100,6 +104,7 @@ def _native_block(
             return ""
         text = body
     else:
+        body = figure_caption_text(body)
         mark = f"[[figure:{figure_id}]]" if figure_id else ""
         if figure_id and figure_id in existing:
             return ""
@@ -225,7 +230,9 @@ def insert_useful_figures(
             continue
         if not _figure_is_useful(query, existing, item.citation_text, alone=alone):
             continue
-        caption = " ".join(item.citation_text.split())[:240].strip()
+        caption = " ".join(figure_caption_text(item.citation_text).split())[
+            :240
+        ].strip()
         text = (
             f"{caption}\n[[figure:{figure_id}]]"
             if caption
@@ -301,6 +308,31 @@ def attach_native_evidence(
         ):
             return payload
         fusion = relevant_native_fusion(payload, fusion, user_query)
+        # Referencing a source does not ask to append all code/table bodies.
+        # Images remain automatic whenever the answer uses their evidence.
+        want_code = bool(
+            re.search(
+                r"(?i)\b(?:show|reproduce|copy|fenced|snippet|code|python)\b",
+                user_query,
+            )
+        )
+        want_table = bool(
+            re.search(
+                r"(?i)\b(?:table|compare|comparison|markdown)\b|\u062c\u062f\u0648\u0644",
+                user_query,
+            )
+        )
+        fusion = fusion.model_copy(
+            update={
+                "evidence": tuple(
+                    item
+                    for item in fusion.evidence
+                    if item.content_kind not in {"code", "table"}
+                    or (item.content_kind == "code" and want_code)
+                    or (item.content_kind == "table" and want_table)
+                )
+            }
+        )
         if any(
             link.link_id.startswith(("cited-table-", "table-block-"))
             for link in payload.atomic_links
@@ -340,6 +372,18 @@ def _append_missing_native_blocks(
     for item in fusion.evidence:
         if item.content_kind not in {"code", "table", "figure"}:
             continue
+        if item.content_kind == "table":
+            owners = {
+                citation.paragraph_index
+                for citation in payload.citations
+                if citation.chunk_id == item.chunk_id
+            }
+            if any(
+                paragraph.paragraph_index in owners
+                and answer_has_markdown_pipe_table(paragraph.text)
+                for paragraph in payload.paragraphs
+            ):
+                continue
         body = item.citation_text.strip()
         if not body:
             continue

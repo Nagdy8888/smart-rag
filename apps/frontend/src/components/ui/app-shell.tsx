@@ -7,6 +7,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { ACCOUNT_NAV_ITEM, ADMIN_NAV_ITEM, PRIMARY_NAV_ITEMS, navItemIsCurrent } from "../../lib/shell-navigation";
 import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
@@ -33,6 +35,9 @@ export type AppShellProps = {
  * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true.
  */
 export function AppShell({ children }: AppShellProps) {
+  const pathname = usePathname() ?? "/";
+  const title = [...PRIMARY_NAV_ITEMS, ADMIN_NAV_ITEM, ACCOUNT_NAV_ITEM]
+    .find((item) => navItemIsCurrent(pathname, item.href))?.label ?? "Smart RAG";
   return (
     <div className={styles.shell}>
       <a className={styles.skipLink} href="#main" data-action-id="shell.skip">
@@ -56,6 +61,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
         <main id="main" className={styles.main} tabIndex={-1}>
+          <h1 className={styles.srOnly}>{title}</h1>
           <div className={styles.plate}>{children}</div>
         </main>
       </div>
