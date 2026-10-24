@@ -775,11 +775,11 @@ describe("ChatApp query_ready gate", () => {
 });
 
 describe("ChatApp Ask workspace", () => {
-  it("shows the dual-mode empty state before a question is sent", async () => {
+  it("shows one welcome before a question is sent", async () => {
     renderChat(<ChatApp />);
     expect(
       await screen.findByText(
-        "Ask about your documents",
+        "What would you like to understand?",
       ),
     ).toBeInTheDocument();
   });
@@ -1165,14 +1165,19 @@ describe("ChatApp Ask workspace", () => {
     const user = userEvent.setup();
     renderChat(<ChatApp />);
     const chipLabel =
-      "Reproduce the cancel_order tool as a fenced Python code block from Building Applications with AI Agents.";
-    await user.click(await screen.findByRole("button", { name: chipLabel }));
+      "Explain the key concepts in my documents in plain language, with examples and citations.";
+    await user.click(await screen.findByRole("button", { name: /Explain a concept/ }));
     expect(screen.getByLabelText("Message")).toHaveValue(chipLabel);
     expect(createConversation).not.toHaveBeenCalled();
   });
 
-  it("shows the answer format gallery on an empty Ask stage", async () => {
+  it("keeps format samples available on demand without sending", async () => {
+    const user = userEvent.setup();
     renderChat(<ChatApp />);
+    const disclosure = await screen.findByText("Explore answer formats");
+    expect(disclosure.closest("details")).not.toHaveAttribute("open");
+    await user.click(disclosure);
+    expect(disclosure.closest("details")).toHaveAttribute("open");
     expect(
       await screen.findByTestId("answer-format-gallery"),
     ).toBeInTheDocument();

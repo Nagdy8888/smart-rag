@@ -1,0 +1,69 @@
+/** Sources library and authorized original-page reader. */
+.sourcesPanel { width: min(30rem, 100%); background: #f3f7f9; }
+.sourcesPanel > :first-child,
+.readerPanel > :first-child { min-height: 72px; background: #173342; color: #f3f8fa; border: 0; padding-inline: 24px; }
+.sourcesPanel > :first-child button,
+.readerPanel > :first-child button { color: #f3f8fa; }
+.sourcesPanel > :first-child button:hover,
+.readerPanel > :first-child button:hover { background: #2b5261; }
+.sourcesPanel > :first-child :focus-visible,
+.readerPanel > :first-child :focus-visible { outline-color: #c8e9df; }
+.readerPanel > :first-child h2 { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.intro { padding: 8px 4px 20px; }
+.libraryMark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--color-evidence); background: #deedf2; margin-block-end: 16px; }
+.libraryMark svg { width: 22px; height: 22px; }
+.intro h3 { margin: 0 0 8px; font-size: 24px; font-weight: 500; letter-spacing: -0.025em; color: #173342; }
+.intro p { margin: 0; max-width: 38ch; font-size: 14px; line-height: 1.65; color: var(--color-text-muted); }
+.sourceList { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.sourceCard { padding: 16px; border-radius: 14px; background: white; box-shadow: 0 3px 12px rgb(23 51 66 / 0.06); min-width: 0; }
+.sourceKind { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; font-size: 12px; font-weight: 500; color: var(--color-text-muted); }
+.sourceKind svg { width: 15px; height: 15px; }
+.sourceCard > button,
+.sourceCard > a { display: block; width: 100%; height: auto; min-height: 44px; max-width: none; padding: 10px 12px; border: 0; background: #eaf2f5; color: #173342; border-radius: 9px; font-size: 14px; line-height: 1.6; white-space: normal; text-align: start; text-decoration: none; }
+.sourceCard > button:hover,
+.sourceCard > a:hover { background: #dbeaf0; }
+.sourceCard > button span,
+.sourceCard > a span { max-width: none; white-space: normal; overflow-wrap: anywhere; color: inherit; font-weight: 500; }
+.technical { margin-top: 20px; padding: 14px 0; border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 13px; }
+.technical summary { cursor: pointer; width: fit-content; }
+.pageReader { margin-block-end: 24px; overflow: hidden; border-radius: 12px; background: #eaf1f5; }
+.readerToolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; color: #244b5b; font-size: 13px; font-weight: 500; }
+.zoomControls { display: flex; align-items: center; gap: 2px; }
+.pageViewport { overflow: auto; max-height: 65dvh; padding: 16px; overscroll-behavior: contain; }
+.pageImage { display: block; max-width: none; height: auto; background: white; box-shadow: 0 4px 14px rgb(23 51 66 / 0.12); }
+@media (max-width: 479px) {
+  .sourcesPanel > :first-child, .readerPanel > :first-child { padding-inline: 16px; }
+  .sourceCard { padding: 12px; }
+  .pageViewport { padding: 8px; }
+}
+
+.readerPanel { width: min(50rem, 100%); }
+.readerPanel > :first-child { min-height: 80px; }
+.readerPanel > :last-child { padding: 20px; background: #f3f7f9; }
+.readerPanel dl { background: white; border-radius: 12px; padding: 8px 16px; }
+.readerPanel dl > div:last-child { border-bottom: 0; }
+.readerPanel > :last-child > div:has(> p[dir="auto"]) { padding: 16px; border-radius: 12px; background: #fff9dd; margin-bottom: 20px; }
+.readerPanel p[dir="auto"] { background: transparent; padding: 0; }
+.readerPanel p[dir="auto"]::before { display: none; }
+.readerToolbar { position: sticky; top: 0; z-index: 1; background: #eaf1f5; }
+.highlightHint { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 12px 10px; color: #435762; font-size: 12px; line-height: 1.5; }
+.highlightHint > span { width: 16px; height: 10px; border-radius: 2px; background: #f9df78; flex-shrink: 0; }
+@media (max-width: 479px) {
+  .readerPanel > :last-child { padding: 12px; }
+}
+
+.citationNavigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.citationPager { display: flex; align-items: center; gap: 8px; }
+.citationPager > span { color: #244b5b; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sourceCard > button, .sourceCard > a { background: #ffffff; color: #173342; border: 1px solid #c1d1d9; }
+.sourceCard > button:hover, .sourceCard > a:hover { background: #edf4f7; border-color: #708d9b; }
+.sourceCard > button span, .sourceCard > a span { color: inherit; }

@@ -312,3 +312,32 @@
     opacity: 0;
   }
 }
+
+.panel { border-color: #d4e0e5; border-radius: 14px; padding: 24px; gap: 16px; }
+.panel h2 { color: #173342; font-size: 18px; font-weight: 600; }
+.panelLead { color: #536b78; line-height: 1.65; }
+.card { border-color: #d4e0e5; border-radius: 12px; padding: 20px; }
+.usageRow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.dangerPanel { border-color: #dfb3b3; background: #fffafa; }
+@media (max-width: 800px) { .usageRow { grid-template-columns: 1fr; } }
+@media (max-width: 479px) { .panel { padding: 18px 14px; } }
+
+.taskHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.taskHeader h2 { margin: 0 0 6px; font-size: 20px; color: #173342; }
+.directoryTools { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+.directoryTools > div:first-child { flex: 1 1 280px; max-width: 520px; }
+.directoryTools > p { margin-block: 0 10px; }
+@media (max-width: 479px) { .directoryTools > div { width: 100%; } }
+
+@media (max-width: 640px) {
+  .peopleDirectory > div { overflow: visible; }
+  .peopleDirectory table, .peopleDirectory tbody { display: block; width: 100%; min-width: 0; }
+  .peopleDirectory thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .peopleDirectory caption { display: block; text-align: start; }
+  .peopleDirectory tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; padding-block: 18px; border-top: 1px solid #d4e0e5; }
+  .peopleDirectory td { display: block; padding: 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+  .peopleDirectory td:first-child { grid-column: 1 / -1; }
+  .peopleDirectory td:nth-child(2)::before { content: "Role: "; color: #536b78; }
+  .peopleDirectory td:nth-child(3)::before { content: "Uploads: "; color: #536b78; }
+  .peopleDirectory td:nth-child(5) { justify-self: end; }
+}

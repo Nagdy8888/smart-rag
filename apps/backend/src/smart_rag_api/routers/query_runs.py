@@ -376,7 +376,11 @@ def get_citation_page_route(
         raise_admission_http(exc)
     except CitationPageReadError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
-    return Response(content=png, media_type="image/png")
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 @router.post(

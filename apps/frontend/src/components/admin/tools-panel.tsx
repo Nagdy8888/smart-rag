@@ -75,7 +75,7 @@ export function ToolsPanel() {
       ) : null}
       {toolsError ? (
         <StatusBanner kind="error" role="alert">
-          {toolsError}
+          {toolsError} <Button type="button" variant="secondary" onClick={() => { void toolsQuery.refetch(); }}>Retry tools</Button>
         </StatusBanner>
       ) : null}
       <form className={styles.toolbar} onSubmit={onSearch}>
@@ -88,7 +88,8 @@ export function ToolsPanel() {
         <Button type="submit" data-action-id="admin.tools.search">
           Search
         </Button>
-        <p className={styles.muted}>{String(cards.length)} tools</p>
+        {draft || submitted ? <Button type="button" variant="secondary" onClick={() => { setDraft(""); setSubmitted(""); }}>Clear search</Button> : null}
+        <p className={styles.muted} role="status">{toolsQuery.isFetching ? "Searching tools..." : `${String(cards.length)} tools${submitted ? ` matching "${submitted}"` : ""}`}</p>
       </form>
       {toolsQuery.isPending ? <Spinner label="Loading tools" /> : null}
       <div className={styles.toolGrid}>

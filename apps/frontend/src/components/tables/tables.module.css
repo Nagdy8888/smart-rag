@@ -263,3 +263,33 @@
     display: block;
   }
 }
+
+/* A searchable library, a short starting action, and optional calculation tools. */
+.page { gap: 20px; }
+.layout { grid-template-columns: 300px minmax(0, 1fr); gap: 24px; }
+.sidebar { position: sticky; top: 0; max-height: calc(100dvh - 150px); overflow-y: auto; border-color: #d2dfe5; border-radius: 14px; padding: 20px 16px; }
+.sidebar h2, .card h2 { color: #173342; font-size: 19px; }
+.manifestItem { padding-block: 8px; gap: 4px; }
+.manifestButton, .manifestButtonActive { border-radius: 8px; padding: 12px; overflow-wrap: anywhere; font-weight: 500; }
+.manifestButtonActive { color: #12674f; background: #e8f3ef; }
+.manifestMeta { color: #536b78; font-size: 12px; font-weight: 400; }
+.card { min-width: 0; border-color: #d2dfe5; border-radius: 14px; padding: 24px; gap: 16px; }
+.muted { color: #536b78; line-height: 1.6; }
+.quickActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-block: 8px; }
+.quickActions > span { max-width: 48ch; font-size: 13px; }
+.analysisOptions { border-top: 1px solid #dce5e9; padding-top: 12px; }
+.analysisOptions summary { min-height: 44px; padding-block: 10px; cursor: pointer; color: #173342; font-weight: 500; }
+.analysisOptions summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.optionsBody { display: flex; flex-direction: column; gap: 24px; padding-block: 12px 20px; }
+.section { padding-top: 12px; border-top: 1px solid #e3eaed; }
+.section > button { align-self: flex-start; }
+.planActions { justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 16px; border-top: 1px solid #dce5e9; }
+.resultCard { scroll-margin-block-start: 16px; }
+.resultCard:focus { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.resultsHeader { justify-content: space-between; }
+@media (max-width: 1023px) { .layout { grid-template-columns: 1fr; } }
+@media (max-width: 479px) { .card { padding: 20px 16px; } .repeatRow { grid-template-columns: minmax(0, 1fr); } .dl { grid-template-columns: 1fr; gap: 8px; } .dl dd { margin: 0 0 12px; } }
+
+.manifestItem .documentLink { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.5; }
+.tableTitle { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 500; color: #173342; overflow-wrap: anywhere; }
+.manifestButton > :first-child, .manifestButtonActive > :first-child { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

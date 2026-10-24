@@ -207,6 +207,7 @@ export const ConversationRail = memo(function ConversationRail({
                     type="button"
                     className={styles.conversationButton}
                     aria-current={selected ? "true" : undefined}
+                    data-action-id="ask.select_session"
                     aria-label={title}
                     onClick={() => onSelect(item)}
                   >
@@ -226,6 +227,7 @@ export const ConversationRail = memo(function ConversationRail({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      data-action-id="ask.delete_session"
                       aria-label="Delete conversation"
                       pending={deletePending && selectedId === item.conversation_id}
                       pendingLabel="Deleting…"

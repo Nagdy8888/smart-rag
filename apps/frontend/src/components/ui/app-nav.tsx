@@ -5,6 +5,7 @@
 
 "use client";
 
+import accountStyles from "./account-menu.module.css";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -134,11 +135,26 @@ export function AccountMenu() {
   const me = meQuery.data;
   const initials = (session.email ?? "U").slice(0, 2).toUpperCase();
   const uploadLabel =
-    me?.upload_enabled === true ? "Uploads enabled" : "Uploads disabled";
+    me ? (me.upload_enabled ? "Uploads enabled" : "Uploads disabled")
+      : meQuery.isPending ? "Checking access" : "Access unavailable";
   return (
     <Menu
       label="Account"
       triggerActionId="shell.account"
+      panelClassName={accountStyles.panel}
+      header={
+        <div className={accountStyles.profile}>
+          <span className={accountStyles.profileAvatar} aria-hidden="true">{initials}</span>
+          <div className={accountStyles.identity}>
+            <p className={accountStyles.caption}>Signed in as</p>
+            <p className={accountStyles.email}><UserText value={session.email ?? ""} /></p>
+            <div className={accountStyles.badges}>
+              <span className={accountStyles.role}><UserText value={me?.role ?? (meQuery.isPending ? "Checking role" : "Role unavailable")} /></span>
+              <span className={accountStyles.access} data-enabled={me?.upload_enabled === true ? "true" : "false"}>{uploadLabel}</span>
+            </div>
+          </div>
+        </div>
+      }
       trigger={
         <>
           <span className={styles.avatarMark} aria-hidden="true">
@@ -149,22 +165,8 @@ export function AccountMenu() {
       }
       items={[
         {
-          id: "identity",
-          label: (
-            <span>
-              <UserText value={session.email ?? ""} />
-              <span>
-                {" "}
-                | <UserText value={me?.role ?? ""} /> | {uploadLabel}
-              </span>
-            </span>
-          ),
-          disabled: true,
-          onSelect: () => undefined,
-        },
-        {
           id: "account",
-          label: ACCOUNT_NAV_ITEM.label,
+          label: <span className={accountStyles.action}><Icon name="profile" /><span><strong>{ACCOUNT_NAV_ITEM.label}</strong><span className={accountStyles.actionHint}>View your account information</span></span></span>,
           actionId: ACCOUNT_NAV_ITEM.actionId,
           onSelect: () => {
             router.push(ACCOUNT_NAV_ITEM.href);
@@ -172,7 +174,7 @@ export function AccountMenu() {
         },
         {
           id: "sign-out",
-          label: "Sign out",
+          label: <span className={accountStyles.action}><Icon name="logout" /><strong>Sign out</strong></span>,
           danger: true,
           actionId: "account.sign_out",
           onSelect: () => {
@@ -246,7 +248,7 @@ export function ConsoleTopbar() {
       </div>
       <div className={styles.topbarEnd}>
         <ReadinessIndicator />
-        <Tooltip text="Go to page">
+        <Tooltip text="Quick navigation (Ctrl+K or Command+K)">
           <Button
             type="button"
             variant="ghost"
@@ -258,8 +260,9 @@ export function ConsoleTopbar() {
             data-testid="shell-command"
             onClick={openCommand}
           >
-            <Icon name="command" />
-            <span className={styles.srOnly}>Command menu</span>
+            <Icon name="search" />
+            <span className={styles.commandLabel}>Go to page</span>
+            <kbd className={styles.commandShortcut}>Ctrl K</kbd>
           </Button>
         </Tooltip>
         <span data-action-id="shell.account" data-testid="shell-account">

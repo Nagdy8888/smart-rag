@@ -4,7 +4,7 @@
 
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { COMPOSER_MAX_CHARS, composerDraftIsSendable } from "../../lib/composer";
 import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";
@@ -71,6 +71,10 @@ export const ChatComposer = memo(function ChatComposer({
   seedKey = 0,
 }: ChatComposerProps) {
   const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const admissionLock = useRef(false);
+  const isSending = sending || submitting;
+  const busy = isSending || running;
   useEffect(() => {
     if (seedText) {
       setDraft(seedText);
@@ -87,18 +91,23 @@ export const ChatComposer = memo(function ChatComposer({
    * returns false (create or admission failed).
    */
   async function handleSubmit(): Promise<void> {
-    if (running || sending || disabled || !sendable) {
+    if (running || sending || admissionLock.current || disabled || !sendable) {
       return;
     }
     const snapshot = draft;
+    admissionLock.current = true;
+    setSubmitting(true);
     setDraft("");
     try {
       const result = await onSubmit(snapshot);
       if (result === false) {
-        setDraft(snapshot);
+        setDraft((current) => current ? `${snapshot}\n\n${current}` : snapshot);
       }
     } catch {
-      setDraft(snapshot);
+      setDraft((current) => current ? `${snapshot}\n\n${current}` : snapshot);
+    } finally {
+      admissionLock.current = false;
+      setSubmitting(false);
     }
   }
 
@@ -124,7 +133,7 @@ export const ChatComposer = memo(function ChatComposer({
           </Button>
         </StatusBanner>
       ) : null}
-      <div className={styles.composerCard}>
+      <div className={styles.composerCard} data-working={busy ? "true" : "false"}>
         <Textarea
           label="Message"
           hideLabel
@@ -134,7 +143,7 @@ export const ChatComposer = memo(function ChatComposer({
           value={draft}
           className={styles.composerField}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Ask anything about your documents…"
+          placeholder={busy ? "Draft your next question while you wait..." : "What would you like to know?"}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing || event.key !== "Enter" || event.shiftKey) {
               return;
@@ -144,41 +153,52 @@ export const ChatComposer = memo(function ChatComposer({
           }}
         />
         <div className={styles.composerFooter}>
-          <p className={styles.composerHint}>
-            <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
-          </p>
-          {remaining < 1000 ? (
-            <p className={styles.hint}>{`${String(remaining)} characters left`}</p>
-          ) : null}
           {running ? (
             <Button
               type="button"
               variant="secondary"
+              className={`${styles.composerSend} ${styles.composerStop}`}
               data-action-id="ask.cancel"
               onClick={onStop}
             >
+              <span className={styles.stopMark} aria-hidden="true" />
               Stop
             </Button>
           ) : (
             <Button
               type="button"
               variant="primary"
-              size="icon"
               className={styles.composerSend}
               data-action-id="ask.send"
-              aria-label={sending ? "Sending…" : "Send"}
+              aria-label={isSending ? "Sending…" : "Send"}
               onClick={() => {
                 void handleSubmit();
               }}
-              pending={sending}
+              pending={isSending}
               pendingLabel="Sending…"
               disabled={disabled || !sendable}
               aria-describedby={sendBlockedReason ? "chat-send-reason" : undefined}
             >
+              <span>Send</span>
               <Icon name="arrowUp" />
             </Button>
           )}
         </div>
+      </div>
+      <div className={styles.composerMeta}>
+          {busy ? (
+            <p className={styles.composerStatus} role="status">
+              <span className={styles.statusDot} aria-hidden="true" />
+              {running ? "Working on your answer" : "Sending your message"}
+            </p>
+          ) : (
+            <p className={styles.composerHint}>
+              <kbd>Enter</kbd> to send <span className={styles.desktopHint}> / <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line</span>
+            </p>
+          )}
+          {remaining < 1000 ? (
+            <p className={styles.hint}>{`${String(remaining)} characters left`}</p>
+          ) : null}
       </div>
       {sendBlockedReason ? (
         <div id="chat-send-reason">

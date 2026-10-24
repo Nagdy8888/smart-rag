@@ -74,7 +74,7 @@ test("retired gap routes do not serve recovery or bootstrap chrome", async ({
   await expect(page.getByLabel(/company/i)).toHaveCount(0);
 });
 
-test("handshake 9.0.0 public stub blocks paid-work copy on login", async ({ page }) => {
+test("query handshake mismatch does not prevent signing in", async ({ page }) => {
   await page.route("**/api/meta", async (route) => {
     await route.fulfill({
       status: 200,
@@ -87,7 +87,8 @@ test("handshake 9.0.0 public stub blocks paid-work copy on login", async ({ page
     });
   });
   await page.goto("/login");
-  await expect(page.getByText(handshakeBelowMinCopy())).toBeVisible();
+  await expect(page.getByText(handshakeBelowMinCopy())).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
 });
 
 test("unauthenticated document 404 still redirects to login", async ({ page }) => {

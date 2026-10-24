@@ -107,7 +107,7 @@ export function RunProgressTimeline(props: RunProgressTimelineProps) {
   const history = working ? activities.filter((item) => item.phase !== "started") : activities;
   const showList = open && history.length > 0;
   return (
-    <div className={styles.progressTimeline} data-testid="run-progress-timeline">
+    <div className={styles.progressTimeline} data-testid="run-progress-timeline" data-working={working ? "true" : "false"}>
       <LiveRegion aria-label="Run progress" politeness="polite">
         <p className={styles.statusLine} role="status">
           {showStarting ? <Spinner label="Starting" /> : null}

@@ -78,7 +78,7 @@ describe("primitive geometry source lock", () => {
     expect(ui).toMatch(/\.confirmPanel\s*\{[\s\S]*?border-radius:\s*var\(--radius-lg\)/);
     expect(ui).toMatch(/\.table th,\s*\n\.table td\s*\{[\s\S]*?height:\s*var\(--row-height\)/);
     expect(shell).toMatch(/\.topbar\s*\{[\s\S]*?min-height:\s*var\(--topbar-height\)/);
-    expect(shell).toMatch(/\.topbar\s*\{[\s\S]*?border-bottom:\s*1px solid var\(--color-border\)/);
+    expect(shell).toMatch(/\.topbar\s*\{[\s\S]*?background:\s*#173342/);
     expect(shell).toMatch(/\.plate\s*\{[\s\S]*?border-radius:\s*0/);
     expect(ui).toMatch(/text-transform:\s*none/);
     expect(globals).toMatch(/"IBM Plex Sans"/);
@@ -128,10 +128,10 @@ describe("Ask independent scroll source lock", () => {
     expect(chat).not.toMatch(/\.answer\s*\{[\s\S]*?overflow:\s*auto/);
     expect(chat).not.toMatch(/\.stage\s*\{[\s\S]*?max-width:\s*880px/);
     expect(chat).toMatch(/\.composer\s*\{[\s\S]*?width:\s*100%/);
-    expect(chat).toMatch(/\.composerSend\s*\{[\s\S]*?width:\s*36px/);
+    expect(chat).toMatch(/\.composerSend\s*\{[\s\S]*?min-width:\s*112px/);
     expect(chat).toMatch(/\.composerSend\[aria-busy="true"\]/);
     expect(chat).toMatch(/\.railBody\[hidden\]\s*\{[\s\S]*?display:\s*none/);
-    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?200px/);
+    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?236px/);
     expect(ui).toMatch(/\.fieldFull\s*\{[\s\S]*?max-width:\s*none/);
     expect(readCss("../components/ui/app-nav.module.css")).toMatch(
       /@media \(max-width: 1023px\)\s*\{\s*\.nav\s*\{\s*display:\s*none/,

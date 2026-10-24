@@ -1488,6 +1488,20 @@
       "idempotency": "same source text",
       "disposition": "keep",
       "test_id": "src/components/chat/answer-code-block.test.tsx"
+    },
+    {
+      "action_id": "ask.select_session",
+      "route": "/",
+      "label": "Select conversation",
+      "control_kind": "button",
+      "contract_owner": "frontend",
+      "contract": "Select an owned conversation and load its history",
+      "role": "authenticated",
+      "success_state": "selected conversation history",
+      "failure_state": "history error with existing state retained",
+      "idempotency": "conversation id",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
     }
   ]
 }

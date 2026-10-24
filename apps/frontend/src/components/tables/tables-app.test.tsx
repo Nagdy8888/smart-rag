@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
@@ -150,6 +150,7 @@ function renderSurface(ui: ReactElement) {
  */
 async function analyzeWithAmountFilter(): Promise<void> {
   fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+  fireEvent.click(screen.getByText("Customize analysis"));
   fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
   fireEvent.change(screen.getByLabelText("Filter column"), {
     target: { value: "amount" },
@@ -161,6 +162,54 @@ async function analyzeWithAmountFilter(): Promise<void> {
 }
 
 describe("TablesApp", () => {
+  it("counts rows without requiring a hand-built filter", async () => {
+    renderSurface(<TablesApp />);
+    fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+    expect(screen.getByText("Customize analysis").closest("details")).not.toHaveAttribute("open");
+    fireEvent.click(screen.getByRole("button", { name: "Count rows" }));
+    await screen.findByRole("heading", { name: "Results" });
+    expect(analyzeTable.mock.calls[0]?.[1]).toMatchObject({ table_id: MANIFEST.table_id, aggregations: [{ op: "count", alias: "row_count" }], row_limit: 100 });
+  });
+
+  it("filters the library and clears an empty search", async () => {
+    renderSurface(<TablesApp />);
+    await screen.findByRole("button", { name: /Sheet1/ });
+    fireEvent.change(screen.getByLabelText("Find a table"), { target: { value: "missing" } });
+    expect(screen.getByText("No tables match your search.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear table search" }));
+    expect(screen.getByRole("button", { name: /Sheet1/ })).toBeInTheDocument();
+  });
+
+  it("clears the old draft and does not show late results under a new table", async () => {
+    const second = { ...MANIFEST, table_id: "33333333-3333-4333-8333-333333333333", table_name: "Other", sheet_name: "OtherSheet" };
+    listTables.mockResolvedValue([MANIFEST, second]);
+    let finish!: (value: unknown) => void;
+    analyzeTable.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderSurface(<TablesApp />);
+    fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+    fireEvent.click(screen.getByText("Customize analysis"));
+    fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    fireEvent.change(screen.getByLabelText("Filter column"), { target: { value: "amount" } });
+    fireEvent.click(screen.getByRole("button", { name: "Count rows" }));
+    await waitFor(() => expect(analyzeTable).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: /OtherSheet/ }));
+    await act(async () => finish({ table_id: MANIFEST.table_id, version_id: MANIFEST.version_id, document_id: "d1", rows: [{ old_value: 7 }], source_ranges: [] }));
+    expect(screen.queryByRole("heading", { name: "Results" })).toBeNull();
+    fireEvent.click(screen.getByText("Customize analysis"));
+    expect(screen.queryByLabelText("Filter column")).toBeNull();
+  });
+
+  it("sorts numeric results by value rather than alphabetically", async () => {
+    analyzeTable.mockResolvedValue({ table_id: MANIFEST.table_id, version_id: MANIFEST.version_id, document_id: "d1", rows: [{ amount: 20 }, { amount: 3 }, { amount: 100 }], source_ranges: [] });
+    renderSurface(<TablesApp />);
+    fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Count rows" }));
+    await screen.findByRole("heading", { name: "Results" });
+    fireEvent.change(screen.getByLabelText(/Display sort/), { target: { value: "amount" } });
+    const rows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(rows.slice(1).map((row) => row.textContent)).toEqual(["3", "20", "100"]);
+  });
+
   it("preselects an accessible tableId from the URL", async () => {
     navState.search = new URLSearchParams(`tableId=${MANIFEST.table_id}`);
     renderSurface(<TablesApp />);
@@ -203,14 +252,15 @@ describe("TablesApp", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: /sql/i })).toBeNull();
-    expect(screen.getAllByText(XSS_FILENAME, { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Sheet1/ })).toHaveAttribute("title", XSS_FILENAME);
     expect(document.querySelector("img")).toBeNull();
   });
 
   it("rejects unknown columns and raw SQL before submission", async () => {
     renderSurface(<TablesApp />);
     fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    fireEvent.click(screen.getByText("Customize analysis"));
+  fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
     fireEvent.change(screen.getByLabelText("Filter column"), {
       target: { value: "1amount" },
     });

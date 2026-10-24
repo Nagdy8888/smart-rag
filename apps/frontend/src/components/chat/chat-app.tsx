@@ -286,6 +286,12 @@ export function ChatApp() {
       />
       <CitationDrawer
         citation={restore.selectedCitation}
+        citations={restore.sheetCitations}
+        onBack={() => {
+          selection.setSelectedCitationId(null);
+          selection.setSourcesOpen(true);
+        }}
+        onNavigateCitation={selection.setSelectedCitationId}
         passagePending={liveQueries.citationDetailPending}
         pageSource={pageSource}
         onClose={() => selection.setSelectedCitationId(null)}

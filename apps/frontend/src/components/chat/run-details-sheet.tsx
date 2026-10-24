@@ -286,7 +286,7 @@ export function RunDetailsSheet({
       <SpendSection
         label="This run spend"
         costUsd={diagnostics.costUsd}
-        summary="Billed USD from immutable usage rows for this question."
+        summary="Recorded cost estimate for this question; this is not a provider invoice."
       />
       <TokenMetricsSection
         label="This chat"
@@ -297,14 +297,14 @@ export function RunDetailsSheet({
       <SpendSection
         label="This chat spend"
         costUsd={chatSpend > 0 ? chatSpend : null}
-        summary="Billed USD for every completed question in this conversation."
+        summary="Recorded cost estimates for completed questions in this conversation."
       />
       {usageUsd === "—" ? null : (
         <section className={styles.spend} aria-label="Account total">
           <p className={styles.kicker}>Account total</p>
           <p className={styles.spendValue}>{usageUsd}</p>
           <p className={styles.summary}>
-            All billed Ask usage on your account, not just this answer.
+            Recorded usage cost estimates on your account, not just this answer.
           </p>
         </section>
       )}

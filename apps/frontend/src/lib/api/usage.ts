@@ -16,13 +16,22 @@ import { apiUrl, readJsonObject } from "./http";
  */
 function parseUsageResponse(body: Record<string, unknown>): UsageResponse {
   const cost = body.cost_usd;
+  const counters = [body.prompt_tokens, body.completion_tokens, body.usage_rows];
+  if (
+    (body.scope !== "me" && body.scope !== "company") ||
+    (typeof cost !== "number" && typeof cost !== "string") ||
+    (typeof cost === "string" && cost.trim() === "") ||
+    !Number.isFinite(Number(cost)) || Number(cost) < 0 ||
+    counters.some((value) => typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+  ) {
+    throw new Error("invalid_usage_response");
+  }
   return {
-    scope: String(body.scope ?? ""),
-    cost_usd:
-      typeof cost === "number" || typeof cost === "string" ? cost : String(cost ?? "0"),
-    prompt_tokens: Number(body.prompt_tokens ?? 0),
-    completion_tokens: Number(body.completion_tokens ?? 0),
-    usage_rows: Number(body.usage_rows ?? 0),
+    scope: body.scope,
+    cost_usd: cost,
+    prompt_tokens: body.prompt_tokens as number,
+    completion_tokens: body.completion_tokens as number,
+    usage_rows: body.usage_rows as number,
   };
 }
 

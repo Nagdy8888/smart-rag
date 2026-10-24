@@ -92,3 +92,26 @@ def test_arbitrary_bad_request_is_not_idempotent_success(
             bucket="documents-quarantine",
             object_path="bad.txt",
         )
+
+
+def test_streamed_download_enforces_byte_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Oversized artifacts fail before returning bytes to the table sandbox."""
+    _install_response(
+        monkeypatch, lambda _request: httpx.Response(200, content=b"123456")
+    )
+    with pytest.raises(StorageAdminError, match="byte limit"):
+        objects.download_object(
+            _settings(),
+            bucket="table-artifacts",
+            object_path="one.parquet",
+            max_bytes=5,
+        )
+    assert (
+        objects.download_object(
+            _settings(),
+            bucket="table-artifacts",
+            object_path="one.parquet",
+            max_bytes=6,
+        )
+        == b"123456"
+    )

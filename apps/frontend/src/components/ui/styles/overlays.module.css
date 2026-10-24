@@ -130,8 +130,13 @@
 }
 
 .tooltipPanel {
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  width: max-content;
   min-width: 0;
-  max-width: 16rem;
+  max-width: min(16rem, calc(100vw - 16px));
+  white-space: normal;
+  line-height: 1.5;
   padding: calc(var(--space) * 1) calc(var(--space) * 2);
   font-size: 0.75rem;
   color: var(--color-text);
@@ -140,6 +145,7 @@
 
 .tooltipPanelEnd {
   position: fixed;
+  inset-inline-end: auto;
   z-index: 80;
   margin-top: 0;
   transform: translateY(-50%);

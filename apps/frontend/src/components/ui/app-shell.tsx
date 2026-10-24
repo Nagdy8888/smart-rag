@@ -13,6 +13,7 @@ import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
 } from "../../lib/client-authorization";
+import { Icon } from "./icon";
 import { AppNav, ConsoleTopbar } from "./app-nav";
 import navStyles from "./app-nav.module.css";
 import layoutStyles from "./app-shell.module.css";
@@ -46,6 +47,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className={styles.layout}>
         <header className={styles.topbar}>
           <div className={styles.brand}>
+            <span className={layoutStyles.brandSymbol} aria-hidden="true"><Icon name="documents" /></span>
             <p className={styles.brandName}>Smart RAG</p>
           </div>
           <nav
@@ -62,7 +64,7 @@ export function AppShell({ children }: AppShellProps) {
         </header>
         <main id="main" className={styles.main} tabIndex={-1}>
           <h1 className={styles.srOnly}>{title}</h1>
-          <div className={styles.plate}>{children}</div>
+          <div className={styles.plate} data-scroll={pathname === "/" ? "contained" : "page"}>{children}</div>
         </main>
       </div>
     </div>

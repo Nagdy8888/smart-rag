@@ -18,7 +18,7 @@
 .menuButton,
 .commandButton {
   display: inline-flex;
-  color: var(--color-text);
+  color: #e6f0f4;
 }
 
 .topbarBrand,
@@ -51,9 +51,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: transparent;
-  color: var(--color-text);
-  border: 1px solid var(--color-border-strong);
+  background: #2b5261;
+  color: #ffffff;
+  border: 1px solid #557782;
   font-size: 12px;
   font-weight: 600;
 }
@@ -90,4 +90,24 @@
   .menuButton {
     display: none;
   }
+}
+
+.topbarEnd .commandButton {
+  width: auto;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  gap: 8px;
+  border: 1px solid #557782;
+  border-radius: 10px;
+  background: #244b5b;
+  color: #f3f8fa;
+}
+.topbarEnd .commandButton:hover { background: #315e70; }
+.commandButton svg { width: 16px; height: 16px; }
+.commandLabel { font-size: 12px; font-weight: 500; white-space: nowrap; }
+.commandShortcut { display: grid; place-items: center; width: 42px; height: 20px; border: 1px solid #74909b; border-radius: 4px; color: #d9e9ef; font-size: 10px; font-family: var(--font-mono); }
+@media (max-width: 767px) {
+  .commandLabel, .commandShortcut { display: none; }
+  .topbarEnd .commandButton { width: 36px; padding: 0; border-radius: 10px; }
 }

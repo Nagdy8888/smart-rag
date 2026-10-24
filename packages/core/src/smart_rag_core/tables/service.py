@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import cast
 
 from smart_rag_core.ingestion.tables.limits import TABLE_ARTIFACT_SCHEMA_VERSION
@@ -155,14 +156,14 @@ def _source_ranges(
     found: list[str] = []
     seen: set[str] = set()
     for raw in payloads:
-        for label in _labels_from_payload(raw, workbook=workbook, sheet=sheet):
+        for label in source_range_labels(raw, workbook=workbook, sheet=sheet):
             if label not in seen:
                 seen.add(label)
                 found.append(label)
     return tuple(found)
 
 
-def _labels_from_payload(
+def source_range_labels(
     raw: str, *, workbook: str, sheet: str | None
 ) -> tuple[str, ...]:
     """Parse one provenance JSON blob into range labels.
@@ -194,6 +195,31 @@ def _labels_from_payload(
             cell: dict[str, object] = {
                 str(key): value for key, value in cell_untyped.items()
             }
+            if cell.get("format") == "pdf":
+                page = cell.get("page_index")
+                coordinates = [
+                    cell.get(key)
+                    for key in ("bbox_x0", "bbox_y0", "bbox_x1", "bbox_y1")
+                ]
+                if (
+                    isinstance(page, int)
+                    and not isinstance(page, bool)
+                    and page >= 0
+                    and all(
+                        isinstance(value, (int, float))
+                        and not isinstance(value, bool)
+                        and math.isfinite(value)
+                        for value in coordinates
+                    )
+                ):
+                    x0, y0, x1, y1 = (
+                        float(cast(int | float, value)) for value in coordinates
+                    )
+                    if 0 <= x0 < x1 and 0 <= y0 < y1:
+                        labels.append(
+                            f"{workbook}!Physical PDF page {page + 1}!bbox({x0!r},{y0!r},{x1!r},{y1!r})"
+                        )
+                continue
             sheet_name = str(cell.get("sheet_name") or sheet or "")
             cell_ref_obj = cell.get("range_ref") or cell.get("cell_ref")
             cell_ref = "" if cell_ref_obj is None else str(cell_ref_obj)

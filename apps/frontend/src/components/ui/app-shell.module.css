@@ -48,9 +48,9 @@
   gap: calc(var(--space) * 4);
   min-height: var(--topbar-height);
   padding: 0 calc(var(--space) * 5);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border-bottom: 1px solid var(--color-border);
+  background: #173342;
+  color: #f3f8fa;
+  border-bottom: 0;
 }
 
 .brand {
@@ -64,10 +64,10 @@
   margin: 0;
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
-  letter-spacing: 0;
-  color: var(--color-text);
+  letter-spacing: -0.025em;
+  color: #f3f8fa;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -88,7 +88,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 calc(var(--space) * 5) calc(var(--space) * 5);
+  padding: 18px 20px 20px;
 }
 
 .plate {
@@ -102,6 +102,18 @@
   color: var(--color-text);
   border-radius: 0;
   padding: 0;
+}
+
+/* Chat owns its internal scrolling; other pages must remain reachable in full. */
+.plate[data-scroll="page"] {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #78919d #e8eff2;
+  overscroll-behavior-y: contain;
+}
+.plate[data-scroll="page"] > * {
+  flex-shrink: 0;
 }
 
 .srOnly {
@@ -140,3 +152,23 @@
     padding: 0 calc(var(--space) * 3) calc(var(--space) * 3);
   }
 }
+
+.brandSymbol {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  margin-inline-end: 10px;
+  border-radius: 10px;
+  background: #c8e9df;
+  color: #173342;
+}
+.brandSymbol svg { width: 21px; height: 21px; }
+@media (max-width: 479px) {
+  .brandSymbol { width: 28px; height: 28px; margin-inline-end: 7px; }
+  .brandSymbol svg { width: 18px; height: 18px; }
+  .main { padding: 10px 8px 8px; }
+}
+
+.topbar :focus-visible { outline-color: #c8e9df; }
