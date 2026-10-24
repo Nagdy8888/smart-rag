@@ -1,5 +1,5 @@
 /**
- * Bookmark redirect from `/curation` to `/admin?tab=curation`.
+ * Bookmark redirect from `/curation` to `/admin?tab=team`.
  */
 import { redirect } from "next/navigation";
 
@@ -9,5 +9,5 @@ import { redirect } from "next/navigation";
  * @returns Never. `redirect` throws.
  */
 export default function CurationRedirectPage() {
-  redirect("/admin?tab=curation");
+  redirect("/admin?tab=team");
 }

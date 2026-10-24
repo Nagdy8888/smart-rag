@@ -99,13 +99,13 @@ test("login geometry, overflow, and mapped Sign in at required viewports", async
         radius: style.borderRadius,
       };
     });
-    expect(box.height).toBe(40);
-    expect(box.radius).toBe("6px");
+    expect(box.height).toBe(48);
+    expect(box.radius).toBe("10px");
     const email = page.getByLabel("Email");
     const inputHeight = await email.evaluate((element) =>
       Math.round(element.getBoundingClientRect().height),
     );
-    expect(inputHeight).toBe(40);
+    expect(inputHeight).toBe(48);
     const skip = page.getByRole("link", { name: "Skip to main content" });
     await expect(skip).toHaveAttribute("data-action-id", "shell.skip");
   }
@@ -262,7 +262,7 @@ test("authenticated Ask splits Sessions and conversation scroll when signed in",
     expect(box).not.toBeNull();
     expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
     expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
-    if (viewport.width >= 1280) {
+    if (viewport.width >= 1024) {
       expect(probe.sessionsVisible).toBe(true);
       expect(probe.sessionsCanScroll).toBe(true);
       expect(probe.afterSessions?.sessions ?? 0).toBeGreaterThan(0);
@@ -271,7 +271,7 @@ test("authenticated Ask splits Sessions and conversation scroll when signed in",
       );
       expect(probe.afterSessions?.main).toBe(0);
       expect(probe.afterSessions?.pageY).toBe(0);
-      const newSession = page.getByRole("button", { name: "New" });
+      const newSession = page.getByRole("button", { name: "New chat", exact: true });
       const newBox = await newSession.boundingBox();
       expect(newBox).not.toBeNull();
       expect(newBox?.y ?? -1).toBeGreaterThanOrEqual(0);

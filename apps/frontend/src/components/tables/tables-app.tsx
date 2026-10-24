@@ -15,6 +15,7 @@ import { TablesDocumentBar } from "./tables-document-bar";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { PageHeader } from "../ui/page-header";
+import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { Skeleton } from "../ui/skeleton";
 import { StatusBanner } from "../ui/status-banner";
@@ -33,6 +34,7 @@ import {
   EMPTY_MANIFESTS_COPY,
   EMPTY_TABLE_PLAN_DRAFT,
   compileTablePlanDraft,
+  buildTableQueryPlan,
   documentDisplayName,
   manifestsForDocument,
   resolveSelectedManifest,
@@ -67,6 +69,7 @@ export function TablesApp() {
   const scopedUserSelectedId =
     selectionScope === documentScope ? userSelectedId : null;
   const [draft, setDraft] = useState<TablePlanDraft>(EMPTY_TABLE_PLAN_DRAFT);
+  const [tableSearch, setTableSearch] = useState("");
   const [compileError, setCompileError] = useState<string | null>(null);
   const [submittedPlan, setSubmittedPlan] = useState<TableQueryPlan | null>(null);
   const [displaySortKey, setDisplaySortKey] = useState<string | null>(null);
@@ -80,6 +83,12 @@ export function TablesApp() {
   const selectTableId = (tableId: string): void => {
     setSelectionScope(documentScope);
     setUserSelectedId(tableId);
+    setDraft(EMPTY_TABLE_PLAN_DRAFT);
+    setCompileError(null);
+    setSubmittedPlan(null);
+    setDisplaySortKey(null);
+    setDisplaySortDir("asc");
+    analyzeMutation.reset();
   };
 
   const tablesQuery = useQuery({
@@ -116,6 +125,8 @@ export function TablesApp() {
     ];
   });
 
+  const matchingManifests = visibleManifests.filter((item) => [item.table_name, item.sheet_name, documentDisplayName(namedDocuments, item.document_id)].some((value) => value?.toLowerCase().includes(tableSearch.trim().toLowerCase())));
+
   const analyzeMutation = useMutation({
     mutationFn: async (plan: TableQueryPlan) => {
       if (auth === null) {
@@ -145,7 +156,9 @@ export function TablesApp() {
   const analyzeError =
     analyzeMutation.error !== null && analyzeMutation.error !== undefined
       ? isClassifiedApiError(analyzeMutation.error)
-        ? apiFailureBanner(analyzeMutation.error.failure)
+        ? analyzeMutation.error.failure.kind === "deleted"
+          ? "This table is unavailable or access has changed. Reload the table list and select it again."
+          : apiFailureBanner(analyzeMutation.error.failure)
         : GENERIC_PRODUCTION_ERROR
       : null;
   const tablesPending = tablesQuery.isPending && tablesQuery.data === undefined;
@@ -179,9 +192,7 @@ export function TablesApp() {
     { value: "", label: "Select a table", disabled: true },
     ...visibleManifests.map((item) => ({
       value: item.table_id,
-      label: item.sheet_name
-        ? `${item.table_name} (${item.sheet_name})`
-        : item.table_name,
+      label: `${item.sheet_name || item.table_name.replace(/_/g, " ")} / ${documentDisplayName(namedDocuments, item.document_id)}`,
     })),
   ];
   const listHeading = scopedToDocument
@@ -203,7 +214,7 @@ export function TablesApp() {
       ) : null}
       {analyzeError ? (
         <StatusBanner kind="error" role="alert">
-          {analyzeError}
+          {analyzeError} <Button type="button" variant="secondary" onClick={() => { analyzeMutation.reset(); void tablesQuery.refetch(); }}>Reload tables</Button>
         </StatusBanner>
       ) : null}
       {scopedToDocument ? (
@@ -216,6 +227,8 @@ export function TablesApp() {
       <div className={styles.layout}>
         <aside className={styles.sidebar} aria-label={listHeading}>
           <h2>{listHeading}</h2>
+          <Input label="Find a table" type="search" fullWidth placeholder="Table, sheet, or document" value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} />
+          {!tablesPending && !listError ? <p className={styles.muted} role="status">{matchingManifests.length} of {visibleManifests.length} tables</p> : null}
           {tablesPending ? (
             <Skeleton label="Loading tables" width="100%" />
           ) : listError ? (
@@ -232,8 +245,10 @@ export function TablesApp() {
           ) : visibleManifests.length === 0 ? (
             <p className={styles.muted}>{emptyCopy.title}</p>
           ) : (
+            <>
+            {matchingManifests.length === 0 ? <div className={styles.section}><p className={styles.muted}>No tables match your search.</p><Button type="button" variant="secondary" onClick={() => setTableSearch("")}>Clear table search</Button></div> : null}
             <ul className={styles.manifestList}>
-              {visibleManifests.map((item) => {
+              {matchingManifests.map((item) => {
                 const active = selected?.table_id === item.table_id;
                 return (
                   <li key={item.table_id} className={styles.manifestItem}>
@@ -242,16 +257,12 @@ export function TablesApp() {
                       className={
                         active ? styles.manifestButtonActive : styles.manifestButton
                       }
+                      title={item.table_name}
                       aria-current={active ? "true" : undefined}
                       onClick={() => selectTableId(item.table_id)}
                     >
-                      <UserText value={item.table_name} />
-                      {item.sheet_name ? (
-                        <>
-                          {" "}
-                          (<UserText value={item.sheet_name} />)
-                        </>
-                      ) : null}
+                      <UserText value={item.sheet_name || item.table_name.replace(/_/g, " ")} />
+                      <span className={styles.manifestMeta}>{item.row_count === null ? "Row count unavailable" : `${item.row_count.toLocaleString()} rows`}{item.column_count === null ? "" : ` / ${item.column_count} columns`}</span>
                     </button>
                     {scopedToDocument ? null : (
                       <Link
@@ -270,6 +281,7 @@ export function TablesApp() {
                 );
               })}
             </ul>
+            </>
           )}
         </aside>
 
@@ -299,19 +311,27 @@ export function TablesApp() {
             />
           ) : (
             <AnalysisPlan
-              manifests={visibleManifests}
+              key={selected.table_id}
               selected={selected}
               documentName={selectedDocumentName}
               draft={draft}
               pending={analyzeMutation.isPending}
-              onSelectTableId={selectTableId}
               onDraftChange={(next) => {
                 setDraft(next);
+              }}
+              onReset={() => { setDraft(EMPTY_TABLE_PLAN_DRAFT); setCompileError(null); }}
+              onCountRows={() => {
+                if (analyzeMutation.isPending) return;
+                const plan = buildTableQueryPlan({ table_id: selected.table_id, version_id: selected.version_id, aggregations: [{ op: "count", alias: "row_count" }] });
+                setCompileError(null);
+                setSubmittedPlan(plan);
+                setDisplaySortKey(null);
+                analyzeMutation.mutate(plan);
               }}
               onAnalyze={handleAnalyze}
             />
           )}
-          {submittedPlan && analyzeMutation.isSuccess && analyzeMutation.data ? (
+          {submittedPlan && analyzeMutation.isSuccess && analyzeMutation.data && analyzeMutation.data.table_id === selected?.table_id && analyzeMutation.data.version_id === selected.version_id ? (
             <AnalysisResults
               result={analyzeMutation.data}
               selected={selected}

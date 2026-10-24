@@ -5,7 +5,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { CodeText, UserText } from "../ui/user-text";
 import { DataTable } from "../ui/data-table";
@@ -54,6 +54,11 @@ export function AnalysisResults({
   onDisplaySortKey,
   onDisplaySortDir,
 }: AnalysisResultsProps) {
+  const resultRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    resultRef.current?.focus({ preventScroll: true });
+    resultRef.current?.scrollIntoView?.({ block: "start" });
+  }, [result]);
   const [provenanceOpen, setProvenanceOpen] = useState(false);
   const listed = allowListedResultColumns(result.rows);
   const sortedRows = [...result.rows].sort((left, right) => {
@@ -62,7 +67,11 @@ export function AnalysisResults({
     }
     const a = String(left[displaySortKey] ?? "");
     const b = String(right[displaySortKey] ?? "");
-    const cmp = a.localeCompare(b);
+    const leftValue = left[displaySortKey];
+    const rightValue = right[displaySortKey];
+    const cmp = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : a.localeCompare(b, undefined, { numeric: true });
     return displaySortDir === "asc" ? cmp : -cmp;
   });
   const indexedRows = sortedRows.map((row, index) => ({
@@ -77,16 +86,17 @@ export function AnalysisResults({
   );
 
   return (
-    <section className={styles.card} aria-label="Results">
+    <section ref={resultRef} tabIndex={-1} className={`${styles.card} ${styles.resultCard}`} aria-label="Results">
       <div className={styles.resultsHeader}>
         <h2>Results</h2>
-        <p className={styles.muted}>{result.rows.length} rows</p>
+        <p className={styles.muted}>{result.rows.length} result {result.rows.length === 1 ? "row" : "rows"}</p>
         {hasRanges ? (
           <Button type="button" variant="secondary" onClick={() => setProvenanceOpen(true)}>
             View provenance
           </Button>
         ) : null}
       </div>
+      <p className={styles.muted}>Last completed calculation. Change the analysis options and run again to update these results.</p>
       {listed.omitted ? (
         <StatusBanner kind="warning">{OMITTED_RESULT_COLUMN_COPY}</StatusBanner>
       ) : null}
@@ -104,7 +114,7 @@ export function AnalysisResults({
                 { value: "", label: "None" },
                 ...listed.columns.map((column) => ({
                   value: column,
-                  label: column,
+                  label: column === "row_count" ? "Row count" : column,
                 })),
               ]}
               onChange={(event) =>
@@ -114,11 +124,12 @@ export function AnalysisResults({
             <Button
               type="button"
               aria-label="Toggle display sort direction"
+              disabled={displaySortKey === null}
               onClick={() =>
                 onDisplaySortDir(displaySortDir === "asc" ? "desc" : "asc")
               }
             >
-              {displaySortDir}
+              {displaySortDir === "asc" ? "Ascending" : "Descending"}
             </Button>
           </div>
           <DataTable
@@ -126,11 +137,11 @@ export function AnalysisResults({
             caption="Table analyze rows"
             columns={listed.columns.map((id) => ({
               id,
-              header: id,
+              header: id === "row_count" ? "Row count" : id,
               align: numericColumns.has(id) ? "end" : "start",
               cell: (row: Record<string, unknown>) => (
                 <UserText
-                  value={row[id]}
+                  value={typeof row[id] === "number" || typeof row[id] === "boolean" ? String(row[id]) : row[id] === null ? "\u2014" : row[id]}
                   className={numericColumns.has(id) ? styles.numeric : undefined}
                 />
               ),

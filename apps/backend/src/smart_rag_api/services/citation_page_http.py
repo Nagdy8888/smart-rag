@@ -11,6 +11,7 @@ from smart_rag_core.ingestion.parser.page_image import (
     CitationPageImageError,
     render_pdf_page_png,
 )
+from smart_rag_core.query_admission import get_run_citation_detail
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext
 
@@ -78,6 +79,9 @@ class CitationPageService:
                         ),
                     )
                     row = cursor.fetchone()
+                detail = get_run_citation_detail(
+                    connection, caller=caller, run_id=run_id, citation_id=citation_id
+                )
         except psycopg.Error as exc:
             if "query_admission:not_found" in str(exc):
                 raise QueryAdmissionError("not_found") from exc
@@ -101,7 +105,11 @@ class CitationPageService:
                 object_path=object_path,
                 timeout_seconds=20.0,
             )
-            return render_pdf_page_png(pdf_bytes, page_number)
+            return render_pdf_page_png(
+                pdf_bytes,
+                page_number,
+                evidence_excerpt=detail.citation.evidence_excerpt,
+            )
         except (
             CitationPageImageError,
             StorageAdminError,

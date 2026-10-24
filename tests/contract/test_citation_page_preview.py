@@ -86,6 +86,7 @@ def test_citation_page_route_returns_png_only_for_an_owned_page(
     assert ok.status_code == 200
     assert ok.headers["content-type"].startswith("image/png")
     assert ok.content.startswith(b"\x89PNG")
+    assert ok.headers["cache-control"] == "private, no-store"
     assert "http" not in ok.text.lower()
     foreign = client.get(f"/runs/{_RUN}/citations/{_FOREIGN}/page")
     assert foreign.status_code == 404

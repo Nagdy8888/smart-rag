@@ -7,8 +7,7 @@
 import Link from "next/link";
 import type { TablePlanDraft } from "../../lib/table-plan";
 import type { TableManifestResponse } from "../../lib/types";
-import { PrimaryAction } from "../ui/button";
-import { Select } from "../ui/select";
+import { Button, PrimaryAction } from "../ui/button";
 import { UserText } from "../ui/user-text";
 import { AggregationsSection } from "./analysis-plan/aggregations-section";
 import { ColumnsSection } from "./analysis-plan/columns-section";
@@ -18,8 +17,6 @@ import { GroupSortSection } from "./analysis-plan/group-sort-section";
 import styles from "./tables.module.css";
 
 export type AnalysisPlanProps = {
-  /** Authorized manifests. */
-  manifests: readonly TableManifestResponse[];
   /** Currently selected accessible table. */
   selected: TableManifestResponse | null;
   /** Document title from `GET /documents/{id}`, or the document id. */
@@ -28,10 +25,12 @@ export type AnalysisPlanProps = {
   draft: TablePlanDraft;
   /** Analyze in flight. */
   pending: boolean;
-  /** Sidebar/select change. */
-  onSelectTableId: (tableId: string) => void;
   /** Replace the draft. */
   onDraftChange: (draft: TablePlanDraft) => void;
+  /** Run a bounded deterministic row count. */
+  onCountRows: () => void;
+  /** Reset just the analysis draft. */
+  onReset: () => void;
   /** Compile and POST. */
   onAnalyze: () => void;
 };
@@ -43,25 +42,15 @@ export type AnalysisPlanProps = {
  * @returns Plan form. Does not fetch.
  */
 export function AnalysisPlan({
-  manifests,
   selected,
   documentName,
   draft,
   pending,
-  onSelectTableId,
   onDraftChange,
   onAnalyze,
+  onCountRows,
+  onReset,
 }: AnalysisPlanProps) {
-  const tableOptions = [
-    { value: "", label: "Select a table", disabled: true },
-    ...manifests.map((item) => ({
-      value: item.table_id,
-      label: item.sheet_name
-        ? `${item.table_name} (${item.sheet_name})`
-        : item.table_name,
-    })),
-  ];
-
   /**
    * Patch the draft immutably.
    *
@@ -73,13 +62,9 @@ export function AnalysisPlan({
 
   return (
     <section className={styles.card} aria-label="Analysis plan">
-      <h2>Analysis plan</h2>
-      <Select
-        label="Table"
-        value={selected?.table_id ?? ""}
-        options={tableOptions}
-        onChange={(event) => onSelectTableId(event.target.value)}
-      />
+      <h2>Work with this table</h2>
+      <p className={styles.muted}>Start with a row count, or build a calculation using the options below.</p>
+      {selected ? <h3 className={styles.tableTitle}><UserText value={selected.sheet_name || selected.table_name.replace(/_/g, " ")} /></h3> : null}
       {selected ? (
         <p className={styles.muted}>
           From{" "}
@@ -91,6 +76,14 @@ export function AnalysisPlan({
           </Link>
         </p>
       ) : null}
+      <div className={styles.quickActions}>
+        <Button type="button" variant="primary" pending={pending} pendingLabel="Calculating..." disabled={selected === null} onClick={onCountRows}>Count rows</Button>
+        <span className={styles.muted}>Counts the full selected table, without applying analysis filters.</span>
+      </div>
+      <details className={styles.analysisOptions}>
+        <summary>Customize analysis</summary>
+        <div className={styles.optionsBody}>
+      <p className={styles.muted}>Use the exact column names from the original spreadsheet. Add a filter, calculation, grouping, sort, or comparison before analyzing.</p>
       <ColumnsSection columns={draft.columns} patchDraft={patchDraft} />
       <FiltersSection filters={draft.filters} patchDraft={patchDraft} />
       <AggregationsSection
@@ -103,7 +96,9 @@ export function AnalysisPlan({
         patchDraft={patchDraft}
       />
       <ComparisonSection draft={draft} patchDraft={patchDraft} />
+        </div>
       <div className={styles.planActions}>
+        <Button type="button" variant="secondary" disabled={pending} onClick={onReset}>Reset analysis</Button>
         <PrimaryAction
           type="button"
           data-action-id="tables.analyze"
@@ -118,6 +113,7 @@ export function AnalysisPlan({
           Analyze
         </PrimaryAction>
       </div>
+      </details>
     </section>
   );
 }

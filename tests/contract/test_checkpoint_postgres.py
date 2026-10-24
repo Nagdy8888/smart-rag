@@ -69,9 +69,9 @@ def postgres_url() -> Iterator[str]:
 
 
 def test_langgraph_checkpoint_postgres_pin_matches_library() -> None:
-    """Pinned 3.1.2 must match langgraph-checkpoint 4.x used by langgraph 1.2.11."""
+    """Pinned 3.1.3 must match langgraph-checkpoint 4.x used by langgraph 1.2.11."""
 
-    assert version("langgraph-checkpoint-postgres") == "3.1.2"
+    assert version("langgraph-checkpoint-postgres") == "3.1.3"
     assert version("langgraph") == "1.2.11"
     assert EXPECTED_CHECKPOINT_VERSIONS == tuple(range(len(MIGRATIONS)))
     assert len(MIGRATIONS) == 10

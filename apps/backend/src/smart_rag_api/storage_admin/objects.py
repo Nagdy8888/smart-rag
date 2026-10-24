@@ -112,6 +112,7 @@ def download_object(
     bucket: str,
     object_path: str,
     timeout_seconds: float = 30.0,
+    max_bytes: int | None = None,
 ) -> bytes:
     """Download one private object after the caller has passed an ACL check.
 
@@ -120,6 +121,7 @@ def download_object(
         bucket: Private bucket id.
         object_path: Object key.
         timeout_seconds: HTTP timeout bound in seconds.
+        max_bytes: Optional streamed download byte limit.
 
     Returns:
         Object bytes.
@@ -147,6 +149,20 @@ def download_object(
     }
     try:
         with httpx.Client(timeout=timeout_seconds) as client:
+            if max_bytes is not None:
+                if max_bytes <= 0:
+                    raise ValueError("max_bytes must be positive")
+                with client.stream("GET", url, headers=headers) as streamed:
+                    if streamed.status_code != 200:
+                        raise StorageAdminError("storage download unavailable")
+                    payload = bytearray()
+                    for chunk in streamed.iter_bytes(chunk_size=65536):
+                        if len(payload) + len(chunk) > max_bytes:
+                            raise StorageAdminError(
+                                "storage download exceeds byte limit"
+                            )
+                        payload.extend(chunk)
+                    return bytes(payload)
             response = client.get(url, headers=headers)
     except httpx.HTTPError as exc:
         raise StorageAdminError(f"storage download transport failure: {exc}") from exc

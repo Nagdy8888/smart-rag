@@ -19,6 +19,7 @@ import type { CitationResponse, ConversationMessage, ReadinessResponse } from ".
 import { SEARCH_SCOPE_LABELS, isRequestedSearchScope } from "../../lib/types";
 import { visibleSearchScopes } from "../../lib/web-search";
 import { Button } from "../ui/button";
+import { Icon } from "../ui/icon";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { AnswerFormatGallery } from "./answer-format-gallery";
 import { AnswerSurface } from "./answer-surface";
@@ -30,14 +31,11 @@ import { RunDetailsSheet } from "./run-details-sheet";
 import type { FeedbackTag } from "../../lib/types";
 import chatStyles from "./chat-transcript.module.css";
 
-/**
- * Live Ask chips that tend to return code or tables from the company PDF.
- * The format gallery above shows rendering without sending.
- */
+/** Question starters fill the composer; sending always stays explicit. */
 const PROMPT_CHIPS = [
-  "Reproduce the cancel_order tool as a fenced Python code block from Building Applications with AI Agents.",
-  "Reproduce Table 10-3 (RACI matrix of monitoring metrics) as a Markdown pipe table from Building Applications with AI Agents.",
-  "Reproduce Table 2-1 (Selected open weight models) as a Markdown pipe table from Building Applications with AI Agents.",
+  { title: "Explain a concept", hint: "Make the complex feel simple", question: "Explain the key concepts in my documents in plain language, with examples and citations." },
+  { title: "Compare approaches", hint: "See the differences side by side", question: "Compare the main approaches described in my documents in a table, with sources for each." },
+  { title: "Find the practical steps", hint: "Turn reading into a clear next move", question: "Find a practical workflow in my documents and explain it step by step, citing the relevant pages." },
 ] as const;
 
 export type ChatStageProps = {
@@ -230,7 +228,7 @@ export function ChatStage(props: ChatStageProps) {
         aria-label="Conversation"
         tabIndex={0}
       >
-        <AnswerSurface
+        {!showEmptyPrompts ? <AnswerSurface
           messages={historyMessages}
           messagesPending={messagesPending}
           messagesError={messagesError}
@@ -257,8 +255,8 @@ export function ChatStage(props: ChatStageProps) {
           onOpenTurnSources={onOpenTurnSources}
           promptTokens={chat.diagnostics.promptTokens}
           completionTokens={chat.diagnostics.completionTokens}
-        />
-        {pinned ? null : (
+        /> : null}
+        {pinned || showEmptyPrompts ? null : (
           <Button
             type="button"
             variant="secondary"
@@ -294,21 +292,29 @@ export function ChatStage(props: ChatStageProps) {
         ) : null}
         {showEmptyPrompts ? (
           <div className={chatStyles.emptyPrompts}>
-            <AnswerFormatGallery />
-            <p className={chatStyles.emptyPromptsLabel}>
-              Or ask the company document
-            </p>
-            {PROMPT_CHIPS.map((chip) => (
-              <Button
-                key={chip}
-                type="button"
-                variant="secondary"
-                data-action-id="ask.prompt_fill"
-                onClick={() => onFillComposer(chip)}
-              >
-                {chip}
-              </Button>
-            ))}
+            <div className={chatStyles.welcome}>
+              <span className={chatStyles.welcomeMark} aria-hidden="true"><Icon name="documents" /></span>
+              <h2>What would you like to understand?</h2>
+              <p>Explore an idea, compare the details, or find your next step. Start with a question and choose where to look.</p>
+            </div>
+            <div className={chatStyles.starterList}>
+              {PROMPT_CHIPS.map((chip) => (
+                <button
+                  className={chatStyles.starter}
+                  key={chip.title}
+                  type="button"
+                  data-action-id="ask.prompt_fill"
+                  onClick={() => onFillComposer(chip.question)}
+                >
+                  <span><strong>{chip.title}</strong><span>{chip.hint}</span></span>
+                  <Icon name="arrowUp" />
+                </button>
+              ))}
+            </div>
+            <details className={chatStyles.formatDisclosure}>
+              <summary>Explore answer formats</summary>
+              <AnswerFormatGallery />
+            </details>
           </div>
         ) : null}
         {feedbackRunId !== null ||

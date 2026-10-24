@@ -11,11 +11,15 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: calc(var(--space) * 5);
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 0;
   flex: 1;
   min-height: 0;
   align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--color-surface);
   transition: grid-template-columns var(--duration-fast) var(--ease-smooth-out);
 }
 
@@ -34,7 +38,9 @@
   border-inline-end: 1px solid var(--color-border);
   border-radius: 0;
   padding: 0 calc(var(--space) * 3) 0 0;
-  opacity: 0.92;
+  opacity: 1;
+  background: #edf3f4;
+  padding: 18px 12px;
 }
 
 .railHeader {
@@ -89,7 +95,7 @@
 .railGroupLabel {
   margin: 0;
   padding: calc(var(--space) * 2) calc(var(--space) * 2) calc(var(--space) * 1);
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 500;
@@ -157,7 +163,7 @@
   min-height: 56px;
   padding: calc(var(--space) * 2);
   border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  border-radius: 10px;
   background: transparent;
   color: var(--color-text);
   font: inherit;
@@ -214,14 +220,14 @@
 }
 
 .workspaceSessionsExpanded {
-  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-columns: 236px minmax(0, 1fr);
 }
 
 .workspaceSessionsCollapsed {
   grid-template-columns: 52px minmax(0, 1fr);
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1023px) {
   .workspace,
   .workspaceSessionsExpanded,
   .workspaceSessionsCollapsed {

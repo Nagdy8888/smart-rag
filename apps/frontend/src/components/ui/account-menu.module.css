@@ -1,0 +1,28 @@
+/** Profile context and actions inside the existing keyboard-aware menu. */
+.panel {
+  width: 336px;
+  max-width: calc(100vw - 16px);
+  padding: 8px;
+  border: 1px solid #d8e3e9;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #173342;
+  box-shadow: 0 12px 36px rgb(23 51 66 / 0.16);
+}
+.profile { display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 20px; margin-bottom: 8px; border-bottom: 1px solid #e1e9ed; }
+.profileAvatar { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; background: #e0eee9; color: #185c46; font-size: 14px; font-weight: 600; }
+.identity { min-width: 0; flex: 1; }
+.caption { margin: 0 0 4px; color: #5b707c; font-size: 12px; line-height: 1.5; }
+.email { margin: 0; color: #173342; font-size: 14px; line-height: 1.6; font-weight: 600; overflow-wrap: anywhere; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.role, .access { padding: 3px 8px; border-radius: 6px; font-size: 11px; line-height: 1.5; font-weight: 500; background: #edf2f5; color: #405d6c; }
+.role { text-transform: capitalize; }
+.access[data-enabled="true"] { color: #185c46; background: #e6f3ed; }
+.panel > button { min-height: 48px; padding: 12px; border-radius: 10px; white-space: normal; }
+.panel > button:hover:not(:disabled) { background: #eff5f7; }
+.panel > button:last-child { margin-top: 6px; color: #b52c34; }
+.panel > button:last-child:hover:not(:disabled) { background: #fff0f0; }
+.action { display: flex; align-items: center; gap: 12px; text-align: start; }
+.action > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.action strong { display: block; font-size: 14px; font-weight: 500; line-height: 1.5; }
+.actionHint { display: block; margin-top: 3px; color: #5b707c; font-size: 12px; line-height: 1.5; }

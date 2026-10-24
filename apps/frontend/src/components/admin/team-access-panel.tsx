@@ -15,12 +15,11 @@ import { Select } from "../ui/select";
 import { Spinner } from "../ui/spinner";
 import { StatusBanner } from "../ui/status-banner";
 import { StatusPill } from "../ui/status-pill";
-import { CodeText, UserText } from "../ui/user-text";
+import { UserText } from "../ui/user-text";
 import { createInvitation, listWorkspaceUsers, offboardUser } from "../../lib/api";
 import {
   INVITE_TOKEN_MAIL_ONLY,
   OFFBOARD_IRREVERSIBLE_COPY,
-  WORKSPACE_PEOPLE_COPY,
   inviteRoleLabel,
 } from "../../lib/admin-copy";
 import { useApiAuth } from "../../lib/auth/use-api-auth";
@@ -79,10 +78,14 @@ export function TeamAccessPanel() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<InviteRole>("member");
   const [uploadEnabled, setUploadEnabled] = useState(false);
-  const [subjectUserId, setSubjectUserId] = useState("");
+  const [subject, setSubject] = useState<WorkspaceMember | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [created, setCreated] = useState<CreateInvitationResponse | null>(null);
   const [offboarded, setOffboarded] = useState<OffboardResponse | null>(null);
+  const [offboardedLabel, setOffboardedLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const canInvite = showInviteConvenience(currentUser?.role);
@@ -115,6 +118,11 @@ export function TeamAccessPanel() {
       setCreated(result);
       setOffboarded(null);
       setError(null);
+      setInviteOpen(false);
+      setEmail("");
+      setRole("member");
+      setUploadEnabled(false);
+      reviewRef.current?.focus();
       void queryClient.invalidateQueries({ queryKey: keys.workspaceUsers });
     },
     onError: (caught: Error) => {
@@ -128,10 +136,14 @@ export function TeamAccessPanel() {
       if (auth === null) {
         throw new Error("signed_out");
       }
-      return offboardUser(auth, subjectUserId.trim());
+      if (subject === null || subject.user_id === currentUser?.user_id) {
+        throw new Error("invalid_subject");
+      }
+      return offboardUser(auth, subject.user_id);
     },
     onSuccess: (result) => {
       setOffboarded(result);
+      setOffboardedLabel(subject?.email || subject?.display_name || result.subject_user_id);
       setCreated(null);
       setConfirmOpen(false);
       setError(null);
@@ -187,11 +199,6 @@ export function TeamAccessPanel() {
         },
       },
       {
-        id: "id",
-        header: "User ID",
-        cell: (row: WorkspaceMember) => <CodeText value={row.user_id} />,
-      },
-      {
         id: "actions",
         header: "Actions",
         cell: (row: WorkspaceMember) => {
@@ -210,8 +217,9 @@ export function TeamAccessPanel() {
               variant="dangerQuiet"
               size="compact"
               data-action-id="admin.offboard"
-              onClick={() => {
-                setSubjectUserId(row.user_id);
+              onClick={(event) => {
+                reviewRef.current = event.currentTarget;
+                setSubject(row);
                 setConfirmOpen(true);
               }}
             >
@@ -276,39 +284,106 @@ export function TeamAccessPanel() {
       : null;
   const members = directoryQuery.data?.members ?? [];
   const pending = directoryQuery.data?.pending_invitations ?? [];
+  const matchingMembers = members.filter((member) => {
+    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? member.disabled_at === null : member.disabled_at !== null);
+    return matchesStatus && [member.email, member.display_name, member.role].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase()));
+  });
 
   return (
     <div className={styles.stack}>
-      <p className={styles.panelLead}>{WORKSPACE_PEOPLE_COPY}</p>
-      {error ? (
+      <div className={styles.taskHeader}>
+        <div><h2>People & access</h2><p className={styles.panelLead}>Find a person, invite a teammate, or review their access.</p></div>
+        {canInvite ? <Button type="button" variant="primary" aria-expanded={inviteOpen} aria-controls="team-invitation" onClick={(event) => {
+          reviewRef.current = event.currentTarget;
+          setInviteOpen((open) => !open);
+        }} disabled={inviteMutation.isPending}>{inviteOpen ? "Close invitation" : "Invite teammate"}</Button> : null}
+      </div>
+      {error && !confirmOpen ? (
         <StatusBanner kind="error" role="alert">
           {error}
         </StatusBanner>
       ) : null}
       {directoryError ? (
         <StatusBanner kind="error" role="alert">
-          {directoryError}
+          {directoryError} <Button type="button" variant="secondary" onClick={() => { void directoryQuery.refetch(); }}>Retry people</Button>
         </StatusBanner>
       ) : null}
 
+      {canInvite && inviteOpen ? (
+        <form id="team-invitation" className={styles.panel} data-testid="invite-form" aria-label="Invite user" onSubmit={(event) => {
+          event.preventDefault();
+          if (!inviteMutation.isPending && email.trim()) inviteMutation.mutate();
+        }}>
+          <h2>Invite a teammate</h2><p className={styles.panelLead}>Choose what they can do. The invitation is delivered by email.</p>
+          <Input
+            label="Email"
+            type="email"
+            required
+            autoFocus
+            autoComplete="email"
+            placeholder="teammate@company.com"
+            fullWidth
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <Select
+            label="Role"
+            value={role}
+            fullWidth
+            options={ROLE_OPTIONS}
+            onChange={(event) => setRole(event.target.value as InviteRole)}
+          />
+          <p className={styles.panelLead}>{role === "viewer" ? "Viewers can read and ask questions. Uploads are disabled." : role === "member" ? "Members can ask questions. Enable uploads only if they need to add documents." : "Owners and admins can manage workspace people, tools, and settings."}</p>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={role === "viewer" ? false : uploadEnabled}
+              disabled={role === "viewer"}
+              onChange={(event) => setUploadEnabled(event.target.checked)}
+            />
+            Upload access
+          </label>
+          <PrimaryAction
+            type="submit"
+            className={styles.stretchAction}
+            data-action-id="admin.invite"
+            pending={inviteMutation.isPending}
+            pendingLabel="Sending…"
+            disabled={!email.trim()}
+          >
+            Send invitation
+          </PrimaryAction>
+        </form>
+      ) : null}
+      {created ? (
+        <StatusBanner kind="success" role="status">
+          <span data-testid="invite-mail-only">Invitation sent to <UserText value={created.email} />. {INVITE_TOKEN_MAIL_ONLY}</span>
+        </StatusBanner>
+      ) : null}
+      {offboarded ? <StatusBanner kind="success" role="status"><span data-testid="offboard-result">Access removed for <UserText value={offboardedLabel} />. Their sessions have ended.</span></StatusBanner> : null}
       {canListPeople ? (
         <section className={styles.panel} aria-label="Workspace people">
-          <h2>Workspace people</h2>
+          <div className={styles.directoryTools}>
+            <Input label="Find a person" fullWidth leadingIcon="search" type="search" placeholder="Search name, email, or role" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <Select label="Account status" value={statusFilter} options={[{ value: "active", label: "Active accounts" }, { value: "disabled", label: "Disabled accounts" }, { value: "all", label: "All accounts" }]} onChange={(event) => setStatusFilter(event.target.value)} />
+            <p className={styles.muted} role="status">{directoryQuery.isPending ? "Loading people..." : directoryQuery.isError ? "People list unavailable" : `${matchingMembers.length} of ${members.length} people`}</p>
+          </div>
           {directoryQuery.isPending ? <Spinner label="Loading people" /> : null}
-          {!directoryQuery.isPending && members.length === 0 ? (
+          {directoryQuery.isSuccess && members.length === 0 ? (
             <EmptyState
               title="No workspace accounts yet."
               body="Send an invitation. After the person accepts, they appear here."
             />
           ) : null}
-          {members.length > 0 ? (
-            <DataTable
+          {members.length > 0 && matchingMembers.length === 0 ? <><EmptyState title="No matching people." body="Try another name or change the account status filter." /><Button type="button" variant="secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Reset people filters</Button></> : null}
+          {matchingMembers.length > 0 ? (
+            <div className={styles.peopleDirectory}><DataTable
               variant="bare"
               caption="Workspace people"
               columns={memberColumns}
-              rows={members}
+              rows={matchingMembers}
               getRowId={(row) => row.user_id}
-            />
+            /></div>
           ) : null}
         </section>
       ) : null}
@@ -325,99 +400,7 @@ export function TeamAccessPanel() {
         </section>
       ) : null}
 
-      <div className={styles.teamGrid}>
-      {canInvite ? (
-        <section className={styles.panel} data-testid="invite-form" aria-label="Invite user">
-          <h2>Invite user</h2>
-          <Input
-            label="Email"
-            type="email"
-            fullWidth
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <Select
-            label="Role"
-            value={role}
-            fullWidth
-            options={ROLE_OPTIONS}
-            onChange={(event) => setRole(event.target.value as InviteRole)}
-          />
-          <label className={styles.checkRow}>
-            <input
-              type="checkbox"
-              checked={role === "viewer" ? false : uploadEnabled}
-              disabled={role === "viewer"}
-              onChange={(event) => setUploadEnabled(event.target.checked)}
-            />
-            Upload access
-          </label>
-          <PrimaryAction
-            type="button"
-            className={styles.stretchAction}
-            data-action-id="admin.invite"
-            pending={inviteMutation.isPending}
-            pendingLabel="Sending…"
-            onClick={() => inviteMutation.mutate()}
-          >
-            Send invitation
-          </PrimaryAction>
-          {created ? (
-            <dl className={styles.dl} data-testid="invite-mail-only">
-              <dt>Invitation ID</dt>
-              <dd>
-                <CodeText value={created.invitation_id} />
-              </dd>
-              <dt>Expires</dt>
-              <dd>
-                <UserText value={created.expires_at} />
-              </dd>
-              <dt>Token</dt>
-              <dd>{INVITE_TOKEN_MAIL_ONLY}</dd>
-            </dl>
-          ) : null}
-        </section>
-      ) : null}
-
-      {canOffboard ? (
-        <section className={`${styles.panel} ${styles.dangerPanel}`} data-testid="offboard-form" aria-label="Offboard user">
-          <h2>Offboard user</h2>
-          <p className={styles.muted}>{OFFBOARD_IRREVERSIBLE_COPY}</p>
-          <Input
-            label="User ID"
-            fullWidth
-            value={subjectUserId}
-            onChange={(event) => setSubjectUserId(event.target.value)}
-          />
-          <Button
-            ref={reviewRef}
-            type="button"
-            variant="dangerQuiet"
-            className={styles.stretchAction}
-            data-action-id="admin.offboard"
-            disabled={subjectUserId.trim() === ""}
-            disabledReason={subjectUserId.trim() === "" ? "Enter a user ID." : undefined}
-            onClick={() => setConfirmOpen(true)}
-          >
-            Review offboarding
-          </Button>
-          {offboarded ? (
-            <dl className={styles.dl} data-testid="offboard-result">
-              <dt>Subject</dt>
-              <dd>
-                <CodeText value={offboarded.subject_user_id} />
-              </dd>
-              <dt>Completed</dt>
-              <dd>
-                <UserText value={offboarded.completed_at} />
-              </dd>
-            </dl>
-          ) : null}
-        </section>
-      ) : null}
-      </div>
-
-      {confirmOpen ? (
+      {confirmOpen && subject ? (
         <ConfirmDialog
           title="Offboard this account?"
           danger
@@ -432,10 +415,11 @@ export function TeamAccessPanel() {
           }}
           onConfirm={() => offboardMutation.mutate()}
         >
+          {error ? <StatusBanner kind="error" role="alert">{error}</StatusBanner> : null}
           <p>
             This disables{" "}
             <span className={styles.mono}>
-              <UserText value={subjectUserId} />
+              <UserText value={subject?.email || subject?.display_name || subject?.user_id || "this person"} />
             </span>{" "}
             and ends their sessions. {OFFBOARD_IRREVERSIBLE_COPY}
           </p>

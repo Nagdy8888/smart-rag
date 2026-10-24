@@ -73,7 +73,7 @@ export const ACCOUNT_NAV_ITEM: ShellNavItem = {
 };
 
 /** Admin query-tab ids. Evaluation appears only when `/api/meta` allows it. */
-export const ADMIN_TABS = ["team", "tools", "curation", "usage", "evaluation"] as const;
+export const ADMIN_TABS = ["team", "tools", "usage", "evaluation"] as const;
 
 /** Admin tab union. */
 export type AdminTab = (typeof ADMIN_TABS)[number];
@@ -84,7 +84,7 @@ export type AdminTab = (typeof ADMIN_TABS)[number];
 export const LEGACY_CONSOLE_REDIRECTS: Readonly<Record<string, string>> = {
   "/team": "/admin?tab=team",
   "/tools": "/admin?tab=tools",
-  "/curation": "/admin?tab=curation",
+  "/curation": "/admin?tab=team",
   "/usage": "/admin?tab=usage",
   "/profile": "/account",
 };
@@ -140,7 +140,7 @@ export function parseAdminTab(
   value: string | undefined,
   pdfEvalWorkspace = false,
 ): AdminTab {
-  if (value === "tools" || value === "curation" || value === "usage") {
+  if (value === "tools" || value === "usage") {
     return value;
   }
   if (value === "evaluation" && pdfEvalWorkspace) {

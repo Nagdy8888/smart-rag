@@ -11,6 +11,8 @@ from typing import Protocol, cast
 
 import fitz
 
+from .page_highlights import HighlightPage, highlight_cited_passage
+
 MAX_PDF_BYTES = 40 * 1024 * 1024
 MAX_PAGE_PIXELS = 4_000_000
 MAX_PNG_BYTES = 8 * 1024 * 1024
@@ -60,12 +62,15 @@ class _Document(Protocol):
         ...
 
 
-def render_pdf_page_png(pdf_bytes: bytes, page_number: int) -> bytes:
+def render_pdf_page_png(
+    pdf_bytes: bytes, page_number: int, *, evidence_excerpt: str | None = None
+) -> bytes:
     """Render one 1-based PDF page to PNG at 120 DPI, scaled down if needed.
 
     Args:
         pdf_bytes: Original PDF bytes already loaded by an authorized caller.
         page_number: 1-based file page. This is the page Acrobat opens.
+        evidence_excerpt: Optional authorized stored passage for exact highlighting.
 
     Returns:
         PNG bytes for that page only.
@@ -84,6 +89,8 @@ def render_pdf_page_png(pdf_bytes: bytes, page_number: int) -> bytes:
         if page_number > document.page_count:
             raise CitationPageImageError("page_missing")
         page = document[page_number - 1]
+        if evidence_excerpt:
+            highlight_cited_passage(cast(HighlightPage, page), evidence_excerpt)
         rect = page.rect
         zoom = _BASE_ZOOM
         pixels = rect.width * zoom * rect.height * zoom

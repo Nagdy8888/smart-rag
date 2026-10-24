@@ -254,7 +254,7 @@ describe("AdminApp", () => {
     );
     fireEvent.click(screen.getByRole("tab", { name: "Tools" }));
     expect(routerReplace).toHaveBeenCalledWith("/admin?tab=tools");
-    expect(screen.getByRole("tab", { name: "Names & aliases" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Names & aliases" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Evaluation" })).toBeNull();
   });
 
@@ -292,9 +292,10 @@ describe("TeamAccessPanel", () => {
 
   it("does not render an invitation token and keeps hostile email as text", async () => {
     renderSurface(<TeamAccessPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Invite teammate" }));
     const email = await screen.findByLabelText("Email");
     fireEvent.change(email, {
-      target: { value: "<img src=x onerror=alert(1)>@evil.test" },
+      target: { value: "teammate@example.com" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     expect(await screen.findByTestId("invite-mail-only")).toHaveTextContent(
@@ -302,7 +303,8 @@ describe("TeamAccessPanel", () => {
     );
     expect(screen.queryByTestId("raw-token")).toBeNull();
     expect(screen.queryByText("once-secret")).toBeNull();
-    expect(email).toHaveValue("<img src=x onerror=alert(1)>@evil.test");
+    expect(screen.queryByLabelText("Email")).toBeNull();
+    expect(screen.getByTestId("invite-mail-only")).toHaveTextContent("<img src=x onerror=alert(1)>@evil.test");
     expect(document.querySelector("img")).toBeNull();
   });
 
@@ -318,18 +320,45 @@ describe("TeamAccessPanel", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("offboards a known user id without MFA copy", async () => {
+  it("filters people by name and recovers from an empty search", async () => {
     renderSurface(<TeamAccessPanel />);
-    const userId = await screen.findByLabelText("User ID");
-    fireEvent.change(userId, { target: { value: "u-2" } });
-    expect(userId).toHaveValue("u-2");
-    fireEvent.click(screen.getByRole("button", { name: "Review offboarding" }));
+    const search = await screen.findByLabelText("Find a person");
+    fireEvent.change(search, { target: { value: "Owner" } });
+    expect(screen.getByRole("table", { name: "Workspace people" })).toHaveTextContent("owner@example.com");
+    expect(within(screen.getByRole("table", { name: "Workspace people" })).queryByText(/evil.test/)).toBeNull();
+    fireEvent.change(search, { target: { value: "no such person" } });
+    expect(screen.getByText("No matching people.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset people filters" }));
+    expect(screen.getByRole("table", { name: "Workspace people" })).toHaveTextContent("evil.test");
+  });
+
+  it("preserves an unfinished invitation and explains viewer permissions", async () => {
+    createInvitation.mockClear();
+    renderSurface(<TeamAccessPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Invite teammate" }));
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "draft@example.com" } });
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "viewer" } });
+    expect(screen.getByLabelText("Upload access")).toBeDisabled();
+    expect(screen.getByText(/Viewers can read and ask questions/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close invitation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Invite teammate" }));
+    expect(screen.getByLabelText("Email")).toHaveValue("draft@example.com");
+    expect(createInvitation).not.toHaveBeenCalled();
+  });
+
+  it("offboards the selected person only after confirmation, without requiring an ID", async () => {
+    offboardUser.mockClear();
+    renderSurface(<TeamAccessPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Offboard" }));
     const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("<img src=x onerror=alert(1)>@evil.test");
+    expect(screen.queryByLabelText("User ID")).toBeNull();
+    expect(offboardUser).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Offboard user" }));
-    expect(await screen.findByTestId("offboard-result")).toHaveTextContent("u-2");
+    expect(await screen.findByTestId("offboard-result")).toHaveTextContent("Access removed for");
     expect(offboardUser).toHaveBeenCalledWith(
       { accessToken: "jwt-token" },
-      "u-2",
+      "u-member",
     );
     expect(screen.queryByText(/MFA|AAL2|assurance/i)).toBeNull();
   });
@@ -357,6 +386,17 @@ describe("ToolsPanel", () => {
     expect(enableTool).toBeDefined();
   });
 
+  it("clears a tool search back to the full catalog", async () => {
+    renderSurface(<ToolsPanel />);
+    await screen.findByText("CSV export");
+    fireEvent.change(screen.getByLabelText("Search tools"), { target: { value: "csv" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(listTools).toHaveBeenCalledWith({ accessToken: "jwt-token" }, "csv"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByLabelText("Search tools")).toHaveValue("");
+    await waitFor(() => expect(listTools).toHaveBeenLastCalledWith({ accessToken: "jwt-token" }, ""));
+  });
+
   it("lets an owner disable a tool through the catalog seed", async () => {
     renderSurface(<ToolsPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "Disable" }));
@@ -373,7 +413,7 @@ describe("ToolsPanel", () => {
 describe("UsagePanel", () => {
   it("shows token meters and no budget slider or fake audit events", async () => {
     renderSurface(<UsagePanel />);
-    expect(await screen.findByText("1.25")).toBeInTheDocument();
+    expect(await screen.findByText("$1.25")).toBeInTheDocument();
     expect(screen.getByText("Your usage")).toBeInTheDocument();
     expect(screen.getByText(/Recorded model usage/)).toBeInTheDocument();
     expect(screen.getAllByText("Prompt tokens").length).toBeGreaterThan(0);
@@ -386,6 +426,28 @@ describe("UsagePanel", () => {
     expect(document.querySelector("input[type='range']")).toBeNull();
     expect(screen.queryByText("SECRET_PASSAGE")).toBeNull();
     expect(screen.queryByRole("table", { name: /audit/i })).toBeNull();
+  });
+
+  it("refreshes both authorized summaries and labels cost as an estimate", async () => {
+    renderSurface(<UsagePanel />);
+    expect(await screen.findByText("$1.25")).toBeInTheDocument();
+    expect(screen.getAllByText("Recorded cost estimate")).toHaveLength(2);
+    expect(screen.getByText(/not a verified provider invoice/)).toBeInTheDocument();
+    const refresh = await screen.findByRole("button", { name: "Refresh usage" });
+    const meCalls = fetchUsageMe.mock.calls.length;
+    const companyCalls = fetchUsageCompany.mock.calls.length;
+    fireEvent.click(refresh);
+    await waitFor(() => expect(fetchUsageMe.mock.calls.length).toBeGreaterThan(meCalls));
+    await waitFor(() => expect(fetchUsageCompany.mock.calls.length).toBeGreaterThan(companyCalls));
+  });
+
+  it("shows unavailable totals rather than fabricated zero usage on failure", async () => {
+    fetchUsageMe.mockRejectedValue(new Error("invalid_usage_response"));
+    fetchUsageCompany.mockRejectedValue(new Error("invalid_usage_response"));
+    renderSurface(<UsagePanel />);
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+    expect(screen.queryByText("$0.00")).toBeNull();
+    expect(screen.queryByText("No model usage has been recorded yet.")).toBeNull();
   });
 
   it("hides company meters for a member without audit chrome", async () => {

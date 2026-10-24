@@ -52,7 +52,7 @@ test("MFA challenge route is not a public Auth surface", async ({ page }) => {
   await expect(page.getByRole("button", { name: /google/i })).toHaveCount(0);
 });
 
-test("handshake banner appears when min_client_version is 9.0.0", async ({
+test("sign-in stays available when the query client needs an upgrade", async ({
   page,
 }) => {
   await page.route("**/api/meta", async (route) => {
@@ -67,7 +67,8 @@ test("handshake banner appears when min_client_version is 9.0.0", async ({
     });
   });
   await page.goto("/login");
-  await expect(page.getByText(handshakeBelowMinCopy())).toBeVisible();
+  await expect(page.getByText(handshakeBelowMinCopy())).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
 });
 
 test("retired GAP-07-07 route returns production 404", async ({

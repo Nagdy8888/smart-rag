@@ -9,10 +9,12 @@ import {
   citationSourceLabel,
 } from "../../lib/citation-label";
 import type { CitationResponse } from "../../lib/types";
+import { Icon } from "../ui/icon";
 import { Button } from "../ui/button";
 import { CitationChip } from "../ui/citation-chip";
 import { Sheet } from "../ui/sheet";
 import styles from "./chat-transcript.module.css";
+import sourceStyles from "./sources.module.css";
 
 export type CitationSheetProps = {
   /** Whether the sheet is open. */
@@ -58,7 +60,13 @@ export function CitationSheet({
         pending || error ? "Sources" : `Sources (${String(citations.length)})`
       }
       onClose={onClose}
+      panelClassName={sourceStyles.sourcesPanel}
     >
+      <div className={sourceStyles.intro}>
+        <span className={sourceStyles.libraryMark} aria-hidden="true"><Icon name="documents" /></span>
+        <h3>Follow the evidence</h3>
+        <p>Open a source to read the supporting passage and inspect its original page.</p>
+      </div>
       {pending ? (
         <p role="status" className={styles.muted}>
           Loading sources…
@@ -75,12 +83,13 @@ export function CitationSheet({
       ) : citations.length === 0 ? (
         <p className={styles.muted}>No citations for this run yet.</p>
       ) : (
-        <ul className={styles.citationList}>
+        <ul className={sourceStyles.sourceList}>
           {citations.map((citation) => (
-            <li key={citation.citation_id}>
+            <li key={citation.citation_id} className={sourceStyles.sourceCard}>
+              <p className={sourceStyles.sourceKind}><Icon name={citation.source_kind === "web" ? "search" : "documents"} />{citation.source_kind === "web" ? "Web source" : "Company source"}</p>
               <CitationChip
                 index={citation.citation_index}
-                label={citationSourceLabel(citation)}
+                label={citationSourceLabel(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
                 name={citationChipName(citation)}
                 unavailable={citation.source_unavailable}
                 href={hrefForCitation(citation)}

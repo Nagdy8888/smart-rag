@@ -18,6 +18,8 @@ import {
 import { limitationCopy } from "../../lib/limitations";
 import type { CitationResponse } from "../../lib/types";
 import overlayStyles from "../ui/styles/overlays.module.css";
+import { Button } from "../ui/button";
+import sourceStyles from "./sources.module.css";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { Sheet } from "../ui/sheet";
 import { UserText } from "../ui/user-text";
@@ -47,6 +49,11 @@ export type CitationDrawerProps = {
   /** Page image loader. Tests replace the network call. */
   loadPage?: (source: CitationPageSource) => Promise<Blob>;
   onClose: () => void;
+  /** Return to the citations for the same answer. */
+  onBack?: () => void;
+  /** Authorized citation list for the current answer only. */
+  citations?: readonly CitationResponse[];
+  onNavigateCitation?: (citationId: string) => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
@@ -70,12 +77,16 @@ export function CitationDrawer({
   pageSource = null,
   loadPage = loadCitationPage,
   onClose,
+  onBack,
+  citations = [],
+  onNavigateCitation,
   returnFocusRef,
 }: CitationDrawerProps) {
 
   if (citation === null) {
     return null;
   }
+  const citationPosition = citations.findIndex((item) => item.citation_id === citation.citation_id);
   const fields = citationLocatorFields(citation);
   const excerpt =
     citation.source_unavailable || typeof citation.evidence_excerpt !== "string"
@@ -83,12 +94,24 @@ export function CitationDrawer({
       : citation.evidence_excerpt;
   return (
     <Sheet
-      title={citationDrawerTitle(citation)}
+      title={citationDrawerTitle(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
       side="right"
       onClose={onClose}
       returnFocusRef={returnFocusRef}
-      panelClassName={overlayStyles.citationSheet}
+      panelClassName={`${overlayStyles.citationSheet} ${sourceStyles.readerPanel}`}
     >
+      {onBack || (citationPosition >= 0 && onNavigateCitation) ? (
+        <nav className={sourceStyles.citationNavigation} aria-label="Citation navigation">
+          {onBack ? <Button type="button" variant="secondary" size="compact" onClick={onBack}>Back to sources</Button> : null}
+          {citationPosition >= 0 && onNavigateCitation ? (
+            <div className={sourceStyles.citationPager}>
+              <Button type="button" variant="ghost" size="compact" aria-label="Previous citation" disabled={citationPosition === 0} onClick={() => { const previous = citations[citationPosition - 1]; if (previous) onNavigateCitation(previous.citation_id); }}>Previous</Button>
+              <span aria-live="polite">{citationPosition + 1} of {citations.length}</span>
+              <Button type="button" variant="ghost" size="compact" aria-label="Next citation" disabled={citationPosition >= citations.length - 1} onClick={() => { const next = citations[citationPosition + 1]; if (next) onNavigateCitation(next.citation_id); }}>Next</Button>
+            </div>
+          ) : null}
+        </nav>
+      ) : null}
       {pageSource !== null ? (
         <CitationPagePreview
           key={JSON.stringify([pageSource.runId, pageSource.citationId, pageSource.auth.accessToken])}
@@ -118,6 +141,11 @@ export function CitationDrawer({
             </dd>
           </div>
         ))}
+
+      </dl>
+      <details className={sourceStyles.technical}>
+        <summary>Source details</summary>
+        <dl className={chatStyles.sourceDl}>
         {fields.technical.map((item) => (
           <div key={item.key}>
             <dt>{item.label}</dt>
@@ -126,7 +154,8 @@ export function CitationDrawer({
             </dd>
           </div>
         ))}
-      </dl>
+        </dl>
+      </details>
       {!passagePending && citation.source_unavailable ? (
         <LimitationCallout tone="warning">
           {limitationCopy("source_unavailable")}
@@ -145,6 +174,7 @@ function CitationPagePreview({pageSource, loadPage, title}: {
   loadPage: NonNullable<CitationDrawerProps["loadPage"]>;
   title: string;
 }) {
+  const [zoom, setZoom] = useState(100);
   const [pageResult, setPageResult] = useState<{
     runId: string;
     citationId: string;
@@ -204,11 +234,20 @@ function CitationPagePreview({pageSource, loadPage, title}: {
       ) : null}
       {pageFailed ? <p className={chatStyles.muted}>{CITATION_PAGE_FAILED}</p> : null}
       {pageUrl !== null ? (
-        <img
-          className={chatStyles.citationPageImage}
-          src={pageUrl}
-          alt={title}
-        />
+        <div className={sourceStyles.pageReader}>
+          <div className={sourceStyles.readerToolbar}>
+            <span>Original page</span>
+            <div className={sourceStyles.zoomControls} role="group" aria-label="Page zoom">
+              <Button type="button" variant="ghost" size="compact" aria-label="Zoom out" disabled={zoom <= 100} onClick={() => setZoom((value) => Math.max(100, value - 25))}>-</Button>
+              <Button type="button" variant="ghost" size="compact" aria-label="Fit page" onClick={() => setZoom(100)}>{zoom}%</Button>
+              <Button type="button" variant="ghost" size="compact" aria-label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom((value) => Math.min(200, value + 25))}>+</Button>
+            </div>
+          </div>
+          <p className={sourceStyles.highlightHint}><span aria-hidden="true" />Yellow marks cited text found on this page. Figure descriptions and very short fragments may have no highlight.</p>
+          <div className={sourceStyles.pageViewport} tabIndex={0} role="region" aria-label="Original source page">
+            <img className={sourceStyles.pageImage} style={{width: `${zoom}%`}} src={pageUrl} alt={title} />
+          </div>
+        </div>
       ) : null}
   </>;
 }

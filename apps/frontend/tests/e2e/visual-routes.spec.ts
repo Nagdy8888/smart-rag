@@ -91,7 +91,6 @@ test("authenticated product routes visual when a session exists", async ({
     { path: "/tables", name: "tables", heading: /table/i },
     { path: "/admin?tab=team", name: "admin-team", heading: "Admin" },
     { path: "/admin?tab=tools", name: "admin-tools", heading: "Admin" },
-    { path: "/admin?tab=curation", name: "admin-curation", heading: "Admin" },
     { path: "/admin?tab=usage", name: "admin-usage", heading: "Admin" },
     { path: "/account", name: "account", heading: "Account" },
   ];

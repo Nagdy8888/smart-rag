@@ -5,13 +5,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AppNav } from "./app-nav";
+import userEvent from "@testing-library/user-event";
+import { AppNav, AccountMenu } from "./app-nav";
 
 const fetchMe = vi.fn();
+const push = vi.fn();
+const signOut = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 vi.mock("next/link", () => ({
@@ -40,13 +43,15 @@ vi.mock("../../lib/auth/session-provider", () => ({
     email: "owner@example.com",
     ready: true,
     supabase: null,
-    signOut: vi.fn(),
+    signOut,
   }),
 }));
 
 afterEach(() => {
   cleanup();
   fetchMe.mockReset();
+  push.mockReset();
+  signOut.mockReset();
 });
 
 function renderNav(): void {
@@ -104,5 +109,41 @@ describe("AppNav role convenience", () => {
       "href",
       "/graph",
     );
+  });
+});
+
+
+describe("Account menu", () => {
+  it("separates profile context and preserves keyboard actions and focus return", async () => {
+    fetchMe.mockResolvedValue({ role: "owner", upload_enabled: true });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><AccountMenu /></QueryClientProvider>);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    expect(await screen.findByText("Uploads enabled")).toBeInTheDocument();
+    expect(screen.getByText("owner@example.com")).toBeInTheDocument();
+    expect(screen.getByText("owner")).toBeInTheDocument();
+    const account = screen.getByRole("menuitem", { name: /^Account details/ });
+    expect(account).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Account" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("menuitem", { name: /^Account details/ }));
+    expect(push).toHaveBeenCalledWith("/account");
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
+    expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  it("does not claim uploads are enabled when profile access fails", async () => {
+    fetchMe.mockRejectedValue(new Error("unavailable"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><AccountMenu /></QueryClientProvider>);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Account" }));
+    expect(await screen.findByText("Access unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Uploads enabled")).not.toBeInTheDocument();
   });
 });

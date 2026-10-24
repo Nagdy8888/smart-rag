@@ -169,6 +169,34 @@ function renderSurface(ui: ReactElement) {
 }
 
 describe("CitationDrawer", () => {
+  it("moves between citations and returns to the same source list", async () => {
+    const user = userEvent.setup();
+    const citations: CitationResponse[] = [1, 2].map((index) => ({
+      citation_id: `cite-${index}`,
+      citation_index: index,
+      chunk_id: `chunk-${index}`,
+      provenance: { page_label: String(index) },
+      source_unavailable: false,
+      document_title: "AI Agents",
+      pdf_page_number: index,
+      evidence_excerpt: "Stored evidence for this citation.",
+    }));
+    const navigate = vi.fn();
+    const back = vi.fn();
+    const { rerender } = render(<CitationDrawer citation={citations[0]!} citations={citations} onNavigateCitation={navigate} onBack={back} onClose={vi.fn()} />);
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous citation" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Next citation" }));
+    expect(navigate).toHaveBeenLastCalledWith("cite-2");
+    rerender(<CitationDrawer citation={citations[1]!} citations={citations} onNavigateCitation={navigate} onBack={back} onClose={vi.fn()} />);
+    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next citation" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Previous citation" }));
+    expect(navigate).toHaveBeenLastCalledWith("cite-1");
+    await user.click(screen.getByRole("button", { name: "Back to sources" }));
+    expect(back).toHaveBeenCalledOnce();
+  });
+
   it("renders hostile provenance as text and no privileged href", () => {
     const citation: CitationResponse = {
       citation_id: XSS_FILENAME,
@@ -254,14 +282,32 @@ describe("CitationDrawer", () => {
     const image = await screen.findByRole("img", { name: "AI Agents — p. 12" });
     const passage = screen.getByText("Refunds close in thirty calendar days.");
     expect(image).toHaveAttribute("src", "blob:page");
+    const user = userEvent.setup();
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" });
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" });
+    expect(zoomOut).toBeDisabled();
+    await user.click(zoomIn);
+    expect(image).toHaveStyle({ width: "125%" });
+    await user.click(zoomOut);
+    expect(image).toHaveStyle({ width: "100%" });
+    for (let step = 0; step < 4; step += 1) await user.click(zoomIn);
+    expect(image).toHaveStyle({ width: "200%" });
+    expect(zoomIn).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Fit page" }));
+    expect(image).toHaveStyle({ width: "100%" });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const sourceDetails = screen.getByText("Source details").closest("details");
+    expect(sourceDetails).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Source details"));
+    expect(sourceDetails).toHaveAttribute("open");
     expect(image.compareDocumentPosition(passage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText(CITATION_PAGE_LOADING)).not.toBeInTheDocument();
   });
 
   it("requests the cited page with the run id, citation id, and bearer token", async () => {
     const png = Uint8Array.from([137, 80, 78, 71]);
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
         new Response(png, {
           status: 200,
           headers: { "content-type": "image/png" },
@@ -588,6 +634,7 @@ describe("TablesApp source_ranges", () => {
     });
     renderSurface(<TablesApp />);
     fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+    fireEvent.click(screen.getByText("Customize analysis"));
     fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
     fireEvent.change(screen.getByLabelText("Filter column"), {
       target: { value: "amount" },
@@ -595,7 +642,7 @@ describe("TablesApp source_ranges", () => {
     fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
     fireEvent.click(await screen.findByRole("button", { name: "View provenance" }));
     expect(await screen.findByText("Sheet1!A1:B2")).toBeInTheDocument();
-    expect(screen.getAllByText(XSS_FILENAME, { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Sheet1/ })).toHaveAttribute("title", XSS_FILENAME);
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
     expect(screen.queryByText(/Client total is null/)).toBeNull();
     expect(document.querySelector("img")).toBeNull();

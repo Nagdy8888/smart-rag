@@ -1,5 +1,5 @@
 /**
- * Real caller and company usage totals. No budget editor, audit, chart, or progress bar.
+ * Caller and company ledger totals with explicit cost-estimate provenance.
  */
 
 "use client";
@@ -7,7 +7,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Spinner } from "../ui/spinner";
 import { StatusBanner } from "../ui/status-banner";
-import { UserText } from "../ui/user-text";
+import { Button } from "../ui/button";
+import { formatUsd } from "../../lib/format-usage";
+import usageStyles from "./usage-panel.module.css";
 import { fetchUsageCompany, fetchUsageMe, type ApiAuth } from "../../lib/api";
 import { RATE_LIMIT_COPY } from "../../lib/admin-copy";
 import { useApiAuth } from "../../lib/auth/use-api-auth";
@@ -23,53 +25,26 @@ import tableStyles from "./admin-tables.module.css";
 
 const styles = { ...shellStyles, ...tableStyles };
 
-/**
- * Format a usage number for the 24px metric line.
- *
- * @param value - API integer or decimal string.
- * @returns Display text. Empty when the payload is still loading.
- */
-function metricText(value: string | number | undefined): string {
-  if (value === undefined) {
-    return "—";
-  }
-  return String(value);
-}
-
-/**
- * One usage metric card.
- *
- * @param props - Title, payload, test id.
- * @returns Prompt, completion, USD, and usage records from the API.
- */
-function UsageCard({
-  title,
-  usage,
-  testId,
-}: {
+/** Totals from the authorized usage endpoint; no placeholder figures. */
+function UsageCard({ title, usage, testId }: {
   title: string;
   usage: UsageResponse | undefined;
   testId: string;
 }) {
+  const count = (value: number | undefined) => value === undefined ? "\u2014" : new Intl.NumberFormat("en-US").format(value);
   return (
-    <section className={styles.metricCard} aria-label={title} data-testid={testId}>
-      <h2>{title}</h2>
-      <p className={styles.metricLabel}>Prompt tokens</p>
-      <p className={styles.metricValue}>
-        <UserText value={metricText(usage?.prompt_tokens)} />
-      </p>
-      <p className={styles.metricLabel}>Completion tokens</p>
-      <p className={styles.metricValue}>
-        <UserText value={metricText(usage?.completion_tokens)} />
-      </p>
-      <p className={styles.metricLabel}>USD</p>
-      <p className={styles.metricValue}>
-        <UserText value={metricText(usage?.cost_usd)} />
-      </p>
-      <p className={styles.metricLabel}>Usage records</p>
-      <p className={styles.metricValue}>
-        <UserText value={metricText(usage?.usage_rows)} />
-      </p>
+    <section className={usageStyles.card} aria-label={title} data-testid={testId}>
+      <header className={usageStyles.cardHeader}>
+        <h2>{title}</h2><span>All time</span>
+      </header>
+      <p className={usageStyles.costLabel}>Recorded cost estimate</p>
+      <p className={usageStyles.cost}>{usage ? formatUsd(usage.cost_usd) : "\u2014"}</p>
+      <dl className={usageStyles.metrics}>
+        <div><dt>Prompt tokens</dt><dd>{count(usage?.prompt_tokens)}</dd></div>
+        <div><dt>Completion tokens</dt><dd>{count(usage?.completion_tokens)}</dd></div>
+        <div><dt>Usage records</dt><dd>{count(usage?.usage_rows)}</dd></div>
+      </dl>
+      {usage?.usage_rows === 0 ? <p className={usageStyles.empty}>No model usage has been recorded yet.</p> : null}
     </section>
   );
 }
@@ -89,12 +64,16 @@ export function UsagePanel() {
     queryKey: keys.usage,
     queryFn: () => fetchUsageMe(auth as ApiAuth),
     enabled: auth !== null,
+    refetchInterval: 30_000,
+    staleTime: 0,
   });
   const showCompany = showCompanyUsageConvenience(currentUser?.role);
   const companyQuery = useQuery({
     queryKey: keys.usageCompany,
     queryFn: () => fetchUsageCompany(auth as ApiAuth),
     enabled: auth !== null && showCompany,
+    refetchInterval: 30_000,
+    staleTime: 0,
   });
   const companyError =
     companyQuery.error instanceof Error
@@ -111,10 +90,20 @@ export function UsagePanel() {
 
   return (
     <div className={styles.stack}>
-      <p className={styles.panelLead}>
-        Recorded model usage for this workspace. Totals only; prompt text is
-        never shown.
-      </p>
+      <div className={usageStyles.toolbar}>
+        <div>
+          <h2 className={usageStyles.heading}>Understand your usage</h2>
+          <p className={styles.panelLead}>Recorded model usage for this workspace, across all time.</p>
+          <p className={usageStyles.updated}>
+            {usageQuery.dataUpdatedAt > 0 ? `Updated ${new Date(usageQuery.dataUpdatedAt).toLocaleTimeString()}` : "Waiting for usage data"}
+            {usageQuery.isError && usageQuery.data ? " / Last successful snapshot" : " / Refreshes every 30 seconds"}
+          </p>
+        </div>
+        <Button type="button" variant="secondary" pending={usageQuery.isFetching || (showCompany && companyQuery.isFetching)} pendingLabel="Refreshing" onClick={() => {
+          void usageQuery.refetch();
+          if (showCompany) void companyQuery.refetch();
+        }}>Refresh usage</Button>
+      </div>
       {meError ? (
         <StatusBanner kind="error" role="alert">
           {meError}
@@ -137,6 +126,11 @@ export function UsagePanel() {
         ) : null}
       </div>
       {loadingCompany ? <Spinner label="Loading company usage" /> : null}
+      <aside className={usageStyles.note}>
+        <strong>What these numbers mean</strong>
+        <p>Tokens and records come from the application usage ledger. Costs are recorded estimates and can include conservative allowances when provider usage is unavailable. They are not a verified provider invoice.</p>
+        <p>Usage records are individual model operations, not the number of questions. Prompt text is never shown here.</p>
+      </aside>
       {rateDegraded ? (
         <StatusBanner kind="warning" role="status">
           Rate limiter is degraded. {RATE_LIMIT_COPY}

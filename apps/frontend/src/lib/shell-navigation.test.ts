@@ -41,17 +41,18 @@ describe("shell navigation", () => {
   it("maps retired bookmarks and gap routes", () => {
     expect(LEGACY_CONSOLE_REDIRECTS["/team"]).toBe("/admin?tab=team");
     expect(LEGACY_CONSOLE_REDIRECTS["/tools"]).toBe("/admin?tab=tools");
-    expect(LEGACY_CONSOLE_REDIRECTS["/curation"]).toBe("/admin?tab=curation");
+    expect(LEGACY_CONSOLE_REDIRECTS["/curation"]).toBe("/admin?tab=team");
     expect(LEGACY_CONSOLE_REDIRECTS["/usage"]).toBe("/admin?tab=usage");
     expect(LEGACY_CONSOLE_REDIRECTS["/profile"]).toBe("/account");
     expect(isRetiredProductPath("/review-fixtures")).toBe(true);
     expect(isRetiredProductPath("/unavailable/GAP-07-07")).toBe(true);
     expect(isRetiredProductPath("/login")).toBe(false);
     expect(parseAdminTab("usage")).toBe("usage");
+    expect(parseAdminTab("curation")).toBe("team");
     expect(parseAdminTab("nope")).toBe("team");
     expect(parseAdminTab("evaluation")).toBe("team");
     expect(parseAdminTab("evaluation", true)).toBe("evaluation");
-    expect(visibleAdminTabs(false)).toEqual(["team", "tools", "curation", "usage"]);
+    expect(visibleAdminTabs(false)).toEqual(["team", "tools", "usage"]);
     expect(visibleAdminTabs(true)).toContain("evaluation");
   });
 

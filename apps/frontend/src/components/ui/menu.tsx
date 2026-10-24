@@ -46,6 +46,9 @@ export type MenuProps = {
   items: readonly MenuItem[];
   /** Inventory id on the trigger button. */
   triggerActionId?: string;
+  /** Non-interactive profile or context above the action rows. */
+  header?: ReactNode;
+  panelClassName?: string;
 };
 
 const VIEWPORT_MARGIN_PX = 8;
@@ -97,7 +100,7 @@ function menuFixedPosition(
  * @param props - Label, trigger node, and items.
  * @returns Menu widget. Side effects: focus restore on close.
  */
-export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
+export function Menu({ label, trigger, items, triggerActionId, header, panelClassName }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [measuredCoords, setMeasuredCoords] = useState<{
     top: number;
@@ -211,12 +214,13 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
           <div
             id={menuId}
             ref={panelRef}
-            className={`${styles.menuPanel} ${styles.menuPanelFixed}`}
+            className={[styles.menuPanel, styles.menuPanelFixed, panelClassName].filter(Boolean).join(" ")}
             role="menu"
             aria-label={label}
             style={panelStyle}
             onKeyDown={onMenuKeyDown}
           >
+            {header ? <div role="presentation">{header}</div> : null}
             {items.map((item) => (
               <button
                 key={item.id}

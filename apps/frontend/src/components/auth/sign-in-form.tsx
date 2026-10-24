@@ -13,7 +13,7 @@ import { StatusBanner } from "../ui/status-banner";
 import { createBrowserSupabase } from "../../lib/auth/browser";
 import { CALLBACK_FAILED, SIGN_IN_FAILED } from "../../lib/auth/copy";
 import { SIGN_IN_TIMEOUT_MS, raceTimeout } from "../../lib/auth/timeout";
-import { EnvMissingBanner, HandshakeBanner } from "./auth-banners";
+import { EnvMissingBanner } from "./auth-banners";
 import authStyles from "./auth.module.css";
 
 export type SignInFormProps = {
@@ -68,7 +68,7 @@ export function SignInForm({ callbackError = false }: SignInFormProps) {
   return (
     <div className={authStyles.card}>
       <h1>Sign in</h1>
-      <p className={authStyles.lead}>Access your workspace and knowledge bases.</p>
+      <p className={authStyles.lead}>Continue to your company workspace.</p>
       <EnvMissingBanner />
       {callbackError ? (
         <StatusBanner kind="error" role="alert">
@@ -80,13 +80,12 @@ export function SignInForm({ callbackError = false }: SignInFormProps) {
           {SIGN_IN_FAILED}
         </StatusBanner>
       ) : null}
-      <HandshakeBanner />
       <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Email"
           type="email"
           autoComplete="username"
-          placeholder="name@enterprise.com"
+          placeholder="you@company.com"
           leadingIcon="mail"
           value={email}
           onChange={(event) => setEmail(event.target.value)}

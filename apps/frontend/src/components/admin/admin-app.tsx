@@ -12,8 +12,8 @@ import { HandshakeBanner } from "../auth/auth-screens";
 import { ErrorState } from "../ui/error-state";
 import { PageHeader } from "../ui/page-header";
 import { Spinner } from "../ui/spinner";
+import { Select } from "../ui/select";
 import { EvaluationPanel } from "../evaluation/evaluation-panel";
-import { CurationPanel } from "./curation-panel";
 import { TeamAccessPanel } from "./team-access-panel";
 import { ToolsPanel } from "./tools-panel";
 import { UsagePanel } from "./usage-panel";
@@ -31,7 +31,6 @@ import styles from "./admin-shell.module.css";
 const TAB_LABELS: Record<AdminTab, string> = {
   team: "Team & access",
   tools: "Tools",
-  curation: "Names & aliases",
   usage: "Usage",
   evaluation: "Evaluation",
 };
@@ -90,6 +89,7 @@ export function AdminApp() {
     const id = tabs[next];
     if (id) {
       router.replace(`/admin?tab=${id}`);
+      document.getElementById(`admin-tab-${id}`)?.focus();
     }
   }
 
@@ -136,9 +136,16 @@ export function AdminApp() {
 
   return (
     <div className={styles.page}>
-      <PageHeader description="Manage people, tools, search names, and usage." />
+      <header className={styles.intro}>
+        <div>
+          <h2>Workspace settings</h2>
+          <p>People, agent tools, and usage.</p>
+        </div>
+      </header>
       <HandshakeBanner />
-      <div role="tablist" aria-label="Admin sections" className={styles.tabList}>
+      <div className={styles.sectionNav}>
+      <div className={styles.mobileSections}><Select label="Admin section" fullWidth value={tab} options={tabs.map((id) => ({ value: id, label: TAB_LABELS[id] }))} onChange={(event) => router.replace(`/admin?tab=${event.target.value}`)} /></div>
+      <div role="tablist" aria-label="Admin sections" className={`${styles.tabList} ${styles.desktopSections}`}>
         {tabs.map((id, index) => {
           const current = tab === id;
           return (
@@ -161,6 +168,7 @@ export function AdminApp() {
           );
         })}
       </div>
+      </div>
       <div
         role="tabpanel"
         id={`admin-panel-${tab}`}
@@ -169,7 +177,6 @@ export function AdminApp() {
       >
         {tab === "team" ? <TeamAccessPanel /> : null}
         {tab === "tools" ? <ToolsPanel /> : null}
-        {tab === "curation" ? <CurationPanel /> : null}
         {tab === "usage" ? <UsagePanel /> : null}
         {tab === "evaluation" ? <EvaluationPanel /> : null}
       </div>
