@@ -9,9 +9,13 @@ description: >-
 parameters:
   Operator:
     type: String
+    interpolationType: ENV_VAR
+    allowedPattern: '^[A-Za-z0-9][A-Za-z0-9-]{0,38}(\[bot\])?$'
     description: GitHub actor. Not a credential.
   ImageApi:
     type: String
+    interpolationType: ENV_VAR
+    allowedPattern: '^(sha256:[a-f0-9]{64}|[A-Za-z0-9][A-Za-z0-9._/-]{0,255}@sha256:[a-f0-9]{64})$'
     description: Immutable API image id. Not a secret.
 mainSteps:
   - action: aws:runShellScript
@@ -21,10 +25,12 @@ mainSteps:
       runCommand:
         - |
           set -eu
+          : "${SSM_Operator:?SSM Agent ENV_VAR interpolation is required}"
+          : "${SSM_ImageApi:?Missing immutable image id}"
           RESULT="failed"
           unset_env() {
             unset DATABASE_URL PGPASSWORD SUPABASE_SERVICE_ROLE_KEY
-            echo "operator={{Operator}} image_api={{ImageApi}} result=${RESULT}"
+            echo "operator=${SSM_Operator} image_api=${SSM_ImageApi} result=${RESULT}"
           }
           trap unset_env EXIT
           set +x

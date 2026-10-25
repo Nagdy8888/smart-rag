@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-25",
+  "base_commit": "6cb0d8beaadcebace6189d0f4235e75286776dd7",
+  "state": "local_uncommitted_source_fixes",
+  "tests": {
+    "full_unit": {
+      "tests": 2246,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "passed": 2242
+    },
+    "new_security_regressions": {
+      "tests": 40,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 40
+    },
+    "selected_offline_contracts": {
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 19
+    },
+    "final_parser_image_contract": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 1
+    }
+  },
+  "static_checks": {
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "pyright": "passed",
+    "git_diff_check": "passed",
+    "compose_example_config": "passed"
+  },
+  "parser_test_image": "sha256:333051160d535b0ff95118ca660375d71bf7f66e198857cf7d2cbcbca17ddcef",
+  "parser_build": "Offline source overlay on cached parser base; clean dependency/base rebuild was not validated.",
+  "selected_contract_exclusions": [
+    "Live Postgres case",
+    "external DNS/proxy gateway case"
+  ],
+  "unit_skips_are_passes": false,
+  "paid_application_model_calls": 0,
+  "deployment_performed": false,
+  "live_database_operations": false,
+  "checkpoints_deleted": false,
+  "production_security_approval": false,
+  "not_run": [
+    "Full live database/role/RLS matrix",
+    "Production infrastructure probes",
+    "Fresh advisory/secret/image scans",
+    "Database/object restore",
+    "Original broad 50-case audit plan",
+    "Paid question evaluations"
+  ],
+  "followup": [
+    "Rebuild and roll out parser with worker in a separately approved release",
+    "Owner evidence for actual DB privileges, egress, TLS, SSM and release protections"
+  ],
+  "changed_source_and_test_hashes": [
+    {
+      "path": "tests/unit/test_security_remediation.py",
+      "sha256": "f32070aa8f405fcd49aeebc8fc2aa86aa0db2a72ccc164f96422ac526eb33792"
+    }
+  ]
+}

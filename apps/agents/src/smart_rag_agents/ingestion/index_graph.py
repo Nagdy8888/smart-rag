@@ -572,7 +572,30 @@ def index_hybrid_content(
 
     document_id = UUID(str(state["document_id"]))
     version_id = UUID(str(state["version_id"]))
+    # Canonical replay must precede any newly introduced provider side effect.
+    with psycopg.connect(postgres_url) as connection:
+        connection.execute("SET ROLE app_worker")
+        existing = JobOperationLedger(connection).fetch_result(
+            job_table="ingestion_jobs",
+            job_id=UUID(str(state["job_id"])),
+            operation_key=f"{state['operation_key']}:canonical",
+        )
+        if existing is not None:
+            return {
+                **state,
+                "status": "indexed",
+                "chunk_set_hash": str(existing.get("chunk_set_hash", "")),
+                "bm25_job_id": str(existing.get("bm25_job_id", "")),
+                "detail": "canonical ledger replay",
+            }
     figure_assets: tuple[FigureAsset, ...] = ()
+    governance_input = load_external_processing_input(
+        state=state,
+        scan_evidence_current=scan_current,
+        configurable=configurable,
+        content_class=content_class,
+        review_approved=review_approved,
+    )
     figure_paths: dict[str, str] = {}
     if (
         source_bytes
@@ -584,7 +607,14 @@ def index_hybrid_content(
         governed_parse, figure_assets = materialize_pdf_figures(
             governed_parse,
             source_bytes,
-            figure_describer(mock_model_mode=bool(mock_model_mode)),
+            figure_describer(
+                mock_model_mode=bool(mock_model_mode),
+                governance=governance_input,
+                postgres_url=postgres_url,
+                job_id=UUID(str(state["job_id"])),
+                lease_token=configurable_job_lease_token(config, state["lease_token"]),
+                operation_key=str(state["operation_key"]),
+            ),
         )
         for asset in figure_assets:
             try:
@@ -621,13 +651,6 @@ def index_hybrid_content(
     )
     gateway = create_embedding_gateway(settings)
 
-    governance_input = load_external_processing_input(
-        state=state,
-        scan_evidence_current=scan_current,
-        configurable=configurable,
-        content_class=content_class,
-        review_approved=review_approved,
-    )
     embed_operation_key = f"{state['operation_key']}:embed"
 
     for artifact in chunking.table_artifacts:

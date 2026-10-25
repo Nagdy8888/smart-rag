@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -169,7 +170,14 @@ class ParserSandboxLauncher:
                     detail=exc.detail,
                 )
             try:
-                return parse_file(input_path, content_hash, resolved)
+                result = parse_file(input_path, content_hash, resolved)
+                if resolved == "pdf":
+                    from smart_rag_core.ingestion.figures.materialize import (
+                        render_pdf_figures,
+                    )
+
+                    result = render_pdf_figures(result, payload)
+                return result
             except ParserError as exc:
                 return _failed_result(
                     content_hash=content_hash,
@@ -203,9 +211,8 @@ class ParserSandboxLauncher:
             ParserSandboxError: When the Docker CLI is missing or cannot start.
 
         Note:
-            ``docker run`` stdout/stderr are decoded as UTF-8 with replacement.
-            Windows locale encodings (cp1252) raise on CMU plot punctuation and
-            abort the hybrid index job before ``result.json`` is read.
+            Container stdout/stderr are discarded rather than buffered in the
+            credential-bearing worker. Only the bounded result file is parsed.
         """
 
         if shutil.which("docker") is None:
@@ -241,6 +248,10 @@ class ParserSandboxLauncher:
                 "--name",
                 container_name,
                 "--rm",
+                "--log-driver",
+                "none",
+                "--ulimit",
+                "fsize=134217728:134217728",
                 "--network",
                 "none",
                 "--read-only",
@@ -273,7 +284,8 @@ class ParserSandboxLauncher:
             try:
                 completed = subprocess.run(
                     command,
-                    capture_output=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
@@ -303,18 +315,24 @@ class ParserSandboxLauncher:
                     detail=detail[:500],
                 )
             if not output_path.exists():
-                stdout_payload = completed.stdout.strip()
-                if stdout_payload:
-                    return ParseResult.model_validate_json(stdout_payload)
                 return _failed_result(
                     content_hash=content_hash,
                     format_key=resolved,
                     code="missing_output",
                     detail="sandbox produced no result.json",
                 )
-            result = ParseResult.model_validate_json(
-                output_path.read_text(encoding="utf-8")
-            )
+            info = output_path.lstat()
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_nlink != 1
+                or info.st_size > 134_217_728
+            ):
+                raise ParserSandboxError("invalid or oversized parser output")
+            with output_path.open("rb") as stream:
+                raw = stream.read(134_217_729)
+            if len(raw) > 134_217_728:
+                raise ParserSandboxError("oversized parser output")
+            result = ParseResult.model_validate_json(raw)
             metrics = result.resource_metrics.model_copy(
                 update={"wall_seconds": time.monotonic() - started}
             )

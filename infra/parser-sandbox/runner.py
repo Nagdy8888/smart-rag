@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/app")
 
+from smart_rag_core.ingestion.figures.materialize import render_pdf_figures
 from smart_rag_core.ingestion.parser.adapters import infer_format, parse_file
 from smart_rag_core.ingestion.parser.exceptions import ParserError
 from smart_rag_core.ingestion.parser.limits import (
@@ -37,6 +38,8 @@ def main() -> int:
     try:
         resolved = format_key or infer_format(input_path, media_type)
         result = parse_file(input_path, content_hash, resolved)
+        if resolved == "pdf":
+            result = render_pdf_figures(result, input_path.read_bytes())
     except ParserError as exc:
         result = ParseResult(
             disposition=ParseDisposition.FAILED,
@@ -60,7 +63,7 @@ def main() -> int:
             detail=f"{exc.code}: {exc.detail}",
         )
     output_path.write_text(result.model_dump_json(), encoding="utf-8")
-    print(result.model_dump_json())
+    # Never duplicate untrusted parser output on the Docker log/stdout path.
     return 0 if result.disposition is not ParseDisposition.FAILED else 1
 
 

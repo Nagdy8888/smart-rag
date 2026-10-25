@@ -42,6 +42,8 @@ class CallerContext(BaseModel):
     role: UserRole
     authorization_version: int = Field(ge=1)
     session_id: str | None = None
+    token_expires_at: int | None = None
+    token_issued_at: int | None = None
     disabled: bool = False
     upload_enabled: bool = False
     mfa_enrolled: bool = False

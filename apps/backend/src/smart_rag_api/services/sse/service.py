@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.security.profile_snapshot import (
+    is_session_revoked,
+    load_profile_snapshot,
+)
 from smart_rag_core.sse.catalog import HEARTBEAT_INTERVAL_SECONDS
 from smart_rag_core.sse.store import RunEventStore
 
@@ -56,6 +62,43 @@ class SseStreamService(RunAccessMixin, RunOrchestrationMixin, SsePersistMixin):
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
         self._postgres_url = postgres_url
         self._settled_run_ids: set[UUID] = set()
+        self._identity_checked_at: float | None = None
+        self._identity_checked_caller: CallerContext | None = None
+
+    def _assert_stream_identity(self, caller: CallerContext) -> None:
+        """Fail closed before delivery if the original bearer lost authority."""
+        if caller.token_expires_at is None:
+            # Only explicitly injected test identities lack verified JWT dates.
+            return
+        if time.time() >= caller.token_expires_at:
+            raise QueryAdmissionError("session_expired")
+        now = time.monotonic()
+        if (
+            self._identity_checked_at is not None
+            and self._identity_checked_caller == caller
+            and now - self._identity_checked_at < 1.0
+        ):
+            return
+        if self._postgres_url is None:
+            raise QueryAdmissionError("identity_store_unavailable")
+        snapshot = load_profile_snapshot(self._postgres_url, user_id=caller.user_id)
+        if (
+            snapshot is None
+            or snapshot.disabled
+            or snapshot.role != caller.role
+            or snapshot.authorization_version != caller.authorization_version
+            or is_session_revoked(
+                self._postgres_url,
+                session_id=caller.session_id,
+                issued_at=caller.token_issued_at,
+                session_revoked_at=snapshot.session_revoked_at,
+            )
+        ):
+            raise QueryAdmissionError("session_revoked")
+        if time.time() >= caller.token_expires_at:
+            raise QueryAdmissionError("session_expired")
+        self._identity_checked_at = time.monotonic()
+        self._identity_checked_caller = caller
 
     async def iter_frames(
         self,

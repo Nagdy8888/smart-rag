@@ -238,11 +238,17 @@ def resolve_caller_context(
             detail="session_revoked",
         )
 
-    return build_caller_context(
+    caller = build_caller_context(
         snapshot,
         session_id=verified.session_id,
         assurance_level=verified.assurance_level,
         authentication_methods=verified.authentication_methods,
+    )
+    return caller.model_copy(
+        update={
+            "token_expires_at": verified.expires_at,
+            "token_issued_at": verified.issued_at,
+        }
     )
 
 

@@ -1,14 +1,11 @@
-# t3.micro origin listener. ACME cannot complete because security-group 443
-# is CloudFront prefix-list only. CloudFront connects with origin_protocol_policy
-# http-only; viewers still use HTTPS. Caddy 2.8.4 needs the HTTP listener
-# port set to 443 so the http://:443 site address does not violate
-# scheme/port convention. Dual origin-header values and 90s timeouts stay
-# identical to Caddyfile. Do not commit real header values.
+# Compatibility filename: HTTP origins are no longer permitted.
+# Staging Caddy origin. 90s timeouts match CloudFront OriginReadTimeout /
+# OriginKeepaliveTimeout (AWS API max OriginReadTimeout is 120). flush_interval
+# -1 disables SSE buffering. Dual origin-header values keep Packet 4 rotation
+# possible. Packet 3 adds header/body/slow-client/connection caps. Do not commit
+# real header values.
 
 {
-	auto_https off
-	http_port 443
-	https_port 8443
 	servers {
 		max_header_size 16KB
 		timeouts {
@@ -21,7 +18,7 @@
 	}
 }
 
-http://:443 {
+:443 {
 	request_body {
 		max_size 16MB
 	}

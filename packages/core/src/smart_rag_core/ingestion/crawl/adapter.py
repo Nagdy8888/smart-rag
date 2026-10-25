@@ -183,9 +183,9 @@ class BoundedCrawlAdapter:
             visited.add(current.normalized)
             try:
                 assert_in_scope(current, scope)
-                robots = self._robots_for(current, robots_cache)
+                robots = self._robots_for(current, robots_cache, scope=scope)
                 require_robots_allowed(robots)
-                page = self._fetch_page(current, redirect_hop=0)
+                page = self._fetch_page(current, redirect_hop=0, scope=scope)
             except CrawlPolicyError as exc:
                 result.fetch_events.append(
                     CrawlFetchProvenance(
@@ -252,13 +252,17 @@ class BoundedCrawlAdapter:
         self,
         origin: NormalizedUrl,
         cache: dict[str, RobotsDecision],
+        *,
+        scope: ApprovedCrawlScope,
     ) -> RobotsDecision:
         """Fetch and cache robots.txt for an origin host."""
 
         if origin.host in cache:
             return cache[origin.host]
         robots_url = robots_url_for(origin)
-        robots_page = self._fetch_page(normalize_url(robots_url), redirect_hop=0)
+        robots_page = self._fetch_page(
+            normalize_url(robots_url), redirect_hop=0, scope=scope
+        )
         body = robots_page.body.decode("utf-8", errors="replace")
         if len(body) > CRAWL_ROBOTS_MAX_BYTES:
             raise CrawlPolicyError("robots_oversize", code="robots_denied")
@@ -271,12 +275,15 @@ class BoundedCrawlAdapter:
         url: NormalizedUrl,
         *,
         redirect_hop: int,
+        scope: ApprovedCrawlScope,
     ) -> _FetchedPage:
         """Fetch one URL through the proxy with manual redirect handling."""
 
         chain: list[str] = [url.normalized]
         current = url
         for hop in range(CRAWL_MAX_REDIRECTS + 1):
+            # Check before DNS as well as before proxy submission, on every hop.
+            assert_in_scope(current, scope)
             dns = self._resolve(current)
             if current.host != dns.hostname and parse_ip_literal(current.host) is None:
                 dns = resolve_hostname(current.host)

@@ -20,6 +20,10 @@ class ReplayCancelMixin:
 
     _store: RunEventStore
 
+    def _assert_stream_identity(self, caller: CallerContext) -> None:
+        """Require the concrete service to provide live stream authorization."""
+        raise NotImplementedError
+
     def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
         """Return whether a terminal event is already persisted.
 
@@ -51,10 +55,12 @@ class ReplayCancelMixin:
             Frame text, new cursor, and whether the event is terminal.
         """
 
+        await asyncio.to_thread(self._assert_stream_identity, caller)
         events = await asyncio.to_thread(
             self._store.list_after, caller, run_id=run_id, after=after
         )
         for event in events:
+            await asyncio.to_thread(self._assert_stream_identity, caller)
             frame = format_sse_event(
                 sequence=event.sequence,
                 event_type=event.event_type,

@@ -758,26 +758,17 @@ def assert_caddy_policy(caddy_text: str) -> None:
 
 
 def assert_caddy_http443_policy(caddy_text: str) -> None:
-    """Require the t3.micro HTTP-on-443 Caddyfile to keep Packet 1 origin rules.
+    """Validate the compatibility filename without permitting plaintext origins.
 
     Args:
-        caddy_text: ``Caddyfile.http443`` source.
+        caddy_text: Caddy source loaded through the historical overlay path.
 
     Raises:
-        Phase10TopologyError: If HTTP-on-443, dual headers, 90s, or 403 drift.
-
-    Notes:
-        Caddy 2.8.4 rejects ``http://:443`` unless ``http_port 443`` is set,
-        because HTTP-on-443 otherwise violates scheme/port convention.
+        Phase10TopologyError: If TLS or the ordinary origin guards are absent.
     """
-
     assert_caddy_policy(caddy_text)
-    if "auto_https off" not in caddy_text:
-        raise Phase10TopologyError("t3.micro Caddy must disable ACME auto_https")
-    if "http_port 443" not in caddy_text:
-        raise Phase10TopologyError("t3.micro Caddy must set http_port 443")
-    if "http://:443" not in caddy_text:
-        raise Phase10TopologyError("t3.micro Caddy must listen HTTP on 443")
+    if "http://" in caddy_text or "auto_https off" in caddy_text:
+        raise Phase10TopologyError("private origin traffic requires HTTPS")
 
 
 def assert_user_data_policy(user_data: str) -> None:

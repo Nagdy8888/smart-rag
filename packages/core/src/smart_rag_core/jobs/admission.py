@@ -193,6 +193,10 @@ class JobAdmissionService:
 
         if estimated_cost_usd <= 0:
             raise JobAdmissionError("invalid_estimated_cost")
+        self._connection.execute(
+            "SELECT pg_advisory_xact_lock("
+            "hashtextextended('smart-rag:ingestion-daily-budget', 0))"
+        )
         self._assert_daily_budget_available(estimated_cost_usd)
         reservation_id = uuid4()
         expires_at = datetime.now(tz=UTC) + timedelta(

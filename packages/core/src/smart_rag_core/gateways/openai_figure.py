@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable
 
-from openai import APIStatusError, APITimeoutError, AuthenticationError
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+)
 
 from smart_rag_core.ingestion.figures.limits import (
     FIGURE_DESCRIPTION_MAX_CHARS,
@@ -42,6 +48,7 @@ def execute_figure_description(
     model_id: str,
     image_png: bytes,
     timeout_seconds: float,
+    usage_observer: Callable[[int, int, str], None] | None = None,
 ) -> str:
     """Describe one figure PNG with the allow-listed chat model.
 
@@ -50,6 +57,7 @@ def execute_figure_description(
         model_id: Must be an allow-listed answer model.
         image_png: PNG bytes, bounded by ``FIGURE_MAX_PNG_BYTES``.
         timeout_seconds: Client timeout. SDK retries are disabled.
+        usage_observer: Receives measured token counts and provider request id.
 
     Returns:
         Visible-content description, or an empty string.
@@ -94,5 +102,14 @@ def execute_figure_description(
         raise FigureDescriptionError("figure_provider_error") from error
     except APIStatusError as error:
         raise FigureDescriptionError("figure_provider_error") from error
+    except APIConnectionError as error:
+        raise FigureDescriptionError("figure_provider_error") from error
     text = str(getattr(response, "output_text", "") or "").strip()
+    usage = getattr(response, "usage", None)
+    if usage_observer is not None:
+        usage_observer(
+            int(getattr(usage, "input_tokens", 0) or 0),
+            int(getattr(usage, "output_tokens", 0) or 0),
+            str(getattr(response, "id", "") or ""),
+        )
     return text[:FIGURE_DESCRIPTION_MAX_CHARS]

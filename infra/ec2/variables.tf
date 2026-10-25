@@ -26,12 +26,12 @@ variable "origin_hostname" {
 
 variable "origin_protocol_policy" {
   type        = string
-  description = "CloudFront-to-origin protocol. https-only is intended. http-only is the t3.micro path when ACME cannot reach prefix-list-only 443."
+  description = "CloudFront-to-origin protocol. Private API traffic requires certificate-backed HTTPS."
   default     = "https-only"
 
   validation {
-    condition     = contains(["https-only", "http-only"], var.origin_protocol_policy)
-    error_message = "origin_protocol_policy must be https-only or http-only."
+    condition     = var.origin_protocol_policy == "https-only"
+    error_message = "origin_protocol_policy must be https-only; HTTP exposes bearer credentials and private responses."
   }
 }
 

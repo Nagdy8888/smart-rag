@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import cast
@@ -18,6 +19,9 @@ ALLOWED_ALGORITHMS = frozenset({"ES256", "RS256"})
 FORBIDDEN_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
 REQUIRED_JWT_ROLE = "authenticated"
 FORBIDDEN_JWT_ROLES = frozenset({"service_role", "anon"})
+MAX_TOKEN_CHARS = 16_384
+MAX_KID_CHARS = 256
+REFRESH_COOLDOWN_SECONDS = 10.0
 
 
 class JwksVerificationError(Exception):
@@ -160,6 +164,8 @@ class JwksVerifier:
         self._cache_seconds = cache_seconds
         self._http_timeout_seconds = http_timeout_seconds
         self._cache: _JwksCache | None = None
+        self._refresh_lock = threading.Lock()
+        self._last_refresh_attempt = float("-inf")
 
     @property
     def issuer(self) -> str:
@@ -200,6 +206,8 @@ class JwksVerifier:
 
         if not token or not token.strip():
             raise JwksVerificationError("missing token")
+        if len(token) > MAX_TOKEN_CHARS:
+            raise JwksVerificationError("token too large")
 
         try:
             header = jwt.get_unverified_header(token)
@@ -213,7 +221,11 @@ class JwksVerifier:
             raise JwksVerificationError("unsupported algorithm")
 
         key_id = header.get("kid")
-        if not isinstance(key_id, str) or not key_id.strip():
+        if (
+            not isinstance(key_id, str)
+            or not key_id.strip()
+            or len(key_id) > MAX_KID_CHARS
+        ):
             raise JwksVerificationError("missing kid")
 
         signing_key = self._resolve_signing_key(key_id)
@@ -280,22 +292,29 @@ class JwksVerifier:
     def _resolve_signing_key(self, key_id: str) -> PyJWK | None:
         """Return a signing key, refreshing JWKS once on unknown ``kid``."""
 
-        cached = self._get_cached_jwks()
-        key = self._lookup_key(cached.jwks, key_id)
-        if key is not None:
-            return key
-
-        refreshed = self._fetch_jwks(force=True)
-        return self._lookup_key(refreshed, key_id)
-
-    def _get_cached_jwks(self) -> _JwksCache:
-        """Return cached JWKS, fetching when missing or expired."""
-
-        now = time.monotonic()
-        if self._cache is None or now - self._cache.fetched_at >= self._cache_seconds:
-            jwks = self._fetch_jwks(force=True)
-            return _JwksCache(jwks=jwks, fetched_at=now)
-        return self._cache
+        snapshot = self._cache
+        if (
+            snapshot is not None
+            and time.monotonic() - snapshot.fetched_at < self._cache_seconds
+        ):
+            known = self._lookup_key(snapshot.jwks, key_id)
+            if known is not None:
+                # A miss refresh must not stall already trusted valid identities.
+                return known
+        # One process-wide verifier coalesces concurrent misses. No attacker-keyed
+        # negative cache: random kid values cannot grow memory or bypass cooldown.
+        with self._refresh_lock:
+            now = time.monotonic()
+            cached = self._cache
+            if cached is not None:
+                key = self._lookup_key(cached.jwks, key_id)
+                if key is not None and now - cached.fetched_at < self._cache_seconds:
+                    return key
+            if now - self._last_refresh_attempt < REFRESH_COOLDOWN_SECONDS:
+                return None
+            self._last_refresh_attempt = now
+            refreshed = self._fetch_jwks(force=True)
+            return self._lookup_key(refreshed, key_id)
 
     def _fetch_jwks(self, *, force: bool) -> PyJWKSet:
         """Download JWKS from Supabase Auth."""

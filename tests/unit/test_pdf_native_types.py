@@ -9,7 +9,10 @@ from uuid import uuid4
 import fitz
 from smart_rag_core.ingestion.chunking.limits import CHUNKING_POLICY_VERSION
 from smart_rag_core.ingestion.chunking.service import chunk_parse_result
-from smart_rag_core.ingestion.figures.materialize import materialize_pdf_figures
+from smart_rag_core.ingestion.figures.materialize import (
+    materialize_pdf_figures,
+    render_pdf_figures,
+)
 from smart_rag_core.ingestion.parser.adapters import parse_file
 from smart_rag_core.ingestion.parser.limits import PDF_PARSER_VERSION
 from smart_rag_core.ingestion.parser.types import ElementKind, PdfLocator
@@ -91,7 +94,7 @@ def test_pdf_emits_code_table_and_figure(tmp_path: Path) -> None:
     assert "Count" in stored.column_names
     assert stored.column("Count").to_pylist() == [3, 4]
     described, assets = materialize_pdf_figures(
-        parsed, payload, lambda _png: "A red square."
+        render_pdf_figures(parsed, payload), payload, lambda _png: "A red square."
     )
     assert assets
     figure = next(

@@ -7,9 +7,13 @@ description: >-
 parameters:
   MigrationHash:
     type: String
+    interpolationType: ENV_VAR
+    allowedPattern: '^[a-f0-9]{64}$'
     description: Immutable SHA-256 of reviewed supabase/migrations files.
   Operator:
     type: String
+    interpolationType: ENV_VAR
+    allowedPattern: '^[A-Za-z0-9][A-Za-z0-9-]{0,38}(\[bot\])?$'
     description: GitHub actor. Not a credential.
 mainSteps:
   - action: aws:runShellScript
@@ -19,12 +23,14 @@ mainSteps:
       runCommand:
         - |
           set -eu
+          : "${SSM_Operator:?SSM Agent ENV_VAR interpolation is required}"
+          : "${SSM_MigrationHash:?Missing migration hash}"
           RESULT="failed"
           DSN_FILE="/tmp/smart-rag-migrate-dsn"
           unset_secrets() {
             unset SECRET_JSON DATABASE_URL PGPASSWORD SUPABASE_DB_URL MIGRATION_DSN
             rm -f "${DSN_FILE}"
-            echo "migration_hash={{MigrationHash}} operator={{Operator}} result=${RESULT}"
+            echo "migration_hash=${SSM_MigrationHash} operator=${SSM_Operator} result=${RESULT}"
           }
           trap unset_secrets EXIT
           set +x

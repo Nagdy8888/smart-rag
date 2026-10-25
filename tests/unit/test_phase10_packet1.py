@@ -429,13 +429,9 @@ def test_live_runtime_and_scan_helpers_fail_closed() -> None:
 
 
 def test_committed_http443_caddy_keeps_origin_rules() -> None:
-    """The t3.micro HTTP-on-443 Caddyfile still denies unmatched origins."""
-
+    """The legacy filename must now preserve TLS and the origin guards."""
     path = Path(__file__).resolve().parents[2] / "infra" / "ec2" / "Caddyfile.http443"
     text = path.read_text(encoding="utf-8")
     assert_caddy_http443_policy(text)
-    missing_http_port = "\n".join(
-        line for line in text.splitlines() if line.strip() != "http_port 443"
-    )
-    with pytest.raises(Phase10TopologyError, match="http_port 443"):
-        assert_caddy_http443_policy(missing_http_port)
+    with pytest.raises(Phase10TopologyError, match="HTTPS"):
+        assert_caddy_http443_policy(text.replace(":443 {", "http://:443 {"))

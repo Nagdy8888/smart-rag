@@ -101,7 +101,10 @@ def is_session_revoked(
         ``app.revoked_sessions``.
     """
 
-    if session_revoked_at is not None and issued_at is not None:
+    if session_revoked_at is not None:
+        if issued_at is None:
+            # Missing token age cannot prove it postdates a profile-wide revoke.
+            return True
         revoked_epoch = int(session_revoked_at.replace(tzinfo=UTC).timestamp())
         if issued_at <= revoked_epoch:
             return True
