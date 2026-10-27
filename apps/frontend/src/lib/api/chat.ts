@@ -6,6 +6,7 @@ import {
   clampCitationCount,
   parseTranscriptSourceKind,
 } from "../chat-restore";
+import { parseKnowledgeResult } from "../knowledge-result";
 import type {
   ConversationMessage,
   ConversationMessagesResponse,
@@ -163,6 +164,7 @@ function parseConversationMessage(item: unknown): ConversationMessage | null {
         : null,
     citation_count: clampCitationCount(row.citation_count),
     source_kind: parseTranscriptSourceKind(row.source_kind),
+    knowledge_result: parseKnowledgeResult(row.knowledge_result),
     citations: [],
   };
 }

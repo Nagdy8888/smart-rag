@@ -232,6 +232,8 @@ export function ChatApp() {
         }
         stage={
           <ChatStage
+            conversationId={selection.conversationId}
+            onConversationId={selection.setConversationId}
             chat={run.chat}
             run={run}
             historyMessages={historyMessages}
@@ -253,7 +255,7 @@ export function ChatApp() {
             ready={liveQueries.ready}
             readyPending={liveQueries.readyPending}
             paradeDbDown={paradeDbDown}
-            companyUsd={String(liveQueries.usage?.cost_usd ?? "0")}
+            companyUsd={String(liveQueries.usage?.cost_reporting?.estimated_cost_usd ?? "")}
             detailsOpen={selection.detailsOpen}
             onDetailsOpen={selection.setDetailsOpen}
             {...restore.stage}

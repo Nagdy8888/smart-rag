@@ -11,6 +11,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from smart_rag_core.gateways.cost_reporting import CostReporting
 from smart_rag_core.query_admission.context import (
     AuthorizedRuntimeContext,
     requested_search_scope_from_row,
@@ -114,6 +115,7 @@ class RunUsageSummary:
     prompt_tokens: int
     completion_tokens: int
     usage_rows: int
+    cost_reporting: CostReporting | None = None
 
 
 def get_query_run(
@@ -565,13 +567,31 @@ def summarize_run_usage(
                 ),
             )
             row = cursor.fetchone()
+            cursor.execute(
+                "SELECT app.run_usage_cost_reporting(%s,%s,%s,%s) AS reporting",
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                ),
+            )
+            reporting_row = cursor.fetchone()
     except psycopg.Error as exc:
         raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("database_rejected")
+    reporting = (
+        CostReporting.model_validate(reporting_row["reporting"])
+        if reporting_row
+        else None
+    )
     return RunUsageSummary(
         cost_usd=Decimal(str(row["cost_usd"])),
-        prompt_tokens=int(row["prompt_tokens"]),
-        completion_tokens=int(row["completion_tokens"]),
+        prompt_tokens=(reporting.measured_prompt_tokens or 0) if reporting else 0,
+        completion_tokens=(reporting.measured_completion_tokens or 0)
+        if reporting
+        else 0,
         usage_rows=int(row["usage_rows"]),
+        cost_reporting=reporting,
     )

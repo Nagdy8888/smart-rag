@@ -75,7 +75,7 @@ export type UseChatRestoreResult = {
     onTag: (tag: FeedbackTag) => void;
     feedbackComment: string;
     onComment: (value: string) => void;
-    onFeedback: () => void;
+    onFeedback: (shareWithReviewers?: boolean) => void;
     feedbackPending: boolean;
   };
 };
@@ -172,7 +172,11 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
 
   const handleSelectCitation = useCallback(
     (citation: CitationResponse, trigger: HTMLButtonElement) => {
-      citationTriggerRef.current = trigger;
+      // Source-list chips unmount when the reader opens. Keep the answer's
+      // Sources button as the return target instead of that detached chip.
+      if (!trigger.closest('[role="dialog"]') || !citationTriggerRef.current?.isConnected) {
+        citationTriggerRef.current = trigger;
+      }
       setSelectedCitationId(citation.citation_id);
     },
     [setSelectedCitationId],
@@ -185,6 +189,7 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
   );
   const openTurnSources = useCallback(
     (runId: string) => {
+      citationTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setViewingRunId(runId);
       setSelectedCitationId(null);
       setSourcesOpen(true);
@@ -192,23 +197,23 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
     [setSelectedCitationId, setSourcesOpen, setViewingRunId],
   );
   const openLiveSources = useCallback(() => {
+    citationTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setViewingRunId(activeRunId === null ? settledRunId : null);
     setSelectedCitationId(null);
     setSourcesOpen(true);
   }, [activeRunId, settledRunId, setSelectedCitationId, setSourcesOpen, setViewingRunId]);
-  const sendFeedback = useCallback(async () => {
+  const sendFeedback = useCallback(async (shareWithReviewers = false) => {
     if (auth === null || feedbackRunId === null) {
       return;
     }
     setFeedbackStore({ ...feedback, key: conversationId, pending: true });
     try {
-      await submitFeedback(
-        auth,
-        feedbackRunId,
-        feedback.thumbsUp,
-        feedback.tag,
-        feedback.comment || null,
-      );
+      if (shareWithReviewers) {
+        await submitFeedback(auth, feedbackRunId, feedback.thumbsUp, feedback.tag,
+          feedback.comment || null, undefined, true);
+      } else {
+        await submitFeedback(auth, feedbackRunId, feedback.thumbsUp, feedback.tag, feedback.comment || null);
+      }
       setFeedbackStore({
         ...feedback,
         key: conversationId,
@@ -257,8 +262,8 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
       onTag: setFeedbackTag,
       feedbackComment: feedback.comment,
       onComment: setFeedbackComment,
-      onFeedback: () => {
-        void sendFeedback();
+      onFeedback: (shareWithReviewers = false) => {
+        void sendFeedback(shareWithReviewers);
       },
       feedbackPending: feedback.pending,
     },

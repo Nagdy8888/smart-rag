@@ -7,6 +7,18 @@ import "@testing-library/jest-dom/vitest";
 import { FeedbackPopover } from "./feedback-popover";
 
 describe("FeedbackPopover", () => {
+  it("shares a review report only after explicit consent", async () => {
+    const user = userEvent.setup();
+    const submit = vi.fn();
+    render(<FeedbackPopover thumbsUp={false} onThumbs={vi.fn()} tag="outdated answer"
+      onTag={vi.fn()} comment="" onComment={vi.fn()} onSubmit={submit} />);
+    await user.click(screen.getByRole("button", { name: "Give feedback" }));
+    await user.click(screen.getByRole("button", { name: "Submit feedback" }));
+    expect(submit).toHaveBeenLastCalledWith(false);
+    await user.click(screen.getByRole("checkbox", { name: /Share this question/ }));
+    await user.click(screen.getByRole("button", { name: "Submit feedback" }));
+    expect(submit).toHaveBeenLastCalledWith(true);
+  });
   afterEach(() => {
     cleanup();
   });

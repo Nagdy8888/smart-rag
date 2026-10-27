@@ -62,6 +62,9 @@ def caller_usage_route(
     return UsageResponse(
         scope=summary.scope,
         cost_usd=summary.cost_usd,
+        cost_reporting=summary.cost_reporting,
+        checkpoint_usage=summary.checkpoint_usage,
+        display_cost_usd=summary.display_cost_usd,
         prompt_tokens=summary.prompt_tokens,
         completion_tokens=summary.completion_tokens,
         usage_rows=summary.usage_rows,
@@ -98,6 +101,9 @@ def company_usage_route(
     return UsageResponse(
         scope=summary.scope,
         cost_usd=summary.cost_usd,
+        cost_reporting=summary.cost_reporting,
+        checkpoint_usage=summary.checkpoint_usage,
+        display_cost_usd=summary.display_cost_usd,
         prompt_tokens=summary.prompt_tokens,
         completion_tokens=summary.completion_tokens,
         usage_rows=summary.usage_rows,

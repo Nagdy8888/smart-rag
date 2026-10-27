@@ -421,6 +421,7 @@ def submit_feedback_route(
             thumbs_up=body.thumbs_up,
             comment=body.comment,
             tag=body.tag,
+            share_with_reviewers=body.share_with_reviewers,
         )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)

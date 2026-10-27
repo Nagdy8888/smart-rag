@@ -71,6 +71,10 @@ _SENSITIVE_KEYS = frozenset(
         "self",
         "text",
         "user_query",
+        "resolved_query",
+        "clarification_original",
+        "clarification_question",
+        "unanswered_parts",
         "vectors",
     }
 )

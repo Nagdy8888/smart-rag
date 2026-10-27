@@ -10,6 +10,7 @@ from uuid import UUID
 import psycopg
 
 from smart_rag_core.gateways.openai_pricing import estimate_usage_cost_usd
+from smart_rag_core.gateways.provider_usage import ProviderUsage, capture_provider_usage
 from smart_rag_core.query_admission.ceilings import usage_kind_caps
 from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_admission.service import (
@@ -95,10 +96,44 @@ def execute_counted_model_call(
     )
     if on_consumed is not None:
         on_consumed(consumed)
-    try:
-        result = send()
-    except TimeoutAfterSendError:
-        record_query_llm_usage(
+    with capture_provider_usage() as observed:
+        try:
+            result = send()
+        except Exception as exc:
+            # A response can be billable even when its JSON/status is invalid.
+            # Prefer its counters to a synthetic timeout allowance.
+            if len(observed) == 1:
+                record_observed_usage(
+                    connection,
+                    caller=caller,
+                    run_id=run_id,
+                    reservation_id=reservation_id,
+                    reservation_version=consumed.optimistic_version,
+                    usage_kind=usage_kind,
+                    model_id=model_id,
+                    provider_attempt_id=provider_attempt_id,
+                    observed=observed[0],
+                    usd_cap=usd_cap,
+                )
+            elif isinstance(exc, TimeoutAfterSendError):
+                record_query_llm_usage(
+                    connection,
+                    caller=caller,
+                    run_id=run_id,
+                    reservation_id=reservation_id,
+                    reservation_version=consumed.optimistic_version,
+                    usage_kind=usage_kind,
+                    model_id=model_id,
+                    provider_attempt_id=provider_attempt_id,
+                    prompt_tokens=prompt_cap,
+                    completion_tokens=completion_cap,
+                    cost_usd=usd_cap,
+                    timeout_after_send=True,
+                    cost_basis="safety_allowance",
+                )
+            raise
+    if len(observed) == 1:
+        usage_id = record_observed_usage(
             connection,
             caller=caller,
             run_id=run_id,
@@ -107,12 +142,10 @@ def execute_counted_model_call(
             usage_kind=usage_kind,
             model_id=model_id,
             provider_attempt_id=provider_attempt_id,
-            prompt_tokens=prompt_cap,
-            completion_tokens=completion_cap,
-            cost_usd=usd_cap,
-            timeout_after_send=True,
+            observed=observed[0],
+            usd_cap=usd_cap,
         )
-        raise
+        return result, consumed, usage_id
     recorded_prompt = actual_prompt_tokens
     recorded_completion = actual_completion_tokens
     recorded_cost = actual_cost_usd
@@ -130,15 +163,22 @@ def execute_counted_model_call(
     resolved_completion = (
         recorded_completion if recorded_completion is not None else completion_cap
     )
-    if recorded_cost is None and recorded_prompt is not None:
+    cost_basis = (
+        "supplied_cost_estimate" if recorded_cost is not None else "safety_allowance"
+    )
+    if (
+        recorded_cost is None
+        and recorded_prompt is not None
+        and recorded_completion is not None
+    ):
         recorded_cost = estimate_usage_cost_usd(
             usage_kind=usage_kind,
             model_id=model_id,
             prompt_tokens=resolved_prompt,
             completion_tokens=resolved_completion,
         )
-        if recorded_cost is not None and recorded_cost > usd_cap:
-            recorded_cost = usd_cap
+        if recorded_cost is not None:
+            cost_basis = "standard_token_estimate"
     usage_id = record_query_llm_usage(
         connection,
         caller=caller,
@@ -152,5 +192,65 @@ def execute_counted_model_call(
         completion_tokens=resolved_completion,
         cost_usd=recorded_cost if recorded_cost is not None else usd_cap,
         timeout_after_send=False,
+        cost_basis=cost_basis,
+        estimated_cost_usd=recorded_cost if cost_basis != "safety_allowance" else None,
+        provider_prompt_tokens=recorded_prompt,
+        provider_completion_tokens=recorded_completion,
     )
     return result, consumed, usage_id
+
+
+def record_observed_usage(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+    reservation_id: UUID,
+    reservation_version: int,
+    usage_kind: str,
+    model_id: str,
+    provider_attempt_id: str,
+    observed: ProviderUsage,
+    usd_cap: Decimal,
+) -> UUID:
+    """Record returned counters even when semantic output failed validation."""
+    # Unknown tiers/cache-write pricing must not be labelled a measured charge.
+    estimate = None
+    if not observed.cache_write_tokens or (
+        observed.cache_write_30m_tokens is not None
+        and observed.cache_write_12h_tokens is not None
+    ):
+        estimate = estimate_usage_cost_usd(
+            usage_kind=usage_kind,
+            model_id=model_id,
+            prompt_tokens=observed.input_tokens,
+            completion_tokens=observed.output_tokens,
+            cached_prompt_tokens=observed.cached_input_tokens,
+            cache_write_30m_tokens=observed.cache_write_30m_tokens or 0,
+            cache_write_12h_tokens=observed.cache_write_12h_tokens or 0,
+            service_tier=observed.service_tier,
+        )
+    return record_query_llm_usage(
+        connection,
+        caller=caller,
+        run_id=run_id,
+        reservation_id=reservation_id,
+        reservation_version=reservation_version,
+        usage_kind=usage_kind,
+        model_id=model_id,
+        provider_attempt_id=provider_attempt_id,
+        prompt_tokens=observed.input_tokens,
+        completion_tokens=observed.output_tokens,
+        cost_usd=estimate if estimate is not None else usd_cap,
+        timeout_after_send=False,
+        cost_basis="standard_token_estimate"
+        if estimate is not None
+        else "safety_allowance",
+        estimated_cost_usd=estimate,
+        provider_prompt_tokens=observed.input_tokens,
+        provider_completion_tokens=observed.output_tokens,
+        cached_prompt_tokens=observed.cached_input_tokens,
+        cache_write_30m_tokens=observed.cache_write_30m_tokens,
+        cache_write_12h_tokens=observed.cache_write_12h_tokens,
+        service_tier=observed.service_tier,
+    )

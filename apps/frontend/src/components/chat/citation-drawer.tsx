@@ -9,7 +9,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 import { fetchCitationPagePng, type ApiAuth } from "../../lib/api";
-import { SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
+import { hrefForCitationRecord, SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
 import {
   LEGACY_EXCERPT_COPY,
   citationDrawerTitle,
@@ -23,6 +23,7 @@ import sourceStyles from "./sources.module.css";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { Sheet } from "../ui/sheet";
 import { UserText } from "../ui/user-text";
+import { SourceAuthority } from "./source-authority";
 import chatStyles from "./chat-transcript.module.css";
 
 /** Copy while the citation detail request has not returned the span. */
@@ -88,13 +89,15 @@ export function CitationDrawer({
   }
   const citationPosition = citations.findIndex((item) => item.citation_id === citation.citation_id);
   const fields = citationLocatorFields(citation);
+  const webHref = hrefForCitationRecord(citation);
+  const readerTitle = citationDrawerTitle(citation);
   const excerpt =
     citation.source_unavailable || typeof citation.evidence_excerpt !== "string"
       ? null
       : citation.evidence_excerpt;
   return (
     <Sheet
-      title={citationDrawerTitle(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
+      title={citation.source_kind === "web" ? readerTitle : readerTitle.replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
       side="right"
       onClose={onClose}
       returnFocusRef={returnFocusRef}
@@ -112,7 +115,14 @@ export function CitationDrawer({
           ) : null}
         </nav>
       ) : null}
-      {pageSource !== null ? (
+      {citation.source_kind === "web" && webHref ? (
+        <section className={sourceStyles.webSource} aria-label="Web source">
+          <p>Web source · {new URL(webHref).hostname}</p>
+          <a href={webHref} target="_blank" rel="noopener noreferrer">Open web page<span className={chatStyles.muted}> (opens in a new tab)</span></a>
+          <p>The supporting passage below is the evidence saved for this answer. The live page may have changed.</p>
+        </section>
+      ) : null}
+      {citation.source_kind !== "web" && pageSource !== null ? (
         <CitationPagePreview
           key={JSON.stringify([pageSource.runId, pageSource.citationId, pageSource.auth.accessToken])}
           pageSource={pageSource}
@@ -132,6 +142,7 @@ export function CitationDrawer({
       ) : citation.source_unavailable ? null : (
         <p className={chatStyles.muted}>{LEGACY_EXCERPT_COPY}</p>
       )}
+      <SourceAuthority citation={citation} />
       <dl className={chatStyles.sourceDl}>
         {fields.locators.map((item) => (
           <div key={item.key}>

@@ -59,6 +59,10 @@ from smart_rag_agents.query.gateway.verifier import (
     VerifierAttemptError,
     gateway_verifier,
 )
+from smart_rag_agents.query.nodes.knowledge import (
+    annotate_knowledge_result,
+    company_evidence_context,
+)
 from smart_rag_agents.query.nodes.release_safety import (
     refresh_refusal_usage,
     refuse_release,
@@ -90,7 +94,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         Cancellation and generator shutdown propagate to normal cleanup.
     """
     try:
-        result = _verify_answer(state, deps)
+        result = annotate_knowledge_result(_verify_answer(state, deps), deps)
     except Exception as exc:
         result = refuse_release(state, type(exc).__name__)
     if str(result.get("detail") or "").startswith("verification_unavailable:"):
@@ -143,6 +147,13 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
     )
     if is_web and not web_excerpts:
         return refuse_release(state, "web_evidence_insufficient")
+    if not is_web and route_needs_retrieval(plan):
+        fusion, tables = company_evidence_context(state, deps)
+        state = {
+            **state,
+            "fusion": fusion.model_dump(mode="json"),
+            "table_composition": tables.model_dump(mode="json"),
+        }
     try:
         prepared = (
             payload
@@ -150,7 +161,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             else bind_company_atomic_links(
                 payload,
                 fusion=fusion,
-                user_query=state["user_query"] or None,
+                user_query=state.get("resolved_query") or state["user_query"] or None,
             )
         )
     except (ValidationError, ValueError, AnswerError):
@@ -284,7 +295,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             completion_tokens=added_completion_tokens,
         )
     if company_release_applies(checked, is_web=is_web):
-        user_query = state["user_query"] or ""
+        user_query = state.get("resolved_query") or state["user_query"] or ""
         try:
             checked = company_release_payload(
                 checked,
@@ -350,6 +361,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         0, added_completion_tokens
     )
     billed_cost_usd: float | None = None
+    usage_reporting: dict[str, object] | None = None
     if deps.connection is not None and context is not None:
         try:
             billed = summarize_run_usage(
@@ -357,9 +369,15 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
                 caller=caller_from_runtime(context),
                 run_id=context.run_id,
             )
+            if billed.cost_reporting is not None:
+                usage_reporting = billed.cost_reporting.model_dump(mode="json")
             billed_prompt = billed.prompt_tokens
             billed_completion = billed.completion_tokens
-            billed_cost_usd = float(billed.cost_usd)
+            if (
+                billed.cost_reporting is not None
+                and billed.cost_reporting.estimated_cost_usd is not None
+            ):
+                billed_cost_usd = float(billed.cost_reporting.estimated_cost_usd)
         except (QueryAdmissionError, psycopg.Error):
             pass
     if route_needs_retrieval(plan) and checked.answer_origin is None:
@@ -440,7 +458,9 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
                                 repaired,
                                 fusion=fusion,
                                 tables=tables.records,
-                                user_query=state["user_query"] or "",
+                                user_query=state.get("resolved_query")
+                                or state["user_query"]
+                                or "",
                             )
                         except (ValidationError, ValueError, AnswerError):
                             pass
@@ -500,7 +520,9 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
     if (
         not is_web
         and terminal in {"verified", "verified_partial"}
-        and has_source_code_syntax_issue(checked, user_query=state["user_query"] or "")
+        and has_source_code_syntax_issue(
+            checked, user_query=state.get("resolved_query") or state["user_query"] or ""
+        )
     ):
         checked = checked.model_copy(update={"status": "partial"})
         terminal = "verified_partial"
@@ -547,6 +569,7 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             "prompt_tokens": billed_prompt,
             "completion_tokens": billed_completion,
             "cost_usd": billed_cost_usd,
+            "cost_reporting": usage_reporting,
             **verifier_timing,
         },
     )

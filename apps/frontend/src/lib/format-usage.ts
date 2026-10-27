@@ -5,7 +5,7 @@
 /**
  * Format a USD amount for Run Details and usage panels.
  *
- * Sub-cent run costs use up to six fractional digits so token-priced
+ * Sub-cent run costs use up to eight fractional digits so token-priced
  * estimates do not round to `$0.00`.
  *
  * @param value - Numeric amount or numeric string from the usage API.
@@ -17,7 +17,7 @@ export function formatUsd(value: number | string): string {
     return "—";
   }
   const maximumFractionDigits =
-    amount > 0 && amount < 0.01 ? 6 : 2;
+    amount > 0 && amount < 0.01 ? 8 : 2;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",

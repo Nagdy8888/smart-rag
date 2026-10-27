@@ -372,6 +372,7 @@ def list_conversation_messages_route(
             run_id=item.run_id,
             citation_count=item.citation_count,
             source_kind=_transcript_source_kind(item.source_kind),
+            knowledge_result=item.knowledge_result,
             citations=[],
         )
         for item in records

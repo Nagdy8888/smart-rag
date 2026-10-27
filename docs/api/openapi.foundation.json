@@ -33,6 +33,17 @@
         "title": "AcceptInvitationResponse",
         "type": "object"
       },
+      "AuthorityStatus": {
+        "description": "Human-managed authority, independent of ingestion readiness.",
+        "enum": [
+          "unreviewed",
+          "draft",
+          "approved",
+          "superseded"
+        ],
+        "title": "AuthorityStatus",
+        "type": "string"
+      },
       "Bm25Diagnostics": {
         "description": "BM25 projection index version, lag, retry, and dead-letter counts.",
         "properties": {
@@ -108,6 +119,110 @@
           }
         },
         "title": "Bm25Diagnostics",
+        "type": "object"
+      },
+      "CheckpointUsageSummary": {
+        "additionalProperties": false,
+        "description": "Anonymous recovered counts plus amounts that can be added without overlap.",
+        "properties": {
+          "additional_completion_tokens": {
+            "minimum": 0.0,
+            "title": "Additional Completion Tokens",
+            "type": "integer"
+          },
+          "additional_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Estimated Cost Usd"
+          },
+          "additional_prompt_tokens": {
+            "minimum": 0.0,
+            "title": "Additional Prompt Tokens",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "minimum": 0.0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "first_recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Recorded At"
+          },
+          "last_recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Recorded At"
+          },
+          "overlapping_ledger_runs": {
+            "minimum": 0.0,
+            "title": "Overlapping Ledger Runs",
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "minimum": 0.0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "runs": {
+            "minimum": 0.0,
+            "title": "Runs",
+            "type": "integer"
+          },
+          "unpriced_runs": {
+            "minimum": 0.0,
+            "title": "Unpriced Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "runs",
+          "prompt_tokens",
+          "completion_tokens",
+          "estimated_cost_usd",
+          "unpriced_runs",
+          "overlapping_ledger_runs",
+          "additional_prompt_tokens",
+          "additional_completion_tokens",
+          "additional_estimated_cost_usd",
+          "first_recorded_at",
+          "last_recorded_at"
+        ],
+        "title": "CheckpointUsageSummary",
         "type": "object"
       },
       "ChunkTableDiagnostics": {
@@ -364,6 +479,47 @@
         "title": "ConversationCreateRequest",
         "type": "object"
       },
+      "ConversationKnowledgeScope": {
+        "additionalProperties": false,
+        "description": "An owned conversation's selected document, rechecked on every run.",
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "unavailable": {
+            "default": false,
+            "title": "Unavailable",
+            "type": "boolean"
+          }
+        },
+        "title": "ConversationKnowledgeScope",
+        "type": "object"
+      },
       "ConversationMessage": {
         "description": "One creator-owned transcript message. Content is escaped untrusted text.",
         "properties": {
@@ -389,6 +545,16 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "knowledge_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnowledgeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "message_id": {
             "format": "uuid",
@@ -524,6 +690,95 @@
           "title"
         ],
         "title": "ConversationResponse",
+        "type": "object"
+      },
+      "CostReporting": {
+        "additionalProperties": false,
+        "description": "Measured/reconstructed estimates with explicit unresolved coverage.",
+        "properties": {
+          "budget_accounted_usd": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Budget Accounted Usd",
+            "type": "string"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "estimated_operations": {
+            "minimum": 0.0,
+            "title": "Estimated Operations",
+            "type": "integer"
+          },
+          "measured_completion_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured Completion Tokens"
+          },
+          "measured_prompt_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured Prompt Tokens"
+          },
+          "pricing_basis": {
+            "maxLength": 200,
+            "title": "Pricing Basis",
+            "type": "string"
+          },
+          "reconstructed_operations": {
+            "minimum": 0.0,
+            "title": "Reconstructed Operations",
+            "type": "integer"
+          },
+          "safety_allowance_usd": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Safety Allowance Usd",
+            "type": "string"
+          },
+          "unmeasured_operations": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unmeasured Operations",
+            "type": "integer"
+          },
+          "unresolved_operations": {
+            "minimum": 0.0,
+            "title": "Unresolved Operations",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "estimated_cost_usd",
+          "safety_allowance_usd",
+          "unresolved_operations",
+          "reconstructed_operations",
+          "estimated_operations",
+          "budget_accounted_usd",
+          "pricing_basis"
+        ],
+        "title": "CostReporting",
         "type": "object"
       },
       "CreateInvitationRequest": {
@@ -691,6 +946,123 @@
           "decision"
         ],
         "title": "DetectorFindingReviewResponse",
+        "type": "object"
+      },
+      "DocumentGovernance": {
+        "additionalProperties": false,
+        "description": "Authorized metadata for one canonical version.",
+        "properties": {
+          "authority_status": {
+            "$ref": "#/components/schemas/AuthorityStatus",
+            "default": "unreviewed"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "governance_generation": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Governance Generation",
+            "type": "integer"
+          },
+          "knowledge_area": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Area"
+          },
+          "owner_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Display Name"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "reliability_enabled": {
+            "default": false,
+            "title": "Reliability Enabled",
+            "type": "boolean"
+          },
+          "review_due_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Due At"
+          },
+          "superseded_by_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Version Id"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          },
+          "version_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Number"
+          }
+        },
+        "title": "DocumentGovernance",
         "type": "object"
       },
       "DocumentIngestionStatusResponse": {
@@ -1434,6 +1806,11 @@
             ],
             "title": "Comment"
           },
+          "share_with_reviewers": {
+            "default": false,
+            "title": "Share With Reviewers",
+            "type": "boolean"
+          },
           "tag": {
             "enum": [
               "helpful answer",
@@ -1450,7 +1827,11 @@
               "wrong route",
               "wrong calculation",
               "bad citation",
-              "insufficient graph"
+              "insufficient graph",
+              "incorrect answer",
+              "outdated answer",
+              "incomplete answer",
+              "wrong source"
             ],
             "title": "Tag",
             "type": "string"
@@ -2360,6 +2741,211 @@
         "title": "IngestionStatusResponse",
         "type": "object"
       },
+      "KnowledgeResult": {
+        "additionalProperties": false,
+        "description": "Final checked knowledge outcome, independent of operational failures.",
+        "properties": {
+          "limitations": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "outcome": {
+            "enum": [
+              "supported",
+              "partial",
+              "insufficient_evidence",
+              "conflicting_evidence"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "unanswered_parts": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Unanswered Parts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "KnowledgeResult",
+        "type": "object"
+      },
+      "MaintenanceItem": {
+        "additionalProperties": false,
+        "description": "One currently authorized review task; reports require explicit consent.",
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "kind": {
+            "enum": [
+              "missing_owner",
+              "overdue_review",
+              "feedback",
+              "insufficient_evidence",
+              "conflicting_evidence"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "report": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Report",
+            "type": "object"
+          },
+          "revision": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "resolved",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "kind",
+          "source_id"
+        ],
+        "title": "MaintenanceItem",
+        "type": "object"
+      },
+      "MaintenanceUpdate": {
+        "additionalProperties": false,
+        "description": "Optimistic human review, with a reason required for closing an item.",
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "resolved",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "MaintenanceUpdate",
+        "type": "object"
+      },
       "MetaResponse": {
         "description": "Compatibility handshake fields. Packet 6 owns enforcement.\n\n``web_search_enabled`` is the runtime flag for public Exa web research.\nIt is never the Exa key and never means company-document search.\nHosted environments reject ``WEB_SEARCH_ENABLED=true`` at settings\nload, so this field stays false in staging and production.",
         "properties": {
@@ -2437,6 +3023,340 @@
           "completed_at"
         ],
         "title": "OffboardResponse",
+        "type": "object"
+      },
+      "OverviewAttention": {
+        "description": "Authorized task metadata, never conversation content.",
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "kind": {
+            "enum": [
+              "missing_owner",
+              "overdue_review",
+              "feedback",
+              "insufficient_evidence",
+              "conflicting_evidence"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "kind",
+          "source_id",
+          "document_id",
+          "title"
+        ],
+        "title": "OverviewAttention",
+        "type": "object"
+      },
+      "OverviewDay": {
+        "description": "UTC daily bucket including actual zero-count days.",
+        "properties": {
+          "cost_reporting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CostReporting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cost_usd": {
+            "title": "Cost Usd",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "display_cost_usd": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Cost Usd"
+          },
+          "questions": {
+            "minimum": 0.0,
+            "title": "Questions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "questions",
+          "cost_usd"
+        ],
+        "title": "OverviewDay",
+        "type": "object"
+      },
+      "OverviewPeriod": {
+        "description": "Explicit query periods; integer coercion accepts normal URL parameters.",
+        "enum": [
+          7,
+          30,
+          90
+        ],
+        "title": "OverviewPeriod",
+        "type": "integer"
+      },
+      "OverviewResponse": {
+        "additionalProperties": false,
+        "description": "Single-snapshot response for the owner/admin overview.",
+        "properties": {
+          "attention_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "missing_owner",
+                "overdue_review",
+                "feedback",
+                "insufficient_evidence",
+                "conflicting_evidence"
+              ]
+            },
+            "title": "Attention Counts",
+            "type": "object"
+          },
+          "attention_items": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewAttention"
+            },
+            "title": "Attention Items",
+            "type": "array"
+          },
+          "authority": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "approved",
+                "unreviewed",
+                "draft",
+                "superseded"
+              ]
+            },
+            "title": "Authority",
+            "type": "object"
+          },
+          "authority_unversioned": {
+            "title": "Authority Unversioned",
+            "type": "integer"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewDay"
+            },
+            "title": "Daily",
+            "type": "array"
+          },
+          "days": {
+            "enum": [
+              7,
+              30,
+              90
+            ],
+            "title": "Days",
+            "type": "integer"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "supported",
+                "partial",
+                "insufficient_evidence",
+                "conflicting_evidence"
+              ]
+            },
+            "title": "Outcomes",
+            "type": "object"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "reliability_enabled": {
+            "title": "Reliability Enabled",
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/OverviewSummary"
+          },
+          "timezone": {
+            "const": "UTC",
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generated_at",
+          "period_start",
+          "days",
+          "timezone",
+          "reliability_enabled",
+          "summary",
+          "daily",
+          "outcomes",
+          "authority",
+          "authority_unversioned",
+          "attention_counts",
+          "attention_items"
+        ],
+        "title": "OverviewResponse",
+        "type": "object"
+      },
+      "OverviewSummary": {
+        "description": "Counts and recorded measurements; missing measurements remain null.",
+        "properties": {
+          "cancelled": {
+            "minimum": 0.0,
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "checkpoint_usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckpointUsageSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completed": {
+            "minimum": 0.0,
+            "title": "Completed",
+            "type": "integer"
+          },
+          "cost_reporting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CostReporting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cost_usd": {
+            "title": "Cost Usd",
+            "type": "string"
+          },
+          "display_cost_usd": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Cost Usd"
+          },
+          "failed": {
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "latency_samples": {
+            "minimum": 0.0,
+            "title": "Latency Samples",
+            "type": "integer"
+          },
+          "measured": {
+            "minimum": 0.0,
+            "title": "Measured",
+            "type": "integer"
+          },
+          "median_response_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Response Seconds"
+          },
+          "not_measured": {
+            "minimum": 0.0,
+            "title": "Not Measured",
+            "type": "integer"
+          },
+          "questions": {
+            "minimum": 0.0,
+            "title": "Questions",
+            "type": "integer"
+          },
+          "supported": {
+            "minimum": 0.0,
+            "title": "Supported",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "questions",
+          "completed",
+          "failed",
+          "cancelled",
+          "measured",
+          "supported",
+          "not_measured",
+          "median_response_seconds",
+          "latency_samples",
+          "cost_usd"
+        ],
+        "title": "OverviewSummary",
         "type": "object"
       },
       "PendingInvitationResponse": {
@@ -3473,6 +4393,93 @@
         "title": "ToolSeedRequest",
         "type": "object"
       },
+      "UpdateDocumentGovernance": {
+        "additionalProperties": false,
+        "description": "Full replacement of governance fields for an expected version.",
+        "properties": {
+          "authority_status": {
+            "$ref": "#/components/schemas/AuthorityStatus",
+            "default": "unreviewed"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "expected_generation": {
+            "minimum": 1.0,
+            "title": "Expected Generation",
+            "type": "integer"
+          },
+          "knowledge_area": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Area"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "review_due_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Due At"
+          },
+          "superseded_by_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Version Id"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_id",
+          "expected_generation"
+        ],
+        "title": "UpdateDocumentGovernance",
+        "type": "object"
+      },
       "UpdateDocumentTitleRequest": {
         "additionalProperties": false,
         "description": "Owner/admin document title body. Max length matches finalize.\n\nAttributes:\n    title: Non-empty trimmed title, at most 512 characters.",
@@ -3490,17 +4497,69 @@
         "title": "UpdateDocumentTitleRequest",
         "type": "object"
       },
+      "UpdateKnowledgeScope": {
+        "additionalProperties": false,
+        "description": "A null selection explicitly clears scope to authorized company documents.",
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          }
+        },
+        "title": "UpdateKnowledgeScope",
+        "type": "object"
+      },
       "UsageResponse": {
         "description": "Usage totals without prompt text.",
         "properties": {
+          "checkpoint_usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckpointUsageSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "completion_tokens": {
             "title": "Completion Tokens",
             "type": "integer"
+          },
+          "cost_reporting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CostReporting"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "cost_usd": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Cost Usd",
             "type": "string"
+          },
+          "display_cost_usd": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Cost Usd"
           },
           "prompt_tokens": {
             "title": "Prompt Tokens",
@@ -5084,6 +6143,462 @@
         ]
       }
     },
+    "/admin/knowledge/maintenance": {
+      "get": {
+        "description": "List currently visible tasks without granting access to private threads.",
+        "operationId": "list_maintenance_admin_knowledge_maintenance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MaintenanceItem"
+                  },
+                  "title": "Response List Maintenance Admin Knowledge Maintenance Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Maintenance",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/admin/knowledge/maintenance/{kind}/{source_id}": {
+      "patch": {
+        "description": "Record an assignment or reasoned resolution with revision checking.",
+        "operationId": "update_maintenance_admin_knowledge_maintenance__kind___source_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "missing_owner",
+                "overdue_review",
+                "feedback",
+                "insufficient_evidence",
+                "conflicting_evidence"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Maintenance",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/admin/overview": {
+      "get": {
+        "description": "Return bounded anonymous totals and currently authorized maintenance tasks.",
+        "operationId": "admin_overview_admin_overview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OverviewPeriod",
+              "default": 30
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Overview",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
     "/admin/tools": {
       "post": {
         "description": "Owner/admin catalog seed. Unknown or core keys fail closed.\n\nArgs:\n    request: Active request.\n    body: Seed payload.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Catalog row id.",
@@ -6383,6 +7898,294 @@
         "summary": "Get Conversation Route",
         "tags": [
           "chat"
+        ]
+      }
+    },
+    "/conversations/{conversation_id}/knowledge-scope": {
+      "get": {
+        "description": "Show a saved selection without revealing a revoked source title.",
+        "operationId": "read_scope_conversations__conversation_id__knowledge_scope_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationKnowledgeScope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Scope",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "patch": {
+        "description": "Set one source for future turns, or explicitly clear it.",
+        "operationId": "update_scope_conversations__conversation_id__knowledge_scope_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKnowledgeScope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationKnowledgeScope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Scope",
+        "tags": [
+          "knowledge"
         ]
       }
     },
@@ -7768,6 +9571,455 @@
         "summary": "Update Document Title Route",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/documents/{document_id}/governance": {
+      "get": {
+        "description": "Read metadata only when the document remains visible.",
+        "operationId": "read_governance_documents__document_id__governance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentGovernance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Governance",
+        "tags": [
+          "knowledge"
+        ]
+      },
+      "patch": {
+        "description": "Owner/admin optimistic update, audited atomically in Postgres.",
+        "operationId": "update_governance_documents__document_id__governance_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDocumentGovernance"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentGovernance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Governance",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/documents/{document_id}/governance/versions": {
+      "get": {
+        "description": "Read version metadata for owner/admin governance without source-body access.",
+        "operationId": "list_governance_versions_documents__document_id__governance_versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentGovernance"
+                  },
+                  "title": "Response List Governance Versions Documents  Document Id  Governance Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Governance Versions",
+        "tags": [
+          "knowledge"
         ]
       }
     },
@@ -10253,6 +12505,154 @@
         "summary": "Submit Feedback Route",
         "tags": [
           "chat"
+        ]
+      }
+    },
+    "/runs/{run_id}/knowledge": {
+      "get": {
+        "description": "Read only the caller's outcome; admin role does not grant chat access.",
+        "operationId": "read_run_knowledge_runs__run_id__knowledge_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/KnowledgeResult"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Read Run Knowledge Runs  Run Id  Knowledge Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Run Knowledge",
+        "tags": [
+          "knowledge"
         ]
       }
     },

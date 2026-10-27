@@ -49,10 +49,11 @@ describe("shell navigation", () => {
     expect(isRetiredProductPath("/login")).toBe(false);
     expect(parseAdminTab("usage")).toBe("usage");
     expect(parseAdminTab("curation")).toBe("team");
-    expect(parseAdminTab("nope")).toBe("team");
-    expect(parseAdminTab("evaluation")).toBe("team");
+    expect(parseAdminTab("nope")).toBe("overview");
+    expect(parseAdminTab("evaluation")).toBe("overview");
     expect(parseAdminTab("evaluation", true)).toBe("evaluation");
-    expect(visibleAdminTabs(false)).toEqual(["team", "tools", "usage"]);
+    expect(visibleAdminTabs(false)).toEqual(["overview", "team", "tools", "knowledge", "usage"]);
+    expect(parseAdminTab("knowledge")).toBe("knowledge");
     expect(visibleAdminTabs(true)).toContain("evaluation");
   });
 

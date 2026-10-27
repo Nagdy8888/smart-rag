@@ -11,6 +11,8 @@ import psycopg
 from smart_rag_core.evaluation.schema import ExpectedProfile
 from smart_rag_core.gateways.embedding import EmbeddingGateway
 from smart_rag_core.gateways.model import ModelGateway
+from smart_rag_core.query_admission.retrieve_budget import QueryRetrieveBudget
+from smart_rag_core.query_answer.knowledge import load_run_scope
 from smart_rag_core.query_routing.profile_fields import profile_strings
 from smart_rag_core.retrieval.bm25 import Bm25Retriever
 from smart_rag_core.retrieval.cache_store import RetrievalCacheMode, RetrievalCacheStore
@@ -198,6 +200,16 @@ class ProcessHybridRetriever:
         scope_started = time.perf_counter()
         scope = self._resolve_scope(caller, typed_profile, query=query)
         restrict_version_id = scope.version_id if scope is not None else None
+        budget_scope = query_budget if query_budget is not None else self.query_budget
+        if (
+            isinstance(budget_scope, QueryRetrieveBudget)
+            and budget_scope.run_id is not None
+        ):
+            with connect_postgres(self._supabase_dsn) as scope_connection:
+                scope_connection.execute("SET ROLE app_api")
+                explicit = load_run_scope(scope_connection, caller, budget_scope.run_id)
+            if explicit is not None:
+                restrict_version_id = UUID(explicit[1])
         ranking_query = query
         if (
             scope is not None

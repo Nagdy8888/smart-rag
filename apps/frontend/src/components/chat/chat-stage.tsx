@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useMemo, type RefObject } from "react";
+import { useMemo, useState, type RefObject } from "react";
 import { shouldShowCitations } from "../../lib/answer-origin";
 import { hrefForCitationRecord } from "../../lib/citation-drawer";
 import type { ChatViewState } from "../../lib/chat-view";
@@ -25,6 +25,7 @@ import { AnswerFormatGallery } from "./answer-format-gallery";
 import { AnswerSurface } from "./answer-surface";
 import { ChatComposer } from "./chat-composer";
 import { FeedbackPopover } from "./feedback-popover";
+import { DocumentScope } from "./document-scope";
 import { SaveToQuizSheet, type SaveToQuizSheetProps } from "./save-to-quiz-sheet";
 import type { UseChatRunResult } from "./hooks/use-chat-run";
 import { RunDetailsSheet } from "./run-details-sheet";
@@ -39,6 +40,8 @@ const PROMPT_CHIPS = [
 ] as const;
 
 export type ChatStageProps = {
+  conversationId?: string | null;
+  onConversationId?: (id: string) => void;
   chat: ChatViewState;
   run: UseChatRunResult;
   historyMessages: ConversationMessage[];
@@ -83,7 +86,7 @@ export type ChatStageProps = {
   onTag: (tag: FeedbackTag) => void;
   feedbackComment: string;
   onComment: (value: string) => void;
-  onFeedback: () => void;
+  onFeedback: (shareWithReviewers?: boolean) => void;
   feedbackPending: boolean;
   showSaveToQuiz?: boolean;
   quiz?: SaveToQuizSheetProps | null;
@@ -98,6 +101,7 @@ export type ChatStageProps = {
  * @returns Stage section.
  */
 export function ChatStage(props: ChatStageProps) {
+  const [scopePending, setScopePending] = useState(false);
   const {
     chat,
     run,
@@ -338,9 +342,10 @@ export function ChatStage(props: ChatStageProps) {
           </div>
         ) : null}
       </div>
+      {props.onConversationId ? <DocumentScope conversationId={props.conversationId ?? null} onConversationId={props.onConversationId} running={running || run.sending} onPendingChange={setScopePending} /> : null}
       <ChatComposer
         onSubmit={run.send}
-        disabled={sendBlockReason !== null}
+        disabled={sendBlockReason !== null || scopePending}
         sending={run.sending}
         running={running}
         onStop={() => {

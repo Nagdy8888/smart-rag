@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -146,6 +146,7 @@ class RunExecutorMixin:
                 assistant_parts: list[str] = []
                 prompt_tokens: int | None = None
                 completion_tokens: int | None = None
+                usage_reporting: dict[str, object] | None = None
                 async for event_type, payload in self._executor.execute(
                     context=runtime,
                     message=message,
@@ -159,6 +160,9 @@ class RunExecutorMixin:
                         if isinstance(delta, str) and delta:
                             assistant_parts.append(delta)
                     elif event_type == "usage":
+                        raw_reporting = payload.get("cost_reporting")
+                        if isinstance(raw_reporting, dict):
+                            usage_reporting = cast(dict[str, object], raw_reporting)
                         event_prompt, event_completion = token_counts_from_update(
                             payload
                         )
@@ -186,6 +190,7 @@ class RunExecutorMixin:
                     assistant_parts=assistant_parts,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
+                    usage_reporting=usage_reporting,
                 )
 
             if settings is None:

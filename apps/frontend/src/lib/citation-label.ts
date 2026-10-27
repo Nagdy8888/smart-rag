@@ -238,6 +238,7 @@ export function citationDrawerTitle(citation: CitationResponse): string {
   if (citation.source_unavailable) {
     return `Citation ${String(citation.citation_index)}`;
   }
+  if (citation.source_kind === "web") return citationSourceLabel(citation);
   if (isCompanyPdfCitation(citation)) {
     return `${companyPdfBookTitle(citation)} — ${companyPdfPagePhrase(citation)}`;
   }
@@ -267,7 +268,7 @@ export function citationSourceLabel(citation: CitationResponse): string {
     if (title) {
       return title;
     }
-    const url = locatorString(provenance.url ?? provenance.source_url);
+    const url = locatorString(citation.source_url ?? provenance.url ?? provenance.source_url);
     if (url) {
       return url;
     }

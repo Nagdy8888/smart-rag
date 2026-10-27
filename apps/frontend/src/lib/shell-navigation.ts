@@ -73,7 +73,7 @@ export const ACCOUNT_NAV_ITEM: ShellNavItem = {
 };
 
 /** Admin query-tab ids. Evaluation appears only when `/api/meta` allows it. */
-export const ADMIN_TABS = ["team", "tools", "usage", "evaluation"] as const;
+export const ADMIN_TABS = ["overview", "team", "tools", "knowledge", "usage", "evaluation"] as const;
 
 /** Admin tab union. */
 export type AdminTab = (typeof ADMIN_TABS)[number];
@@ -133,20 +133,20 @@ export function visibleAdminTabs(pdfEvalWorkspace: boolean): readonly AdminTab[]
  *
  * @param value - Raw search param.
  * @param pdfEvalWorkspace - Handshake capability. Unknown or unauthorized
- *   Evaluation values fall back to Team.
- * @returns Known tab. Unknown values fall back to Team.
+ *   Evaluation values fall back to Overview.
+ * @returns Known tab. Unknown values fall back to Overview.
  */
 export function parseAdminTab(
   value: string | undefined,
   pdfEvalWorkspace = false,
 ): AdminTab {
-  if (value === "tools" || value === "usage") {
+  if (value === "overview" || value === "team" || value === "tools" || value === "usage" || value === "knowledge") {
     return value;
   }
   if (value === "evaluation" && pdfEvalWorkspace) {
     return "evaluation";
   }
-  return "team";
+  return value === "curation" ? "team" : "overview";
 }
 
 /**

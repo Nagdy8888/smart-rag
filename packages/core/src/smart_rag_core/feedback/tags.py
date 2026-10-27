@@ -20,6 +20,10 @@ FeedbackTag = Literal[
     "wrong calculation",
     "bad citation",
     "insufficient graph",
+    "incorrect answer",
+    "outdated answer",
+    "incomplete answer",
+    "wrong source",
 ]
 
 FEEDBACK_TAGS_UP: frozenset[str] = frozenset(
@@ -44,6 +48,10 @@ FEEDBACK_TAGS_DOWN: frozenset[str] = frozenset(
         "wrong calculation",
         "bad citation",
         "insufficient graph",
+        "incorrect answer",
+        "outdated answer",
+        "incomplete answer",
+        "wrong source",
     }
 )
 

@@ -30,7 +30,14 @@ class TemporalDocument:
         expired: True when the version is superseded or expired.
     """
 
-    __slots__ = ("chunk_id", "effective_at", "expired", "published_at")
+    __slots__ = (
+        "authority_status",
+        "chunk_id",
+        "effective_at",
+        "expired",
+        "published_at",
+        "reliability_enabled",
+    )
 
     def __init__(
         self,
@@ -39,6 +46,8 @@ class TemporalDocument:
         effective_at: datetime | None,
         published_at: datetime | None = None,
         expired: bool = False,
+        authority_status: str = "unreviewed",
+        reliability_enabled: bool = False,
     ) -> None:
         """Store UTC dates. Naive datetimes and Hijri values are rejected.
 
@@ -51,6 +60,8 @@ class TemporalDocument:
             effective_at: Effective timestamp.
             published_at: Published timestamp.
             expired: Supersession flag.
+            authority_status: Human-reviewed authority status.
+            reliability_enabled: Whether the company enabled authority-aware selection.
 
         Raises:
             ValueError: If a provided datetime is not timezone-aware UTC.
@@ -60,6 +71,8 @@ class TemporalDocument:
         self.effective_at = _require_utc(effective_at)
         self.published_at = _require_utc(published_at)
         self.expired = expired
+        self.authority_status = authority_status
+        self.reliability_enabled = reliability_enabled
 
 
 def _require_utc(value: datetime | None) -> datetime | None:
@@ -116,6 +129,38 @@ def apply_temporal_policy(
     aware = _require_utc(clock)
     if aware is None:
         raise ValueError("utc_clock_required")
+    # Historical requests retain the existing historical evidence boundary.
+    # For ordinary/current requests, authority filtering applies before ranking.
+    if intent in {
+        TemporalIntent.NONE,
+        TemporalIntent.CURRENT,
+        TemporalIntent.LATEST,
+        TemporalIntent.RECENT,
+    }:
+        candidates = tuple(
+            item
+            for item in candidates
+            if (record := records.get(item.chunk_id)) is None
+            or not record.reliability_enabled
+            or (
+                record.authority_status not in {"draft", "superseded"}
+                and not record.expired
+                and (record.effective_at is None or record.effective_at <= aware)
+            )
+        )
+        # A stable partition preserves relevance within each authority tier.
+        candidates = tuple(
+            sorted(
+                candidates,
+                key=lambda item: (
+                    0
+                    if (record := records.get(item.chunk_id)) is not None
+                    and record.reliability_enabled
+                    and record.authority_status == "approved"
+                    else 1
+                ),
+            )
+        )
     if intent is TemporalIntent.NONE:
         return candidates
     if intent is TemporalIntent.CURRENT:

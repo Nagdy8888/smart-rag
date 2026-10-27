@@ -1466,3 +1466,22 @@ def test_binder_does_not_retarget_when_two_leaves_match() -> None:
     )
     bound = bind_company_atomic_links(payload, fusion=fusion)
     assert bound.citations[0].chunk_id == parent_id
+
+
+def test_rejected_figure_numbers_cannot_restore_unrelated_shopping_excerpt() -> None:
+    """Numeric overlap must not override a verifier rejection (live m19)."""
+    source = "Observation: Page 1 (Total results: 50) breakfast bars $21.49. Box 2."
+    claim = "Figure 2-1 shows the core components of an agent system."
+    fusion, payload = _identifier_payload(source, claim)
+    rejected = payload.model_copy(
+        update={
+            "answer_text": "Insufficient authorized evidence.",
+            "paragraphs": (),
+            "citations": (),
+            "atomic_links": (),
+            "status": "refused",
+        }
+    )
+    aligned = align_split_source_identifiers(payload, rejected, fusion=fusion)
+    assert aligned is rejected
+    assert aligned.atomic_links == ()

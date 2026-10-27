@@ -3,7 +3,9 @@
  * on reconnect.
  */
 
+import { parseCostReporting, type CostReporting } from "./cost-reporting";
 import { displayText } from "./safe-text";
+import { parseKnowledgeResult, type KnowledgeResult } from "./knowledge-result";
 import {
   isKnownSseEvent,
   parseSsePayload,
@@ -35,6 +37,7 @@ export type ChatDiagnostics = {
   completionTokens: number;
   /** Billed USD for the current run when the usage event includes it. */
   costUsd: number | null;
+  costReporting?: CostReporting | null;
   heartbeatCount: number;
   unknownEvents: string[];
   strayCitationsHidden: number;
@@ -55,6 +58,7 @@ export type ChatViewState = {
   idempotencyKey: string;
   answerOrigin: string | null;
   clarificationRequired: boolean;
+  knowledgeResult?: KnowledgeResult | null;
   progress: RunProgressState;
   /** Client source preference echoed from admission or run fetch. */
   requestedSearchScope: RequestedSearchScope | null;
@@ -361,6 +365,7 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
       }
       break;
     case "answer_origin": {
+      next.knowledgeResult = parseKnowledgeResult(payload.knowledge_result);
       const raw = stringField(payload, "origin");
       if (raw) {
         next.answerOrigin = raw;
@@ -379,6 +384,7 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
       next.answerText = `${state.answerText}${displayText(stringField(payload, "delta") ?? "")}`;
       break;
     case "usage":
+      diagnostics.costReporting = parseCostReporting(payload.cost_reporting);
       diagnostics.promptTokens =
         typeof payload.prompt_tokens === "number" ? payload.prompt_tokens : 0;
       diagnostics.completionTokens =

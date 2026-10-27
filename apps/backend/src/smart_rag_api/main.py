@@ -388,6 +388,12 @@ def create_app() -> FastAPI:
     from smart_rag_api.routers.graph_inspect import router as graph_inspect_router
     from smart_rag_api.routers.ingestion_crawl import router as ingestion_crawl_router
     from smart_rag_api.routers.ingestion_status import router as ingestion_status_router
+    from smart_rag_api.routers.knowledge import router as knowledge_router
+    from smart_rag_api.routers.knowledge_maintenance import (
+        router as knowledge_maintenance_router,
+    )
+    from smart_rag_api.routers.knowledge_runs import router as knowledge_runs_router
+    from smart_rag_api.routers.knowledge_scope import router as knowledge_scope_router
     from smart_rag_api.routers.ops import router as ops_router
     from smart_rag_api.routers.pdf_eval import (
         pdf_eval_routes_enabled,
@@ -404,6 +410,13 @@ def create_app() -> FastAPI:
     application.include_router(ops_router)
     application.include_router(auth_team_router)
     application.include_router(documents_router)
+    application.include_router(knowledge_router)
+    application.include_router(knowledge_runs_router)
+    application.include_router(knowledge_scope_router)
+    from smart_rag_api.routers.overview import router as overview_router
+
+    application.include_router(overview_router)
+    application.include_router(knowledge_maintenance_router)
     application.include_router(figures_router)
     application.include_router(conversations_router)
     application.include_router(query_runs_router)

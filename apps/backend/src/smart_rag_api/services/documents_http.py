@@ -325,6 +325,11 @@ def _raise_documents(exc: BaseException) -> NoReturn:
     raise QueryAdmissionError(reason) from exc
 
 
+def raise_document_error(exc: BaseException) -> NoReturn:
+    """Map governance RPC errors using the document error contract."""
+    _raise_documents(exc)
+
+
 def _as_int(value: object) -> int:
     """Convert a SQL scalar to int.
 

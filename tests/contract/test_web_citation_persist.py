@@ -444,7 +444,8 @@ def test_web_citation_detail_requires_https_and_returns_excerpt(
     db_connection.execute("RESET ROLE")
     assert detail.citation.source_kind == "web"
     assert detail.source_url == "https://example.com/water"
-    assert detail.citation.evidence_excerpt == excerpt[:1000]
+    assert detail.citation.evidence_excerpt == "Public excerpt"
+    assert detail.citation.evidence_excerpt != excerpt
     assert detail.citation.source_unavailable is False
 
     http_caller, http_run, _http_conv = _admit_run(

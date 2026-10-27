@@ -42,8 +42,14 @@ def query_profile_json_schema() -> dict[str, object]:
             "knowledge_scope",
             "knowledge_scope_confidence",
             "requested_sources",
+            "clarification_question",
         ],
         "properties": {
+            "clarification_question": {
+                "type": ["string", "null"],
+                "maxLength": 300,
+                "description": "One focused question ONLY if missing policy, subject, time, or jurisdiction would materially change the company answer. Otherwise null. Do not invent company facts, source names, countries, or choices. Do not ask for secrets. Do not clarify ordinary answerable questions.",
+            },
             "rewrite": {"type": ["string", "null"]},
             "query_type": {"type": ["string", "null"]},
             "subquestions": {**string_list, "maxItems": 3},

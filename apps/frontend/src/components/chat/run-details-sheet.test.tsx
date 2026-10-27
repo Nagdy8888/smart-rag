@@ -110,7 +110,7 @@ describe("RunDetailsSheet", () => {
     expect(details).toHaveTextContent("$3.20");
     expect(details).toHaveTextContent("Account total");
     expect(details).toHaveTextContent("$0.40");
-    expect(details).toHaveTextContent("This run spend");
+    expect(details).toHaveTextContent("This run estimated cost");
     expect(details).toHaveTextContent("run-1");
     expect(details).not.toHaveTextContent("Requested route");
     expect(details).not.toHaveTextContent("Effective route");

@@ -32,4 +32,6 @@ def usage_event(
         raw_cost = None
     if isinstance(raw_cost, (int, float)) and raw_cost >= 0:
         payload["cost_usd"] = float(raw_cost)
+    if isinstance(update.get("cost_reporting"), dict):
+        payload["cost_reporting"] = update["cost_reporting"]
     return ("usage", payload)

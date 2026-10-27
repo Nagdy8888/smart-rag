@@ -73,6 +73,7 @@ def test_configured_model_uses_its_own_rate_and_unknown_models_fail_conservative
         ("gpt-4o-mini", Decimal("0.00058185")),
         ("gpt-4.1-mini", Decimal("0.00155160")),
         ("gpt-5.4-mini", Decimal("0.00312975")),
+        ("gpt-6-luna", Decimal("0.00040260")),
         ("unpriced-model", Decimal("0.40")),
     ],
 )
@@ -144,3 +145,54 @@ def test_execute_counted_model_call_records_token_priced_usd(
     assert recorded["prompt_tokens"] == 3291
     assert recorded["completion_tokens"] == 147
     assert recorded["cost_usd"] == expected_cost
+
+
+def test_luna_standard_cache_and_long_context_rates() -> None:
+    """Luna uses its own verified rates and the documented long-context threshold."""
+    assert estimate_usage_cost_usd(
+        usage_kind="answer",
+        model_id="gpt-6-luna",
+        prompt_tokens=1000,
+        completion_tokens=100,
+    ) == Decimal("0.00015000")
+    assert estimate_usage_cost_usd(
+        usage_kind="answer",
+        model_id="gpt-6-luna",
+        prompt_tokens=1000,
+        completion_tokens=100,
+        cached_prompt_tokens=500,
+    ) == Decimal("0.00010500")
+    assert estimate_usage_cost_usd(
+        usage_kind="answer",
+        model_id="gpt-6-luna",
+        prompt_tokens=272001,
+        completion_tokens=100,
+    ) == Decimal("0.05447520")
+    with pytest.raises(ValueError, match="chat_cached_usage_exceeds_input"):
+        estimate_usage_cost_usd(
+            usage_kind="answer",
+            model_id="gpt-6-luna",
+            prompt_tokens=1,
+            completion_tokens=0,
+            cached_prompt_tokens=2,
+        )
+
+
+@pytest.mark.parametrize(
+    "tier,multiplier", [("default", 1), ("flex", Decimal("0.5")), ("fast", 2)]
+)
+def test_luna_cache_write_lifetimes_and_returned_tier(
+    tier: str, multiplier: Decimal | int
+) -> None:
+    """Cache writes replace ordinary input and are never added twice."""
+    cost = estimate_usage_cost_usd(
+        usage_kind="answer",
+        model_id="gpt-6-luna",
+        prompt_tokens=12000,
+        completion_tokens=100,
+        cached_prompt_tokens=4000,
+        cache_write_30m_tokens=3000,
+        cache_write_12h_tokens=4000,
+        service_tier=tier,
+    )
+    assert cost == Decimal("0.00156500") * multiplier

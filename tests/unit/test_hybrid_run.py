@@ -771,10 +771,10 @@ def test_load_temporal_records_uses_app_api_role(
 
             return None
 
-        def fetchall(self) -> list[tuple[UUID, None]]:
+        def fetchall(self) -> list[tuple[UUID, None, str, bool]]:
             """Return one undated version."""
 
-            return [(version_id, None)]
+            return [(version_id, None, "unreviewed", False)]
 
     class _Conn:
         """Record SET ROLE and yield a cursor."""

@@ -8,6 +8,10 @@ export const INSUFFICIENT_EVIDENCE_COPY =
   "Company sources could not support an answer. Narrow the question and try again.";
 
 const LIMITATION_COPY: Record<string, string> = {
+  source_values_conflict: "Approved sources give different values for the same stated scope. Review both passages before acting.",
+  source_unreviewed: "The cited source has not been approved. Its currentness is unconfirmed.",
+  source_owner_missing: "The cited source has no accountable knowledge owner.",
+  source_review_overdue: "The cited source is overdue for review. This does not automatically expire it.",
   temporal_graph_limitation:
     "Historical and as-of relationship questions stay on Hybrid. The graph is current-version only.",
   graph_outage:

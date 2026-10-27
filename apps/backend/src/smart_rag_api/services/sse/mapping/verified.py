@@ -145,7 +145,12 @@ def emit_verified_events(
         return empty, False, None
     events: list[tuple[str, dict[str, object]]] = []
     if payload is not None and payload.answer_origin is not None:
-        events.append(("answer_origin", {"origin": payload.answer_origin.value}))
+        origin: dict[str, object] = {"origin": payload.answer_origin.value}
+        if payload.knowledge_result is not None:
+            origin["knowledge_result"] = payload.knowledge_result.model_dump(
+                mode="json"
+            )
+        events.append(("answer_origin", origin))
     for piece in chunks:
         events.append(("token_delta", {"delta": piece}))
     preview = citation_preview(payload) if payload is not None else None

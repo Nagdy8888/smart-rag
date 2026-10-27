@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from smart_rag_core.knowledge import KnowledgeResult
 from smart_rag_core.query_answer.versions import (
     MAX_VERIFIER_LINKS,
     PARAGRAPH_DELIMITER,
@@ -155,6 +156,7 @@ class AnswerPayload(BaseModel):
     status: Literal["complete", "partial", "refused"] = "complete"
     refused_links: tuple[str, ...] = ()
     answer_origin: KnowledgeScope | None = None
+    knowledge_result: KnowledgeResult | None = None
 
 
 class VerifierLinkVerdict(BaseModel):

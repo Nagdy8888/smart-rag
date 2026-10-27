@@ -16,6 +16,10 @@ from smart_rag_core.query_routing.preparation import caller_from_runtime, prepar
 from smart_rag_core.query_routing.serde import memory_from_state
 
 from smart_rag_agents.query.deps import QueryGraphDeps
+from smart_rag_agents.query.nodes.clarification import (
+    clarification_query,
+    persist_clarification,
+)
 from smart_rag_agents.query.nodes.shared import (
     runtime_after_consume,
     runtime_from_state,
@@ -69,6 +73,11 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     context = runtime_from_state(state)
     if context is None:
         return {**state, "status": "admission_rejected"}
+    resolved_query, resumed_clarification, reliability_enabled = clarification_query(
+        deps.connection, context, str(state.get("user_query") or "")
+    )
+    if resumed_clarification:
+        state = {**state, "resolved_query": resolved_query}
     surface_raw = state.get("routing_surface") or RoutingSurface.PRODUCTION.value
     try:
         surface = RoutingSurface(str(surface_raw))
@@ -84,7 +93,7 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         force_model = False
     try:
         preparation = prepare_query(
-            str(state.get("user_query") or ""),
+            resolved_query,
             runtime=context,
             memory=memory,
             routing_surface=surface,
@@ -96,6 +105,13 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             caller=caller_from_runtime(context),
             model_id=deps.profile_model_id,
             on_reservation_consume=consumed.append,
+        )
+        preparation = persist_clarification(
+            deps.connection,
+            context,
+            preparation,
+            enabled=reliability_enabled,
+            resumed=resumed_clarification,
         )
     except QueryRoutingError as exc:
         return cast(

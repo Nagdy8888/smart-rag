@@ -239,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
                 "origin": str(streamed.get("origin") or ""),
                 "stages": _json_mapping(streamed.get("stages")),
                 "timing": _json_mapping(streamed.get("timing")),
+                "knowledge_result": _json_mapping(streamed.get("knowledge_result")),
+                "usage": _json_mapping(streamed.get("usage")),
             }
             done = len(answers)
             if args.progress is not None:
@@ -302,6 +304,13 @@ def main(argv: list[str] | None = None) -> int:
             answers=answers,
         )
     summary = dict(write_redacted_summary(results, args.out))
+    from smart_rag_core.evaluation.knowledge_metrics import summarize_knowledge_metrics
+
+    knowledge_metrics = summarize_knowledge_metrics(questions, results, answers)
+    args.out.with_name(f"{args.out.stem}-knowledge-metrics.json").write_text(
+        json.dumps(knowledge_metrics, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     origin_leaks = sum(
         1
         for row in answers.values()
@@ -638,6 +647,8 @@ def _read_sse(
     terminal = ""
     limitation = ""
     origin = ""
+    knowledge: dict[str, object] = {}
+    usage: dict[str, object] = {}
     coverage_score: float | None = None
     correction = "none"
     citation_count = 0
@@ -671,6 +682,17 @@ def _read_sse(
                         limitation = str(payload.get("code") or "")
                     elif event_name == "answer_origin":
                         origin = str(payload.get("origin") or "")
+                        knowledge = _json_mapping(payload.get("knowledge_result"))
+                    elif event_name == "usage":
+                        usage = {
+                            key: payload[key]
+                            for key in (
+                                "prompt_tokens",
+                                "completion_tokens",
+                                "cost_usd",
+                            )
+                            if key in payload
+                        }
                     elif event_name == "coverage":
                         raw_score = payload.get("coverage_score")
                         if isinstance(raw_score, (int, float)) and not isinstance(
@@ -711,6 +733,8 @@ def _read_sse(
         "limitation": limitation,
         "origin": origin,
         "citation_count": citation_count,
+        "knowledge_result": knowledge,
+        "usage": usage,
         "path": ">".join(path_steps) if path_steps else "-",
         "first_frame_seconds": first_frame_seconds,
         "sse_seconds": round(time.monotonic() - started, 3),

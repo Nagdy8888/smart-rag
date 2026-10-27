@@ -49,6 +49,8 @@ def _record_query_run_usage(result: Mapping[str, object]) -> None:
         return
     input_count, output_count = counts
     cost = optional_cost_usd(result.get("estimated_cost_usd"))
+    if cost is None and result.get("usage_cost_status") == "unresolved":
+        return
     if cost is None:
         cost = estimate_traced_chat_cost_usd(
             input_tokens=input_count,

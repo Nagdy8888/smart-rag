@@ -64,6 +64,10 @@
 }
 .citationPager { display: flex; align-items: center; gap: 8px; }
 .citationPager > span { color: #244b5b; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.webSource { margin-block-end: 20px; padding-block-end: 16px; border-bottom: 1px solid var(--color-border); }
+.webSource p { color: var(--color-text-muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.webSource a { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 44px; color: var(--color-evidence); text-underline-offset: 4px; }
+.webSource a:focus-visible { outline: 2px solid var(--color-evidence); outline-offset: 4px; border-radius: 3px; }
 .sourceCard > button, .sourceCard > a { background: #ffffff; color: #173342; border: 1px solid #c1d1d9; }
 .sourceCard > button:hover, .sourceCard > a:hover { background: #edf4f7; border-color: #708d9b; }
 .sourceCard > button span, .sourceCard > a span { color: inherit; }

@@ -18,6 +18,7 @@ export type ConversationResponse = {
 
 /** One `GET /conversations/{id}/messages` item. Content is escaped text. */
 export type ConversationMessage = {
+  knowledge_result?: import("../knowledge-result").KnowledgeResult | null;
   message_id: string;
   role: "user" | "assistant";
   content: string;
@@ -140,6 +141,10 @@ export const FEEDBACK_TAGS_DOWN = [
   "wrong calculation",
   "bad citation",
   "insufficient graph",
+  "incorrect answer",
+  "outdated answer",
+  "incomplete answer",
+  "wrong source",
 ] as const;
 
 /** Union of polarity catalogs. Tags are never merged. */

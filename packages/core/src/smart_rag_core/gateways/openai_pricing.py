@@ -79,6 +79,10 @@ def estimate_usage_cost_usd(
     model_id: str,
     prompt_tokens: int,
     completion_tokens: int,
+    cached_prompt_tokens: int = 0,
+    cache_write_30m_tokens: int = 0,
+    cache_write_12h_tokens: int = 0,
+    service_tier: str | None = None,
 ) -> Decimal | None:
     """Estimate USD for one ``app.llm_usage`` row.
 
@@ -88,12 +92,68 @@ def estimate_usage_cost_usd(
         model_id: Provider model identifier recorded on the row.
         prompt_tokens: Prompt or input tokens.
         completion_tokens: Completion or output tokens.
+        cached_prompt_tokens: Provider-reported cached input.
+        cache_write_30m_tokens: Input tokens written with 30-minute retention.
+        cache_write_12h_tokens: Input tokens written with 12-hour retention.
+        service_tier: Returned processing tier; unknown tiers remain unpriced.
 
     Returns:
         List-price USD estimate, or None for an unknown model. The caller must
         use its conservative reserved cap instead of another model's rate.
     """
 
+    if (
+        min(
+            prompt_tokens,
+            completion_tokens,
+            cached_prompt_tokens,
+            cache_write_30m_tokens,
+            cache_write_12h_tokens,
+        )
+        < 0
+    ):
+        raise ValueError("chat_usage_negative")
+    if (
+        cached_prompt_tokens + cache_write_30m_tokens + cache_write_12h_tokens
+        > prompt_tokens
+    ):
+        raise ValueError("chat_cached_usage_exceeds_input")
+    # GPT-6 Luna Standard text rates verified 2026-10-26 against the official
+    # model page. Returned tiers and cache-write lifetimes are priced explicitly; regional premiums are excluded.
+    if model_id == "gpt-6-luna" and usage_kind != "embedding":
+        input_multiplier = Decimal(2) if prompt_tokens > 272_000 else Decimal(1)
+        output_multiplier = Decimal("1.5") if prompt_tokens > 272_000 else Decimal(1)
+        tier_multiplier = {
+            None: Decimal(1),
+            "default": Decimal(1),
+            "standard": Decimal(1),
+            "flex": Decimal("0.5"),
+            "batch": Decimal("0.5"),
+            "fast": Decimal(2),
+        }.get(service_tier)
+        if tier_multiplier is None:
+            return None
+        total = (
+            Decimal(
+                prompt_tokens
+                - cached_prompt_tokens
+                - cache_write_30m_tokens
+                - cache_write_12h_tokens
+            )
+            * Decimal("0.10")
+            + Decimal(cached_prompt_tokens) * Decimal("0.01")
+            + Decimal(cache_write_30m_tokens) * Decimal("0.125")
+            + Decimal(cache_write_12h_tokens) * Decimal("0.25")
+        ) * input_multiplier + Decimal(completion_tokens) * Decimal(
+            "0.50"
+        ) * output_multiplier
+        return (total * tier_multiplier / _ONE_MILLION).quantize(Decimal("0.00000001"))
+    if (
+        service_tier not in {None, "default", "standard"}
+        or cache_write_30m_tokens
+        or cache_write_12h_tokens
+    ):
+        return None
     if usage_kind == "embedding":
         if model_id != "text-embedding-3-large":
             return None
@@ -112,7 +172,9 @@ def estimate_usage_cost_usd(
         )
         return (
             (
-                Decimal(prompt_tokens) * input_rate
+                Decimal(prompt_tokens - cached_prompt_tokens) * input_rate
+                + Decimal(cached_prompt_tokens)
+                * (Decimal("0.075") if model_id == "gpt-5.4-mini" else Decimal("0.10"))
                 + Decimal(completion_tokens) * output_rate
             )
             / _ONE_MILLION
@@ -122,4 +184,5 @@ def estimate_usage_cost_usd(
     return estimate_chat_cost_usd(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
+        cached_prompt_tokens=cached_prompt_tokens,
     )

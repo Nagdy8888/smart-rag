@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 
 from pydantic import ValidationError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.models import AnswerPayload, AtomicLink
 from smart_rag_core.query_answer.versions import (
@@ -163,12 +164,26 @@ def gateway_web_answer(
     if gateway is None:
         raise AnswerError("model_gateway_unbound")
     timeout_seconds = gateway_timeout_seconds(context)
+    fitted = sources
+    records = isolate_web_sources(fitted)
+    # Persisted sources may total 40K characters; the configured model input
+    # limit is smaller. Fit the prompt copy, preserving canonical source IDs.
+    limit = deps.model_input_max_chars - len(query or "query")
+    while len(records) > limit:
+        size = max(len(source.excerpt) for source in fitted) // 2
+        if size < 80:
+            raise AnswerError("web_answer_input_bound")
+        fitted = tuple(
+            source.model_copy(update={"excerpt": source.excerpt[:size]})
+            for source in fitted
+        )
+        records = isolate_web_sources(fitted)
     request = WebAnswerModelRequest(
         query=query or "query",
         prompt_version=WEB_ANSWER_PROMPT_VERSION,
         prompt_sha256=WEB_ANSWER_PROMPT_SHA256,
         prompt_text=str(prompt_text),
-        source_records=isolate_web_sources(sources),
+        source_records=records,
         web_source_ids=tuple(item.web_source_id for item in sources),
         remaining_deadline_seconds=timeout_seconds,
     )
@@ -181,7 +196,7 @@ def gateway_web_answer(
                 timeout_seconds=request.remaining_deadline_seconds,
             ),
         )
-    except AnswerError:
+    except (AnswerError, TimeoutAfterSendError):
         raise
     except Exception as exc:
         raise AnswerError("web_answer_provider_error") from exc

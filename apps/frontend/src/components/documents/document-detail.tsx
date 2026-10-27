@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { IngestionStatus } from "./ingestion-status";
+import { DocumentGovernancePanel } from "./document-governance";
 import { DocumentDeleteSheet } from "./document-delete-sheet";
 import { useDocumentDetail } from "./hooks/use-document-detail";
 import { Button } from "../ui/button";
@@ -162,6 +163,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
 
       <div className={styles.detailGrid}>
         <div>
+          <DocumentGovernancePanel key={documentId} documentId={documentId} canManage={detail.canDelete} currentVersionId={record.current_version_id} />
           <section className={styles.section} aria-label="Processing">
             <h2>Processing</h2>
             {versionPayload ? (

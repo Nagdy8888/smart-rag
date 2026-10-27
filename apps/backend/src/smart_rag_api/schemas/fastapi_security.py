@@ -9,6 +9,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from smart_rag_core.feedback.tags import FeedbackTag
+from smart_rag_core.gateways.cost_reporting import CostReporting
+from smart_rag_core.knowledge import KnowledgeResult
+from smart_rag_core.observability.checkpoint_usage import CheckpointUsageSummary
 from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.tables.plan import TableQueryPlan
 
@@ -155,6 +158,7 @@ class ConversationMessage(BaseModel):
     run_id: UUID | None = None
     citation_count: int = Field(default=0, ge=0, le=50)
     source_kind: Literal["company_document", "web"] | None = None
+    knowledge_result: KnowledgeResult | None = None
     citations: list[CitationResponse] = Field(default_factory=_empty_citation_responses)
 
 
@@ -223,6 +227,7 @@ class FeedbackRequest(BaseModel):
     thumbs_up: bool
     tag: FeedbackTag
     comment: str | None = Field(default=None, max_length=2000)
+    share_with_reviewers: bool = False
 
 
 class FeedbackResponse(BaseModel):
@@ -240,6 +245,9 @@ class UsageResponse(BaseModel):
 
     scope: str
     cost_usd: Decimal
+    cost_reporting: CostReporting | None = None
+    checkpoint_usage: CheckpointUsageSummary | None = None
+    display_cost_usd: Decimal | None = None
     prompt_tokens: int
     completion_tokens: int
     usage_rows: int

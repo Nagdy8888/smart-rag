@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, SecretStr
 
 from smart_rag_core.gateways.embedding import EmbeddingGateway, create_embedding_gateway
 from smart_rag_core.gateways.model import ModelGateway, create_model_gateway
+from smart_rag_core.gateways.provider_usage import capture_provider_usage
 from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
@@ -44,6 +45,7 @@ from smart_rag_core.query_admission.service import (
     consume_query_reservation,
     record_query_llm_usage,
 )
+from smart_rag_core.query_admission.usage import record_observed_usage
 from smart_rag_core.retrieval.graph import (
     DEFAULT_GRAPH_WORKSPACE,
     LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE,
@@ -677,10 +679,43 @@ async def _counted_query_callback(
         )
         budget.expected_version = consumed.optimistic_version
         debit_retrieve_budget(budget, usage_kind, remaining_usd=consumed.remaining_usd)
-        try:
-            result = await send()
-        except TimeoutAfterSendError:
-            record_query_llm_usage(
+        attempt_id = str(uuid4())
+        with capture_provider_usage() as observed:
+            try:
+                result = await send()
+            except Exception as exc:
+                if len(observed) == 1:
+                    record_observed_usage(
+                        typed_connection,
+                        caller=caller,
+                        run_id=cast(UUID, run_id),
+                        reservation_id=cast(UUID, reservation_id),
+                        reservation_version=consumed.optimistic_version,
+                        usage_kind=usage_kind,
+                        model_id=model_id,
+                        provider_attempt_id=attempt_id,
+                        observed=observed[0],
+                        usd_cap=usd_cap,
+                    )
+                elif isinstance(exc, TimeoutAfterSendError):
+                    record_query_llm_usage(
+                        typed_connection,
+                        caller=caller,
+                        run_id=cast(UUID, run_id),
+                        reservation_id=cast(UUID, reservation_id),
+                        reservation_version=consumed.optimistic_version,
+                        usage_kind=usage_kind,
+                        model_id=model_id,
+                        provider_attempt_id=attempt_id,
+                        prompt_tokens=prompt_cap,
+                        completion_tokens=completion_cap,
+                        cost_usd=usd_cap,
+                        timeout_after_send=True,
+                        cost_basis="safety_allowance",
+                    )
+                raise
+        if len(observed) == 1:
+            record_observed_usage(
                 typed_connection,
                 caller=caller,
                 run_id=cast(UUID, run_id),
@@ -688,13 +723,15 @@ async def _counted_query_callback(
                 reservation_version=consumed.optimistic_version,
                 usage_kind=usage_kind,
                 model_id=model_id,
-                provider_attempt_id=str(uuid4()),
-                prompt_tokens=prompt_cap,
-                completion_tokens=completion_cap,
-                cost_usd=usd_cap,
-                timeout_after_send=True,
+                provider_attempt_id=attempt_id,
+                observed=observed[0],
+                usd_cap=usd_cap,
             )
-            raise
+            add_recorded_tokens(
+                budget, observed[0].input_tokens, observed[0].output_tokens
+            )
+            take_callback_usage()
+            return result
         prompt, completion, measured_cost = take_callback_usage()
         add_recorded_tokens(budget, prompt, completion)
         record_query_llm_usage(
@@ -714,6 +751,12 @@ async def _counted_query_callback(
                 else usd_cap
             ),
             timeout_after_send=False,
+            cost_basis="supplied_cost_estimate"
+            if measured_cost is not None and measured_cost > 0
+            else "safety_allowance",
+            estimated_cost_usd=measured_cost
+            if measured_cost is not None and measured_cost > 0
+            else None,
         )
         return result
     debit_retrieve_budget(budget, usage_kind)

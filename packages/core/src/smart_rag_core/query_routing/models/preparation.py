@@ -73,6 +73,7 @@ class PreparationModelPayload(BaseModel):
     knowledge_scope: str | None = Field(default=None, max_length=64)
     knowledge_scope_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     requested_sources: tuple[str, ...] = Field(default_factory=tuple, max_length=8)
+    clarification_question: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")
     def _bound_lists(self) -> PreparationModelPayload:
@@ -184,6 +185,7 @@ class QueryPreparation(BaseModel):
     knowledge_scope_confidence: float = Field(ge=0.0, le=1.0)
     scope_degradation_reason: ScopeDegradationReason | None = None
     requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
+    clarification_question: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")
     def _original_preserved(self) -> QueryPreparation:

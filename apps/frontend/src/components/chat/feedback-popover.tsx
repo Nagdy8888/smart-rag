@@ -4,11 +4,14 @@
 
 "use client";
 
+import { useState } from "react";
+
 import { feedbackTagsFor, type FeedbackTag } from "../../lib/types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover } from "../ui/popover";
 import { Select } from "../ui/select";
+import knowledge from "../ui/styles/knowledge.module.css";
 import styles from "./chat-transcript.module.css";
 
 export type FeedbackPopoverProps = {
@@ -25,7 +28,7 @@ export type FeedbackPopoverProps = {
   /** Comment change. */
   onComment: (value: string) => void;
   /** Submit existing catalog payload. */
-  onSubmit: () => void;
+  onSubmit: (shareWithReviewers?: boolean) => void;
   /** True while submit is in flight. */
   pending?: boolean;
 };
@@ -68,6 +71,7 @@ export function FeedbackPopover({
   pending = false,
 }: FeedbackPopoverProps) {
   const tagOptions = feedbackTagsFor(thumbsUp);
+  const [share, setShare] = useState(false);
   return (
     <Popover label="Give feedback" trigger="Give feedback">
       <div className={styles.feedbackForm}>
@@ -98,15 +102,19 @@ export function FeedbackPopover({
             value={comment}
             onChange={(event) => onComment(event.target.value)}
           />
+          <label className={knowledge.consent}><input data-action-id="knowledge.feedback.share" type="checkbox" checked={share} onChange={(event) => setShare(event.target.checked)} />
+            <span>Share this question, answer, and feedback with workspace owners and admins for knowledge review.</span>
+          </label>
           <Button
             type="button"
             data-action-id="ask.feedback"
             pending={pending}
             pendingLabel="Submitting…"
-            onClick={onSubmit}
+            onClick={() => onSubmit(share)}
           >
             Submit feedback
           </Button>
+
         </div>
       </Popover>
   );

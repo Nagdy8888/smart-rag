@@ -74,6 +74,17 @@ class HybridCacheLookupMixin:
         store = self._retrieval_cache
         if store is None:
             return None
+        # Governance and effective dates can change without changing chunk IDs.
+        # Until caches carry authority snapshots, live reliability mode bypasses
+        # ID-only hits and reruns bounded selection under the current policy.
+        if self._supabase_dsn:
+            with connect_postgres(self._supabase_dsn) as connection:
+                connection.execute("SET ROLE app_api")
+                row = connection.execute(
+                    "SELECT knowledge_reliability_enabled FROM app.company_settings"
+                ).fetchone()
+                if row is not None and row[0]:
+                    return None
 
         def recheck(chunk_ids: Sequence[UUID]) -> tuple[RetrievalCandidate, ...]:
             """Recheck cached IDs before they become evidence.

@@ -983,7 +983,7 @@ describe("ChatApp Ask workspace", () => {
     expect(await screen.findAllByText("Finding information")).not.toHaveLength(0);
   });
 
-  it("shows Web origin URL chips and keeps company citations non-clickable", async () => {
+  it("opens Web citations in the shared reader and keeps company storage URLs private", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue({
       ...ALLOWED_META,
@@ -1011,6 +1011,12 @@ describe("ChatApp Ask workspace", () => {
         web_source_id: "ws-1",
       },
     ]);
+    vi.mocked(fetchCitationDetail).mockResolvedValue({
+      citation_id: "cite-web", citation_index: 1, chunk_id: null,
+      provenance: { title: "Public briefing" }, source_unavailable: false,
+      source_kind: "web", source_url: "https://example.test/brief",
+      evidence_excerpt: "The briefing is public.",
+    });
     vi.stubGlobal(
       "fetch",
       stubChatFetch({
@@ -1029,11 +1035,12 @@ describe("ChatApp Ask workspace", () => {
     await user.click(screen.getByRole("radio", { name: "Web" }));
     await user.type(screen.getByLabelText("Message"), "public briefing");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    const chip = await screen.findByRole("link", {
+    const chip = await screen.findByRole("button", {
       name: "Citation 1, Public briefing",
     });
-    expect(chip).toHaveAttribute("href", "https://example.test/brief");
-    expect(chip).toHaveAttribute("rel", "noreferrer");
+    expect(chip).not.toHaveAttribute("href");
+    await user.click(chip);
+    expect(await screen.findByRole("link", { name: /Open web page/ })).toHaveAttribute("href", "https://example.test/brief");
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Web");
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Web research");
   });

@@ -504,3 +504,43 @@ uv run python -m pytest tests/unit/test_phase07_api_ui_mapping.py -q
 uv run python scripts/ci/check_openapi.py
 uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
 ```
+
+## Company knowledge reliability additions (26 October 2026)
+
+- `GET/PATCH /documents/{document_id}/governance`: authorized metadata and owner/admin optimistic governance changes.
+- `GET /documents/{document_id}/governance/versions`: owner/admin version metadata; approval never publishes source content.
+- `GET /runs/{run_id}/knowledge`: creator-private checked outcome; old records remain unknown.
+- `GET/PATCH /conversations/{conversation_id}/knowledge-scope`: creator-private saved selection, explicit clearing, and immutable per-run snapshot at admission.
+- `GET /admin/knowledge/maintenance`: owner/admin task list with source ACL and explicit report-sharing consent.
+- `PATCH /admin/knowledge/maintenance/{kind}/{source_id}`: optimistic assignment/resolution/dismissal with an audit record and a closing reason.
+- Existing `answer_origin` SSE payloads may include `knowledge_result`; restored transcripts return the same persisted outcome. Operational verification failures are not supported knowledge outcomes.
+- Existing feedback accepts an explicit `share_with_reviewers` boolean, default false. Sharing does not grant source access or general conversation access.
+
+See [implementation and rollout evidence](../development/company-knowledge-reliability.md) for v1 limits and external gates.
+
+### Admin overview
+
+`GET /admin/overview?days=7|30|90` is owner/admin only. Anonymous company
+question/outcome totals and recorded model-operation costs drive the Overview
+charts; document authority and open maintenance counts are current ACL/consent
+snapshots. No private question, answer, employee identifier, or source passage is
+returned. Refresh and period selection are read-only. Bookmarked admin tabs stay
+available; `/admin` defaults to Overview. Missing outcomes remain unmeasured.
+
+### Cost reporting provenance
+
+Overview and caller/company Usage responses add `cost_reporting`. UI estimates
+exclude unresolved safety allowances and identify historical Standard-rate
+reconstructions. Legacy `cost_usd` remains original budget accounting; it is not
+presented as actual spending. Missing reporting coverage stays unmeasured, and
+timeout allowances never become zero-cost or fabricated token bills.
+
+### Recovered checkpoint usage
+
+Caller/company Usage responses add `checkpoint_usage` and `display_cost_usd`.
+Recorded token totals include one recovered snapshot per run when provider
+measurements are absent. Combined cost adds checkpoint estimates only for runs
+absent from the ledger. Personal totals retain original caller ownership;
+anonymous company history remains owner/admin-only. Usage exposes recovered
+coverage and unresolved costs. Overview summary/daily `display_cost_usd` uses
+the same deduplication. Original budget-accounted fields are preserved.

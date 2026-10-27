@@ -93,6 +93,33 @@ loads hosted environment files; do not use it for this local corpus.
 Hosted Auth users and application rows have not been cloned. The verified archive
 contains only checkpoints; local development uses fresh identities and ingestion.
 
+## Archived checkpoint import (2026-10-26)
+
+The user explicitly requested that all downloaded hosted checkpoints be added to
+the local database. The verified October 21 archive was appended to the three
+existing `langgraph` checkpoint tables without replacing their schema or rows.
+Its history covers October 7–21, not August.
+
+The import added 21,946 checkpoints, 207,904 checkpoint blobs, and 1,067,577
+checkpoint writes. Resulting local counts are 29,843, 284,564, and 1,457,845.
+Archived and existing local thread keys were disjoint. Full sorted row-content
+digests verified both the imported records and preservation of every existing
+record before the transaction committed. Owners, grants, and RLS were unchanged.
+
+The archive remains at
+`C:\Users\Nagdy\Backups\SmartRAG\checkpoints-20261021T135733Z`.
+A pre-import local checkpoint backup and import evidence are retained under
+`.private-eval/checkpoint-import-20261026/`. An initial transfer attempt rolled
+back completely; the successful retry used staged binary transfer files and a
+longer maintenance timeout. The temporary files were removed after verification;
+both backups remain intact. The API was restarted and its live/ready checks pass.
+
+This is historical execution-state storage. Hosted users, conversations,
+documents, citations, and `llm_usage` rows were not recreated or attributed to
+local accounts. Old hosted threads must not be treated as resumable local chats
+without their original authorized application records. Usage-ledger reconciliation
+is separate from checkpoint import.
+
 The local API uses the local Compose override with read-only source mounts for
 core, agents, and backend code. Dependencies remain pinned in the built image;
 restart the API after Python changes, only when no evaluation run is active.
@@ -134,3 +161,14 @@ Changing the private environment requires recreating the API with the local
 Compose files, then checking `/health/ready`. Do this only between evaluation
 runs. Merging these examples does not change hosted environment variables or
 repair the hosted Supabase project.
+
+## Recovered checkpoint usage reporting
+
+Following the explicit request to display the stored tokens and costs, local
+reporting now reads a content-free `app.checkpoint_usage_runs` projection.
+`uv run python scripts/ops/recover_checkpoint_usage.py` previews recovery;
+`--write` refreshes that projection by run ID. It does not modify checkpoints,
+budgets, or the usage ledger. Current Usage and Overview totals deduplicate
+repeated snapshots and ledger overlaps. See
+[usage cost reporting](../development/usage-cost-reporting.md) for provenance,
+coverage, cost-screening rules, and local verification evidence.

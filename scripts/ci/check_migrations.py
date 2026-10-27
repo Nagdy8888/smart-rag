@@ -107,6 +107,19 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20261015163000_citation_page_object_v2.sql",
     "20261016150000_composite_rewrite_deadline_v1.sql",
     "20261023150000_usage_recorded_cost_totals.sql",
+    "20261025100000_company_knowledge_governance_v1.sql",
+    "20261025110000_company_knowledge_outcomes_v1.sql",
+    "20261025120000_knowledge_feedback_v1.sql",
+    "20261025130000_knowledge_maintenance_v1.sql",
+    "20261025140000_knowledge_conversation_scope_v1.sql",
+    "20261025150000_knowledge_clarifications_v1.sql",
+    "20261025160000_knowledge_history_guard_v1.sql",
+    "20261026100000_admin_overview_v1.sql",
+    "20261026110000_usage_cost_reporting_v1.sql",
+    "20261026120000_provider_usage_measurements_v1.sql",
+    "20261026130000_checkpoint_usage_reporting_v1.sql",
+    "20261026140000_checkpoint_usage_unknown_cost_v1.sql",
+    "20261026150000_web_citation_exact_span_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

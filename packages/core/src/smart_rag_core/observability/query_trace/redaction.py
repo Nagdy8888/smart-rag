@@ -255,6 +255,14 @@ def _attach_usage_fields(payload: dict[str, Any], typed: Mapping[str, object]) -
     payload["input_tokens"] = input_count
     payload["output_tokens"] = output_count
     payload["total_tokens"] = input_count + output_count
+    if typed.get("usage_cost_status") == "unresolved":
+        payload["usage_cost_status"] = "unresolved"
+        payload["usage_metadata"] = {
+            "input_tokens": input_count,
+            "output_tokens": output_count,
+            "total_tokens": input_count + output_count,
+        }
+        return
     cost = optional_cost_usd(typed.get("estimated_cost_usd"))
     if cost is None:
         cost = estimate_traced_chat_cost_usd(

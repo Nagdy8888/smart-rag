@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal, NotRequired, TypeAlias
 
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -103,6 +103,8 @@ class QueryGraphState(TypedDict):
     remaining_side_effects: int
     remaining_recursion_steps: int
     user_query: str
+    resolved_query: NotRequired[str]
+    knowledge_conflict: NotRequired[bool]
     routing_surface: str
     requested_manual_route: str | None
     memory_summary_status: str
@@ -137,6 +139,7 @@ class QueryGraphState(TypedDict):
     scope_degradation_reason: str | None
     prompt_tokens: int
     completion_tokens: int
+    cost_reporting: dict[str, object] | None
     cost_usd: float | None
     web_sources: list[dict[str, object]]
     answer_context_fit: dict[str, object] | None
@@ -227,6 +230,7 @@ def pending_query_state(
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "cost_usd": None,
+        "cost_reporting": None,
         "web_sources": [],
         "answer_context_fit": None,
         "run_timings": None,

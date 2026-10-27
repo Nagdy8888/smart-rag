@@ -131,6 +131,7 @@ beforeEach(() => {
   fetchUsageMe.mockResolvedValue({
     scope: "me",
     cost_usd: "1.25",
+    cost_reporting: {estimated_cost_usd:"1.25",safety_allowance_usd:"0",budget_accounted_usd:"1.25",unresolved_operations:0,reconstructed_operations:0,estimated_operations:2,pricing_basis:"Standard",measured_prompt_tokens:10,measured_completion_tokens:4,unmeasured_operations:0},
     prompt_tokens: 10,
     completion_tokens: 4,
     usage_rows: 2,
@@ -138,6 +139,7 @@ beforeEach(() => {
   fetchUsageCompany.mockResolvedValue({
     scope: "company",
     cost_usd: "9.00",
+    cost_reporting: {estimated_cost_usd:"9.00",safety_allowance_usd:"0",budget_accounted_usd:"9.00",unresolved_operations:0,reconstructed_operations:0,estimated_operations:8,pricing_basis:"Standard",measured_prompt_tokens:100,measured_completion_tokens:40,unmeasured_operations:0},
     prompt_tokens: 100,
     completion_tokens: 40,
     usage_rows: 8,
@@ -411,12 +413,24 @@ describe("ToolsPanel", () => {
 });
 
 describe("UsagePanel", () => {
+  it("shows recovered checkpoint counts and the deduplicated combined cost", async () => {
+    const ledger = await fetchUsageCompany({accessToken:"fixture"});
+    fetchUsageCompany.mockResolvedValue({...ledger,display_cost_usd:"12.34",prompt_tokens:25845103,completion_tokens:1261013,checkpoint_usage:{runs:2291,prompt_tokens:25845103,completion_tokens:1261013,estimated_cost_usd:"4.55844231",unpriced_runs:85,overlapping_ledger_runs:614,additional_prompt_tokens:25845103,additional_completion_tokens:1261013,additional_estimated_cost_usd:"3.2",first_recorded_at:"2026-10-07T00:00:00Z",last_recorded_at:"2026-10-26T00:00:00Z"}});
+    renderSurface(<UsagePanel />);
+    const company = await screen.findByTestId("company-usage-meters");
+    await waitFor(()=>expect(company).toHaveTextContent("$12.34"));
+    expect(company).toHaveTextContent("25,845,103");
+    expect(company).toHaveTextContent("1,261,013");
+    expect(company).toHaveTextContent("Recovered checkpoint history");
+    expect(company).toHaveTextContent("Each run is counted once");
+    expect(company).toHaveTextContent("85 runs have missing or allowance-like costs");
+  });
   it("shows token meters and no budget slider or fake audit events", async () => {
     renderSurface(<UsagePanel />);
-    expect(await screen.findByText("$1.25")).toBeInTheDocument();
+    expect((await screen.findAllByText("$1.25")).length).toBeGreaterThan(0);
     expect(screen.getByText("Your usage")).toBeInTheDocument();
     expect(screen.getByText(/Recorded model usage/)).toBeInTheDocument();
-    expect(screen.getAllByText("Prompt tokens").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Recorded input tokens").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Usage records").length).toBeGreaterThan(0);
     expect(screen.getByTestId("usage-meters")).toBeInTheDocument();
     expect(await screen.findByTestId("company-usage-meters")).toBeInTheDocument();
@@ -430,9 +444,9 @@ describe("UsagePanel", () => {
 
   it("refreshes both authorized summaries and labels cost as an estimate", async () => {
     renderSurface(<UsagePanel />);
-    expect(await screen.findByText("$1.25")).toBeInTheDocument();
-    expect(screen.getAllByText("Recorded cost estimate")).toHaveLength(2);
-    expect(screen.getByText(/not a verified provider invoice/)).toBeInTheDocument();
+    expect((await screen.findAllByText("$1.25")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Estimated usage cost")).toHaveLength(2);
+    expect(screen.getAllByText(/not a verified provider invoice/).length).toBeGreaterThan(0);
     const refresh = await screen.findByRole("button", { name: "Refresh usage" });
     const meCalls = fetchUsageMe.mock.calls.length;
     const companyCalls = fetchUsageCompany.mock.calls.length;

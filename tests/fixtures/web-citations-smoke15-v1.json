@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "id": "web-citations-smoke15-v1",
+  "purpose": "Development web answer and citation-reader smoke checks; not a holdout or semantic accuracy score.",
+  "created_on": "2026-10-26",
+  "source_verification": "RFC 6585, W3C WCAG 2.2, Python tutorial and PostgreSQL isolation documentation inspected through web search/open.",
+  "search_scope": "web",
+  "questions": [
+    {
+      "id": "w01",
+      "question": "What does HTTP 429 mean according to RFC 6585? Search the web and cite the RFC.",
+      "reference_url": "https://www.rfc-editor.org/rfc/rfc6585",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w02",
+      "question": "Does RFC 6585 require every 429 response to contain Retry-After, or is it optional? Cite the wording.",
+      "reference_url": "https://www.rfc-editor.org/rfc/rfc6585",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w03",
+      "question": "What does HTTP 428 prevent, and what request condition can address it? Use RFC 6585 as evidence.",
+      "reference_url": "https://www.rfc-editor.org/rfc/rfc6585",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w04",
+      "question": "Can HTTP 429 responses be stored by a cache according to RFC 6585? Cite the source.",
+      "reference_url": "https://www.rfc-editor.org/rfc/rfc6585",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w05",
+      "question": "اشرح باختصار معنى HTTP 429 وهل وجود Retry-After إلزامي، مع الاستشهاد بـ RFC 6585.",
+      "reference_url": "https://www.rfc-editor.org/rfc/rfc6585",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w06",
+      "question": "According to WCAG 2.2 criterion 2.5.8, what is the minimum pointer target size and conformance level? Cite W3C.",
+      "reference_url": "https://www.w3.org/TR/WCAG22/",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w07",
+      "question": "Compare WCAG 2.2 target-size criteria 2.5.8 and 2.5.5, including their sizes and conformance levels. Cite W3C.",
+      "reference_url": "https://www.w3.org/TR/WCAG22/",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w08",
+      "question": "Does WCAG 2.2 criterion 2.5.7 require an alternative to dragging? Explain its exceptions using W3C evidence.",
+      "reference_url": "https://www.w3.org/TR/WCAG22/",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w09",
+      "question": "بالعربية، اذكر استثناءين لحجم هدف المؤشر في معيار WCAG 2.2 رقم 2.5.8 مع مصدر W3C.",
+      "reference_url": "https://www.w3.org/TR/WCAG22/",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w10",
+      "question": "According to the official Python tutorial, how do list.append and list.extend differ? Include a small example and citations.",
+      "reference_url": "https://docs.python.org/3/tutorial/datastructures.html",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w11",
+      "question": "Which Python list methods implement a last-in-first-out stack in the official tutorial? Cite the documentation.",
+      "reference_url": "https://docs.python.org/3/tutorial/datastructures.html",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w12",
+      "question": "Why does the official Python tutorial recommend collections.deque rather than a list for a FIFO queue? Cite it.",
+      "reference_url": "https://docs.python.org/3/tutorial/datastructures.html",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w13",
+      "question": "What is PostgreSQL 18 default transaction isolation level, and what snapshot does a SELECT see? Cite official documentation.",
+      "reference_url": "https://www.postgresql.org/docs/18/transaction-iso.html",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w14",
+      "question": "Does PostgreSQL 18 implement Read Uncommitted differently from Read Committed? Use its official isolation documentation.",
+      "reference_url": "https://www.postgresql.org/docs/18/transaction-iso.html",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    },
+    {
+      "id": "w15",
+      "question": "Compare phantom-read behavior under PostgreSQL 18 Repeatable Read and Serializable using the official table. Cite your evidence.",
+      "reference_url": "https://www.postgresql.org/docs/18/transaction-iso.html",
+      "checks": [
+        "web_origin",
+        "authorized_run_citations",
+        "supporting_excerpt",
+        "safe_original_url",
+        "history_reader"
+      ]
+    }
+  ]
+}

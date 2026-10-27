@@ -28,6 +28,14 @@ def record_query_llm_usage(
     completion_tokens: int,
     cost_usd: Decimal,
     timeout_after_send: bool,
+    cost_basis: str | None = None,
+    estimated_cost_usd: Decimal | None = None,
+    provider_prompt_tokens: int | None = None,
+    provider_completion_tokens: int | None = None,
+    cached_prompt_tokens: int = 0,
+    cache_write_30m_tokens: int | None = None,
+    cache_write_12h_tokens: int | None = None,
+    service_tier: str | None = None,
 ) -> UUID:
     """Append one immutable ``llm_usage`` row for a provider attempt.
 
@@ -44,6 +52,14 @@ def record_query_llm_usage(
         completion_tokens: Actual or estimated completion tokens.
         cost_usd: Actual or estimated USD.
         timeout_after_send: True when the HTTP response was lost after send.
+        cost_basis: Explicit estimate provenance, or None for legacy callers.
+        estimated_cost_usd: Reporting estimate; null for safety allowances.
+        provider_prompt_tokens: Observed input count, absent when unknown.
+        provider_completion_tokens: Observed output count, absent when unknown.
+        cached_prompt_tokens: Observed cached subset of provider input.
+        cache_write_30m_tokens: Observed short-lived cache writes.
+        cache_write_12h_tokens: Observed long-lived cache writes.
+        service_tier: Returned provider processing tier.
 
     Returns:
         ``llm_usage.id``.
@@ -84,7 +100,42 @@ def record_query_llm_usage(
         raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("usage_returned_no_row")
-    return UUID(str(row[0]))
+    usage_id = UUID(str(row[0]))
+    if cost_basis is not None:
+        try:
+            connection.execute(
+                "SELECT app.record_usage_cost_basis(%s,%s,%s,%s,%s,%s)",
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    usage_id,
+                    cost_basis,
+                    estimated_cost_usd,
+                ),
+            )
+        except psycopg.Error as exc:
+            raise_admission(exc)
+    if provider_prompt_tokens is not None and provider_completion_tokens is not None:
+        try:
+            connection.execute(
+                "SELECT app.record_usage_token_measurement(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    usage_id,
+                    provider_prompt_tokens,
+                    provider_completion_tokens,
+                    cached_prompt_tokens,
+                    cache_write_30m_tokens,
+                    cache_write_12h_tokens,
+                    service_tier,
+                ),
+            )
+        except psycopg.Error as exc:
+            raise_admission(exc)
+    return usage_id
 
 
 def record_run_restricted_evidence(

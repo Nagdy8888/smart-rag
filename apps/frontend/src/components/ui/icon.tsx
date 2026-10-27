@@ -8,6 +8,12 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  CircleCheck,
+  CircleDashed,
+  Clock3,
+  FilePenLine,
+  TriangleAlert,
+  Archive,
   ArrowUp,
   BarChart3,
   Bell,
@@ -41,6 +47,12 @@ import {
 import type { ReactElement, SVGProps } from "react";
 
 export type IconName =
+  | "checkCircle"
+  | "partial"
+  | "clock"
+  | "fileEdit"
+  | "alert"
+  | "archive"
   | "chat"
   | "documents"
   | "graph"
@@ -80,6 +92,12 @@ export type IconProps = SVGProps<SVGSVGElement> & {
 };
 
 const LUCIDE_BY_NAME: Record<Exclude<IconName, "google">, LucideIcon> = {
+  checkCircle: CircleCheck,
+  partial: CircleDashed,
+  clock: Clock3,
+  fileEdit: FilePenLine,
+  alert: TriangleAlert,
+  archive: Archive,
   chat: MessageSquare,
   documents: FileText,
   graph: Share2,

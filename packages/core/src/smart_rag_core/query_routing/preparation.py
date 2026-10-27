@@ -399,6 +399,9 @@ def prepare_query(
     scope = apply_requested_search_scope(original, scope, requested_search_scope)
     try:
         preparation = QueryPreparation(
+            clarification_question=payload.clarification_question
+            if payload is not None
+            else None,
             original=original,
             rewrite=accepted,
             profile=profile,

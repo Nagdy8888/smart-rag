@@ -336,6 +336,7 @@ export type Database = {
           created_at: string
           id: string
           message_id: string | null
+          paragraph_index: number | null
           provenance: Json
           run_id: string
           snippet: string | null
@@ -347,6 +348,7 @@ export type Database = {
           created_at?: string
           id?: string
           message_id?: string | null
+          paragraph_index?: number | null
           provenance?: Json
           run_id: string
           snippet?: string | null
@@ -358,6 +360,7 @@ export type Database = {
           created_at?: string
           id?: string
           message_id?: string | null
+          paragraph_index?: number | null
           provenance?: Json
           run_id?: string
           snippet?: string | null
@@ -399,6 +402,7 @@ export type Database = {
           graph_bulk_window_ends_at: string | null
           graph_bulk_window_starts_at: string | null
           id: string
+          knowledge_reliability_enabled: boolean
           legal_hold_enabled: boolean
           monthly_graph_maintenance_budget_usd: number
           monthly_llm_budget_usd: number | null
@@ -421,6 +425,7 @@ export type Database = {
           graph_bulk_window_ends_at?: string | null
           graph_bulk_window_starts_at?: string | null
           id?: string
+          knowledge_reliability_enabled?: boolean
           legal_hold_enabled?: boolean
           monthly_graph_maintenance_budget_usd?: number
           monthly_llm_budget_usd?: number | null
@@ -443,6 +448,7 @@ export type Database = {
           graph_bulk_window_ends_at?: string | null
           graph_bulk_window_starts_at?: string | null
           id?: string
+          knowledge_reliability_enabled?: boolean
           legal_hold_enabled?: boolean
           monthly_graph_maintenance_budget_usd?: number
           monthly_llm_budget_usd?: number | null
@@ -456,12 +462,62 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_knowledge_context: {
+        Row: {
+          clarification_original: string | null
+          clarification_question: string | null
+          clarification_run_id: string | null
+          conversation_id: string
+          document_id: string | null
+          revision: number
+        }
+        Insert: {
+          clarification_original?: string | null
+          clarification_question?: string | null
+          clarification_run_id?: string | null
+          conversation_id: string
+          document_id?: string | null
+          revision?: number
+        }
+        Update: {
+          clarification_original?: string | null
+          clarification_question?: string | null
+          clarification_run_id?: string | null
+          conversation_id?: string
+          document_id?: string | null
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_knowledge_context_clarification_run_id_fkey"
+            columns: ["clarification_run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_knowledge_context_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_knowledge_context_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string
           creator_user_id: string
           deleted_at: string | null
           id: string
+          purpose: string
           title: string | null
           updated_at: string
         }
@@ -470,6 +526,7 @@ export type Database = {
           creator_user_id: string
           deleted_at?: string | null
           id?: string
+          purpose?: string
           title?: string | null
           updated_at?: string
         }
@@ -478,6 +535,7 @@ export type Database = {
           creator_user_id?: string
           deleted_at?: string | null
           id?: string
+          purpose?: string
           title?: string | null
           updated_at?: string
         }
@@ -875,6 +933,69 @@ export type Database = {
           },
         ]
       }
+      document_figures: {
+        Row: {
+          byte_size: number
+          caption: string
+          content_hash: string
+          created_at: string
+          description: string
+          document_id: string
+          figure_key: string
+          id: string
+          model_id: string | null
+          page_index: number
+          storage_bucket: string
+          storage_path: string
+          version_id: string
+        }
+        Insert: {
+          byte_size: number
+          caption?: string
+          content_hash: string
+          created_at?: string
+          description?: string
+          document_id: string
+          figure_key: string
+          id: string
+          model_id?: string | null
+          page_index: number
+          storage_bucket: string
+          storage_path: string
+          version_id: string
+        }
+        Update: {
+          byte_size?: number
+          caption?: string
+          content_hash?: string
+          created_at?: string
+          description?: string
+          document_id?: string
+          figure_key?: string
+          id?: string
+          model_id?: string | null
+          page_index?: number
+          storage_bucket?: string
+          storage_path?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_figures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_figures_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_scan_events: {
         Row: {
           bytes_examined: number | null
@@ -1136,6 +1257,7 @@ export type Database = {
       }
       document_versions: {
         Row: {
+          authority_status: string
           bm25_verified_at: string | null
           byte_size: number | null
           chunk_set_hash: string | null
@@ -1147,6 +1269,7 @@ export type Database = {
           effective_at: string | null
           embedding_model: string | null
           embedding_policy_hash: string | null
+          governance_generation: number
           graph_eligible: boolean
           graph_handoff_at: string | null
           hybrid_verified_at: string | null
@@ -1158,10 +1281,12 @@ export type Database = {
           status: Database["app"]["Enums"]["document_status"]
           storage_bucket: string | null
           storage_path: string | null
+          superseded_by_version_id: string | null
           updated_at: string
           version_number: number
         }
         Insert: {
+          authority_status?: string
           bm25_verified_at?: string | null
           byte_size?: number | null
           chunk_set_hash?: string | null
@@ -1173,6 +1298,7 @@ export type Database = {
           effective_at?: string | null
           embedding_model?: string | null
           embedding_policy_hash?: string | null
+          governance_generation?: number
           graph_eligible?: boolean
           graph_handoff_at?: string | null
           hybrid_verified_at?: string | null
@@ -1184,10 +1310,12 @@ export type Database = {
           status?: Database["app"]["Enums"]["document_status"]
           storage_bucket?: string | null
           storage_path?: string | null
+          superseded_by_version_id?: string | null
           updated_at?: string
           version_number: number
         }
         Update: {
+          authority_status?: string
           bm25_verified_at?: string | null
           byte_size?: number | null
           chunk_set_hash?: string | null
@@ -1199,6 +1327,7 @@ export type Database = {
           effective_at?: string | null
           embedding_model?: string | null
           embedding_policy_hash?: string | null
+          governance_generation?: number
           graph_eligible?: boolean
           graph_handoff_at?: string | null
           hybrid_verified_at?: string | null
@@ -1210,6 +1339,7 @@ export type Database = {
           status?: Database["app"]["Enums"]["document_status"]
           storage_bucket?: string | null
           storage_path?: string | null
+          superseded_by_version_id?: string | null
           updated_at?: string
           version_number?: number
         }
@@ -1219,6 +1349,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_versions_superseded_by_version_id_fkey"
+            columns: ["superseded_by_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -1232,6 +1369,10 @@ export type Database = {
           description: string | null
           graph_eligible: boolean
           id: string
+          knowledge_area: string | null
+          knowledge_generation: number
+          knowledge_owner_user_id: string | null
+          review_due_at: string | null
           title: string
           updated_at: string
           visibility: Database["app"]["Enums"]["document_visibility"]
@@ -1245,6 +1386,10 @@ export type Database = {
           description?: string | null
           graph_eligible?: boolean
           id?: string
+          knowledge_area?: string | null
+          knowledge_generation?: number
+          knowledge_owner_user_id?: string | null
+          review_due_at?: string | null
           title: string
           updated_at?: string
           visibility?: Database["app"]["Enums"]["document_visibility"]
@@ -1258,6 +1403,10 @@ export type Database = {
           description?: string | null
           graph_eligible?: boolean
           id?: string
+          knowledge_area?: string | null
+          knowledge_generation?: number
+          knowledge_owner_user_id?: string | null
+          review_due_at?: string | null
           title?: string
           updated_at?: string
           visibility?: Database["app"]["Enums"]["document_visibility"]
@@ -1270,6 +1419,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "document_versions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_knowledge_owner_user_id_fkey"
+            columns: ["knowledge_owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1328,6 +1484,361 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "embedding_operation_ledger_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eval_exam_case_results: {
+        Row: {
+          case_id: string
+          created_at: string
+          exam_run_id: string
+          gold_count: number
+          hit: boolean
+          latency_ms: number | null
+          ordinal: number
+          ranked_hit_count: number
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          exam_run_id: string
+          gold_count: number
+          hit: boolean
+          latency_ms?: number | null
+          ordinal: number
+          ranked_hit_count: number
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          exam_run_id?: string
+          gold_count?: number
+          hit?: boolean
+          latency_ms?: number | null
+          ordinal?: number
+          ranked_hit_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eval_exam_case_results_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "eval_quiz_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_exam_case_results_exam_run_id_fkey"
+            columns: ["exam_run_id"]
+            isOneToOne: false
+            referencedRelation: "eval_exam_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eval_exam_reports: {
+        Row: {
+          candidate_fingerprint: string
+          case_count: number
+          created_at: string
+          dataset_hash: string
+          exam_run_id: string
+          gates_pass: boolean
+          hit_count: number
+          holdout_opened: boolean
+          hybrid_recall_at_10: number
+          metric_version: string
+          split: string
+        }
+        Insert: {
+          candidate_fingerprint: string
+          case_count: number
+          created_at?: string
+          dataset_hash: string
+          exam_run_id: string
+          gates_pass: boolean
+          hit_count: number
+          holdout_opened?: boolean
+          hybrid_recall_at_10: number
+          metric_version: string
+          split: string
+        }
+        Update: {
+          candidate_fingerprint?: string
+          case_count?: number
+          created_at?: string
+          dataset_hash?: string
+          exam_run_id?: string
+          gates_pass?: boolean
+          hit_count?: number
+          holdout_opened?: boolean
+          hybrid_recall_at_10?: number
+          metric_version?: string
+          split?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eval_exam_reports_exam_run_id_fkey"
+            columns: ["exam_run_id"]
+            isOneToOne: true
+            referencedRelation: "eval_exam_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eval_exam_runs: {
+        Row: {
+          cache_mode: string
+          candidate_fingerprint: string
+          case_count: number
+          case_ids: string[]
+          completed_at: string | null
+          completed_case_count: number
+          conversation_id: string
+          created_at: string
+          creator_user_id: string | null
+          dataset_hash: string
+          error_code: string | null
+          expires_at: string
+          holdout_opened: boolean
+          id: string
+          idempotency_key: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          metric_version: string
+          request_payload_hash: string
+          split: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cache_mode: string
+          candidate_fingerprint: string
+          case_count: number
+          case_ids: string[]
+          completed_at?: string | null
+          completed_case_count?: number
+          conversation_id: string
+          created_at?: string
+          creator_user_id?: string | null
+          dataset_hash: string
+          error_code?: string | null
+          expires_at: string
+          holdout_opened?: boolean
+          id?: string
+          idempotency_key: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          metric_version: string
+          request_payload_hash: string
+          split: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cache_mode?: string
+          candidate_fingerprint?: string
+          case_count?: number
+          case_ids?: string[]
+          completed_at?: string | null
+          completed_case_count?: number
+          conversation_id?: string
+          created_at?: string
+          creator_user_id?: string | null
+          dataset_hash?: string
+          error_code?: string | null
+          expires_at?: string
+          holdout_opened?: boolean
+          id?: string
+          idempotency_key?: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          metric_version?: string
+          request_payload_hash?: string
+          split?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eval_exam_runs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eval_quiz_cases: {
+        Row: {
+          atomic_facts: string[]
+          created_at: string
+          creator_user_id: string | null
+          document_id: string | null
+          expected_answer: string
+          expected_profile_id: string
+          expected_refusal: boolean
+          expected_scope: string
+          expires_at: string
+          generated_only: boolean
+          id: string
+          idempotency_key: string
+          query_class: string
+          question: string
+          request_payload_hash: string
+          required_terms: string[]
+          review_status: string
+          reviewed_at: string | null
+          reviewer_user_id: string | null
+          row_version: number
+          source_family_id: string | null
+          source_run_id: string | null
+          split: string
+          updated_at: string
+          version_id: string | null
+        }
+        Insert: {
+          atomic_facts?: string[]
+          created_at?: string
+          creator_user_id?: string | null
+          document_id?: string | null
+          expected_answer?: string
+          expected_profile_id?: string
+          expected_refusal?: boolean
+          expected_scope?: string
+          expires_at: string
+          generated_only?: boolean
+          id?: string
+          idempotency_key: string
+          query_class: string
+          question: string
+          request_payload_hash: string
+          required_terms?: string[]
+          review_status?: string
+          reviewed_at?: string | null
+          reviewer_user_id?: string | null
+          row_version?: number
+          source_family_id?: string | null
+          source_run_id?: string | null
+          split: string
+          updated_at?: string
+          version_id?: string | null
+        }
+        Update: {
+          atomic_facts?: string[]
+          created_at?: string
+          creator_user_id?: string | null
+          document_id?: string | null
+          expected_answer?: string
+          expected_profile_id?: string
+          expected_refusal?: boolean
+          expected_scope?: string
+          expires_at?: string
+          generated_only?: boolean
+          id?: string
+          idempotency_key?: string
+          query_class?: string
+          question?: string
+          request_payload_hash?: string
+          required_terms?: string[]
+          review_status?: string
+          reviewed_at?: string | null
+          reviewer_user_id?: string | null
+          row_version?: number
+          source_family_id?: string | null
+          source_run_id?: string | null
+          split?: string
+          updated_at?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eval_quiz_cases_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_quiz_cases_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_quiz_cases_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eval_quiz_gold_chunks: {
+        Row: {
+          case_id: string
+          chunk_id: string
+          created_at: string
+          document_id: string
+          ordinal: number
+          page_label: string | null
+          page_number: number | null
+          section_path: string[]
+          version_id: string
+        }
+        Insert: {
+          case_id: string
+          chunk_id: string
+          created_at?: string
+          document_id: string
+          ordinal: number
+          page_label?: string | null
+          page_number?: number | null
+          section_path?: string[]
+          version_id: string
+        }
+        Update: {
+          case_id?: string
+          chunk_id?: string
+          created_at?: string
+          document_id?: string
+          ordinal?: number
+          page_label?: string | null
+          page_number?: number | null
+          section_path?: string[]
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eval_quiz_gold_chunks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "eval_quiz_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_quiz_gold_chunks_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "document_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_quiz_gold_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_quiz_gold_chunks_version_id_fkey"
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "document_versions"
@@ -2195,6 +2706,74 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_maintenance_reviews: {
+        Row: {
+          assigned_to: string | null
+          kind: string
+          reason: string | null
+          revision: number
+          source_feedback_id: string | null
+          source_id: string
+          source_run_id: string | null
+          status: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          kind: string
+          reason?: string | null
+          revision?: number
+          source_feedback_id?: string | null
+          source_id: string
+          source_run_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          assigned_to?: string | null
+          kind?: string
+          reason?: string | null
+          revision?: number
+          source_feedback_id?: string | null
+          source_id?: string
+          source_run_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_maintenance_reviews_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "knowledge_maintenance_reviews_source_feedback_id_fkey"
+            columns: ["source_feedback_id"]
+            isOneToOne: false
+            referencedRelation: "user_feedback"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_maintenance_reviews_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_maintenance_reviews_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       langsmith_deletion_requests: {
         Row: {
           attempts: number
@@ -2898,6 +3477,10 @@ export type Database = {
           id: string
           idempotency_key: string | null
           idempotency_key_hash: string | null
+          knowledge_document_id: string | null
+          knowledge_resolved_query: string | null
+          knowledge_result: Json | null
+          knowledge_version_id: string | null
           manifest_ceiling: number | null
           model_call_ceiling: number | null
           recursion_limit: number | null
@@ -2925,6 +3508,10 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           idempotency_key_hash?: string | null
+          knowledge_document_id?: string | null
+          knowledge_resolved_query?: string | null
+          knowledge_result?: Json | null
+          knowledge_version_id?: string | null
           manifest_ceiling?: number | null
           model_call_ceiling?: number | null
           recursion_limit?: number | null
@@ -2952,6 +3539,10 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           idempotency_key_hash?: string | null
+          knowledge_document_id?: string | null
+          knowledge_resolved_query?: string | null
+          knowledge_result?: Json | null
+          knowledge_version_id?: string | null
           manifest_ceiling?: number | null
           model_call_ceiling?: number | null
           recursion_limit?: number | null
@@ -2972,6 +3563,20 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "runs_knowledge_document_id_fkey"
+            columns: ["knowledge_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "runs_knowledge_version_id_fkey"
+            columns: ["knowledge_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
           {
@@ -3433,6 +4038,50 @@ export type Database = {
           },
         ]
       }
+      checkpoint_usage_runs: {
+        Row: { run_id: string; source_user_id: string; checkpoint_id: string; recorded_at: string; prompt_tokens: number; completion_tokens: number; stored_cost_usd: number | null; estimated_cost_usd: number | null; cost_state: string }
+        Insert: { run_id: string; source_user_id: string; checkpoint_id: string; recorded_at: string; prompt_tokens: number; completion_tokens: number; stored_cost_usd?: number | null; estimated_cost_usd?: number | null; cost_state: string }
+        Update: { run_id?: string; source_user_id?: string; checkpoint_id?: string; recorded_at?: string; prompt_tokens?: number; completion_tokens?: number; stored_cost_usd?: number | null; estimated_cost_usd?: number | null; cost_state?: string }
+        Relationships: []
+      }
+      usage_token_measurements: {
+        Row: { usage_id: string; prompt_tokens: number; completion_tokens: number; cached_prompt_tokens: number; cache_write_30m_tokens: number | null; cache_write_12h_tokens: number | null; service_tier: string | null }
+        Insert: { usage_id: string; prompt_tokens: number; completion_tokens: number; cached_prompt_tokens: number; cache_write_30m_tokens?: number | null; cache_write_12h_tokens?: number | null; service_tier?: string | null }
+        Update: { usage_id?: string; prompt_tokens?: number; completion_tokens?: number; cached_prompt_tokens?: number; cache_write_30m_tokens?: number | null; cache_write_12h_tokens?: number | null; service_tier?: string | null }
+        Relationships: [{ foreignKeyName: "usage_token_measurements_usage_id_fkey"; columns: ["usage_id"]; isOneToOne: true; referencedRelation: "llm_usage"; referencedColumns: ["id"] }]
+      }
+      usage_cost_basis: {
+        Row: {
+          basis: string
+          estimated_cost_usd: number | null
+          pricing_version: string
+          recorded_at: string
+          usage_id: string
+        }
+        Insert: {
+          basis: string
+          estimated_cost_usd?: number | null
+          pricing_version?: string
+          recorded_at?: string
+          usage_id: string
+        }
+        Update: {
+          basis?: string
+          estimated_cost_usd?: number | null
+          pricing_version?: string
+          recorded_at?: string
+          usage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_cost_basis_usage_id_fkey"
+            columns: ["usage_id"]
+            isOneToOne: true
+            referencedRelation: "llm_usage"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_feedback: {
         Row: {
           comment: string | null
@@ -3440,6 +4089,7 @@ export type Database = {
           id: string
           rating: number | null
           run_id: string
+          share_with_reviewers: boolean
           tag: string | null
           user_id: string
         }
@@ -3449,6 +4099,7 @@ export type Database = {
           id?: string
           rating?: number | null
           run_id: string
+          share_with_reviewers?: boolean
           tag?: string | null
           user_id: string
         }
@@ -3458,6 +4109,7 @@ export type Database = {
           id?: string
           rating?: number | null
           run_id?: string
+          share_with_reviewers?: boolean
           tag?: string | null
           user_id?: string
         }
@@ -3779,6 +4431,80 @@ export type Database = {
       }
     }
     Functions: {
+      _eval_exam_audit: {
+        Args: {
+          p_actor_role: string
+          p_actor_user_id: string
+          p_authorization_version: number
+          p_event_type: string
+          p_payload: Json
+          p_target_id: string
+        }
+        Returns: string
+      }
+      _eval_exam_require_owner_admin: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: undefined
+      }
+      _eval_exam_snapshot: {
+        Args: { caller_role: string; caller_user_id: string; p_split: string }
+        Returns: {
+          case_ids: string[]
+          dataset_hash: string
+        }[]
+      }
+      _eval_quiz_apply_gold: {
+        Args: {
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+          p_chunk_ids: string[]
+        }
+        Returns: undefined
+      }
+      _eval_quiz_assert_family: {
+        Args: { p_case_id: string; p_source_family_id: string; p_split: string }
+        Returns: undefined
+      }
+      _eval_quiz_audit: {
+        Args: {
+          p_actor_role: string
+          p_actor_user_id: string
+          p_authorization_version: number
+          p_event_type: string
+          p_payload: Json
+          p_target_id: string
+        }
+        Returns: string
+      }
+      _eval_quiz_chunk_is_current: {
+        Args: {
+          caller_role: string
+          caller_user_id: string
+          p_chunk_id: string
+        }
+        Returns: boolean
+      }
+      _eval_quiz_chunk_page_label: {
+        Args: { p_provenance: Json }
+        Returns: string
+      }
+      _eval_quiz_lock_workspace: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      _eval_quiz_require_owner_admin: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: undefined
+      }
       _graph_entity_rule_require_admin: {
         Args: {
           caller_authorization_version: number
@@ -3799,18 +4525,15 @@ export type Database = {
           upload_quota_bytes: number | null
           user_id: string
         }
-        SetofOptions: {
-          from: "*"
-          to: "profiles"
-          isOneToOne: true
-          isSetofReturn: false
-        }
       }
       _validate_job_lease_seconds: {
         Args: { p_lease_seconds: number }
         Returns: undefined
       }
-      _validate_job_owner: { Args: { p_owner: string }; Returns: undefined }
+      _validate_job_owner: {
+        Args: { p_owner: string }
+        Returns: undefined
+      }
       _web_require_run_owner: {
         Args: {
           caller_authorization_version: number
@@ -3818,16 +4541,45 @@ export type Database = {
           caller_user_id: string
           p_run_id: string
         }
-        Returns: Database["app"]["Tables"]["runs"]["Row"]
-        SetofOptions: {
-          from: "*"
-          to: "runs"
-          isOneToOne: true
-          isSetofReturn: false
+        Returns: {
+          completed_at: string | null
+          conversation_id: string
+          correction_ceiling: number | null
+          created_at: string
+          creator_user_id: string
+          deadline_at: string | null
+          discovery_ceiling: number | null
+          graph_name: string | null
+          heartbeat_at: string | null
+          id: string
+          idempotency_key: string | null
+          idempotency_key_hash: string | null
+          knowledge_document_id: string | null
+          knowledge_resolved_query: string | null
+          knowledge_result: Json | null
+          knowledge_version_id: string | null
+          manifest_ceiling: number | null
+          model_call_ceiling: number | null
+          recursion_limit: number | null
+          request_payload_hash: string | null
+          requested_search_scope: string
+          reservation_id: string | null
+          route_family: string | null
+          side_effect_ceiling: number | null
+          started_at: string | null
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number | null
+          tool_ceiling: number | null
+          updated_at: string
         }
       }
       accept_invitation: {
-        Args: { p_token_hash: string; p_user_email: string; p_user_id: string }
+        Args: {
+          p_assurance_level?: string
+          p_token_hash: string
+          p_user_email: string
+          p_user_id: string
+        }
         Returns: string
       }
       activate_graph_ineligible_version: {
@@ -3840,17 +4592,33 @@ export type Database = {
           description: string | null
           graph_eligible: boolean
           id: string
+          knowledge_area: string | null
+          knowledge_generation: number
+          knowledge_owner_user_id: string | null
+          review_due_at: string | null
           title: string
           updated_at: string
           visibility: Database["app"]["Enums"]["document_visibility"]
           visibility_generation: number
         }
-        SetofOptions: {
-          from: "*"
-          to: "documents"
-          isOneToOne: true
-          isSetofReturn: false
+      }
+      admin_overview_ledger_v1: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_days?: number
         }
+        Returns: Json
+      }
+      admin_overview: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_days?: number
+        }
+        Returns: Json
       }
       admit_query_run: {
         Args: {
@@ -4023,6 +4791,19 @@ export type Database = {
           repair_job_id: string
         }[]
       }
+      approve_eval_quiz_case: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+          p_row_version: number
+        }
+        Returns: {
+          case_id: string
+          row_version: number
+        }[]
+      }
       approve_glossary_import: {
         Args: {
           caller_authorization_version: number
@@ -4112,7 +4893,10 @@ export type Database = {
           status: string
         }[]
       }
-      bootstrap_owner: { Args: { p_user_id: string }; Returns: boolean }
+      bootstrap_owner: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       caller_can_read_document: {
         Args: {
           caller_role: string
@@ -4120,6 +4904,18 @@ export type Database = {
           p_document_id: string
         }
         Returns: boolean
+      }
+      cancel_eval_exam: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_exam_run_id: string
+        }
+        Returns: {
+          exam_run_id: string
+          status: string
+        }[]
       }
       cancel_ingestion_job: {
         Args: { p_job_id: string; p_lease_token: string; p_owner: string }
@@ -4165,12 +4961,6 @@ export type Database = {
           updated_at: string
           version_id: string | null
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "bm25_index_jobs"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       claim_bm25_reconcile_job: {
         Args: { p_lease_seconds: number; p_owner: string }
@@ -4196,12 +4986,25 @@ export type Database = {
           updated_at: string
           version_id: string | null
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "bm25_index_jobs"
-          isOneToOne: false
-          isSetofReturn: true
+      }
+      claim_eval_exam: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_lease_owner: string
+          p_lease_seconds: number
         }
+        Returns: {
+          candidate_fingerprint: string
+          case_count: number
+          case_ids: string[]
+          completed_case_count: number
+          conversation_id: string
+          dataset_hash: string
+          exam_run_id: string
+          split: string
+        }[]
       }
       claim_ingestion_job: {
         Args: { p_lease_seconds: number; p_owner: string }
@@ -4227,12 +5030,6 @@ export type Database = {
           updated_at: string
           version_id: string | null
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "ingestion_jobs"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       claim_langsmith_deletion_requests: {
         Args: { p_limit?: number; p_now?: string }
@@ -4252,12 +5049,6 @@ export type Database = {
           status: string
           updated_at: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "langsmith_deletion_requests"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       claim_lightrag_index_job: {
         Args: { p_lease_seconds: number; p_owner: string }
@@ -4283,12 +5074,15 @@ export type Database = {
           updated_at: string
           version_id: string | null
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "lightrag_index_jobs"
-          isOneToOne: false
-          isSetofReturn: true
-        }
+      }
+      classify_usage_cost: {
+        Args: { u: Database["app"]["Tables"]["llm_usage"]["Row"] }
+        Returns: {
+          estimated_usd: number
+          reconstructed: number
+          safety_usd: number
+          unresolved: number
+        }[]
       }
       complete_ingestion_job: {
         Args: { p_job_id: string; p_lease_token: string; p_owner: string }
@@ -4349,6 +5143,17 @@ export type Database = {
           reservation_id: string
         }[]
       }
+      conversation_knowledge_scope: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_document_id?: string
+          p_update?: boolean
+        }
+        Returns: Json
+      }
       count_authorized_retrievable_chunks: {
         Args: {
           caller_authorization_version: number
@@ -4368,6 +5173,21 @@ export type Database = {
         }
         Returns: number
       }
+      count_eval_quiz_case_status: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          approved_count: number
+          draft_count: number
+          live_count: number
+          rejected_count: number
+          remaining_capacity: number
+          stale_gold_count: number
+        }[]
+      }
       create_conversation: {
         Args: {
           caller_authorization_version: number
@@ -4382,7 +5202,34 @@ export type Database = {
           title: string
         }[]
       }
-      current_authorization_version: { Args: never; Returns: number }
+      create_eval_quiz_case: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_atomic_facts: string[]
+          p_chunk_ids: string[]
+          p_expected_answer: string
+          p_generated_only: boolean
+          p_idempotency_key: string
+          p_query_class: string
+          p_question: string
+          p_request_payload_hash: string
+          p_required_terms: string[]
+          p_source_family_id: string
+          p_source_run_id: string
+          p_split: string
+        }
+        Returns: {
+          case_id: string
+          replayed: boolean
+          row_version: number
+        }[]
+      }
+      current_authorization_version: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       delete_conversation: {
         Args: {
           caller_authorization_version: number
@@ -4391,6 +5238,27 @@ export type Database = {
           p_conversation_id: string
         }
         Returns: undefined
+      }
+      delete_eval_quiz_case: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+          p_row_version: number
+        }
+        Returns: {
+          deleted: boolean
+        }[]
+      }
+      delete_visible_document: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_document_id: string
+        }
+        Returns: string
       }
       detector_reviews_cover_version: {
         Args: {
@@ -4452,6 +5320,25 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_eval_exam: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_candidate_fingerprint: string
+          p_expected_dataset_hash: string
+          p_idempotency_key: string
+          p_request_payload_hash: string
+          p_split: string
+        }
+        Returns: {
+          conversation_id: string
+          dataset_hash: string
+          exam_run_id: string
+          replayed: boolean
+          status: string
+        }[]
+      }
       enqueue_graph_map_repair: {
         Args: {
           p_config_generation: string
@@ -4497,6 +5384,7 @@ export type Database = {
       exclude_version_from_retrieval: {
         Args: { p_reason?: string; p_version_id: string }
         Returns: {
+          authority_status: string
           bm25_verified_at: string | null
           byte_size: number | null
           chunk_set_hash: string | null
@@ -4508,6 +5396,7 @@ export type Database = {
           effective_at: string | null
           embedding_model: string | null
           embedding_policy_hash: string | null
+          governance_generation: number
           graph_eligible: boolean
           graph_handoff_at: string | null
           hybrid_verified_at: string | null
@@ -4519,14 +5408,9 @@ export type Database = {
           status: Database["app"]["Enums"]["document_status"]
           storage_bucket: string | null
           storage_path: string | null
+          superseded_by_version_id: string | null
           updated_at: string
           version_number: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "document_versions"
-          isOneToOne: true
-          isSetofReturn: false
         }
       }
       fail_lightrag_index_job: {
@@ -4578,6 +5462,21 @@ export type Database = {
           version_id: string
         }[]
       }
+      finalize_eval_exam: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_error_code: string
+          p_exam_run_id: string
+          p_gates_pass: boolean
+        }
+        Returns: {
+          exam_run_id: string
+          report_present: boolean
+          status: string
+        }[]
+      }
       finalize_hybrid_ready: {
         Args: {
           p_bm25_job_id?: string
@@ -4585,6 +5484,7 @@ export type Database = {
           p_version_id: string
         }
         Returns: {
+          authority_status: string
           bm25_verified_at: string | null
           byte_size: number | null
           chunk_set_hash: string | null
@@ -4596,6 +5496,7 @@ export type Database = {
           effective_at: string | null
           embedding_model: string | null
           embedding_policy_hash: string | null
+          governance_generation: number
           graph_eligible: boolean
           graph_handoff_at: string | null
           hybrid_verified_at: string | null
@@ -4607,14 +5508,9 @@ export type Database = {
           status: Database["app"]["Enums"]["document_status"]
           storage_bucket: string | null
           storage_path: string | null
+          superseded_by_version_id: string | null
           updated_at: string
           version_number: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "document_versions"
-          isOneToOne: true
-          isSetofReturn: false
         }
       }
       finalize_quarantine_upload: {
@@ -4670,6 +5566,10 @@ export type Database = {
           id: string
           idempotency_key: string | null
           idempotency_key_hash: string | null
+          knowledge_document_id: string | null
+          knowledge_resolved_query: string | null
+          knowledge_result: Json | null
+          knowledge_version_id: string | null
           manifest_ceiling: number | null
           model_call_ceiling: number | null
           recursion_limit: number | null
@@ -4684,12 +5584,29 @@ export type Database = {
           tool_ceiling: number | null
           updated_at: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "runs"
-          isOneToOne: false
-          isSetofReturn: true
+      }
+      find_visible_document_by_content_hash: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_content_hash: string
         }
+        Returns: string
+      }
+      get_citation_page_object_v1: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_citation_id: string
+          p_run_id: string
+        }
+        Returns: {
+          pdf_page_number: number
+          storage_bucket: string
+          storage_path: string
+        }[]
       }
       get_conversation: {
         Args: {
@@ -4716,6 +5633,110 @@ export type Database = {
           assistant_excerpt: string
           current_title: string
           user_excerpt: string
+        }[]
+      }
+      get_document_governance: {
+        Args:
+          | {
+              caller_authorization_version: number
+              caller_role: string
+              caller_user_id: string
+              p_document_id: string
+            }
+          | {
+              caller_authorization_version: number
+              caller_role: string
+              caller_user_id: string
+              p_document_id: string
+              p_version_id: string
+            }
+        Returns: Json
+      }
+      get_eval_exam_run: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_exam_run_id: string
+        }
+        Returns: {
+          candidate_fingerprint: string
+          case_count: number
+          completed_case_count: number
+          conversation_id: string
+          dataset_hash: string
+          exam_run_id: string
+          holdout_opened: boolean
+          split: string
+          status: string
+        }[]
+      }
+      get_eval_quiz_case: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+        }
+        Returns: {
+          atomic_facts: string[]
+          case_id: string
+          created_at: string
+          document_id: string
+          expected_answer: string
+          expected_scope: string
+          expires_at: string
+          generated_only: boolean
+          gold: Json
+          gold_stale: boolean
+          query_class: string
+          question: string
+          required_terms: string[]
+          review_status: string
+          reviewed_at: string
+          reviewer_user_id: string
+          row_version: number
+          source_family_id: string
+          source_run_id: string
+          split: string
+          version_id: string
+        }[]
+      }
+      get_latest_eval_exam_report: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          case_count: number
+          created_at: string
+          dataset_hash: string
+          exam_run_id: string
+          gates_pass: boolean
+          hit_count: number
+          holdout_opened: boolean
+          hybrid_recall_at_10: number
+          split: string
+        }[]
+      }
+      get_latest_eval_exam_report_for_split: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_split: string
+        }
+        Returns: {
+          case_count: number
+          created_at: string
+          dataset_hash: string
+          exam_run_id: string
+          gates_pass: boolean
+          hit_count: number
+          holdout_opened: boolean
+          hybrid_recall_at_10: number
+          split: string
         }[]
       }
       get_query_run: {
@@ -4777,9 +5798,9 @@ export type Database = {
           p_run_id: string
         }
         Returns: {
+          chunk_id: string
           citation_id: string
           citation_index: number
-          chunk_id: string
           document_id: string
           document_title: string
           document_visibility: string
@@ -4793,6 +5814,24 @@ export type Database = {
           version_id: string
           web_source_id: string
         }[]
+      }
+      get_run_knowledge_result: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: Json
+      }
+      get_run_knowledge_scope: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: Json
       }
       get_version_ingestion_status: {
         Args: {
@@ -4826,7 +5865,10 @@ export type Database = {
         Args: { pattern: string }
         Returns: boolean
       }
-      glossary_payload_has_cycle: { Args: { payload: Json }; Returns: boolean }
+      glossary_payload_has_cycle: {
+        Args: { payload: Json }
+        Returns: boolean
+      }
       graph_entity_rule_has_conflict: {
         Args: {
           p_aliases: string[]
@@ -4848,6 +5890,17 @@ export type Database = {
           acl_blindness_count: number
           partial_readiness_count: number
         }[]
+      }
+      heartbeat_eval_exam: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_exam_run_id: string
+          p_lease_owner: string
+          p_lease_seconds: number
+        }
+        Returns: string
       }
       heartbeat_graph_writer_lease: {
         Args: { p_lease_seconds: number; p_owner: string; p_token: string }
@@ -4912,6 +5965,22 @@ export type Database = {
           citation_id: string
         }[]
       }
+      insert_run_citation_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_chunk_id: string
+          p_citation_index: number
+          p_paragraph_index: number
+          p_provenance: Json
+          p_run_id: string
+          p_snippet: string
+        }
+        Returns: {
+          citation_id: string
+        }[]
+      }
       insert_web_citation: {
         Args: {
           caller_authorization_version: number
@@ -4965,6 +6034,29 @@ export type Database = {
           version_id: string
         }[]
       }
+      knowledge_run_review_allowed: {
+        Args: { p_role: string; p_run: string; p_user: string }
+        Returns: boolean
+      }
+      list_authorized_eval_passages: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_after_chunk_id: string
+          p_limit: number
+          p_version_id: string
+        }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          is_search_representative: boolean
+          page_number: number
+          raw_text: string
+          section_path: string[]
+          version_id: string
+        }[]
+      }
       list_authorized_table_manifests: {
         Args: {
           caller_authorization_version: number
@@ -4981,6 +6073,29 @@ export type Database = {
           table_id: string
           table_name: string
           version_id: string
+        }[]
+      }
+      list_conversation_citations_v1: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_run_ids: string[]
+        }
+        Returns: {
+          chunk_id: string
+          citation_id: string
+          citation_index: number
+          document_title: string
+          evidence_excerpt: string
+          paragraph_index: number
+          pdf_page_number: number
+          provenance: Json
+          run_id: string
+          source_kind: string
+          source_unavailable: boolean
+          web_source_id: string
         }[]
       }
       list_conversation_messages: {
@@ -5035,6 +6150,47 @@ export type Database = {
           source_kind: string
         }[]
       }
+      list_eval_exam_report_cases: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_exam_run_id: string
+        }
+        Returns: {
+          case_id: string
+          exam_run_id: string
+          gold_count: number
+          hit: boolean
+          latency_ms: number
+          ordinal: number
+          ranked_hit_count: number
+        }[]
+      }
+      list_eval_quiz_case_summaries: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_after_id: string
+          p_limit: number
+          p_review_status: string
+          p_split: string
+        }
+        Returns: {
+          case_id: string
+          created_at: string
+          expires_at: string
+          generated_only: boolean
+          gold_chunk_count: number
+          gold_stale: boolean
+          query_class: string
+          review_status: string
+          row_version: number
+          source_family_id: string
+          split: string
+        }[]
+      }
       list_graph_entity_rules: {
         Args: {
           caller_authorization_version: number
@@ -5059,6 +6215,27 @@ export type Database = {
           source: Database["app"]["Enums"]["graph_entity_rule_source"]
           status: Database["app"]["Enums"]["graph_entity_rule_status"]
           updated_at: string
+        }[]
+      }
+      list_knowledge_maintenance: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          assigned_to: string
+          document_id: string
+          kind: string
+          reason: string
+          report: Json
+          revision: number
+          run_id: string
+          source_id: string
+          status: string
+          title: string
         }[]
       }
       list_pending_team_invitations: {
@@ -5158,6 +6335,22 @@ export type Database = {
         }[]
       }
       list_run_events_after: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_after_sequence: number
+          p_run_id: string
+        }
+        Returns: {
+          created_at: string
+          event_type: string
+          payload: Json
+          run_id: string
+          sequence: number
+        }[]
+      }
+      list_run_events_before_knowledge_guard: {
         Args: {
           caller_authorization_version: number
           caller_role: string
@@ -5434,6 +6627,78 @@ export type Database = {
         Args: { p_lease_seconds: number; p_owner: string; p_token: string }
         Returns: boolean
       }
+      patch_eval_quiz_case: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_atomic_facts: string[]
+          p_case_id: string
+          p_expected_answer: string
+          p_expected_scope: string
+          p_query_class: string
+          p_question: string
+          p_required_terms: string[]
+          p_row_version: number
+          p_source_family_id: string
+        }
+        Returns: {
+          case_id: string
+          row_version: number
+        }[]
+      }
+      pdf_viewer_page_from_locators: {
+        Args: { p_provenance: Json }
+        Returns: number
+      }
+      persist_eval_exam_case_result: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+          p_exam_run_id: string
+          p_gold_count: number
+          p_hit: boolean
+          p_latency_ms: number
+          p_ranked_hit_count: number
+        }
+        Returns: {
+          case_id: string
+          completed_case_count: number
+          exam_run_id: string
+          inserted: boolean
+        }[]
+      }
+      prepare_knowledge_clarification: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_query: string
+          p_question?: string
+          p_run_id: string
+        }
+        Returns: Json
+      }
+      purge_expired_eval_exam_runs: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: number
+      }
+      purge_expired_eval_quiz_cases: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          purged_count: number
+        }[]
+      }
       quarantine_graph_workspace: {
         Args: { p_reason: string; p_workspace_key: string }
         Returns: string
@@ -5481,7 +6746,24 @@ export type Database = {
           version_id: string
         }[]
       }
-      reconcile_expired_query_runs: { Args: never; Returns: number }
+      reclaim_eval_exam: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_exam_run_id: string
+          p_lease_owner: string
+          p_lease_seconds: number
+        }
+        Returns: {
+          exam_run_id: string
+          reclaimed: boolean
+        }[]
+      }
+      reconcile_expired_query_runs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       record_embedding_ledger: {
         Args: {
           p_actual_usd?: number
@@ -5547,6 +6829,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_run_knowledge_result: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_result: Json
+          p_run_id: string
+        }
+        Returns: undefined
+      }
       record_run_restricted_evidence: {
         Args: {
           caller_authorization_version: number
@@ -5562,7 +6854,42 @@ export type Database = {
         }
         Returns: string
       }
-      redact_audit_payload: { Args: { payload: Json }; Returns: Json }
+      record_usage_token_measurement: {
+        Args: { p_user: string; p_role: string; p_authz: number; p_usage: string; p_input: number; p_output: number; p_cached: number; p_write_30m?: number | null; p_write_12h?: number | null; p_tier?: string | null }
+        Returns: undefined
+      }
+      run_usage_cost_reporting: {
+        Args: { p_user: string; p_role: string; p_authz: number; p_run: string }
+        Returns: Json
+      }
+      record_usage_cost_basis: {
+        Args: {
+          p_authz: number
+          p_basis: string
+          p_estimate: number
+          p_role: string
+          p_usage_id: string
+          p_user: string
+        }
+        Returns: undefined
+      }
+      redact_audit_payload: {
+        Args: { payload: Json }
+        Returns: Json
+      }
+      reject_eval_quiz_case: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+          p_row_version: number
+        }
+        Returns: {
+          case_id: string
+          row_version: number
+        }[]
+      }
       release_expired_upload_reservations: {
         Args: { as_of?: string }
         Returns: number
@@ -5570,6 +6897,21 @@ export type Database = {
       release_graph_writer_lease: {
         Args: { p_owner: string; p_token: string }
         Returns: boolean
+      }
+      replace_eval_quiz_gold: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_case_id: string
+          p_chunk_ids: string[]
+          p_row_version: number
+        }
+        Returns: {
+          case_id: string
+          gold_chunk_count: number
+          row_version: number
+        }[]
       }
       reserve_upload_quota: {
         Args: {
@@ -5612,7 +6954,10 @@ export type Database = {
           version_id: string
         }[]
       }
-      retrieval_exact_row_cap: { Args: never; Returns: number }
+      retrieval_exact_row_cap: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       retrieve_dense_candidates: {
         Args: {
           caller_authorization_version: number
@@ -5671,6 +7016,7 @@ export type Database = {
           caller_role: string
           caller_user_id: string
           p_candidate_limit: number
+          p_extra_terms?: string[]
           p_language?: string
           p_query_normalized: string
         }
@@ -5763,6 +7109,15 @@ export type Database = {
           status: Database["app"]["Enums"]["glossary_import_status"]
         }[]
       }
+      run_knowledge_history_unavailable: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: boolean
+      }
       sanitize_ingestion_last_error: {
         Args: { p_category: string; p_error: string }
         Returns: string
@@ -5807,16 +7162,14 @@ export type Database = {
           description: string | null
           graph_eligible: boolean
           id: string
+          knowledge_area: string | null
+          knowledge_generation: number
+          knowledge_owner_user_id: string | null
+          review_due_at: string | null
           title: string
           updated_at: string
           visibility: Database["app"]["Enums"]["document_visibility"]
           visibility_generation: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "documents"
-          isOneToOne: true
-          isSetofReturn: false
         }
       }
       set_tool_permission: {
@@ -5829,6 +7182,24 @@ export type Database = {
           p_tool_key: string
         }
         Returns: string
+      }
+      share_knowledge_feedback: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_feedback_id: string
+        }
+        Returns: undefined
+      }
+      standard_token_cost_20261026: {
+        Args: {
+          p_input: number
+          p_kind: string
+          p_model: string
+          p_output: number
+        }
+        Returns: number
       }
       submit_run_feedback: {
         Args: {
@@ -5882,6 +7253,23 @@ export type Database = {
           usage_rows: number
         }[]
       }
+      summarize_checkpoint_usage: {
+        Args: { p_user: string; p_role: string; p_authz: number; p_company: boolean }
+        Returns: Json
+      }
+      checkpoint_usage_summary: {
+        Args: { p_start: string; p_end: string; p_user: string }
+        Returns: Json
+      }
+      summarize_usage_cost_reporting: {
+        Args: {
+          p_authz: number
+          p_company: boolean
+          p_role: string
+          p_user: string
+        }
+        Returns: Json
+      }
       switch_graph_active_workspace: {
         Args: {
           p_expected_generation: number
@@ -5907,6 +7295,10 @@ export type Database = {
           switched: boolean
           workspace_id: string
         }[]
+      }
+      sync_document_title_search_terms: {
+        Args: { p_document_id: string; p_title: string }
+        Returns: number
       }
       transition_document_version_status: {
         Args: {
@@ -5962,6 +7354,37 @@ export type Database = {
           id: string
           title: string
         }[]
+      }
+      update_document_governance: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_body: Json
+          p_document_id: string
+        }
+        Returns: Json
+      }
+      update_document_title: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_document_id: string
+          p_title: string
+        }
+        Returns: string
+      }
+      update_knowledge_maintenance: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_body: Json
+          p_kind: string
+          p_source_id: string
+        }
+        Returns: undefined
       }
       upsert_graph_cleanup_tombstone: {
         Args: {
@@ -6021,6 +7444,10 @@ export type Database = {
         }
         Returns: string
       }
+      usage_report_summary: {
+        Args: { p_end: string; p_run: string; p_start: string; p_user: string }
+        Returns: Json
+      }
       validate_active_graph_writer_lease: {
         Args: { p_owner: string; p_token: string }
         Returns: boolean
@@ -6037,7 +7464,10 @@ export type Database = {
         }
         Returns: boolean
       }
-      verify_audit_chain: { Args: { limit_n?: number }; Returns: string }
+      verify_audit_chain: {
+        Args: { limit_n?: number }
+        Returns: string
+      }
       version_governance_review_diagnostics: {
         Args: {
           caller_authorization_version: number
@@ -6503,6 +7933,83 @@ export type Database = {
           },
         ]
       }
+      mfa_recovery_code_sets: {
+        Row: {
+          created_at: string
+          failed_verification_count: number
+          id: string
+          mfa_factor_id: string
+          updated_at: string
+          user_id: string
+          verification_locked_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          failed_verification_count?: number
+          id: string
+          mfa_factor_id: string
+          updated_at?: string
+          user_id: string
+          verification_locked_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          failed_verification_count?: number
+          id?: string
+          mfa_factor_id?: string
+          updated_at?: string
+          user_id?: string
+          verification_locked_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mfa_recovery_code_sets_mfa_factor_id_fkey"
+            columns: ["mfa_factor_id"]
+            isOneToOne: true
+            referencedRelation: "mfa_factors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mfa_recovery_code_sets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          id: string
+          mfa_recovery_code_set_id: string
+        }
+        Insert: {
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          id: string
+          mfa_recovery_code_set_id: string
+        }
+        Update: {
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          mfa_recovery_code_set_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mfa_recovery_codes_mfa_recovery_code_set_id_fkey"
+            columns: ["mfa_recovery_code_set_id"]
+            isOneToOne: false
+            referencedRelation: "mfa_recovery_code_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oauth_authorizations: {
         Row: {
           approved_at: string | null
@@ -6698,6 +8205,7 @@ export type Database = {
       one_time_tokens: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
           relates_to: string
           token_hash: string
@@ -6707,6 +8215,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id: string
           relates_to: string
           token_hash: string
@@ -6716,6 +8225,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           relates_to?: string
           token_hash?: string
@@ -6881,13 +8391,108 @@ export type Database = {
         }
         Relationships: []
       }
+      scim_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_used_at: string | null
+          prefix: string
+          revoked_at: string | null
+          sso_provider_id: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id: string
+          last_used_at?: string | null
+          prefix: string
+          revoked_at?: string | null
+          sso_provider_id: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          prefix?: string
+          revoked_at?: string | null
+          sso_provider_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scim_tokens_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scim_users: {
+        Row: {
+          active: boolean
+          created_at: string
+          deleted_at: string | null
+          external_id: string | null
+          id: string
+          resource: Json
+          sso_provider_id: string
+          updated_at: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id: string
+          resource: Json
+          sso_provider_id: string
+          updated_at?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          resource?: Json
+          sso_provider_id?: string
+          updated_at?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scim_users_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scim_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sessions: {
         Row: {
           aal: Database["auth"]["Enums"]["aal_level"] | null
           created_at: string | null
           factor_id: string | null
           id: string
-          ip: unknown
+          ip: unknown | null
           not_after: string | null
           oauth_client_id: string | null
           refresh_token_counter: number | null
@@ -6904,7 +8509,7 @@ export type Database = {
           created_at?: string | null
           factor_id?: string | null
           id: string
-          ip?: unknown
+          ip?: unknown | null
           not_after?: string | null
           oauth_client_id?: string | null
           refresh_token_counter?: number | null
@@ -6921,7 +8526,7 @@ export type Database = {
           created_at?: string | null
           factor_id?: string | null
           id?: string
-          ip?: unknown
+          ip?: unknown | null
           not_after?: string | null
           oauth_client_id?: string | null
           refresh_token_counter?: number | null
@@ -7219,16 +8824,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      email: { Args: never; Returns: string }
-      jwt: { Args: never; Returns: Json }
-      role: { Args: never; Returns: string }
-      uid: { Args: never; Returns: string }
+      email: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      jwt: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      uid: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       aal_level: "aal1" | "aal2" | "aal3"
       code_challenge_method: "s256" | "plain"
       factor_status: "unverified" | "verified"
-      factor_type: "totp" | "webauthn" | "phone"
+      factor_type: "totp" | "webauthn" | "phone" | "recovery_code"
       oauth_authorization_status: "pending" | "approved" | "denied" | "expired"
       oauth_client_type: "public" | "confidential"
       oauth_registration_type: "dynamic" | "manual"
@@ -7271,6 +8888,8 @@ export type Database = {
           created_at: string | null
           file_size_limit: number | null
           id: string
+          lifecycle_configuration: Json | null
+          lifecycle_configuration_generation: string | null
           name: string
           owner: string | null
           owner_id: string | null
@@ -7285,6 +8904,8 @@ export type Database = {
           created_at?: string | null
           file_size_limit?: number | null
           id: string
+          lifecycle_configuration?: Json | null
+          lifecycle_configuration_generation?: string | null
           name: string
           owner?: string | null
           owner_id?: string | null
@@ -7299,6 +8920,8 @@ export type Database = {
           created_at?: string | null
           file_size_limit?: number | null
           id?: string
+          lifecycle_configuration?: Json | null
+          lifecycle_configuration_generation?: string | null
           name?: string
           owner?: string | null
           owner_id?: string | null
@@ -7359,6 +8982,101 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      iceberg_namespaces: {
+        Row: {
+          bucket_name: string
+          catalog_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          catalog_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iceberg_namespaces_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_analytics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iceberg_tables: {
+        Row: {
+          bucket_name: string
+          catalog_id: string
+          created_at: string
+          id: string
+          location: string
+          name: string
+          namespace_id: string
+          remote_table_id: string | null
+          shard_id: string | null
+          shard_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          catalog_id: string
+          created_at?: string
+          id?: string
+          location: string
+          name: string
+          namespace_id: string
+          remote_table_id?: string | null
+          shard_id?: string | null
+          shard_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          location?: string
+          name?: string
+          namespace_id?: string
+          remote_table_id?: string | null
+          shard_id?: string | null
+          shard_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iceberg_tables_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "iceberg_tables_namespace_id_fkey"
+            columns: ["namespace_id"]
+            isOneToOne: false
+            referencedRelation: "iceberg_namespaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       migrations: {
         Row: {
@@ -7605,15 +9323,24 @@ export type Database = {
         Args: { bucketid: string; metadata: Json; name: string; owner: string }
         Returns: undefined
       }
-      extension: { Args: { name: string }; Returns: string }
-      filename: { Args: { name: string }; Returns: string }
-      foldername: { Args: { name: string }; Returns: string[] }
+      extension: {
+        Args: { name: string }
+        Returns: string
+      }
+      filename: {
+        Args: { name: string }
+        Returns: string
+      }
+      foldername: {
+        Args: { name: string }
+        Returns: string[]
+      }
       get_common_prefix: {
         Args: { p_delimiter: string; p_key: string; p_prefix: string }
         Returns: string
       }
       get_size_by_bucket: {
-        Args: never
+        Args: { delete_markers?: string; noncurrent_versions?: string }
         Returns: {
           bucket_id: string
           size: number
@@ -7627,6 +9354,7 @@ export type Database = {
           next_key_token?: string
           next_upload_token?: string
           prefix_param: string
+          raw_prefix_param?: string
         }
         Returns: {
           created_at: string
@@ -7637,28 +9365,41 @@ export type Database = {
       list_objects_with_delimiter: {
         Args: {
           _bucket_id: string
+          delete_markers?: string
           delimiter_param: string
           max_keys?: number
           next_token?: string
+          next_token_archived_at?: string
+          next_token_version?: string
+          noncurrent_versions?: string
           prefix_param: string
           sort_order?: string
           start_after?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
-      operation: { Args: never; Returns: string }
+      operation: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       search: {
         Args: {
           bucketname: string
+          delete_markers?: string
           levels?: number
           limits?: number
+          noncurrent_versions?: string
           offsets?: number
           prefix: string
           search?: string
@@ -7666,16 +9407,22 @@ export type Database = {
           sortorder?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       search_by_timestamp: {
         Args: {
+          delete_markers?: string
+          noncurrent_versions?: string
           p_bucket_id: string
           p_level: number
           p_limit: number
@@ -7684,36 +9431,50 @@ export type Database = {
           p_sort_column_after: string
           p_sort_order: string
           p_start_after: string
+          p_start_after_version?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           key: string
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       search_v2: {
         Args: {
           bucket_name: string
+          delete_markers?: string
           levels?: number
           limits?: number
+          noncurrent_versions?: string
           prefix: string
           sort_column?: string
           sort_column_after?: string
           sort_order?: string
           start_after?: string
+          start_after_archived_at?: string
+          start_after_is_continuation?: boolean
+          start_after_version?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           key: string
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
     }
@@ -7734,12 +9495,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7763,11 +9524,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7788,11 +9549,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7813,11 +9574,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7830,11 +9591,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -7942,7 +9703,7 @@ export const Constants = {
       aal_level: ["aal1", "aal2", "aal3"],
       code_challenge_method: ["s256", "plain"],
       factor_status: ["unverified", "verified"],
-      factor_type: ["totp", "webauthn", "phone"],
+      factor_type: ["totp", "webauthn", "phone", "recovery_code"],
       oauth_authorization_status: ["pending", "approved", "denied", "expired"],
       oauth_client_type: ["public", "confidential"],
       oauth_registration_type: ["dynamic", "manual"],

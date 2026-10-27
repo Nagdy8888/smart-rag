@@ -1,3 +1,5 @@
+import { parseCheckpointUsage, parseDisplayCost } from "../checkpoint-usage";
+import { parseCostReporting } from "../cost-reporting";
 /**
  * Caller and company usage HTTP helpers.
  */
@@ -29,6 +31,9 @@ function parseUsageResponse(body: Record<string, unknown>): UsageResponse {
   return {
     scope: body.scope,
     cost_usd: cost,
+    ...(body.cost_reporting === undefined ? {} : {cost_reporting:parseCostReporting(body.cost_reporting)}),
+    ...(body.checkpoint_usage === undefined ? {} : {checkpoint_usage:parseCheckpointUsage(body.checkpoint_usage)}),
+    ...(body.display_cost_usd === undefined ? {} : {display_cost_usd:parseDisplayCost(body.display_cost_usd)}),
     prompt_tokens: body.prompt_tokens as number,
     completion_tokens: body.completion_tokens as number,
     usage_rows: body.usage_rows as number,

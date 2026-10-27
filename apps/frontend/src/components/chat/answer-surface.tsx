@@ -51,6 +51,7 @@ import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
 import { CopyAnswerButton } from "./copy-answer-button";
 import { AnswerCodeBlock } from "./answer-code-block";
+import { KnowledgeOutcome } from "./knowledge-outcome";
 import { RunProgressTimeline } from "./run-progress-timeline";
 import { VerifiedAnswerReveal } from "./verified-answer-reveal";
 import styles from "./chat-transcript.module.css";
@@ -660,6 +661,7 @@ export const AnswerSurface = memo(function AnswerSurface({
         ) : (
           <div key={item.message_id} className={styles.turnAssistant}>
             <div className={styles.assistantBlock}>
+            <KnowledgeOutcome result={item.run_id === chat?.runId ? chat?.knowledgeResult : item.knowledge_result} />
             <LiveRegion aria-label="Answer" politeness="polite">
               <AnswerParagraphs
                 answerText={item.content}
@@ -720,6 +722,7 @@ export const AnswerSurface = memo(function AnswerSurface({
       {showLiveAssistant ? (
         <div className={`${styles.turnAssistant} ${styles.liveTurn}`}>
           <div className={styles.assistantBlock}>
+          <KnowledgeOutcome result={chat?.knowledgeResult} />
           {originLabel !== null ? (
             <p className={styles.answerHeader}>
               <Badge label={originLabel} data-testid="answer-origin" />

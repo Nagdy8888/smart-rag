@@ -17,6 +17,8 @@ import { EvaluationPanel } from "../evaluation/evaluation-panel";
 import { TeamAccessPanel } from "./team-access-panel";
 import { ToolsPanel } from "./tools-panel";
 import { UsagePanel } from "./usage-panel";
+import { OverviewPanel } from "./overview-panel";
+import { KnowledgePanel } from "./knowledge-panel";
 import { fetchMeta, listEntityRules, type ApiAuth } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
 import { pdfEvalCapability } from "../../lib/eval-workspace";
@@ -29,9 +31,11 @@ import {
 import styles from "./admin-shell.module.css";
 
 const TAB_LABELS: Record<AdminTab, string> = {
+  overview: "Overview",
   team: "Team & access",
   tools: "Tools",
   usage: "Usage",
+  knowledge: "Knowledge",
   evaluation: "Evaluation",
 };
 
@@ -175,9 +179,11 @@ export function AdminApp() {
         aria-labelledby={`admin-tab-${tab}`}
         className={styles.tabPanel}
       >
+        {tab === "overview" ? <OverviewPanel /> : null}
         {tab === "team" ? <TeamAccessPanel /> : null}
         {tab === "tools" ? <ToolsPanel /> : null}
         {tab === "usage" ? <UsagePanel /> : null}
+        {tab === "knowledge" ? <KnowledgePanel /> : null}
         {tab === "evaluation" ? <EvaluationPanel /> : null}
       </div>
     </div>

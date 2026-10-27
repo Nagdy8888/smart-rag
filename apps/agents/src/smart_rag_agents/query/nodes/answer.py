@@ -34,6 +34,8 @@ from smart_rag_core.query_answer.generate_code_salvage import (
     salvage_named_code_definition,
     salvage_named_table_block,
 )
+from smart_rag_core.query_answer.knowledge import load_governance
+from smart_rag_core.query_answer.knowledge_conflicts import explicit_policy_conflict
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.reproduction import canonical_reproduction_payload
 from smart_rag_core.query_answer.versions import ANSWER_MODEL_ID
@@ -50,6 +52,7 @@ from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.answer import gateway_answer
 from smart_rag_agents.query.gateway.general_chat import gateway_general_chat
 from smart_rag_agents.query.nodes.answer_attempts import run_answer_attempts
+from smart_rag_agents.query.nodes.knowledge import company_evidence_context
 from smart_rag_agents.query.nodes.shared import (
     route_needs_retrieval,
     runtime_after_consume,
@@ -112,6 +115,17 @@ def generate_answer_node(
 
     if skip_closed_nodes(state):
         return state
+    preparation = state.get("preparation")
+    if preparation is not None and preparation.get("clarification_question"):
+        return {
+            **state,
+            "status": "answered",
+            "detail": "clarification_required",
+            "answer": AnswerPayload(
+                answer_text=str(preparation["clarification_question"]),
+                answer_origin=KnowledgeScope.AMBIGUOUS,
+            ).model_dump(mode="json"),
+        }
     context = runtime_from_state(state)
     fusion = fusion_from_state(state.get("fusion"))
     tables = tables_from_state(state.get("table_composition"))
@@ -124,6 +138,29 @@ def generate_answer_node(
     company_forbidden = plan.company_claim_forbidden if plan is not None else False
     graph_forbidden = plan.graph_as_answer_forbidden if plan is not None else False
     knowledge_scope = plan.knowledge_scope if plan is not None else None
+    if knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS:
+        fusion, tables = company_evidence_context(state, deps)
+        state = {
+            **state,
+            "fusion": fusion.model_dump(mode="json"),
+            "table_composition": tables.model_dump(mode="json"),
+        }
+        if deps.connection is not None and context is not None and fusion.evidence:
+            records = load_governance(
+                deps.connection,
+                caller_from_runtime(context),
+                tuple(dict.fromkeys(item.document_id for item in fusion.evidence)),
+            )
+            if any(record.reliability_enabled for record in records.values()):
+                conflict = explicit_policy_conflict(fusion, records)
+                if conflict is not None:
+                    return {
+                        **state,
+                        "status": "answered",
+                        "detail": "explicit_policy_conflict",
+                        "knowledge_conflict": True,
+                        "answer": conflict.model_dump(mode="json"),
+                    }
     answer_mode = plan.no_retrieval_answer_mode if plan is not None else None
     degradation = plan.scope_degradation_reason if plan is not None else None
     if answer_mode is NoRetrievalAnswerMode.DETERMINISTIC_CHAT:
@@ -164,7 +201,9 @@ def generate_answer_node(
     working_tables = tables.records
     if needs_rag_model:
         fit = fit_source_records(
-            user_query=str(state.get("user_query") or ""),
+            user_query=str(
+                state.get("resolved_query") or state.get("user_query") or ""
+            ),
             fusion=fusion,
             tables=tables.records,
             max_input_chars=deps.model_input_max_chars,
@@ -187,7 +226,8 @@ def generate_answer_node(
             )
         clock = deps.now if deps.now is not None else (lambda: datetime.now(UTC))
         literal = canonical_reproduction_payload(
-            working_fusion, str(state.get("user_query") or "")
+            working_fusion,
+            str(state.get("resolved_query") or state.get("user_query") or ""),
         )
         if literal is not None and (
             context is None or (context.deadline_at - clock()).total_seconds() >= 5
@@ -274,7 +314,9 @@ def generate_answer_node(
             if needs_general_model:
                 return gateway_general_chat(
                     deps,
-                    query=str(state.get("user_query") or ""),
+                    query=str(
+                        state.get("resolved_query") or state.get("user_query") or ""
+                    ),
                     knowledge_scope=(
                         KnowledgeScope.USER_SUPPLIED_TEXT
                         if answer_mode is NoRetrievalAnswerMode.USER_TEXT_MODEL
@@ -285,7 +327,7 @@ def generate_answer_node(
                 )
             return gateway_answer(
                 deps,
-                query=str(state.get("user_query") or ""),
+                query=str(state.get("resolved_query") or state.get("user_query") or ""),
                 resolved_query=str(
                     (state.get("preparation") or {}).get("rewrite") or ""
                 ),
@@ -359,7 +401,9 @@ def generate_answer_node(
             if needs_rag_model:
                 payload, status = company_model_failure_payload(
                     working_fusion,
-                    user_query=str(state.get("user_query") or ""),
+                    user_query=str(
+                        state.get("resolved_query") or state.get("user_query") or ""
+                    ),
                     reason=str(reason),
                 )
                 return cast(
@@ -395,7 +439,9 @@ def generate_answer_node(
             answer = generate_answer(
                 fusion=working_fusion,
                 tables=working_tables,
-                user_query=str(state.get("user_query") or "query"),
+                user_query=str(
+                    state.get("resolved_query") or state.get("user_query") or "query"
+                ),
                 caller=caller,
                 already_generated=answer_calls,
                 company_claim_forbidden=company_forbidden,
@@ -410,7 +456,9 @@ def generate_answer_node(
             if needs_rag_model:
                 payload, status = company_model_failure_payload(
                     working_fusion,
-                    user_query=str(state.get("user_query") or ""),
+                    user_query=str(
+                        state.get("resolved_query") or state.get("user_query") or ""
+                    ),
                     reason=reason,
                 )
                 return cast(
@@ -495,7 +543,11 @@ def company_model_failure_payload(
     if reason == "input_bound_exceeded":
         return company_input_bound_payload(), "insufficient_evidence"
     refusal = AnswerPayload(
-        answer_text=("The available company evidence could not support this answer."),
+        answer_text=(
+            "The answer service timed out. Please try again."
+            if reason == "timeout_after_send"
+            else "The answer could not be generated. Please try again."
+        ),
         status="refused",
         answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     )

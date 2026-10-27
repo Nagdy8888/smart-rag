@@ -1,0 +1,15 @@
+/* A compact source control aligned to the chat composer. */
+.scope { display: grid; gap: 8px; width: 100%; max-width: 760px; margin-inline: auto; min-width: 0; flex-shrink: 0; }
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.picker { position: relative; width: 320px; max-width: 100%; min-width: 0; }
+.label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.select { display: block; appearance: none; width: 100%; min-width: 0; height: 38px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text-secondary); padding: 0 34px; font: inherit; font-size: 13px; line-height: 20px; text-overflow: ellipsis; cursor: pointer; transition: border-color var(--motion-fast), background-color var(--motion-fast); }
+.select:hover:not(:disabled) { border-color: var(--color-border-strong); background: var(--color-bg); }
+.select:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.select:disabled { opacity: .6; cursor: not-allowed; }
+.documentIcon,.chevron { position: absolute; width: 15px; height: 15px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
+.documentIcon { inset-inline-start: 11px; }
+.chevron { inset-inline-end: 10px; }
+.clear { width: auto; min-height: 38px; padding-inline: 8px; color: var(--color-text-muted); font-size: 12px; }
+.clear svg { width: 14px; height: 14px; }
+@media (max-width: 479px) { .picker { width: auto; flex: 1 1 220px; } .controls:has(.clear) .picker { flex-basis: 180px; } .clearLabel { display: none; } .clear { min-width: 38px; } }

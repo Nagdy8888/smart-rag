@@ -388,15 +388,16 @@ class HybridChannelJobsMixin:
         version_ids = tuple({item.version_id for item in candidates})
         if not version_ids or not self._supabase_dsn:
             return {}
-        by_version: dict[UUID, datetime | None] = {}
+        by_version: dict[UUID, tuple[datetime | None, str, bool]] = {}
         with self._channel_supabase() as connection:
             connection.execute("SET ROLE app_api")
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, effective_at
-                    FROM app.document_versions
-                    WHERE id = ANY(%s)
+                    SELECT v.id, v.effective_at, v.authority_status,
+                           s.knowledge_reliability_enabled
+                    FROM app.document_versions v CROSS JOIN app.company_settings s
+                    WHERE v.id = ANY(%s)
                     """,
                     (list(version_ids),),
                 )
@@ -404,12 +405,19 @@ class HybridChannelJobsMixin:
                     version_id = UUID(str(row[0]))
                     stamp = row[1]
                     by_version[version_id] = (
-                        stamp if isinstance(stamp, datetime) else None
+                        stamp if isinstance(stamp, datetime) else None,
+                        str(row[2]),
+                        bool(row[3]),
                     )
         records: dict[UUID, TemporalDocument] = {}
         for item in candidates:
+            stamp, authority, enabled = by_version.get(
+                item.version_id, (None, "unreviewed", False)
+            )
             records[item.chunk_id] = TemporalDocument(
                 item.chunk_id,
-                effective_at=by_version.get(item.version_id),
+                effective_at=stamp,
+                authority_status=authority,
+                reliability_enabled=enabled,
             )
         return records

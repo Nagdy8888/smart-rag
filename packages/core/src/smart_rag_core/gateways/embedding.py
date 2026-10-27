@@ -8,6 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from smart_rag_core.gateways.provider_usage import observe_provider_response
 from smart_rag_core.ingestion.embeddings.mock_vectors import mock_embedding_vector
 from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
@@ -196,6 +197,7 @@ class OpenAIEmbeddingAdapter:
             if error.status_code == 429:
                 raise EmbeddingProviderError("embedding_rate_limited") from error
             raise EmbeddingProviderError("embedding_provider_error") from error
+        observe_provider_response(response, embedding=True)
         by_index: dict[int, tuple[float, ...]] = {}
         for item in response.data:
             index = int(item.index)
@@ -212,9 +214,9 @@ class OpenAIEmbeddingAdapter:
                 raise ValueError("embedding_dimension_mismatch")
             vectors.append(vector)
         usage = getattr(response, "usage", None)
-        prompt_tokens = 0
-        if usage is not None:
-            prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        prompt_tokens = getattr(usage, "prompt_tokens", None)
+        if type(prompt_tokens) is not int or prompt_tokens < 0:
+            raise EmbeddingProviderError("embedding_unknown_usage")
         cost = (
             Decimal(prompt_tokens) * _OPENAI_LARGE_USD_PER_MILLION / Decimal(1_000_000)
         )

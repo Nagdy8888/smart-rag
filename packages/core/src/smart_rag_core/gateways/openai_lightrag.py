@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from openai import APIStatusError, APITimeoutError, AuthenticationError
 
+from smart_rag_core.gateways.provider_usage import observe_provider_response
 from smart_rag_core.observability.langsmith_tracing import (
     lightrag_llm_responses_traceable,
     traced_openai_client,
@@ -106,12 +107,16 @@ def execute_openai_lightrag_llm(
         if error.status_code == 429:
             raise OpenAILightragError("lightrag_llm_budget_denied") from error
         raise OpenAILightragError("lightrag_llm_provider_error") from error
+    observe_provider_response(response)
     request_id = str(getattr(response, "id", "") or "unknown")
     status = getattr(response, "status", None)
     if status not in {None, "completed"}:
         raise OpenAILightragError("lightrag_llm_incomplete")
     usage = getattr(response, "usage", None)
-    if usage is None:
+    if usage is None or any(
+        type(getattr(usage, field, None)) is not int or getattr(usage, field) < 0
+        for field in ("input_tokens", "output_tokens")
+    ):
         raise OpenAILightragError("lightrag_llm_unknown_usage")
     input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
     input_details = getattr(usage, "input_tokens_details", None)

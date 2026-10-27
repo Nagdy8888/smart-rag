@@ -163,8 +163,30 @@ def test_usage_response_has_no_source_text_fields() -> None:
     assert forbidden.isdisjoint(properties)
     assert set(properties) <= {
         "scope",
+        "checkpoint_usage",
+        "display_cost_usd",
         "cost_usd",
+        "cost_reporting",
         "prompt_tokens",
         "completion_tokens",
         "usage_rows",
+    }
+
+    from smart_rag_core.gateways.cost_reporting import CostReporting
+
+    report_properties = json_object(
+        CostReporting.model_json_schema().get("properties", {})
+    )
+    assert forbidden.isdisjoint(report_properties)
+    assert set(report_properties) == {
+        "estimated_cost_usd",
+        "safety_allowance_usd",
+        "budget_accounted_usd",
+        "unresolved_operations",
+        "reconstructed_operations",
+        "estimated_operations",
+        "pricing_basis",
+        "measured_prompt_tokens",
+        "measured_completion_tokens",
+        "unmeasured_operations",
     }

@@ -65,7 +65,7 @@ export function CitationSheet({
       <div className={sourceStyles.intro}>
         <span className={sourceStyles.libraryMark} aria-hidden="true"><Icon name="documents" /></span>
         <h3>Follow the evidence</h3>
-        <p>Open a source to read the supporting passage and inspect its original page.</p>
+        <p>Open a source to read the supporting passage, then inspect its original page or website.</p>
       </div>
       {pending ? (
         <p role="status" className={styles.muted}>
@@ -89,7 +89,7 @@ export function CitationSheet({
               <p className={sourceStyles.sourceKind}><Icon name={citation.source_kind === "web" ? "search" : "documents"} />{citation.source_kind === "web" ? "Web source" : "Company source"}</p>
               <CitationChip
                 index={citation.citation_index}
-                label={citationSourceLabel(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
+                label={citation.source_kind === "web" ? citationSourceLabel(citation) : citationSourceLabel(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
                 name={citationChipName(citation)}
                 unavailable={citation.source_unavailable}
                 href={hrefForCitation(citation)}

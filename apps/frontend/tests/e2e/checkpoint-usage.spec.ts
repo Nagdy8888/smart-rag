@@ -1,0 +1,36 @@
+import { expect, test } from "@playwright/test";
+import { dashboardCost } from "../../src/components/admin/overview-charts";
+import { signInLiveMember } from "./live-auth";
+
+test("recovered token and cost totals match the live API on desktop and mobile", async ({ page, request }) => {
+  await signInLiveMember(page, request);
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const companyResponse = page.waitForResponse(response => response.url().endsWith("/usage/company") && response.ok());
+  await page.goto("/admin?tab=usage");
+  const totals = await (await companyResponse).json();
+  expect(totals.checkpoint_usage.runs).toBeGreaterThan(0);
+  expect(totals.prompt_tokens).toBeGreaterThan(0);
+  expect(totals.display_cost_usd).not.toBeNull();
+  const company = page.getByTestId("company-usage-meters");
+  await expect(company).toContainText(new Intl.NumberFormat("en-US").format(totals.prompt_tokens));
+  await expect(company).toContainText(new Intl.NumberFormat("en-US").format(totals.completion_tokens));
+  await expect(company).toContainText(dashboardCost(totals.display_cost_usd));
+  await expect(company).toContainText("Each run is counted once");
+  await page.getByRole("region", { name: "Company usage checkpoint history", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "../../.private-eval/checkpoint-usage-reporting-20261026/usage-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("region", { name: "Company usage checkpoint history", exact: true }).scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.screenshot({ path: "../../.private-eval/checkpoint-usage-reporting-20261026/usage-mobile.png" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const overviewResponse = page.waitForResponse(response => response.url().includes("/admin/overview?days=30") && response.ok());
+  await page.goto("/admin");
+  const overview = await (await overviewResponse).json();
+  expect(overview.summary.checkpoint_usage.runs).toBeGreaterThan(0);
+  await expect(page.getByText("Estimated AI cost", { exact: true }).locator("..")).toContainText(dashboardCost(overview.summary.display_cost_usd));
+  await expect(page.getByRole("region", { name: "Workspace overview", exact: true }).getByRole("alert")).toHaveCount(0);
+  await page.screenshot({ path: "../../.private-eval/checkpoint-usage-reporting-20261026/overview-desktop.png" });
+  expect(errors).toEqual([]);
+});

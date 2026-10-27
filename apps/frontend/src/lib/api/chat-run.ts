@@ -286,6 +286,7 @@ export async function submitFeedback(
   tag: FeedbackTag,
   comment: string | null,
   fetchImpl: typeof fetch = fetch,
+  shareWithReviewers = false,
 ): Promise<FeedbackResponse> {
   const response = await fetchImpl(apiUrl(`/runs/${runId}/feedback`), {
     method: "POST",
@@ -294,6 +295,7 @@ export async function submitFeedback(
       thumbs_up: thumbsUp,
       tag,
       comment,
+      ...(shareWithReviewers ? { share_with_reviewers: true } : {}),
     }),
   });
   const body = await readJsonObject(response);

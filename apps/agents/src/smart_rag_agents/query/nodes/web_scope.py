@@ -30,7 +30,7 @@ from smart_rag_core.web_research.models import WebSourceRecord
 from smart_rag_core.web_research.planner import propose_follow_ups
 
 from smart_rag_agents.query.deps import QueryGraphDeps
-from smart_rag_agents.query.gateway.web_answer import synthesize_web_answer
+from smart_rag_agents.query.gateway.counted_web_answer import counted_web_answer
 from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_nodes
 from smart_rag_agents.query.state import QueryGraphState
 
@@ -348,13 +348,15 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             Grounded ``AnswerPayload``.
         """
 
-        return synthesize_web_answer(
-            deps, query=query, sources=sources, context=context
-        )
+        return counted_web_answer(state, deps, query=query, sources=sources)
 
     synthesize = None
     if deps.model_gateway is not None and deps.web_answer_prompt_text:
         synthesize = _synthesize
+    else:
+        return _fail_closed(
+            state, status="routing_rejected", detail="web_answer_unconfigured"
+        )
     try:
         result = run_web_research(
             user_query=_exa_query(state),

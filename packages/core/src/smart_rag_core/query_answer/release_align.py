@@ -102,6 +102,10 @@ def _verbatim_identifier_excerpt(source: str, claim: str) -> str | None:
         if found:
             needles.append(found)
     needles.extend(token for token in claim_tokens if token in source)
+    # Numbers alone cannot identify a source statement. Figure 2-1 can
+    # otherwise match an unrelated example containing prices or page numbers.
+    if not any(any(char.isalpha() for char in needle) for needle in needles):
+        return None
     for match in _NUMBER.finditer(claim):
         if match.group(0) in source:
             needles.append(match.group(0))

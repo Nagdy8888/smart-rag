@@ -20,6 +20,16 @@
   margin: 0;
 }
 
+.reviewItem {
+  display: grid;
+  gap: calc(var(--space) * 3);
+  min-width: 0;
+  border-top: 1px solid var(--color-border);
+  padding-block: calc(var(--space) * 4);
+}
+
+.reviewItem form { min-width: 0; }
+
 .list {
   list-style: none;
   display: flex;

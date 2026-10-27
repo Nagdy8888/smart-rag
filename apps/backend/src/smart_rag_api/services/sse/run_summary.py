@@ -14,6 +14,7 @@ def build_termination_payload(
     assistant_parts: list[str],
     prompt_tokens: int | None,
     completion_tokens: int | None,
+    usage_reporting: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Build the executor's termination payload with token and cost totals.
 
@@ -29,6 +30,7 @@ def build_termination_payload(
         assistant_parts: Streamed ``token_delta`` texts in order.
         prompt_tokens: Last prompt-token count from ``usage`` events.
         completion_tokens: Last completion-token count from ``usage`` events.
+        usage_reporting: Authoritative per-operation projection when available.
 
     Returns:
         A new payload dict. ``summary`` is not modified.
@@ -76,4 +78,14 @@ def build_termination_payload(
                 output_tokens=output_total,
             )
         )
+    if usage_reporting is not None:
+        # Mixed-model aggregate counts cannot be priced as one answer call.
+        estimate = usage_reporting.get("estimated_cost_usd")
+        payload["usage_cost_status"] = (
+            "reported" if estimate is not None else "unresolved"
+        )
+        if estimate is None:
+            payload.pop("estimated_cost_usd", None)
+        else:
+            payload["estimated_cost_usd"] = float(str(estimate))
     return payload

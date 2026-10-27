@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -382,6 +383,26 @@ class QueryRunService:
                     citation_id=citation.citation_id,
                     purpose="preview",
                 )
+            if (
+                citation.source_kind == "company_document"
+                and not citation.source_unavailable
+                and detail.document_id is not None
+            ):
+                governance = connection.execute(
+                    "SELECT app.get_document_governance(%s,%s,%s,%s,%s)",
+                    (
+                        caller.user_id,
+                        caller.rpc_role(),
+                        caller.rpc_authorization_version(),
+                        detail.document_id,
+                        detail.version_id,
+                    ),
+                ).fetchone()
+                if governance is not None and governance[0] is not None:
+                    citation = replace(
+                        citation,
+                        provenance={**citation.provenance, "authority": governance[0]},
+                    )
             connection.commit()
         return RunCitationDetail(
             citation=citation,

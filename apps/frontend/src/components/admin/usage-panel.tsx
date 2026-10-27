@@ -4,11 +4,13 @@
 
 "use client";
 
+import { usageDisplayCost } from "../../lib/checkpoint-usage";
 import { useQuery } from "@tanstack/react-query";
+import { CostReportingDetails } from "./cost-reporting-details";
+import { dashboardCost } from "./overview-charts";
 import { Spinner } from "../ui/spinner";
 import { StatusBanner } from "../ui/status-banner";
 import { Button } from "../ui/button";
-import { formatUsd } from "../../lib/format-usage";
 import usageStyles from "./usage-panel.module.css";
 import { fetchUsageCompany, fetchUsageMe, type ApiAuth } from "../../lib/api";
 import { RATE_LIMIT_COPY } from "../../lib/admin-copy";
@@ -32,19 +34,36 @@ function UsageCard({ title, usage, testId }: {
   testId: string;
 }) {
   const count = (value: number | undefined) => value === undefined ? "\u2014" : new Intl.NumberFormat("en-US").format(value);
+  const cost = usage ? usageDisplayCost(usage) : null;
+  const history = usage?.checkpoint_usage;
   return (
     <section className={usageStyles.card} aria-label={title} data-testid={testId}>
       <header className={usageStyles.cardHeader}>
         <h2>{title}</h2><span>All time</span>
       </header>
-      <p className={usageStyles.costLabel}>Recorded cost estimate</p>
-      <p className={usageStyles.cost}>{usage ? formatUsd(usage.cost_usd) : "\u2014"}</p>
+      <p className={usageStyles.costLabel}>Estimated usage cost</p>
+      <p className={usageStyles.cost}>{cost != null ? dashboardCost(cost) : "Not measured"}</p>
+      {usage ? <CostReportingDetails report={usage.cost_reporting} /> : null}
       <dl className={usageStyles.metrics}>
-        <div><dt>Prompt tokens</dt><dd>{count(usage?.prompt_tokens)}</dd></div>
-        <div><dt>Completion tokens</dt><dd>{count(usage?.completion_tokens)}</dd></div>
+        <div><dt>Recorded input tokens</dt><dd>{usage && (history?.runs || usage.cost_reporting?.measured_prompt_tokens != null) ? count(usage.prompt_tokens) : "Not measured"}</dd></div>
+        <div><dt>Recorded output tokens</dt><dd>{usage && (history?.runs || usage.cost_reporting?.measured_completion_tokens != null) ? count(usage.completion_tokens) : "Not measured"}</dd></div>
         <div><dt>Usage records</dt><dd>{count(usage?.usage_rows)}</dd></div>
       </dl>
-      {usage?.usage_rows === 0 ? <p className={usageStyles.empty}>No model usage has been recorded yet.</p> : null}
+      {usage?.cost_reporting?.unmeasured_operations ? <p className={usageStyles.empty}>{count(usage.cost_reporting.unmeasured_operations)} ledger operations lack provider measurements.{history?.runs ? " Available checkpoint counters are included in recorded totals." : " Token usage remains unmeasured."}</p> : null}
+      {history && history.runs > 0 ? <section className={usageStyles.history} aria-label={`${title} checkpoint history`}>
+        <h3>Recovered checkpoint history</h3>
+        {history.first_recorded_at && history.last_recorded_at ? <p>{new Date(history.first_recorded_at).toLocaleDateString("en-US",{timeZone:"UTC",year:"numeric",month:"short",day:"numeric"})} to {new Date(history.last_recorded_at).toLocaleDateString("en-US",{timeZone:"UTC",year:"numeric",month:"short",day:"numeric"})} / UTC</p> : null}
+        <p>{count(history.runs)} runs recovered. Each run is counted once across checkpoints and the usage ledger.</p>
+        <dl className={usageStyles.metrics}>
+          <div><dt>Stored input tokens</dt><dd>{count(history.prompt_tokens)}</dd></div>
+          <div><dt>Stored output tokens</dt><dd>{count(history.completion_tokens)}</dd></div>
+          <div><dt>Stored cost estimate</dt><dd>{history.estimated_cost_usd === null ? "Not recorded" : dashboardCost(history.estimated_cost_usd)}</dd></div>
+          <div><dt>Added checkpoint cost</dt><dd>{history.additional_estimated_cost_usd === null ? "None recorded" : dashboardCost(history.additional_estimated_cost_usd)}</dd></div>
+        </dl>
+        <p>{count(history.overlapping_ledger_runs)} runs already have ledger records; their costs are not added again. {history.unpriced_runs ? `${count(history.unpriced_runs)} runs have missing or allowance-like costs and are excluded from the cost estimate.` : ""}</p>
+        <p>Checkpoint counters and costs retain their original recorded values. Provider measurements take precedence when available.</p>
+      </section> : null}
+      {usage?.usage_rows === 0 && !history?.runs ? <p className={usageStyles.empty}>No model usage has been recorded yet.</p> : null}
     </section>
   );
 }
@@ -128,7 +147,7 @@ export function UsagePanel() {
       {loadingCompany ? <Spinner label="Loading company usage" /> : null}
       <aside className={usageStyles.note}>
         <strong>What these numbers mean</strong>
-        <p>Tokens and records come from the application usage ledger. Costs are recorded estimates and can include conservative allowances when provider usage is unavailable. They are not a verified provider invoice.</p>
+        <p>Recorded tokens combine provider measurements with recovered checkpoint counters. A run with provider measurements uses those measurements; otherwise its checkpoint total is used once. Usage-cost estimates exclude unresolved safety allowances. Historical reconstructions use Standard uncached token rates. They are not a verified provider invoice.</p>
         <p>Usage records are individual model operations, not the number of questions. Prompt text is never shown here.</p>
       </aside>
       {rateDegraded ? (

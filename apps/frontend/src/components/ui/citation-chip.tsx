@@ -70,7 +70,7 @@ export function CitationChip({
         : null}
     </>
   );
-  if (href) {
+  if (href && !onSelect) {
     return (
       <a className={className} href={href} rel="noreferrer" aria-label={accessibleName}>
         {body}

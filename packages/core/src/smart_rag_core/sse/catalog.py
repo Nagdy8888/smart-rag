@@ -6,6 +6,9 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from smart_rag_core.gateways.cost_reporting import CostReporting
+from smart_rag_core.knowledge import KnowledgeResult
+
 HEARTBEAT_INTERVAL_SECONDS: Final[int] = 15
 """Production SSE heartbeat interval. Tests may inject a shorter clock only
 when they also assert this constant remains 15."""
@@ -171,6 +174,7 @@ class AnswerOriginPayload(_SsePayload):
     """Strict-split answer origin. Never inferred from route family."""
 
     origin: str = Field(min_length=1, max_length=64)
+    knowledge_result: KnowledgeResult | None = None
 
 
 class TokenDeltaPayload(_SsePayload):
@@ -185,6 +189,7 @@ class UsagePayload(_SsePayload):
     prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     cost_usd: float | None = Field(default=None, ge=0)
+    cost_reporting: CostReporting | None = None
 
 
 class CompletedPayload(_SsePayload):

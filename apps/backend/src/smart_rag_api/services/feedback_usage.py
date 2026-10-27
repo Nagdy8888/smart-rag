@@ -9,6 +9,11 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 from smart_rag_core.feedback.tags import FeedbackTagError, require_feedback_tag
+from smart_rag_core.gateways.cost_reporting import CostReporting
+from smart_rag_core.observability.checkpoint_usage import (
+    CheckpointUsageSummary,
+    combined_usage_cost,
+)
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.security.untrusted import isolate_untrusted_text
@@ -23,6 +28,9 @@ class UsageSummary:
     completion_tokens: int
     usage_rows: int
     scope: str
+    cost_reporting: CostReporting | None = None
+    checkpoint_usage: CheckpointUsageSummary | None = None
+    display_cost_usd: Decimal | None = None
 
 
 class FeedbackUsageService:
@@ -45,6 +53,7 @@ class FeedbackUsageService:
         thumbs_up: bool,
         comment: str | None,
         tag: str,
+        share_with_reviewers: bool = False,
     ) -> UUID:
         """Store thumbs feedback for an owned run.
 
@@ -54,6 +63,7 @@ class FeedbackUsageService:
             thumbs_up: True for up (rating 5), False for down (rating 1).
             comment: Optional untrusted correction text.
             tag: Required unmerged Phase 6 feedback tag.
+            share_with_reviewers: Explicit consent to share this run for knowledge review.
 
         Returns:
             Feedback row id.
@@ -96,6 +106,16 @@ class FeedbackUsageService:
                         ),
                     )
                     row = cursor.fetchone()
+                    if share_with_reviewers and row is not None:
+                        cursor.execute(
+                            "SELECT app.share_knowledge_feedback(%s, %s, %s, %s)",
+                            (
+                                caller.user_id,
+                                caller.rpc_role(),
+                                caller.rpc_authorization_version(),
+                                row[0],
+                            ),
+                        )
                 connection.commit()
         except psycopg.Error as exc:
             message = str(exc)
@@ -163,12 +183,51 @@ class FeedbackUsageService:
                     ),
                 )
                 row = cursor.fetchone()
+                cursor.execute(
+                    "SELECT app.summarize_usage_cost_reporting(%s,%s,%s,%s) AS reporting",
+                    (
+                        caller.user_id,
+                        caller.rpc_role(),
+                        caller.rpc_authorization_version(),
+                        company,
+                    ),
+                )
+                report = cursor.fetchone()
+                cursor.execute(
+                    "SELECT app.summarize_checkpoint_usage(%s,%s,%s,%s) AS history",
+                    (
+                        caller.user_id,
+                        caller.rpc_role(),
+                        caller.rpc_authorization_version(),
+                        company,
+                    ),
+                )
+                history_row = cursor.fetchone()
         if row is None:
             raise QueryAdmissionError("database_rejected")
+        reporting = (
+            CostReporting.model_validate(report["reporting"]) if report else None
+        )
+        history = (
+            CheckpointUsageSummary.model_validate(history_row["history"])
+            if history_row
+            else None
+        )
         return UsageSummary(
             cost_usd=Decimal(str(row["cost_usd"])),
-            prompt_tokens=int(row["prompt_tokens"]),
-            completion_tokens=int(row["completion_tokens"]),
+            prompt_tokens=((reporting.measured_prompt_tokens or 0) if reporting else 0)
+            + (history.additional_prompt_tokens if history else 0),
+            completion_tokens=(
+                (reporting.measured_completion_tokens or 0) if reporting else 0
+            )
+            + (history.additional_completion_tokens if history else 0),
             usage_rows=int(row["usage_rows"]),
             scope="company" if company else "me",
+            cost_reporting=reporting,
+            checkpoint_usage=history,
+            display_cost_usd=combined_usage_cost(
+                reporting.estimated_cost_usd if reporting else None,
+                history,
+                ledger_operations=reporting.estimated_operations if reporting else 0,
+            ),
         )

@@ -5,6 +5,39 @@ from __future__ import annotations
 from smart_rag_api.services.sse.run_summary import build_termination_payload
 
 
+def test_operation_cost_projection_wins_over_mixed_model_token_repricing() -> None:
+    """Parent traces must use the ledger projection, including cache discounts."""
+    payload = build_termination_payload(
+        None,
+        cancelled=False,
+        assistant_parts=[],
+        prompt_tokens=1000,
+        completion_tokens=100,
+        usage_reporting={"estimated_cost_usd": "0.00010500"},
+    )
+    assert payload["estimated_cost_usd"] == 0.000105
+
+
+def test_unknown_reported_cost_stays_unknown_through_trace_redaction() -> None:
+    """Unknown usage cannot become a default-model charge on a parent span."""
+    from smart_rag_core.observability.query_trace.redaction import (
+        redact_query_run_sse_outputs,
+    )
+
+    payload = build_termination_payload(
+        None,
+        cancelled=False,
+        assistant_parts=[],
+        prompt_tokens=1000,
+        completion_tokens=100,
+        usage_reporting={"estimated_cost_usd": None},
+    )
+    assert "estimated_cost_usd" not in payload
+    redacted = redact_query_run_sse_outputs(payload)
+    assert "estimated_cost_usd" not in redacted
+    assert redacted["usage_cost_status"] == "unresolved"
+
+
 def test_non_dict_summary_becomes_minimal_payload() -> None:
     """A missing executor summary yields reason, terminal type, and no tokens."""
 

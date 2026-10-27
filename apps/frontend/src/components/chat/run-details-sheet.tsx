@@ -4,6 +4,7 @@
 
 "use client";
 
+import { CostReportingDetails } from "../admin/cost-reporting-details";
 import { useEffect, useState } from "react";
 import { INFERENCE_LINKS_UNAVAILABLE } from "../../lib/citation-drawer";
 import { chatCostTotal, chatTokenTotals, type ChatViewState } from "../../lib/chat-view";
@@ -83,7 +84,7 @@ function TokenMetricsSection({
           <span className={styles.metricValue}>
             {TOKEN_GROUPING.format(completionTokens)}
           </span>
-          <span className={styles.metricLabel}>Answer tokens</span>
+          <span className={styles.metricLabel}>Output tokens</span>
         </div>
         <div className={`${styles.metric} ${styles.metricTotal}`}>
           <span className={styles.metricValue}>
@@ -201,7 +202,7 @@ export function RunDetailsSheet({
     diagnostics.requestedRoute !== effectiveRoute;
   const changeReason = correctionReasonLabel(diagnostics.correctionReason);
   const cacheLabel = cacheStatusLabel(diagnostics.cacheStatus);
-  const usageUsd = formatUsd(companyUsd);
+  const usageUsd = companyUsd.trim() === "" ? "?" : formatUsd(companyUsd);
   const chatTotals = chatTokenTotals(chat);
   const chatSpend = chatCostTotal(chat);
   const runUsage = formatRunTokenUsage(
@@ -277,6 +278,8 @@ export function RunDetailsSheet({
           </div>
         </section>
       ) : null}
+      {diagnostics.costReporting ? <CostReportingDetails report={diagnostics.costReporting} /> : null}
+      {diagnostics.costReporting?.unmeasured_operations ? <p className={styles.note}>Token totals are partial: {diagnostics.costReporting.unmeasured_operations} operations have no verified counters.</p> : null}
       <TokenMetricsSection
         label="This run"
         promptTokens={diagnostics.promptTokens}
@@ -284,9 +287,9 @@ export function RunDetailsSheet({
         summary="Profile, search, answer, and verifier tokens for this question."
       />
       <SpendSection
-        label="This run spend"
+        label="This run estimated cost"
         costUsd={diagnostics.costUsd}
-        summary="Recorded cost estimate for this question; this is not a provider invoice."
+        summary="Cost calculated from recorded usage; unresolved safety allowances are excluded."
       />
       <TokenMetricsSection
         label="This chat"
@@ -295,16 +298,16 @@ export function RunDetailsSheet({
         summary="Every question in this conversation, including this run and the session title."
       />
       <SpendSection
-        label="This chat spend"
+        label="This chat estimated cost"
         costUsd={chatSpend > 0 ? chatSpend : null}
-        summary="Recorded cost estimates for completed questions in this conversation."
+        summary="Sum of recorded cost estimates for questions in this conversation."
       />
       {usageUsd === "—" ? null : (
         <section className={styles.spend} aria-label="Account total">
           <p className={styles.kicker}>Account total</p>
           <p className={styles.spendValue}>{usageUsd}</p>
           <p className={styles.summary}>
-            Recorded usage cost estimates on your account, not just this answer.
+            Estimated usage cost on your account; unresolved safety allowances are excluded.
           </p>
         </section>
       )}
@@ -350,9 +353,9 @@ export function RunDetailsSheet({
         {runUsage ? `This run ${runUsage}. ` : null}
         {chatUsage ? `This chat ${chatUsage}. ` : null}
         {diagnostics.costUsd !== null
-          ? `This run spend ${formatUsd(diagnostics.costUsd)}. `
+          ? `This run estimated cost ${formatUsd(diagnostics.costUsd)}. `
           : null}
-        {chatSpend > 0 ? `This chat spend ${formatUsd(chatSpend)}. ` : null}
+        {chatSpend > 0 ? `This chat estimated cost ${formatUsd(chatSpend)}. ` : null}
         Account total {usageUsd}.
       </p>
     </div>

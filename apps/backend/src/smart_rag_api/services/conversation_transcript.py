@@ -9,6 +9,7 @@ from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
+from smart_rag_core.knowledge import KnowledgeResult
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import RunCitationRecord
 from smart_rag_core.security.identity import CallerContext
@@ -46,6 +47,7 @@ class ConversationMessageRecord:
     run_id: UUID | None = None
     citation_count: int = 0
     source_kind: str | None = None
+    knowledge_result: KnowledgeResult | None = None
     citations: tuple[RunCitationRecord, ...] = field(default_factory=tuple)
 
 
@@ -106,13 +108,23 @@ def list_conversation_messages(
             cursor.execute(
                 """
                 SELECT message_id, role, content, created_at, run_id,
-                       citation_count, source_kind
+                       citation_count, source_kind,
+                       app.get_run_knowledge_result(%s, %s, %s, run_id) AS knowledge_result,
+                       CASE WHEN role='assistant' AND run_id IS NOT NULL THEN
+                         app.run_knowledge_history_unavailable(%s,%s,%s,run_id)
+                         ELSE false END AS source_unavailable
                 FROM app.list_conversation_messages_v3(
                   %s::uuid, %s::text, %s::bigint, %s::uuid, %s::integer, %s::uuid
                 )
                 ORDER BY created_at DESC, message_id DESC
                 """,
                 (
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
                     caller.rpc_user_id(),
                     caller.rpc_role(),
                     caller.rpc_authorization_version(),
@@ -141,11 +153,18 @@ def list_conversation_messages(
             ConversationMessageRecord(
                 message_id=UUID(str(row["message_id"])),
                 role=role,  # type: ignore[arg-type]
-                content=isolate_untrusted_text(str(row["content"] or "")),
+                content=isolate_untrusted_text(
+                    "Source unavailable. This answer is hidden because its supporting evidence is no longer accessible."
+                    if row.get("source_unavailable")
+                    else str(row["content"] or "")
+                ),
                 created_at=created,
                 run_id=_optional_uuid(row.get("run_id")),
                 citation_count=citation_count,
                 source_kind=source_kind,
+                knowledge_result=KnowledgeResult.model_validate(row["knowledge_result"])
+                if row.get("knowledge_result") and not row.get("source_unavailable")
+                else None,
             )
         )
     return tuple(records)
