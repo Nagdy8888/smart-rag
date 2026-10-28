@@ -30,8 +30,8 @@ EVAL_PDF_JUDGE_PROMPT_VERSION = "eval_pdf_judge_v1"
 EVAL_PDF_JUDGE_PROMPT_PATH = Path(__file__).resolve().parent / "eval_pdf_judge_v1.md"
 WEB_CRITIQUE_PROMPT_VERSION = "web_critique_v1"
 WEB_CRITIQUE_PROMPT_PATH = Path(__file__).resolve().parent / "web_critique_v1.md"
-WEB_ANSWER_PROMPT_VERSION = "web_answer_v1"
-WEB_ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "web_answer_v1.md"
+WEB_ANSWER_PROMPT_VERSION = "web_answer_v2"
+WEB_ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "web_answer_v2.md"
 
 
 def query_profile_prompt_text() -> str:

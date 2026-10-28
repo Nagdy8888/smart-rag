@@ -49,6 +49,7 @@ export type UseChatRunResult = {
   liveRunCreated: boolean;
   searchScope: RequestedSearchScope;
   setSearchScope: (scope: RequestedSearchScope) => void;
+  restoreSearchScope: (id: string, scope: RequestedSearchScope) => void;
   send(text: string): Promise<boolean>;
   reconnect(): Promise<void>;
   cancel(): Promise<void>;
@@ -341,6 +342,7 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
     liveRunCreated,
     searchScope,
     setSearchScope,
+    restoreSearchScope: restoreConversationScope,
     send,
     reconnect,
     cancel,

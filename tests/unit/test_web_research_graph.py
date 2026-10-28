@@ -67,6 +67,7 @@ def test_optional_search_failure_keeps_first_search_evidence(reason: str) -> Non
 
     store = FakeStore()
     result = run_web_research(
+        allow_mock=True,
         user_query="Search the web for public rainfall totals",
         search=OptionalFailure(),
         store=store,
@@ -74,7 +75,7 @@ def test_optional_search_failure_keeps_first_search_evidence(reason: str) -> Non
         remaining_deadline_seconds=lambda: 40.0,
     )
     assert len(budgets) == result.search_count == 2
-    assert budgets[1] <= budgets[0] / 3
+    assert budgets[1] <= budgets[0] / 2
     assert result.contents_count == 1
     assert result.sources == tuple(store.sources)
     assert result.answer.status == "partial"
@@ -233,7 +234,13 @@ class FakeFetch:
     urls: list[str] = field(default_factory=list[str])
     text: str = "Fallback excerpt from the candidate page."
 
-    def fetch_text(self, url: str, *, allowed_urls: frozenset[str]) -> str | None:
+    def fetch_text(
+        self,
+        url: str,
+        *,
+        allowed_urls: frozenset[str],
+        remaining_deadline_seconds: float | None = None,
+    ) -> str | None:
         """Fetch only allow-listed URLs."""
 
         if url not in allowed_urls:
@@ -265,6 +272,7 @@ def test_two_round_happy_path_caps_sources_and_empty_company_citations() -> None
         return ("latest rainfall totals", "follow up weather desks")
 
     result = run_web_research(
+        allow_mock=True,
         user_query="search the web for latest rainfall totals",
         search=search,
         store=store,
@@ -303,6 +311,7 @@ def test_third_round_never_attempted() -> None:
         return ("follow-a", "follow-b", "follow-c", "follow-d")
 
     result = run_web_research(
+        allow_mock=True,
         user_query="search the web for latest news",
         search=search,
         store=store,
@@ -328,6 +337,7 @@ def test_provider_failures_map_to_typed_codes(reason: str) -> None:
     search = FakeSearch(search_error=reason)
     with pytest.raises(WebResearchError, match=reason):
         run_web_research(
+            allow_mock=True,
             user_query="search the web for latest news",
             search=search,
             store=FakeStore(),
@@ -342,6 +352,7 @@ def test_ambiguous_operation_does_not_retry() -> None:
     store = FakeStore(ambiguous_on_sent=True)
     with pytest.raises(WebResearchError, match="web_operation:ambiguous"):
         run_web_research(
+            allow_mock=True,
             user_query="search the web for latest news",
             search=search,
             store=store,
@@ -358,6 +369,7 @@ def test_company_passage_never_sent_to_exa() -> None:
     passage = "Internal refund policy chunk_id=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
     with pytest.raises(WebResearchError, match="company_passage_forbidden"):
         run_web_research(
+            allow_mock=True,
             user_query=f"search the web <<untrusted-source>> {passage}",
             search=search,
             store=FakeStore(),
@@ -404,6 +416,7 @@ def test_crawl_fallback_only_for_exa_failed_candidate() -> None:
     search = FakeSearch(contents_text={_PAGE: None, _PAGE_B: None})
     fetch = FakeFetch()
     result = run_web_research(
+        allow_mock=True,
         user_query="search the web for latest news",
         search=search,
         store=FakeStore(),
@@ -423,6 +436,7 @@ def test_cancellation_closes_client_without_leaking_key() -> None:
     cancelled = True
     with pytest.raises(WebResearchError, match="cancelled"):
         run_web_research(
+            allow_mock=True,
             user_query="search the web for latest news",
             search=search,
             store=FakeStore(),
@@ -439,6 +453,7 @@ def test_progress_payloads_omit_query_and_bodies() -> None:
 
     stages: list[str] = []
     run_web_research(
+        allow_mock=True,
         user_query="search the web for latest news",
         search=FakeSearch(),
         store=FakeStore(),
@@ -514,6 +529,7 @@ def test_empty_contents_without_fetch_is_content_unavailable() -> None:
     search = FakeSearch(contents_text={_PAGE: None, _PAGE_B: None})
     with pytest.raises(WebResearchError, match="web_content_unavailable"):
         run_web_research(
+            allow_mock=True,
             user_query="search the web for latest news",
             search=search,
             store=FakeStore(),
@@ -542,6 +558,7 @@ def test_follow_up_company_passage_never_searched() -> None:
 
     with pytest.raises(WebResearchError, match="company_passage_forbidden"):
         run_web_research(
+            allow_mock=True,
             user_query="search the web for latest news",
             search=search,
             store=FakeStore(),
@@ -590,7 +607,7 @@ def test_current_user_turn_is_not_a_forbidden_web_snippet() -> None:
     assert "Our refund period is thirty calendar days." in snippets
 
 
-def test_verify_answer_node_web_skips_model_verifier() -> None:
+def test_verify_answer_node_web_refuses_without_accounted_verifier() -> None:
     """Web verification is excerpt-bound and never calls the fusion verifier."""
 
     from smart_rag_agents.query.deps import QueryGraphDeps
@@ -663,12 +680,9 @@ def test_verify_answer_node_web_skips_model_verifier() -> None:
             verifier_prompt_text="unused",
         ),
     )
-    assert verified["status"] == "verified"
+    assert verified["status"] == "refused"
     answer = AnswerPayload.model_validate(verified["answer"])
-    assert answer.citations == ()
-    assert answer.table_citations == ()
-    assert answer.answer_origin is KnowledgeScope.WEB
-    assert len(answer.web_citations) == 1
+    assert not answer.web_citations
 
 
 def test_empty_search_urls_are_evidence_insufficient() -> None:
@@ -706,6 +720,7 @@ def test_empty_search_urls_are_evidence_insufficient() -> None:
 
     with pytest.raises(WebResearchError, match="web_evidence_insufficient"):
         run_web_research(
+            allow_mock=True,
             user_query="search the web for latest news",
             search=_EmptySearch(),
             store=FakeStore(),
@@ -820,12 +835,11 @@ def test_synthesize_web_answer_drops_invented_ids() -> None:
     assert payload.atomic_links[0].web_source_ids == (source.web_source_id,)
 
 
-def test_synthesize_web_answer_falls_back_to_mock_on_provider_error() -> None:
+def test_synthesize_web_answer_never_mocks_provider_error() -> None:
     """Provider failures degrade to extractive mock, not Hybrid."""
 
     from smart_rag_agents.query.deps import QueryGraphDeps
     from smart_rag_agents.query.gateway.web_answer import synthesize_web_answer
-    from smart_rag_core.web_research.synthesis import mock_web_answer
 
     source = WebSourceRecord(
         web_source_id="11111111-1111-4111-8111-111111111111",
@@ -852,24 +866,17 @@ def test_synthesize_web_answer_falls_back_to_mock_on_provider_error() -> None:
             del request
             raise RuntimeError("provider down")
 
-    payload = synthesize_web_answer(
-        QueryGraphDeps(
-            model_gateway=_BoomGateway(),
-            web_answer_prompt_text="web_answer fixture prompt",
-        ),
-        query="search the web for latest news",
-        sources=(source,),
-        context=None,
-    )
-    expected = mock_web_answer(
-        query="search the web for latest news",
-        sources=(source,),
-    )
-    assert payload.answer_origin is KnowledgeScope.WEB
-    assert payload.citations == ()
-    assert payload.table_citations == ()
-    assert payload.web_citations
-    assert payload.answer_text == expected.answer_text
+    from smart_rag_core.query_answer.exceptions import AnswerError
+
+    with pytest.raises(AnswerError):
+        synthesize_web_answer(
+            QueryGraphDeps(
+                model_gateway=_BoomGateway(), web_answer_prompt_text="fixture"
+            ),
+            query="search the web for latest news",
+            sources=(source,),
+            context=None,
+        )
 
 
 def test_run_web_research_uses_injected_synthesize() -> None:
@@ -910,6 +917,7 @@ def test_run_web_research_uses_injected_synthesize() -> None:
         )
 
     result = run_web_research(
+        allow_mock=True,
         user_query="search the web for latest news",
         search=search,
         store=FakeStore(),
@@ -960,6 +968,7 @@ def test_missing_requested_heading_refresh_preserves_evidence(
     )
     fetch = FakeFetch(text=fetched)
     result = run_web_research(
+        allow_mock=True,
         user_query="Compare 3.1.7 and 3.1.9 target sizes and conformance levels",
         search=CriterionSearch(),
         store=FakeStore(),

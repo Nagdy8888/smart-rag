@@ -523,6 +523,17 @@
       "ConversationMessage": {
         "description": "One creator-owned transcript message. Content is escaped untrusted text.",
         "properties": {
+          "answer_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Origin"
+          },
           "citation_count": {
             "default": 0,
             "maximum": 50.0,
@@ -560,6 +571,17 @@
             "format": "uuid",
             "title": "Message Id",
             "type": "string"
+          },
+          "requested_search_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Search Scope"
           },
           "role": {
             "enum": [

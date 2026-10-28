@@ -20,6 +20,8 @@ export type ConversationResponse = {
 export type ConversationMessage = {
   /** Recorded operational state; never inferred from answer content. */
   run_status?: string | null;
+  requested_search_scope?: RequestedSearchScope | null;
+  answer_origin?: string | null;
   knowledge_result?: import("../knowledge-result").KnowledgeResult | null;
   message_id: string;
   role: "user" | "assistant";

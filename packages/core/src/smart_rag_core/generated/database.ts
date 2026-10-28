@@ -5789,6 +5789,18 @@ export type Database = {
           status: Database["app"]["Enums"]["run_status"]
         }[]
       }
+      get_run_presentation_v1: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          answer_origin: string
+          requested_search_scope: string
+        }[]
+      }
       get_run_citation_detail_v1: {
         Args: {
           caller_authorization_version: number

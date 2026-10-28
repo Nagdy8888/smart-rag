@@ -3,7 +3,6 @@
  */
 
 "use client";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isClassifiedApiError, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
@@ -26,6 +25,8 @@ import { ChatWorkspace } from "./chat-workspace";
 import { CitationDrawer } from "./citation-drawer";
 import { CitationSheet } from "./citation-sheet";
 import { ConversationRail } from "./conversation-rail";
+import { useRestoreHistoryScope } from "./hooks/use-restore-history-scope";
+import { useHistoryCitations } from "./hooks/use-history-citations";
 import { useChatQueries } from "./hooks/use-chat-queries";
 import { useChatRestore } from "./hooks/use-chat-restore";
 import { useChatRun } from "./hooks/use-chat-run";
@@ -36,9 +37,7 @@ import { toSaveToQuizSheetProps, useQuizCapture } from "./hooks/use-quiz-capture
 import { useCitationPageSource } from "./hooks/use-citation-page-source";
 import { useChatPresentation } from "./hooks/use-chat-presentation";
 import chatStyles from "./chat.module.css";
-
 export { CitationDrawer } from "./citation-drawer";
-
 /**
  * Ask: sessions, composer, transcript, diagnostics, feedback.
  * @returns Chat surface. Fetch and SSE live in extracted hooks.
@@ -127,6 +126,10 @@ export function ChatApp() {
       ),
     [actions.olderMessages, liveQueries.messages, run.settledTurns],
   );
+  const historyCitations = useHistoryCitations(queries.auth, accessToken,
+    selection.conversationId, historyMessages, scroll.containerRef);
+  useRestoreHistoryScope(selection.conversationId, liveQueries.messagesPending,
+    historyMessages, run.chat.runId, run.restoreSearchScope);
   const restore = useChatRestore({
     conversationId: selection.conversationId,
     auth: queries.auth,
@@ -237,6 +240,11 @@ export function ChatApp() {
             chat={run.chat}
             run={run}
             historyMessages={historyMessages}
+            historyCitations={historyCitations}
+            onSelectTurnCitation={(runId, citation, trigger) => {
+              selection.setViewingRunId(runId);
+              restore.handleSelectCitation(citation, trigger);
+            }}
             messagesPending={liveQueries.messagesPending}
             messagesError={liveQueries.messagesError}
             nextBeforeId={actions.nextBeforeId}

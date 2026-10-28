@@ -45,6 +45,8 @@ export type ChatStageProps = {
   chat: ChatViewState;
   run: UseChatRunResult;
   historyMessages: ConversationMessage[];
+  historyCitations?: Record<string, readonly CitationResponse[]>;
+  onSelectTurnCitation?: (runId: string, citation: CitationResponse, trigger: HTMLButtonElement) => void;
   /** True while the selected conversation transcript is fetching. */
   messagesPending?: boolean;
   /** True when the selected transcript query failed. */
@@ -234,6 +236,8 @@ export function ChatStage(props: ChatStageProps) {
       >
         {!showEmptyPrompts ? <AnswerSurface
           messages={historyMessages}
+          historyCitations={props.historyCitations}
+          onSelectTurnCitation={props.onSelectTurnCitation}
           messagesPending={messagesPending}
           messagesError={messagesError}
           hasEarlier={nextBeforeId !== null}
@@ -342,7 +346,7 @@ export function ChatStage(props: ChatStageProps) {
           </div>
         ) : null}
       </div>
-      {props.onConversationId ? <DocumentScope conversationId={props.conversationId ?? null} onConversationId={props.onConversationId} running={running || run.sending} onPendingChange={setScopePending} /> : null}
+      {props.onConversationId && (run.searchScope === "auto" || run.searchScope === "company_documents") ? <DocumentScope conversationId={props.conversationId ?? null} onConversationId={props.onConversationId} running={running || run.sending} onPendingChange={setScopePending} /> : null}
       <ChatComposer
         onSubmit={run.send}
         disabled={sendBlockReason !== null || scopePending}

@@ -8,6 +8,8 @@ audience: engineering
 
 # Prompt changelog
 
+- 2026-10-28: `web_answer_v2` preserves original language and question requirements and emits validated citation markers. `web_verifier_v1` checks whole-answer support, coverage, language and references in one counted call. Previous prompt files remain immutable.
+
 Phase 6 Packet 4 adds the Level 0 optional-catalog disclosure prompt.
 Runtime v1 uses deterministic mapping; discovery is not retained.
 

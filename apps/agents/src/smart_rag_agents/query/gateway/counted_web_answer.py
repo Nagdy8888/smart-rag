@@ -28,6 +28,7 @@ def counted_web_answer(
     *,
     query: str,
     sources: tuple[WebSourceRecord, ...],
+    search_query: str = "",
 ) -> AnswerPayload:
     """Reserve, call once, record usage, and retain consumed state on failure."""
     context = runtime_from_state(state)
@@ -46,11 +47,16 @@ def counted_web_answer(
         """Surface provider failure rather than releasing a mock answer."""
         try:
             return gateway_web_answer(
-                deps, query=query, sources=sources, context=context
+                deps,
+                query=query,
+                sources=sources,
+                context=context,
+                search_query=search_query,
             )
         except AnswerError as exc:
             if exc.reason in {
                 "web_answer_input_bound",
+                "web_answer_deadline_exhausted",
                 "web_answer_sources_empty",
                 "web_answer_prompt_unbound",
                 "model_gateway_unbound",

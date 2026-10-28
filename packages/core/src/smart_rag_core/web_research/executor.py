@@ -25,6 +25,7 @@ from smart_rag_core.web_research.bounds import (
     WEB_PROGRESS_SEARCH,
 )
 from smart_rag_core.web_research.exceptions import WebResearchError
+from smart_rag_core.web_research.excerpt_window import query_excerpt_window
 from smart_rag_core.web_research.heading_coverage import (
     missing_level_references,
     title_mentions_reference,
@@ -41,6 +42,7 @@ from smart_rag_core.web_research.ports import (
     WebSearchPort,
 )
 from smart_rag_core.web_research.sanitize import sanitize_exa_query
+from smart_rag_core.web_research.selection import rank_candidates
 from smart_rag_core.web_research.synthesis import mock_web_answer
 
 CritiqueFn = Callable[[str, tuple[str, ...]], tuple[str, ...]]
@@ -122,10 +124,14 @@ def run_web_research(
     forbidden_snippets: tuple[str, ...] = (),
     critique: CritiqueFn | None = None,
     synthesize: SynthesizeFn | None = None,
+    original_query: str = "",
+    allow_mock: bool = False,
 ) -> WebResearchResult:
     """Run at most two research rounds and persist sources before synthesis.
 
     Args:
+        original_query: Original user text for multilingual excerpt anchors.
+        allow_mock: Explicit fixture-only opt-in for extractive synthesis.
         user_query: Rewritten user text only. Never memory or company
             passages.
         search: Injected Exa port.
@@ -136,9 +142,9 @@ def run_web_research(
         progress: Emits ``web_search`` / ``web_read`` stage keys only.
         forbidden_snippets: Company/memory strings that must not appear
             in the Exa query.
-        critique: Returns 0-2 follow-up queries from titles. Default is
+        critique: Returns 0-2 follow-up queries from first-round excerpts. Default is
             no follow-up.
-        synthesize: Builds the Web draft. Default is extractive mock.
+        synthesize: Builds the Web draft. Required unless allow_mock is explicit.
 
     Returns:
         Persisted sources and a Web-origin answer.
@@ -222,70 +228,46 @@ def run_web_research(
             worker=_worker,
         )
 
-    _search_one(query, "search-round-1", round_index=1)
-    titles = tuple(item.title for item in candidates_by_url.values() if item.title)
-    raw_follow_ups = () if critique is None else critique(query, titles)
-    sanitized_follow_ups: list[str] = []
-    for item in raw_follow_ups:
-        try:
-            cleaned = sanitize_exa_query(item, forbidden_snippets=forbidden_snippets)
-        except WebResearchError as exc:
-            if exc.reason == "company_passage_forbidden":
-                raise
-            continue
-        sanitized_follow_ups.append(cleaned)
-    planned = bound_formulations(query, tuple(sanitized_follow_ups))
-    extra = planned[1:]
-    limitations: list[str] = []
-    for index, formulation in enumerate(extra):
-        try:
-            # Reserve shares for every remaining optional search, reading and
-            # synthesis. Optional discovery must not consume the whole run.
-            _search_one(
-                formulation,
-                f"search-round-2-{index}",
-                round_index=2,
-                time_budget=remaining_deadline_seconds() / (len(extra) - index + 2),
-            )
-        except WebResearchError as exc:
-            if not candidates_by_url or exc.reason not in {
-                "web_search_timeout",
-                "web_search_transport_failed",
-            }:
-                raise
-            limitations.append(exc.reason)
-            break
-
-    urls = tuple(candidates_by_url)[:EXA_MAX_CONTENTS_URLS]
+    if synthesize is None and not allow_mock:
+        raise WebResearchError("web_runtime_unavailable")
+    # Keep twenty seconds for synthesis and the semantic verifier.
+    reserve = 20.0
     contents_by_url: dict[str, ExaContentItem] = {}
-    if urls:
+    limitations: list[str] = []
+
+    def _read(urls: tuple[str, ...], key: str) -> None:
+        """Read selected current-run candidates before assessing evidence gaps."""
+        if not urls:
+            return
         _cancel()
         _bump()
         counters.contents += 1
         if progress is not None:
             progress(WEB_PROGRESS_READ)
 
-        def _contents() -> None:
-            """Fetch bounded contents for the current allow-listed URLs."""
-
+        def worker() -> None:
+            """Read only the selected current-run candidate URLs."""
             try:
                 response = search.get_contents(
                     urls=urls,
                     allowed_urls=frozenset(allowed),
-                    remaining_deadline_seconds=remaining_deadline_seconds(),
+                    remaining_deadline_seconds=max(
+                        0.1, remaining_deadline_seconds() - reserve
+                    ),
                 )
             except ExaSearchError as exc:
                 raise _map_exa(exc) from exc
             for item in response.items:
-                contents_by_url[item.url] = item
+                if item.url in urls:
+                    contents_by_url[item.url] = item
 
         try:
             run_recorded_operation(
                 store,
-                operation_key="contents-batch-1",
+                operation_key=key,
                 kind="contents",
                 request_hash=_hash_request("contents", *urls),
-                worker=_contents,
+                worker=worker,
             )
         except WebResearchError as exc:
             if exc.reason not in {
@@ -294,6 +276,71 @@ def run_web_research(
                 "web_search_invalid_response",
             }:
                 raise
+            limitations.append(exc.reason)
+
+    def selected_urls() -> tuple[str, ...]:
+        """Return ranked, bounded candidate URLs before each read."""
+        return tuple(
+            item.url
+            for item in rank_candidates(query, tuple(candidates_by_url.values()))
+        )[:EXA_MAX_CONTENTS_URLS]
+
+    _search_one(
+        query,
+        "search-round-1",
+        round_index=1,
+        time_budget=max(0.1, remaining_deadline_seconds() - reserve),
+    )
+    _read(selected_urls(), "contents-batch-1")
+    evidence = tuple(
+        query_excerpt_window(
+            item.text or "", f"{query} {original_query}", WEB_MAX_EXCERPT_CHARS
+        )
+        for item in contents_by_url.values()
+        if item.text
+    )
+    raw_follow_ups = () if critique is None else critique(query, evidence)
+    sanitized_follow_ups: list[str] = []
+    for item in raw_follow_ups:
+        try:
+            sanitized_follow_ups.append(
+                sanitize_exa_query(item, forbidden_snippets=forbidden_snippets)
+            )
+        except WebResearchError as exc:
+            if exc.reason == "company_passage_forbidden":
+                raise
+    extra = bound_formulations(query, tuple(sanitized_follow_ups))[1:]
+    for index, formulation in enumerate(extra):
+        # Reserve one contents operation as well as answer/verification time.
+        if (
+            counters.ops >= WEB_MAX_EXTERNAL_OPS - 1
+            or remaining_deadline_seconds() <= reserve + 2
+        ):
+            break
+        try:
+            _search_one(
+                formulation,
+                f"search-round-2-{index}",
+                round_index=2,
+                time_budget=max(
+                    0.1,
+                    (remaining_deadline_seconds() - reserve) / (len(extra) - index + 1),
+                ),
+            )
+        except WebResearchError as exc:
+            if exc.reason not in {"web_search_timeout", "web_search_transport_failed"}:
+                raise
+            limitations.append(exc.reason)
+            break
+    urls = selected_urls()
+    unread = tuple(url for url in urls if url not in contents_by_url)
+    if (
+        extra
+        and unread
+        and counters.ops < WEB_MAX_EXTERNAL_OPS
+        and remaining_deadline_seconds() > reserve
+    ):
+        _read(unread, "contents-batch-2")
 
     excerpts: list[tuple[str, str, str, str | None]] = []
     total_chars = 0
@@ -316,12 +363,13 @@ def run_web_research(
         refresh_heading = bool(
             text.strip()
             and title_mentions_reference(title, missing_levels)
-            and remaining_deadline_seconds() >= 20.0
+            and remaining_deadline_seconds() >= reserve + 5.0
         )
         if (
             (not text.strip() or refresh_heading)
             and fetch is not None
             and counters.ops < WEB_MAX_EXTERNAL_OPS
+            and remaining_deadline_seconds() > reserve
         ):
             _cancel()
             _bump()
@@ -339,7 +387,13 @@ def run_web_research(
                     Extracted text, or None when empty.
                 """
 
-                return fetch.fetch_text(target, allowed_urls=frozenset(allowed))
+                return fetch.fetch_text(
+                    target,
+                    allowed_urls=frozenset(allowed),
+                    remaining_deadline_seconds=max(
+                        0.1, remaining_deadline_seconds() - reserve
+                    ),
+                )
 
             fetched = run_recorded_operation(
                 store,
@@ -366,7 +420,9 @@ def run_web_research(
                 if refreshed_missing < missing_levels:
                     text = fetched
                     missing_levels = refreshed_missing
-        excerpt = text.strip()[:WEB_MAX_EXCERPT_CHARS]
+        excerpt = query_excerpt_window(
+            text.strip(), f"{query} {original_query}", WEB_MAX_EXCERPT_CHARS
+        )
         if not excerpt:
             continue
         if total_chars + len(excerpt) > WEB_MAX_TOTAL_EXCERPT_CHARS:
@@ -392,6 +448,7 @@ def run_web_research(
                 published_date=published,
             )
         )
+    _cancel()
     source_tuple = tuple(sources)
     answer = (
         synthesize(query, source_tuple)

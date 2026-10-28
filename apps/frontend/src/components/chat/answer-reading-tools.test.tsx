@@ -111,7 +111,7 @@ describe("Answer reading tools", () => {
     const { rerender } = render(
       <AnswerSurface {...props} messages={[message]} />,
     );
-    expect(screen.getByTestId("answer-source-list")).toBeInTheDocument();
+    expect(screen.queryByTestId("answer-source-list")).toBeNull();
     rerender(
       <AnswerSurface
         {...props}

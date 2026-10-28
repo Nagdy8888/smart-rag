@@ -325,6 +325,19 @@ class CheckRunner:
                     ),
                     extra_environ=_FRONTEND_PUBLIC_BUILD_ENV,
                 ),
+                Command(
+                    "Playwright Web quality fixtures",
+                    (
+                        self._pnpm,
+                        "--filter",
+                        "smart-rag-frontend",
+                        "exec",
+                        "playwright",
+                        "test",
+                        "--config",
+                        "playwright.web-fixture.config.ts",
+                    ),
+                ),
             ),
             "fast": (),
         }

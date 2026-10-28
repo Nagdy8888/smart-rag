@@ -465,7 +465,9 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(await screen.findByText("<script>x</script>")).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
     expect(screen.queryByText("SECRET PASSAGE")).toBeNull();
+    await user.click(await screen.findByRole("button", { name: "Sources (1)" }));
     expect(await screen.findByRole("button", { name: "Citation 1, Source · PDF page 3" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
     const diagnostics = screen.getByTestId("advanced-diagnostics");
     expect(diagnostics).toHaveTextContent("future_metric");
     expect(diagnostics).toHaveTextContent("Combined");
@@ -637,7 +639,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Run details" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Sources (0)" }));
-    expect(screen.getByRole("dialog", { name: "Sources (0)" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Sources (0 pages)" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("button", { name: "Give feedback" })).toBeNull();
   });
@@ -826,7 +828,7 @@ describe("ChatApp Ask workspace", () => {
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
     expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Citation 1" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Sources (0)" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sources (0 pages)" })).toBeNull();
     expect(screen.getByTestId("answer-token-usage")).toHaveTextContent(
       "412 prompt · 88 completion",
     );
@@ -869,7 +871,10 @@ describe("ChatApp Ask workspace", () => {
     await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "What is our refund period?");
     await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.queryByRole("button", { name: /^Citation / })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Sources (1)" }));
     expect(await screen.findByRole("button", { name: /Citation 1/ })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("link", { name: "Citation 1" })).toBeNull();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Company documents");
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
@@ -1035,6 +1040,7 @@ describe("ChatApp Ask workspace", () => {
     await user.click(screen.getByRole("radio", { name: "Web" }));
     await user.type(screen.getByLabelText("Message"), "public briefing");
     await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(await screen.findByRole("button", { name: "Sources (1)" }));
     const chip = await screen.findByRole("button", {
       name: "Citation 1, Public briefing",
     });
@@ -1084,7 +1090,7 @@ describe("ChatApp Ask workspace", () => {
     expect(await screen.findByText(MIXED_SCOPE_CLARIFICATION)).toBeInTheDocument();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Needs clarification");
     expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sources (0)" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sources (0 pages)" })).toBeNull();
   });
 
   it("exposes labeled Sessions and Conversation regions", async () => {
@@ -1291,7 +1297,7 @@ describe("ChatApp Ask workspace", () => {
       );
     });
     expect(fetchCitationDetail).not.toHaveBeenCalled();
-    await user.click(await screen.findByRole("button", { name: /Citation 0/ }));
+    await user.click(await screen.findByRole("button", { name: /Citation 1/ }));
     await waitFor(() => {
       expect(fetchCitationDetail).toHaveBeenCalledTimes(1);
     });

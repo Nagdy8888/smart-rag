@@ -153,7 +153,10 @@ def test_operation_replay_and_conflict(db_connection: psycopg.Connection) -> Non
     )
     assert replay.replayed is True
     assert replay.operation_id == first.operation_id
-    with pytest.raises(QueryAdmissionError, match="conflict"):
+    with (
+        pytest.raises(QueryAdmissionError, match="conflict"),
+        db_connection.transaction(),
+    ):
         begin_web_research_operation(
             db_connection,
             caller=caller,
@@ -167,7 +170,10 @@ def test_operation_replay_and_conflict(db_connection: psycopg.Connection) -> Non
         caller=caller,
         operation_id=UUID(first.operation_id),
     )
-    with pytest.raises(QueryAdmissionError, match="ambiguous"):
+    with (
+        pytest.raises(QueryAdmissionError, match="ambiguous"),
+        db_connection.transaction(),
+    ):
         begin_web_research_operation(
             db_connection,
             caller=caller,
@@ -199,7 +205,10 @@ def test_caps_and_span_and_foreign_run(db_connection: psycopg.Connection) -> Non
         )
         for index in range(6)
     ]
-    with pytest.raises(QueryAdmissionError, match="cap_exceeded"):
+    with (
+        pytest.raises(QueryAdmissionError, match="cap_exceeded"),
+        db_connection.transaction(),
+    ):
         insert_web_source(
             db_connection,
             caller=caller,
@@ -209,7 +218,10 @@ def test_caps_and_span_and_foreign_run(db_connection: psycopg.Connection) -> Non
             title="T",
             excerpt="abcdef",
         )
-    with pytest.raises(ValueError, match="span_not_contained"):
+    with (
+        pytest.raises(ValueError, match="span_not_contained"),
+        db_connection.transaction(),
+    ):
         insert_web_citation(
             db_connection,
             caller=caller,
@@ -220,7 +232,10 @@ def test_caps_and_span_and_foreign_run(db_connection: psycopg.Connection) -> Non
                 web_source_id=sources[0].web_source_id, span="missing"
             ),
         )
-    with pytest.raises(QueryAdmissionError, match="not_found"):
+    with (
+        pytest.raises(QueryAdmissionError, match="not_found"),
+        db_connection.transaction(),
+    ):
         list_run_citations(db_connection, caller=other, run_id=run_id)
     other_source = insert_web_source(
         db_connection,
@@ -231,7 +246,10 @@ def test_caps_and_span_and_foreign_run(db_connection: psycopg.Connection) -> Non
         title="O",
         excerpt="other excerpt",
     )
-    with pytest.raises(QueryAdmissionError, match="not_found"):
+    with (
+        pytest.raises(QueryAdmissionError, match="not_found"),
+        db_connection.transaction(),
+    ):
         insert_web_citation(
             db_connection,
             caller=caller,
@@ -270,7 +288,10 @@ def test_thirteenth_citation_and_invalid_inputs(
             source=source,
             citation=WebCitation(web_source_id=source.web_source_id, span="same span"),
         )
-    with pytest.raises(QueryAdmissionError, match="cap_exceeded"):
+    with (
+        pytest.raises(QueryAdmissionError, match="cap_exceeded"),
+        db_connection.transaction(),
+    ):
         insert_web_citation(
             db_connection,
             caller=caller,
@@ -279,7 +300,7 @@ def test_thirteenth_citation_and_invalid_inputs(
             source=source,
             citation=WebCitation(web_source_id=source.web_source_id, span="same span"),
         )
-    with pytest.raises(ValueError, match="invalid_url"):
+    with pytest.raises(ValueError, match="invalid_url"), db_connection.transaction():
         insert_web_source(
             db_connection,
             caller=caller,
@@ -289,7 +310,10 @@ def test_thirteenth_citation_and_invalid_inputs(
             title="Bad",
             excerpt="loopback",
         )
-    with pytest.raises(QueryAdmissionError, match="invalid_excerpt"):
+    with (
+        pytest.raises(QueryAdmissionError, match="invalid_excerpt"),
+        db_connection.transaction(),
+    ):
         insert_web_source(
             db_connection,
             caller=caller,
@@ -311,7 +335,10 @@ def test_rpc_rejects_mismatched_content_hash(
     )
     db_connection.execute("RESET ROLE")
     db_connection.execute("SET ROLE app_api")
-    with pytest.raises(psycopg.Error, match="invalid_hash"):
+    with (
+        pytest.raises(psycopg.Error, match="invalid_hash"),
+        db_connection.transaction(),
+    ):
         with db_connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -380,7 +407,7 @@ def test_app_api_cannot_insert_web_tables_directly(
     """``app_api`` has no table DML on Web evidence tables."""
 
     db_connection.execute("SET ROLE app_api")
-    with pytest.raises(psycopg.Error):
+    with pytest.raises(psycopg.Error), db_connection.transaction():
         db_connection.execute(
             """
             INSERT INTO app.web_sources (
@@ -511,7 +538,10 @@ def test_web_citation_detail_unknown_id_is_not_found(
         db_connection, user_id=uuid4(), role="member"
     )
     db_connection.execute("SET ROLE app_api")
-    with pytest.raises(QueryAdmissionError, match="not_found"):
+    with (
+        pytest.raises(QueryAdmissionError, match="not_found"),
+        db_connection.transaction(),
+    ):
         get_run_citation_detail(
             db_connection,
             caller=caller,

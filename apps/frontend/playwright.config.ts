@@ -11,6 +11,8 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests/e2e",
+  // This suite runs immediately afterward with its own local Auth fixture.
+  testIgnore: "web-quality-fixture.spec.ts",
   fullyParallel: false,
   retries: 0,
   timeout: 60_000,

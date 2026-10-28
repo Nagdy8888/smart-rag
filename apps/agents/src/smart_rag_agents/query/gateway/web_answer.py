@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal, cast
 
 from pydantic import ValidationError
@@ -19,7 +20,6 @@ from smart_rag_core.web_research.models import WebSourceRecord
 from smart_rag_core.web_research.synthesis import (
     citations_from_persisted_ids,
     isolate_web_sources,
-    mock_web_answer,
 )
 
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -116,6 +116,14 @@ def _parse_web_answer_payload(
         except ValidationError:
             continue
     answer_text = str(typed.get("answer_text") or "").strip()
+    refs = re.findall(r"\[\[cite:(\d+)\]\]", answer_text)
+    if refs:
+        if len(web_citations) != len(citation_items) or any(
+            int(ref) >= len(web_citations) for ref in refs
+        ):
+            raise AnswerError("web_answer_citation_reference_invalid")
+    if "[[cite:" in re.sub(r"\[\[cite:\d+\]\]", "", answer_text):
+        raise AnswerError("web_answer_citation_reference_invalid")
     if not web_citations:
         status = "refused"
         if not answer_text:
@@ -137,12 +145,14 @@ def gateway_web_answer(
     query: str,
     sources: tuple[WebSourceRecord, ...],
     context: AuthorizedRuntimeContext | None,
+    search_query: str = "",
 ) -> tuple[AnswerPayload, int, int]:
     """Run one async Web-answer gateway call from the sync graph.
 
     Args:
         deps: Bound gateway and ``web_answer_v1`` prompt.
-        query: Sanitized user query.
+        search_query: Optional discovery rewrite for multilingual fitting.
+        query: Original user query.
         sources: Persisted Web sources for this run.
         context: Admitted run context used for the live deadline timeout.
 
@@ -165,6 +175,9 @@ def gateway_web_answer(
     if gateway is None:
         raise AnswerError("model_gateway_unbound")
     timeout_seconds = gateway_timeout_seconds(context)
+    if timeout_seconds <= 8.0:
+        raise AnswerError("web_answer_deadline_exhausted")
+    timeout_seconds = min(25.0, timeout_seconds - 8.0)
     fitted = sources
     records = isolate_web_sources(fitted)
     # Persisted sources may total 40K characters; the configured model input
@@ -176,7 +189,11 @@ def gateway_web_answer(
             raise AnswerError("web_answer_input_bound")
         fitted = tuple(
             source.model_copy(
-                update={"excerpt": query_excerpt_window(source.excerpt, query, size)}
+                update={
+                    "excerpt": query_excerpt_window(
+                        source.excerpt, f"{query} {search_query}", size
+                    )
+                }
             )
             for source in sources
         )
@@ -237,7 +254,7 @@ def synthesize_web_answer(
             context=context,
         )
     except AnswerError:
-        return mock_web_answer(query=query, sources=sources)
+        raise
     if payload.answer_origin is not KnowledgeScope.WEB:
         payload = payload.model_copy(update={"answer_origin": KnowledgeScope.WEB})
     return payload.model_copy(update={"citations": (), "table_citations": ()})

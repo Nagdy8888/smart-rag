@@ -6,6 +6,8 @@ import {
   clampCitationCount,
   parseTranscriptSourceKind,
 } from "../chat-restore";
+import { isRequestedSearchScope } from "../types";
+import { isAnswerOrigin } from "../answer-origin";
 import { parseKnowledgeResult } from "../knowledge-result";
 import type {
   ConversationMessage,
@@ -163,6 +165,8 @@ function parseConversationMessage(item: unknown): ConversationMessage | null {
         ? row.run_id
         : null,
     citation_count: clampCitationCount(row.citation_count),
+    requested_search_scope: typeof row.requested_search_scope === "string" && isRequestedSearchScope(row.requested_search_scope) ? row.requested_search_scope : null,
+    answer_origin: typeof row.answer_origin === "string" && isAnswerOrigin(row.answer_origin) ? row.answer_origin : null,
     run_status: typeof row.run_status === "string" ? row.run_status : null,
     source_kind: parseTranscriptSourceKind(row.source_kind),
     knowledge_result: parseKnowledgeResult(row.knowledge_result),

@@ -4,7 +4,8 @@
 
 "use client";
 
-import { Fragment, memo, type ReactNode } from "react";
+import { citationDisplayNumber, citationPageCountLabel, citationCopyText } from "../../lib/citation-display";
+import { Fragment, cloneElement, isValidElement, memo, type ReactNode } from "react";
 import { splitAnswerFences } from "../../lib/answer-fences";
 import {
   MIXED_SCOPE_CLARIFICATION,
@@ -12,7 +13,6 @@ import {
   shouldShowCitations,
 } from "../../lib/answer-origin";
 import {
-  citationChipName,
   citationSourceLabel,
   splitVerifiedParagraphs,
 } from "../../lib/citation-label";
@@ -59,6 +59,8 @@ import styles from "./chat-transcript.module.css";
 export type AnswerSurfaceProps = {
   /** Persisted messages in ascending order. */
   messages?: ConversationMessage[];
+  historyCitations?: Record<string, readonly CitationResponse[]>;
+  onSelectTurnCitation?: (runId: string, citation: CitationResponse, trigger: HTMLButtonElement) => void;
   /** True while the selected transcript query is in flight. */
   messagesPending?: boolean;
   /** True when the selected transcript query failed. */
@@ -179,85 +181,6 @@ export function transcriptTextMatches(
     return false;
   }
   return displayText(persisted) === displayText(live);
-}
-
-/**
- * Render citation chips for a company or legacy-null origin.
- *
- * @param citations - Authorized citations.
- * @param answerOrigin - Additive origin.
- * @param hrefForCitation - Chip href builder.
- * @param onSelectCitation - Open the citation drawer.
- * @returns List, or null.
- */
-function CitationRow({
-  citations,
-  hrefForCitation,
-  onSelectCitation,
-  testId,
-  className,
-}: {
-  citations: CitationResponse[];
-  hrefForCitation: (citation: CitationResponse) => string | undefined;
-  onSelectCitation: (
-    citation: CitationResponse,
-    trigger: HTMLButtonElement,
-  ) => void;
-  testId?: string;
-  className?: string;
-}) {
-  if (citations.length === 0) {
-    return null;
-  }
-  return (
-    <ul
-      className={className ? `${styles.citationRow} ${className}` : styles.citationRow}
-      data-testid={testId}
-    >
-      {citations.map((citation) => (
-        <li key={citation.citation_id}>
-          <CitationChip
-            index={citation.citation_index}
-            label={citationSourceLabel(citation)}
-            name={citationChipName(citation)}
-            unavailable={citation.source_unavailable}
-            href={hrefForCitation(citation)}
-            onSelect={(trigger) => {
-              onSelectCitation(citation, trigger);
-            }}
-          />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/**
- * Render chips that belong to one verified paragraph.
- *
- * @param props - Mapped citations and chip handlers.
- * @returns Citation list, or null.
- */
-export function ParagraphCitations({
-  citations,
-  hrefForCitation,
-  onSelectCitation,
-}: {
-  citations: CitationResponse[];
-  hrefForCitation: (citation: CitationResponse) => string | undefined;
-  onSelectCitation: (
-    citation: CitationResponse,
-    trigger: HTMLButtonElement,
-  ) => void;
-}) {
-  return (
-    <CitationRow
-      citations={citations}
-      hrefForCitation={hrefForCitation}
-      onSelectCitation={onSelectCitation}
-      testId="paragraph-citations"
-    />
-  );
 }
 
 /**
@@ -461,12 +384,30 @@ export function AnswerContentPreview({ text }: { text: string }) {
  * @param props - Full answer, visible prefix, citations, and chip handlers.
  * @returns Paragraph blocks. Chips wait until their paragraph is fully visible.
  */
+function renderWebReferences(node: ReactNode, citations: readonly CitationResponse[],
+  onSelect: (citation: CitationResponse, trigger: HTMLButtonElement) => void): ReactNode {
+  if (typeof node === "string") return node.split(/(\[\[cite:\d+\]\]|\[\d+\])/g).map((part, index) => {
+    const reference = /^(?:\[\[cite:(\d+)\]\]|\[(\d+)\])$/.exec(part);
+    if (!reference) return part;
+    const citation = citations.find((item) => item.citation_index === Number(reference[1] ?? reference[2]));
+    return citation ? <span key={index} className={styles.inlineWebCitation}><CitationChip index={citationDisplayNumber(citation, citations)}
+      label="" name={`Citation ${citationDisplayNumber(citation, citations)}, ${citationSourceLabel(citation)}`}
+      unavailable={citation.source_unavailable} onSelect={(trigger) => onSelect(citation, trigger)} /></span>
+      : <span key={index}> [Source unavailable] </span>;
+  });
+  if (Array.isArray(node)) return node.map((child, index) => <Fragment key={index}>{renderWebReferences(child, citations, onSelect)}</Fragment>);
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    if (node.type === "code" || node.type === "pre" || node.type === AnswerCodeBlock) return node;
+    return cloneElement(node, {}, renderWebReferences(node.props.children, citations, onSelect));
+  }
+  return node;
+}
+
 function AnswerParagraphs({
   answerText,
   visibleText,
   citations,
   answerOrigin,
-  hrefForCitation,
   onSelectCitation,
 }: {
   answerText: string;
@@ -504,7 +445,9 @@ function AnswerParagraphs({
               data-paragraph-index={String(index)}
               key={`p-${String(index)}`}
             >
-              {renderAnswerParagraphBody(slice.text, slice.complete, seenTables, false, seenFigures)}
+              {answerOrigin === "web" && slice.complete ? renderWebReferences(
+                renderAnswerParagraphBody(slice.text, true, seenTables, false, seenFigures), visibleCitations, onSelectCitation,
+              ) : renderAnswerParagraphBody(slice.text, slice.complete, seenTables, false, seenFigures)}
             </div>
           );
         })}
@@ -516,17 +459,7 @@ function AnswerParagraphs({
         seenFigures.add(id);
         return <AnswerFigure key={`cited-${id}`} figureId={id} caption="" />;
       }) : null}
-      {showChips && visibleCitations.length > 0 && visibleText === answerText ? (
-        <section className={styles.answerSources} aria-label="Answer sources">
-          <p className={styles.answerSourcesLabel}>Sources</p>
-          <CitationRow
-            citations={visibleCitations}
-            hrefForCitation={hrefForCitation}
-            onSelectCitation={onSelectCitation}
-            testId="answer-source-list"
-          />
-        </section>
-      ) : null}
+
     </div>
   );
 }
@@ -544,6 +477,8 @@ function AnswerParagraphs({
  */
 export const AnswerSurface = memo(function AnswerSurface({
   messages = [],
+  historyCitations = {},
+  onSelectTurnCitation,
   messagesPending = false,
   messagesError = false,
   hasEarlier = false,
@@ -658,27 +593,31 @@ export const AnswerSurface = memo(function AnswerSurface({
               <UserText value={item.content} />
             </p>
             {item.run_id && !messages.some((answer) => answer.role === "assistant" && answer.run_id === item.run_id) && (item.run_status === "failed" || item.run_status === "cancelled") ? (
-              <p className={styles.messageMeta}>
+              <p className={styles.failedQuestionNote}>
                 {item.run_status === "cancelled" ? "This question was cancelled. No answer was saved." : "This question could not be completed. No answer was saved."}
               </p>
             ) : null}
           </div>
         ) : (
-          <div key={item.message_id} className={styles.turnAssistant}>
+          <div key={item.message_id} className={styles.turnAssistant} data-history-run={(item.citation_count ?? 0) > 0 ? item.run_id : undefined}>
             <div className={styles.assistantBlock}>
+            {item.answer_origin ? <p className={styles.answerHeader}><Badge label={answerOriginLabel(item.answer_origin) ?? ""} /></p> : null}
             <KnowledgeOutcome result={item.run_id === chat?.runId ? chat?.knowledgeResult : item.knowledge_result} />
             <LiveRegion aria-label="Answer" politeness="polite">
               <AnswerParagraphs
                 answerText={item.content}
                 visibleText={item.content}
-                citations={item.run_id === chat?.runId ? citations : []}
-                answerOrigin={item.run_id === chat?.runId ? answerOrigin : null}
+                citations={item.run_id === chat?.runId ? citations : historyCitations[item.run_id ?? ""] ?? []}
+                answerOrigin={item.run_id === chat?.runId ? answerOrigin : item.answer_origin ?? null}
                 hrefForCitation={hrefForCitation}
-                onSelectCitation={onSelectCitation}
+                onSelectCitation={(citation, trigger) => {
+                  if (item.run_id && onSelectTurnCitation) onSelectTurnCitation(item.run_id, citation, trigger);
+                  else onSelectCitation(citation, trigger);
+                }}
               />
             </LiveRegion>
             <p className={styles.messageMeta}>
-              <CopyAnswerButton text={item.content} />
+              <CopyAnswerButton text={citationCopyText(item.content, item.run_id === chat?.runId ? citations : historyCitations[item.run_id ?? ""] ?? [])} />
               <span>{formatRelativeTime(item.created_at)}</span>
               {(item.citation_count ?? 0) > 0 && item.run_id ? (
                 <>
@@ -694,7 +633,7 @@ export const AnswerSurface = memo(function AnswerSurface({
                       }
                     }}
                   >
-                    {`Sources (${String(item.citation_count)})`}
+                    {historyCitations[item.run_id ?? ""]?.length ? `Sources (${citationPageCountLabel(historyCitations[item.run_id ?? ""] ?? [])})` : `Sources (${String(item.citation_count)} citations)`}
                   </Button>
                 </>
               ) : null}
@@ -766,7 +705,7 @@ export const AnswerSurface = memo(function AnswerSurface({
             <LimitationCallout tone="warning">{MIXED_SCOPE_CLARIFICATION}</LimitationCallout>
           ) : null}
           <p className={styles.messageMeta}>
-            {!revealing && answer.trim() !== "" ? <CopyAnswerButton text={answer} /> : null}
+            {!revealing && answer.trim() !== "" ? <CopyAnswerButton text={citationCopyText(answer, citations)} /> : null}
             {liveCreatedAt ? formatRelativeTime(liveCreatedAt) : null}
             {routeName ? ` · ${routeName}` : null}
             {usageLabel !== null ? (

@@ -53,11 +53,13 @@ def test_web_prompts_match_pinned_sha256() -> None:
     from smart_rag_core.query_answer.versions import (
         WEB_ANSWER_PROMPT_SHA256,
         WEB_CRITIQUE_PROMPT_SHA256,
+        WEB_VERIFIER_PROMPT_SHA256,
     )
 
     critique = load_prompt("web_critique_v1", environment="dev")
-    answer = load_prompt("web_answer_v1", environment="dev")
+    answer = load_prompt("web_answer_v2", environment="dev")
     assert critique.sha256 == WEB_CRITIQUE_PROMPT_SHA256
     assert answer.sha256 == WEB_ANSWER_PROMPT_SHA256
+    assert load_prompt("web_verifier_v1").sha256 == WEB_VERIFIER_PROMPT_SHA256
     assert "company" in prompt_text("web_critique_v1").lower()
     assert "web_source_id" in prompt_text("web_answer_v1")

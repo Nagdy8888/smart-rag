@@ -371,6 +371,8 @@ def list_conversation_messages_route(
             created_at=item.created_at,
             run_id=item.run_id,
             run_status=item.run_status,
+            requested_search_scope=item.requested_search_scope,
+            answer_origin=item.answer_origin,
             citation_count=item.citation_count,
             source_kind=_transcript_source_kind(item.source_kind),
             knowledge_result=item.knowledge_result,

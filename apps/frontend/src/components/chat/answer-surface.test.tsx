@@ -111,7 +111,7 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.getByTestId("answer-citations")).toBeInTheDocument();
   });
 
-  it("labels company citations with the Acrobat page", () => {
+  it("keeps company page labels out of the chat until Sources opens", () => {
     renderSurface({
       answerOrigin: "company_documents",
       citations: [
@@ -127,11 +127,8 @@ describe("AnswerSurface origin chrome", () => {
         },
       ],
     });
-    expect(
-      screen.getByRole("button", { name: "Citation 0, AI agents · p. 12" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("cite-1")).not.toBeInTheDocument();
-    expect(screen.queryByText("PDF page 129")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Citation / })).not.toBeInTheDocument();
+    expect(screen.queryByText("AI agents")).not.toBeInTheDocument();
   });
 
   it("shows clarification and no citation chips for an ambiguous origin", () => {
@@ -578,7 +575,7 @@ describe("AnswerSurface paragraph citations", () => {
     expect(view.container.querySelector("[data-answer-groups='true']")).toBeNull();
   });
 
-  it("keeps all citations in a Sources section outside the answer paragraphs", () => {
+  it("keeps multi-paragraph sources out of the chat", () => {
     renderSurface({
       answerOrigin: "company_documents",
       answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
@@ -605,19 +602,12 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    const sources = screen.getByRole("region", { name: "Answer sources" });
-    expect(sources.querySelectorAll("button")).toHaveLength(2);
-    expect(document.querySelector("[data-paragraph-index] button")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Citation 0, AI Agents · PDF page 25" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Citation 1, AI Agents · PDF page 40" }),
-    ).toBeInTheDocument();
-
+    expect(screen.queryByRole("region", { name: "Answer sources" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("answer-source-list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Citation / })).not.toBeInTheDocument();
   });
 
-  it("can show two source chips on one paragraph", () => {
+  it("keeps multiple supporting citations behind Sources", () => {
     renderSurface({
       answerOrigin: "company_documents",
       answer: "Refunds close in 30 days.",
@@ -644,17 +634,11 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    const row = screen.getByTestId("answer-source-list");
-    expect(
-      screen.getByRole("button", { name: "Citation 0, Policy · PDF page 10" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Citation 1, Handbook · PDF page 11" }),
-    ).toBeInTheDocument();
-    expect(row.querySelectorAll("button")).toHaveLength(2);
+    expect(screen.queryByTestId("answer-source-list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Citation / })).not.toBeInTheDocument();
   });
 
-  it("keeps unmapped citations in the legacy footer", () => {
+  it("keeps legacy source lists behind Sources", () => {
     renderSurface({
       answerOrigin: "company_documents",
       answer: "Refunds close in 30 days.",
@@ -671,15 +655,8 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    expect(
-      screen.getByText("Sources"),
-    ).toBeInTheDocument();
-    expect(screen.queryByTestId("paragraph-citations")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: "Citation 3, AI Agents · PDF page 25",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Sources")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Citation / })).not.toBeInTheDocument();
   });
 
   it("hides chips until the paced-reveal paragraph is fully visible", () => {
@@ -702,7 +679,7 @@ describe("AnswerSurface paragraph citations", () => {
       ],
     });
     expect(screen.getByText("Refunds close")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Citation 0/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Citation 1/ })).toBeNull();
   });
 
   it("shows Sources (citation_count) for historical assistants without live chips", () => {
@@ -749,11 +726,11 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    expect(screen.getByRole("button", { name: "Sources (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sources (1 citations)" })).toBeInTheDocument();
     expect(screen.queryByText("History Book")).not.toBeInTheDocument();
     expect(screen.queryByText("Live Book")).not.toBeInTheDocument();
     expect(screen.queryByText("should not render from list")).not.toBeInTheDocument();
-    screen.getByRole("button", { name: "Sources (1)" }).click();
+    screen.getByRole("button", { name: "Sources (1 citations)" }).click();
     expect(onOpenTurnSources).toHaveBeenCalledWith("run-hist");
   });
 
@@ -806,5 +783,25 @@ describe("transcriptTextMatches", () => {
 
   it("does not match an empty live string to persisted history", () => {
     expect(transcriptTextMatches("Previous verified answer.", "")).toBe(false);
+  });
+});
+
+
+describe("restored Web references", () => {
+  afterEach(cleanup);
+  it("opens the correct historical run from structured and legacy references", () => {
+    const select = vi.fn();
+    const web: CitationResponse = { citation_id: "web-c", citation_index: 0, chunk_id: null,
+      source_kind: "web", source_unavailable: false, provenance: { title: "RFC 6585" } };
+    renderSurface({ question: "", answer: "", messages: [{ message_id: "m", role: "assistant",
+      content: "Supported. [[cite:0]] Legacy. [0]", created_at: "2026-10-28T00:00:00Z",
+      run_id: "historical-run", answer_origin: "web", citation_count: 1 }],
+      historyCitations: { "historical-run": [web] }, onSelectTurnCitation: select });
+    const buttons = screen.getAllByRole("button", { name: "Citation 1, RFC 6585" });
+    buttons[0]!.click();
+    expect(select.mock.calls[0]?.[0]).toBe("historical-run");
+    expect(select.mock.calls[0]?.[1].citation_id).toBe("web-c");
+    expect(screen.queryByText(/\[\[cite:/)).not.toBeInTheDocument();
+    expect(buttons).toHaveLength(2);
   });
 });

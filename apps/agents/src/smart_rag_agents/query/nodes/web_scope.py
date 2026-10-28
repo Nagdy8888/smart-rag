@@ -27,7 +27,7 @@ from smart_rag_core.web_research.exceptions import WebResearchError
 from smart_rag_core.web_research.executor import run_web_research
 from smart_rag_core.web_research.fetch import CrawlProxyCandidateFetch
 from smart_rag_core.web_research.models import WebSourceRecord
-from smart_rag_core.web_research.planner import propose_follow_ups
+from smart_rag_core.web_research.selection import evidence_follow_ups
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.counted_web_answer import counted_web_answer
@@ -38,65 +38,68 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _await_exa(
-    factory: Callable[[], object], *, cancel_check: Callable[[], bool] | None
+    factory: Callable[[], object],
+    *,
+    cancel_check: Callable[[], bool] | None,
+    timeout_seconds: float = 40.0,
 ) -> object:
-    """Run one Exa coroutine without rewriting typed ``ExaSearchError``.
+    """Await Exa within the caller's remaining budget, preserving typed errors."""
+    stopped = threading.Event()
 
-    Args:
-        factory: Zero-arg callable returning an awaitable.
-        cancel_check: Cooperative cancellation probe.
-
-    Returns:
-        Gateway result.
-
-    Raises:
-        BaseException: Original gateway errors, including ``ExaSearchError``.
-        WebResearchError: Cancellation.
-    """
+    async def invoke() -> object:
+        """Await and cancel one child within its supplied deadline."""
+        produced = factory()
+        if not asyncio.iscoroutine(produced):
+            return produced
+        task = asyncio.create_task(produced)
+        deadline = time.monotonic() + max(0.1, timeout_seconds)
+        try:
+            while not task.done():
+                if stopped.is_set() or (cancel_check is not None and cancel_check()):
+                    raise WebResearchError("cancelled")
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise WebResearchError("web_search_timeout")
+                await asyncio.wait((task,), timeout=min(0.05, remaining))
+            return await task
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
 
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        produced = factory()
-        if asyncio.iscoroutine(produced):
-            return asyncio.run(produced)
-        return produced
-    if cancel_check is not None and cancel_check():
-        raise WebResearchError("cancelled")
+        return asyncio.run(invoke())
     box: dict[str, object] = {}
-    errors: dict[str, BaseException] = {}
+    errors: list[BaseException] = []
     copied = contextvars.copy_context()
 
-    def _worker() -> None:
-        """Complete the awaitable on a dedicated loop."""
+    def worker() -> None:
+        """Execute the child on a private loop when the caller already has one."""
+        try:
+            box["result"] = copied.run(asyncio.run, invoke())
+        except BaseException as exc:
+            errors.append(exc)
 
-        def _inner() -> None:
-            """Run the factory on this copied context."""
-
-            try:
-                produced = factory()
-                if asyncio.iscoroutine(produced):
-                    box["value"] = asyncio.run(produced)
-                else:
-                    box["value"] = produced
-            except BaseException as exc:
-                errors["exc"] = exc
-
-        copied.run(_inner)
-
-    thread = threading.Thread(target=_worker, name="exa-gateway-loop", daemon=True)
+    thread = threading.Thread(target=worker, name="exa-gateway-loop", daemon=True)
     thread.start()
-    deadline = time.monotonic() + 50.0
+    deadline = time.monotonic() + max(0.1, timeout_seconds)
     while thread.is_alive():
-        if cancel_check is not None and cancel_check():
-            raise WebResearchError("cancelled")
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise WebResearchError("web_search_timeout")
-        thread.join(timeout=min(0.05, remaining))
-    if "exc" in errors:
-        raise errors["exc"]
-    return box.get("value")
+        if (
+            cancel_check is not None and cancel_check()
+        ) or time.monotonic() >= deadline:
+            stopped.set()
+            thread.join(timeout=0.2)
+            raise WebResearchError(
+                "cancelled"
+                if cancel_check is not None and cancel_check()
+                else "web_search_timeout"
+            )
+        thread.join(timeout=0.05)
+    if errors:
+        raise errors[0]
+    return box.get("result")
 
 
 class _SyncExaPort:
@@ -134,6 +137,7 @@ class _SyncExaPort:
                 num_results=num_results,
             ),
             cancel_check=self._cancel,
+            timeout_seconds=remaining_deadline_seconds,
         )
         return result  # type: ignore[return-value]
 
@@ -153,13 +157,16 @@ class _SyncExaPort:
                 remaining_deadline_seconds=remaining_deadline_seconds,
             ),
             cancel_check=self._cancel,
+            timeout_seconds=remaining_deadline_seconds,
         )
         return result  # type: ignore[return-value]
 
     def aclose(self) -> None:
         """Close the HTTP client without logging the key."""
 
-        _await_exa(lambda: self._gateway.aclose(), cancel_check=None)
+        _await_exa(
+            lambda: self._gateway.aclose(), cancel_check=None, timeout_seconds=1.0
+        )
 
 
 def _emit_progress(stage: str) -> None:
@@ -351,7 +358,9 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         # Search rewrites may translate Arabic for discovery. Synthesis must
         # retain the employee's original language and presentation request.
         original = str(state.get("user_query") or query)
-        return counted_web_answer(state, deps, query=original, sources=sources)
+        return counted_web_answer(
+            state, deps, query=original, sources=sources, search_query=query
+        )
 
     synthesize = None
     if deps.model_gateway is not None and deps.web_answer_prompt_text:
@@ -370,7 +379,8 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             cancel_check=deps.cancel_check,
             progress=_emit_progress,
             forbidden_snippets=forbidden_web_memory_snippets(state),
-            critique=propose_follow_ups,
+            critique=evidence_follow_ups,
+            original_query=str(state.get("user_query") or ""),
             synthesize=synthesize,
         )
     except WebResearchError as exc:

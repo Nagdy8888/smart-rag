@@ -42,6 +42,8 @@ from smart_rag_core.query_answer.versions import (
     VERIFIER_PROMPT_VERSION,
     WEB_ANSWER_PROMPT_SHA256,
     WEB_ANSWER_PROMPT_VERSION,
+    WEB_VERIFIER_PROMPT_SHA256,
+    WEB_VERIFIER_PROMPT_VERSION,
 )
 
 
@@ -269,10 +271,10 @@ def execute_openai_verifier(
 
     from openai import omit
 
-    if (
-        prompt_version != VERIFIER_PROMPT_VERSION
-        or prompt_sha256 != VERIFIER_PROMPT_SHA256
-    ):
+    if (prompt_version, prompt_sha256) not in {
+        (VERIFIER_PROMPT_VERSION, VERIFIER_PROMPT_SHA256),
+        (WEB_VERIFIER_PROMPT_VERSION, WEB_VERIFIER_PROMPT_SHA256),
+    }:
         raise OpenAIAnswerError("verifier_version_mismatch")
     if model_id not in ALLOWED_VERIFIER_MODEL_IDS:
         raise OpenAIAnswerError("verifier_version_mismatch")

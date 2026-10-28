@@ -517,7 +517,7 @@ describe("CitationSheet", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Citation 0, AI agents · PDF page 129" }),
+      screen.getByRole("button", { name: "Citation 1, AI agents · PDF page 129" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("a035e243-03dd-4987-b7ed-fe00c0b9336c"),

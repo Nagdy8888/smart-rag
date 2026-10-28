@@ -5,9 +5,9 @@
 "use client";
 
 import {
-  citationChipName,
   citationSourceLabel,
 } from "../../lib/citation-label";
+import { citationDisplayNumber, citationPageGroups, citationPageCountLabel } from "../../lib/citation-display";
 import type { CitationResponse } from "../../lib/types";
 import { Icon } from "../ui/icon";
 import { Button } from "../ui/button";
@@ -57,7 +57,7 @@ export function CitationSheet({
   return (
     <Sheet
       title={
-        pending || error ? "Sources" : `Sources (${String(citations.length)})`
+        pending || error ? "Sources" : `Sources (${citationPageCountLabel(citations)})`
       }
       onClose={onClose}
       panelClassName={sourceStyles.sourcesPanel}
@@ -84,21 +84,23 @@ export function CitationSheet({
         <p className={styles.muted}>No citations for this run yet.</p>
       ) : (
         <ul className={sourceStyles.sourceList}>
-          {citations.map((citation) => (
+          {citationPageGroups(citations).map((group) => { const citation = group[0]!; return (
             <li key={citation.citation_id} className={sourceStyles.sourceCard}>
               <p className={sourceStyles.sourceKind}><Icon name={citation.source_kind === "web" ? "search" : "documents"} />{citation.source_kind === "web" ? "Web source" : "Company source"}</p>
-              <CitationChip
-                index={citation.citation_index}
-                label={citation.source_kind === "web" ? citationSourceLabel(citation) : citationSourceLabel(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
-                name={citationChipName(citation)}
+              {group.length > 1 ? <p>{citationSourceLabel(citation)}</p> : null}
+              {group.map((citation) => <CitationChip
+                key={citation.citation_id}
+                index={citationDisplayNumber(citation, citations)}
+                label={group.length > 1 ? `Supporting passage ${citationDisplayNumber(citation, citations)}` : citation.source_kind === "web" ? citationSourceLabel(citation) : citationSourceLabel(citation).replace(/[-_]/g, " ").replace(/\.pdf(?=\s|$)/i, "")}
+                name={`Citation ${citationDisplayNumber(citation, citations)}, ${citationSourceLabel(citation)}`}
                 unavailable={citation.source_unavailable}
                 href={hrefForCitation(citation)}
                 onSelect={(trigger) => {
                   onSelectCitation(citation, trigger);
                 }}
-              />
+              />)}
             </li>
-          ))}
+          ); })}
         </ul>
       )}
       {!pending && !error && citations.length > 0 ? (

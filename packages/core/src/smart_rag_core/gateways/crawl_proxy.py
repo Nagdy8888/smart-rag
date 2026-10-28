@@ -71,11 +71,14 @@ class CrawlProxyGateway:
         self._base_url = proxy_base_url.rstrip("/")
         self._timeout = timeout_seconds
 
-    def fetch(self, request: ProxyFetchRequest) -> ProxyFetchResponse:
+    def fetch(
+        self, request: ProxyFetchRequest, *, timeout_seconds: float | None = None
+    ) -> ProxyFetchResponse:
         """Execute one pinned fetch via ``POST /fetch``.
 
         Args:
             request: Fully validated fetch contract.
+            timeout_seconds: Optional smaller caller deadline.
 
         Returns:
             Proxy response including peer IP and bounded body bytes.
@@ -102,7 +105,11 @@ class CrawlProxyGateway:
         }
         url = f"{self._base_url}/fetch"
         try:
-            with httpx.Client(timeout=self._timeout) as client:
+            with httpx.Client(
+                timeout=min(self._timeout, max(0.1, timeout_seconds))
+                if timeout_seconds is not None
+                else self._timeout
+            ) as client:
                 response = client.post(url, json=payload)
         except httpx.HTTPError as exc:
             raise CrawlProxyError(f"proxy transport failure: {exc}") from exc

@@ -70,10 +70,12 @@ class CandidateFetchPort(Protocol):
         url: str,
         *,
         allowed_urls: frozenset[str],
+        remaining_deadline_seconds: float | None = None,
     ) -> str | None:
         """Return excerpt text or ``None`` when the fetch fails.
 
         Args:
+            remaining_deadline_seconds: Optional caller deadline.
             url: Candidate URL.
             allowed_urls: Current-run Exa URLs. Non-members must not fetch.
 

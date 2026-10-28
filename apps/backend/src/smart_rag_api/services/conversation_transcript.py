@@ -46,6 +46,8 @@ class ConversationMessageRecord:
     created_at: datetime
     run_id: UUID | None = None
     run_status: str | None = None
+    requested_search_scope: str | None = None
+    answer_origin: str | None = None
     citation_count: int = 0
     source_kind: str | None = None
     knowledge_result: KnowledgeResult | None = None
@@ -109,7 +111,7 @@ def list_conversation_messages(
             cursor.execute(
                 """
                 SELECT message_id, role, content, created_at, run_id,
-                       citation_count, source_kind,
+                       citation_count, source_kind, presentation.requested_search_scope, presentation.answer_origin,
                        CASE WHEN run_id IS NOT NULL THEN
                          (SELECT r.status::text FROM app.get_query_run_v3(
                            %s,%s,%s,transcript.run_id) r)
@@ -121,6 +123,9 @@ def list_conversation_messages(
                 FROM app.list_conversation_messages_v3(
                   %s::uuid, %s::text, %s::bigint, %s::uuid, %s::integer, %s::uuid
                 ) AS transcript
+                LEFT JOIN LATERAL app.get_run_presentation_v1(
+                  %s,%s,%s,transcript.run_id
+                ) presentation ON transcript.run_id IS NOT NULL
                 ORDER BY created_at DESC, message_id DESC
                 """,
                 (
@@ -139,6 +144,9 @@ def list_conversation_messages(
                     str(conversation_id),
                     bounded,
                     str(before_id) if before_id is not None else None,
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
                 ),
             )
             rows = cursor.fetchall()
@@ -171,6 +179,8 @@ def list_conversation_messages(
                 citation_count=citation_count,
                 source_kind=source_kind,
                 run_status=str(row["run_status"]) if row.get("run_status") else None,
+                requested_search_scope=row.get("requested_search_scope"),
+                answer_origin=row.get("answer_origin"),
                 knowledge_result=KnowledgeResult.model_validate(row["knowledge_result"])
                 if row.get("knowledge_result") and not row.get("source_unavailable")
                 else None,

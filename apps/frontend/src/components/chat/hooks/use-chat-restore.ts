@@ -5,6 +5,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
+import { citationPageGroups } from "../../../lib/citation-display";
 import { submitFeedback, type ApiAuth } from "../../../lib/api";
 import {
   citationsForSources,
@@ -163,7 +164,7 @@ export function useChatRestore(input: UseChatRestoreInput): UseChatRestoreResult
   );
   const sourceTarget = viewingRunId ?? activeRunId ?? settledRunId;
   const sourceMessage = [...historyMessages].reverse().find((item) => item.role === "assistant" && item.run_id === sourceTarget);
-  const sourcesCount = sheetCitations.length || (sourceMessage?.citation_count ?? 0);
+  const sourcesCount = (sheetCitations.length ? citationPageGroups(sheetCitations).length : 0) || (sourceMessage?.citation_count ?? 0);
   const selectedCitation = selectedCitationRecord(
     sheetCitations,
     selectedCitationId,

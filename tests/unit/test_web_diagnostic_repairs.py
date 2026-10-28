@@ -17,6 +17,8 @@ from smart_rag_core.web_research.excerpt_window import query_excerpt_window
 @pytest.mark.parametrize(
     "question",
     [
+        "Compare WCAG 2.2 target-size criteria 2.5.8 and 2.5.5, including their sizes and conformance levels. Cite W3C.",
+        "Compare phantom-read behavior under PostgreSQL 18 Repeatable Read and Serializable using the official table. Cite your evidence.",
         "Compare target-size criteria and their conformance levels. Cite the standards body.",
         "Compare phantom-read behavior under two isolation levels using the official table.",
     ],

@@ -61,6 +61,7 @@ from smart_rag_agents.query.gateway.verifier import (
     VerifierAttemptError,
     gateway_verifier,
 )
+from smart_rag_agents.query.gateway.web_verifier import verify_web_answer
 from smart_rag_agents.query.nodes.knowledge import (
     annotate_knowledge_result,
     company_evidence_context,
@@ -179,6 +180,15 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         )
     except (ValidationError, ValueError, AnswerError):
         return refuse_release(state, "deterministic_check_failed")
+    if is_web and checked.status != "refused":
+        try:
+            checked = verify_web_answer(state, deps, checked, tuple(web_records))
+        except Exception as exc:
+            return refuse_release(
+                state,
+                getattr(exc, "reason", "web_verifier_unavailable"),
+                verifier_call_count=int(state.get("verifier_call_count") or 0),
+            )
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
     verifier_link_verdicts: tuple[VerifierLinkVerdict, ...] = ()
@@ -545,7 +555,9 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         result = VerificationResult(
             answer=checked,
             deterministic_failures=failures,
-            verifier_call_count=1 if verifier_calls else 0,
+            verifier_call_count=1
+            if (verifier_calls or (is_web and state.get("verifier_call_count")))
+            else 0,
             verifier_link_verdicts=verifier_link_verdicts,
             omitted_link_ids=omitted,
             verifier_skipped_reason=verifier_skipped_reason,

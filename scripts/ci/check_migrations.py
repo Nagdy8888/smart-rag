@@ -122,6 +122,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20261026150000_web_citation_exact_span_v1.sql",
     "20261027100000_live_diagnostic_contract_repairs_v1.sql",
     "20261028100000_cancel_reservation_lock_order_v1.sql",
+    "20261028110000_run_presentation_metadata_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
