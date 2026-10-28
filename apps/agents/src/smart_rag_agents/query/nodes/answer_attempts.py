@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import TypeVar
 from uuid import UUID, uuid4
@@ -26,7 +27,23 @@ from smart_rag_agents.query.run_timings import (
 from smart_rag_agents.query.state import QueryGraphState
 
 ANSWER_ATTEMPT_CAP_SECONDS = 15.0
-"""Per-attempt cap until a measured 99th percentile replaces it."""
+"""Base time slice; counted attempts share at most twice this allowance."""
+
+_ACTIVE_ANSWER_BUDGET: ContextVar[float | None] = ContextVar(
+    "answer_budget", default=None
+)
+
+
+def answer_timeout_cap(default: float) -> float:
+    """Share the existing two-attempt allowance without extending the run.
+
+    Outside the counted helper, keep the original cap. Inside it, one slow
+    successful request can use the same 30 seconds previously spent on two
+    independently timed-out 15-second requests.
+    """
+    budget = _ACTIVE_ANSWER_BUDGET.get()
+    return default if budget is None else max(0.1, budget)
+
 
 ANSWER_RETRY_MIN_REMAINING_SECONDS = 8.0
 """Do not start a second attempt with less than this much run time left."""
@@ -91,6 +108,7 @@ def run_answer_attempts(
     """
 
     remaining = remaining_model_calls
+    attempts_started = time.perf_counter()
 
     def consumed_snapshot(consumed: ReservationConsumeResult) -> None:
         """Keep retry and fallback verification on the consumed version."""
@@ -104,6 +122,12 @@ def run_answer_attempts(
 
     def counted_send() -> T:
         """Charge received-but-invalid answers conservatively without retrying."""
+        left = 2 * ANSWER_ATTEMPT_CAP_SECONDS - (time.perf_counter() - attempts_started)
+        if context is not None:
+            left = min(
+                left, (context.deadline_at - datetime.now(UTC)).total_seconds() - 5
+            )
+        token = _ACTIVE_ANSWER_BUDGET.set(max(0.1, left))
         try:
             return send()
         except AnswerError as exc:
@@ -114,11 +138,18 @@ def run_answer_attempts(
             }:
                 raise _CountedAnswerFailure(exc.reason) from exc
             raise
+        finally:
+            _ACTIVE_ANSWER_BUDGET.reset(token)
 
     last: BaseException | None = None
     for index in range(2):
         if index:
-            if not _retry_allowed(context, remaining):
+            answer_left = 2 * ANSWER_ATTEMPT_CAP_SECONDS - (
+                time.perf_counter() - attempts_started
+            )
+            if answer_left < ANSWER_RETRY_MIN_REMAINING_SECONDS or not _retry_allowed(
+                context, remaining
+            ):
                 break
             try:
                 remaining = assert_call_available(remaining)

@@ -122,6 +122,20 @@ class JsonLogFormatter(logging.Formatter):
             identifier = raw_error_type.strip()
             if identifier.isidentifier() and len(identifier) <= 128:
                 payload["error_type"] = identifier
+        # Fixed machine codes only; never copy arbitrary extras or error text.
+        for field, pattern in (
+            ("reason", r"[a-z][a-z0-9_]{0,63}"),
+            ("sqlstate", r"[A-Z0-9]{5}"),
+            ("sse_event_type", r"[a-z][a-z0-9_]{0,63}"),
+            ("run_id", r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"),
+        ):
+            value = record.__dict__.get(field)
+            if (
+                field not in payload
+                and isinstance(value, str)
+                and re.fullmatch(pattern, value)
+            ):
+                payload[field] = value
         if record.exc_info is not None and record.exc_info[1] is not None:
             payload["exception_type"] = type(record.exc_info[1]).__name__
             payload["exception_message"] = "[REDACTED]"

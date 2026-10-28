@@ -63,7 +63,7 @@ class WebSearchPort(Protocol):
 
 
 class CandidateFetchPort(Protocol):
-    """Crawl-proxy fallback for Exa-failed candidate URLs only."""
+    """Crawl-proxy fallback for missing candidate text or requested metadata."""
 
     def fetch_text(
         self,

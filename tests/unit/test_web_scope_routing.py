@@ -200,6 +200,28 @@ def _planned_state(
     return state
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Compare two public target-size criteria and their conformance levels. Cite the standards body.",
+        "Compare phantom-read behavior under two isolation levels using the official table.",
+    ],
+)
+def test_explicit_public_comparison_stays_in_the_web_envelope(query: str) -> None:
+    """Comparison shape cannot create Hybrid branches inside an admitted Web run."""
+    plan = _plan(
+        query,
+        requested_search_scope=RequestedSearchScope.WEB,
+        route_family=Phase6RouteFamily.WEB_RESEARCH,
+    )
+    state = pending_query_state(user_query=query)
+    state["status"] = "planned"
+    state["retrieval_plan"] = plan.model_dump(mode="json")
+    assert route_after_plan(state) == "web_scope"
+    assert plan.effective_route is Phase6RouteFamily.WEB_RESEARCH
+    assert all(branch.kind is not BranchKind.HYBRID for branch in plan.branches)
+
+
 def _visit_nodes(
     query: str,
     *,

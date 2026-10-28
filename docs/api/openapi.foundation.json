@@ -581,6 +581,17 @@
             ],
             "title": "Run Id"
           },
+          "run_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Status"
+          },
           "source_kind": {
             "anyOf": [
               {

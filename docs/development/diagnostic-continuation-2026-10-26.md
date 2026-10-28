@@ -1,5 +1,7 @@
 ﻿# Diagnostic continuation and real Web citations — 2026-10-26
 
+Follow-up: [October 27 completion and repairs](live-question-completion-2026-10-27.md) records the remaining questions being attempted once. This earlier snapshot is retained as historical evidence.
+
 This delivery is **incomplete as an evaluation**. It does not qualify the agent for release.
 
 ## What was exercised

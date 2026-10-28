@@ -10,6 +10,33 @@ from typing import cast
 from smart_rag_core.observability import JsonLogFormatter, correlation_context
 
 
+def test_failure_logs_keep_only_bounded_machine_diagnostics() -> None:
+    """Safe SQLSTATE/reason/run IDs survive; arbitrary source extras do not."""
+    record = logging.makeLogRecord(
+        {
+            "msg": "persist failed",
+            "levelname": "INFO",
+            "reason": "database_rejected",
+            "sqlstate": "23514",
+            "run_id": "00000000-0000-4000-8000-000000000011",
+            "sse_event_type": "answer_origin",
+            "passage": "private source text",
+        }
+    )
+    formatter = JsonLogFormatter(service="test", environment="test")
+    payload = json.loads(formatter.format(record))
+    assert payload["reason"] == "database_rejected"
+    assert payload["sqlstate"] == "23514"
+    assert payload["sse_event_type"] == "answer_origin"
+    assert payload["run_id"] == "00000000-0000-4000-8000-000000000011"
+    assert "private source text" not in json.dumps(payload)
+    record.__dict__["reason"] = "Bearer private-secret"
+    record.__dict__["sqlstate"] = "private source text"
+    payload = json.loads(formatter.format(record))
+    assert "reason" not in payload
+    assert "sqlstate" not in payload
+
+
 def test_json_logs_include_required_metadata_and_redact_secrets() -> None:
     """Structured records retain correlations while removing credential forms."""
 

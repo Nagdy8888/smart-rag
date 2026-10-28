@@ -45,6 +45,7 @@ class ConversationMessageRecord:
     content: str
     created_at: datetime
     run_id: UUID | None = None
+    run_status: str | None = None
     citation_count: int = 0
     source_kind: str | None = None
     knowledge_result: KnowledgeResult | None = None
@@ -109,16 +110,23 @@ def list_conversation_messages(
                 """
                 SELECT message_id, role, content, created_at, run_id,
                        citation_count, source_kind,
+                       CASE WHEN run_id IS NOT NULL THEN
+                         (SELECT r.status::text FROM app.get_query_run_v3(
+                           %s,%s,%s,transcript.run_id) r)
+                         ELSE NULL END AS run_status,
                        app.get_run_knowledge_result(%s, %s, %s, run_id) AS knowledge_result,
                        CASE WHEN role='assistant' AND run_id IS NOT NULL THEN
                          app.run_knowledge_history_unavailable(%s,%s,%s,run_id)
                          ELSE false END AS source_unavailable
                 FROM app.list_conversation_messages_v3(
                   %s::uuid, %s::text, %s::bigint, %s::uuid, %s::integer, %s::uuid
-                )
+                ) AS transcript
                 ORDER BY created_at DESC, message_id DESC
                 """,
                 (
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
                     caller.rpc_user_id(),
                     caller.rpc_role(),
                     caller.rpc_authorization_version(),
@@ -162,6 +170,7 @@ def list_conversation_messages(
                 run_id=_optional_uuid(row.get("run_id")),
                 citation_count=citation_count,
                 source_kind=source_kind,
+                run_status=str(row["run_status"]) if row.get("run_status") else None,
                 knowledge_result=KnowledgeResult.model_validate(row["knowledge_result"])
                 if row.get("knowledge_result") and not row.get("source_unavailable")
                 else None,

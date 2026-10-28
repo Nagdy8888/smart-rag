@@ -156,6 +156,7 @@ class ConversationMessage(BaseModel):
     content: str
     created_at: datetime
     run_id: UUID | None = None
+    run_status: str | None = None
     citation_count: int = Field(default=0, ge=0, le=50)
     source_kind: Literal["company_document", "web"] | None = None
     knowledge_result: KnowledgeResult | None = None

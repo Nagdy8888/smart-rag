@@ -25,6 +25,10 @@ from smart_rag_core.web_research.bounds import (
     WEB_PROGRESS_SEARCH,
 )
 from smart_rag_core.web_research.exceptions import WebResearchError
+from smart_rag_core.web_research.heading_coverage import (
+    missing_level_references,
+    title_mentions_reference,
+)
 from smart_rag_core.web_research.models import WebSourceRecord
 from smart_rag_core.web_research.operations import run_recorded_operation
 from smart_rag_core.web_research.planner import bound_formulations
@@ -91,6 +95,7 @@ class WebResearchResult:
     contents_count: int
     fetch_count: int
     formulations: tuple[str, ...]
+    limitations: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -163,13 +168,20 @@ def run_web_research(
     allowed: set[str] = set()
     candidates_by_url: dict[str, ExaSearchCandidate] = {}
 
-    def _search_one(formulation: str, key: str, *, round_index: int) -> None:
+    def _search_one(
+        formulation: str,
+        key: str,
+        *,
+        round_index: int,
+        time_budget: float | None = None,
+    ) -> None:
         """Run one recorded Exa search for a sanitized formulation.
 
         Args:
             formulation: Sanitized Exa query.
             key: Durable operation key.
             round_index: 1-based research round.
+            time_budget: Optional share of the existing run deadline.
         """
 
         _cancel()
@@ -188,7 +200,11 @@ def run_web_research(
             try:
                 response = search.search(
                     query=formulation,
-                    remaining_deadline_seconds=remaining_deadline_seconds(),
+                    remaining_deadline_seconds=min(
+                        remaining_deadline_seconds(), time_budget
+                    )
+                    if time_budget is not None
+                    else remaining_deadline_seconds(),
                     num_results=WEB_MAX_CANDIDATES_PER_ROUND,
                 )
             except ExaSearchError as orig:
@@ -220,8 +236,25 @@ def run_web_research(
         sanitized_follow_ups.append(cleaned)
     planned = bound_formulations(query, tuple(sanitized_follow_ups))
     extra = planned[1:]
+    limitations: list[str] = []
     for index, formulation in enumerate(extra):
-        _search_one(formulation, f"search-round-2-{index}", round_index=2)
+        try:
+            # Reserve shares for every remaining optional search, reading and
+            # synthesis. Optional discovery must not consume the whole run.
+            _search_one(
+                formulation,
+                f"search-round-2-{index}",
+                round_index=2,
+                time_budget=remaining_deadline_seconds() / (len(extra) - index + 2),
+            )
+        except WebResearchError as exc:
+            if not candidates_by_url or exc.reason not in {
+                "web_search_timeout",
+                "web_search_transport_failed",
+            }:
+                raise
+            limitations.append(exc.reason)
+            break
 
     urls = tuple(candidates_by_url)[:EXA_MAX_CONTENTS_URLS]
     contents_by_url: dict[str, ExaContentItem] = {}
@@ -264,6 +297,13 @@ def run_web_research(
 
     excerpts: list[tuple[str, str, str, str | None]] = []
     total_chars = 0
+    missing_levels = missing_level_references(
+        query,
+        tuple(
+            (item.text or "")[:WEB_MAX_EXCERPT_CHARS]
+            for item in contents_by_url.values()
+        ),
+    )
     for url in urls:
         item = contents_by_url.get(url)
         text = (item.text if item is not None else None) or ""
@@ -273,8 +313,13 @@ def run_web_research(
             if item is not None
             else candidates_by_url[url].published_date
         )
+        refresh_heading = bool(
+            text.strip()
+            and title_mentions_reference(title, missing_levels)
+            and remaining_deadline_seconds() >= 20.0
+        )
         if (
-            not text.strip()
+            (not text.strip() or refresh_heading)
             and fetch is not None
             and counters.ops < WEB_MAX_EXTERNAL_OPS
         ):
@@ -303,7 +348,24 @@ def run_web_research(
                 request_hash=_hash_request("fetch", url),
                 worker=_fetch,
             )
-            text = fetched or ""
+            # A failed or unhelpful refresh must preserve the original evidence.
+            # Only real page text with better requested-field coverage replaces it.
+            if not text.strip():
+                text = fetched or ""
+            elif fetched:
+                refreshed_missing = missing_level_references(
+                    query,
+                    (
+                        *(
+                            (entry.text or "")[:WEB_MAX_EXCERPT_CHARS]
+                            for entry in contents_by_url.values()
+                        ),
+                        fetched,
+                    ),
+                )
+                if refreshed_missing < missing_levels:
+                    text = fetched
+                    missing_levels = refreshed_missing
         excerpt = text.strip()[:WEB_MAX_EXCERPT_CHARS]
         if not excerpt:
             continue
@@ -338,6 +400,8 @@ def run_web_research(
     )
     if answer.citations or answer.table_citations:
         raise WebResearchError("web_search_invalid_response")
+    if limitations and answer.status == "complete":
+        answer = answer.model_copy(update={"status": "partial"})
     return WebResearchResult(
         sources=source_tuple,
         answer=answer,
@@ -345,4 +409,5 @@ def run_web_research(
         contents_count=counters.contents,
         fetch_count=counters.fetches,
         formulations=tuple(counters.search_queries),
+        limitations=tuple(limitations),
     )

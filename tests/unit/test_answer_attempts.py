@@ -14,6 +14,67 @@ from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_answer.exceptions import AnswerError
 
 
+def test_one_slow_success_uses_existing_combined_allowance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 16-second answer need not be killed twice by independent 15-second caps."""
+    from smart_rag_agents.query.nodes.answer_attempts import answer_timeout_cap
+
+    clock = [0.0]
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.answer_attempts.time.perf_counter",
+        lambda: clock[0],
+    )
+
+    def send() -> str:
+        """Simulate provider latency without sleeping or sending a request."""
+        assert 29 <= answer_timeout_cap(15) <= 30
+        clock[0] += 16
+        return "ok"
+
+    usage, result = _run(monkeypatch, send=send, seconds=45, remaining=3)
+    assert usage == []
+    assert isinstance(result, tuple)
+    assert answer_timeout_cap(15) == 15
+
+
+def test_exhausted_combined_allowance_never_starts_a_second_send(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sharing the allowance cannot turn two 15-second attempts into two 30s calls."""
+    clock = [0.0]
+    sends: list[bool] = []
+    monkeypatch.setattr(
+        "smart_rag_agents.query.nodes.answer_attempts.time.perf_counter",
+        lambda: clock[0],
+    )
+
+    def send() -> str:
+        """Consume the full time allowance, then lose the response."""
+        sends.append(True)
+        clock[0] += 30
+        raise TimeoutAfterSendError("timeout_after_send")
+
+    usage, result = _run(monkeypatch, send=send, seconds=45, remaining=3)
+    assert len(sends) == len(usage) == 1
+    assert isinstance(result, TimeoutAfterSendError)
+
+
+def test_attempt_preserves_run_deadline_and_verifier_headroom(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The existing route deadline still wins over the shared 30-second allowance."""
+    from smart_rag_agents.query.nodes.answer_attempts import answer_timeout_cap
+
+    def send() -> str:
+        """Observe the cap under a short admitted deadline."""
+        assert 0 < answer_timeout_cap(15) <= 7
+        return "ok"
+
+    _usage, result = _run(monkeypatch, send=send, seconds=12, remaining=3)
+    assert isinstance(result, tuple)
+
+
 def _context(seconds: float) -> SimpleNamespace:
     """Build a runtime whose deadline is ``seconds`` from now."""
 

@@ -42,6 +42,46 @@ _PAGE_B = "https://example.org/update"
 _EXCERPT = "Public agencies published the latest rainfall totals this morning."
 
 
+@pytest.mark.parametrize(
+    "reason", ["web_search_timeout", "web_search_transport_failed"]
+)
+def test_optional_search_failure_keeps_first_search_evidence(reason: str) -> None:
+    """A failed optional search cannot discard valid candidates or the read budget."""
+    budgets: list[float] = []
+
+    class OptionalFailure(FakeSearch):
+        """Succeed once, then simulate the recorded follow-up failure."""
+
+        def search(
+            self, *, query: str, remaining_deadline_seconds: float, num_results: int
+        ) -> ExaSearchResponse:
+            """Record budgets and fail only the second planned search."""
+            budgets.append(remaining_deadline_seconds)
+            if self.queries:
+                raise ExaSearchError(reason)
+            return super().search(
+                query=query,
+                remaining_deadline_seconds=remaining_deadline_seconds,
+                num_results=num_results,
+            )
+
+    store = FakeStore()
+    result = run_web_research(
+        user_query="Search the web for public rainfall totals",
+        search=OptionalFailure(),
+        store=store,
+        critique=lambda _query, _titles: ("public rainfall regional totals",),
+        remaining_deadline_seconds=lambda: 40.0,
+    )
+    assert len(budgets) == result.search_count == 2
+    assert budgets[1] <= budgets[0] / 3
+    assert result.contents_count == 1
+    assert result.sources == tuple(store.sources)
+    assert result.answer.status == "partial"
+    assert result.answer.web_citations
+    assert result.limitations == (reason,)
+
+
 def _candidate(url: str, title: str = "News") -> ExaSearchCandidate:
     """Build one search hit."""
 
@@ -879,3 +919,71 @@ def test_run_web_research_uses_injected_synthesize() -> None:
     assert called == [len(result.sources)]
     assert result.answer.answer_text == "Synthesized public web answer."
     assert result.answer.answer_origin is KnowledgeScope.WEB
+
+
+@pytest.mark.parametrize("remaining", [40.0, 5.0])
+@pytest.mark.parametrize("recovered", [True, False])
+def test_missing_requested_heading_refresh_preserves_evidence(
+    remaining: float, recovered: bool
+) -> None:
+    """Only the missing criterion gets a bounded, allow-listed page refresh."""
+    from smart_rag_core.web_research.fetch import html_to_excerpt
+
+    class CriterionSearch(FakeSearch):
+        """Provider text omits a heading on the second comparison source."""
+
+        def get_contents(self, **kwargs: object) -> ExaContentsResponse:
+            """Return a complete first criterion and a body-only second one."""
+            return ExaContentsResponse(
+                items=(
+                    ExaContentItem(
+                        url=_PAGE,
+                        title="Criterion 3.1.7",
+                        text="3.1.7 (Level AA) Minimum 24 pixels.",
+                    ),
+                    ExaContentItem(
+                        url=_PAGE_B,
+                        title="Criterion 3.1.9",
+                        text="3.1.9 Target size. Minimum 44 pixels.",
+                    ),
+                ),
+                metadata=_META,
+            )
+
+    original = "3.1.9 Target size. Minimum 44 pixels."
+    fetched = (
+        html_to_excerpt(
+            b"<h1>3.1.9 Target size (Level AAA)</h1><p>Minimum 44 pixels.</p>"
+        )
+        if recovered
+        else "Page unavailable."
+    )
+    fetch = FakeFetch(text=fetched)
+    result = run_web_research(
+        user_query="Compare 3.1.7 and 3.1.9 target sizes and conformance levels",
+        search=CriterionSearch(),
+        store=FakeStore(),
+        fetch=fetch,
+        critique=lambda _query, _titles: (
+            "criterion comparison sources",
+            "criterion size levels",
+        ),
+        remaining_deadline_seconds=lambda: remaining,
+    )
+    assert result.search_count + result.contents_count + result.fetch_count <= 5
+    assert fetch.urls == ([_PAGE_B] if remaining >= 20 else [])
+    assert result.sources[0].excerpt == "3.1.7 (Level AA) Minimum 24 pixels."
+    assert result.sources[1].excerpt == (
+        fetched if recovered and remaining >= 20 else original
+    )
+
+
+def test_level_coverage_does_not_borrow_a_different_criterion() -> None:
+    """Neighbouring numbered headings cannot fill the requested level field."""
+    from smart_rag_core.web_research.heading_coverage import missing_level_references
+
+    assert missing_level_references(
+        "Compare conformance levels of 3.1.7 and 3.1.9",
+        ("3.1.7 target size. 3.1.9 (Level AAA)",),
+    ) == frozenset({"3.1.7"})
+    assert not missing_level_references("Explain 3.1.7", ("3.1.7 text",))

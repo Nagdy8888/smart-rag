@@ -38,6 +38,22 @@ describe("AnswerSurface origin chrome", () => {
     cleanup();
   });
 
+  it("restores a recorded failure beside an unanswered historical question", () => {
+    renderSurface({ question: "", answer: "", terminal: null, messages: [{
+      message_id: "failed-question", role: "user", content: "Compare two public standards",
+      created_at: "2026-10-27T12:00:00Z", run_id: "failed-run", run_status: "failed",
+    }] });
+    expect(screen.getByText("This question could not be completed. No answer was saved.")).toBeInTheDocument();
+  });
+
+  it("does not infer failure from an older question without recorded status", () => {
+    renderSurface({ question: "", answer: "", terminal: null, messages: [{
+      message_id: "old-question", role: "user", content: "An old question",
+      created_at: "2026-10-27T12:00:00Z", run_id: "old-run",
+    }] });
+    expect(screen.queryByText("This question could not be completed. No answer was saved.")).not.toBeInTheDocument();
+  });
+
   it("renders each catalog origin label without inferring from the route", () => {
     const labels = [
       ["general_knowledge", "General knowledge"],

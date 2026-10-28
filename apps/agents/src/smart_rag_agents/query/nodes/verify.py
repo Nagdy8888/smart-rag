@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, cast
 
@@ -52,6 +53,7 @@ from smart_rag_core.query_routing.constants import (
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.query_routing.serde import plan_from_state
+from smart_rag_core.sse.store import sqlstate_of
 from smart_rag_core.web_research.models import WebSourceRecord
 
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -416,7 +418,17 @@ def _verify_answer(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
                 fusion=fusion,
                 answer=checked,
             )
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).info(
+                "citation persistence failed",
+                extra={
+                    "event": "query.verify.citation_persist_failed",
+                    "error_type": type(exc).__name__,
+                    "reason": getattr(exc, "reason", "unexpected_failure"),
+                    "sqlstate": sqlstate_of(exc),
+                    "run_id": str(context.run_id) if context is not None else None,
+                },
+            )
             return refuse_release(
                 cast(QueryGraphState, {**state, **verifier_timing}),
                 "citation_persist_failed",

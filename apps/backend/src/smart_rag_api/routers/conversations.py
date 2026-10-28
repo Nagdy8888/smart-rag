@@ -370,6 +370,7 @@ def list_conversation_messages_route(
             content=item.content,
             created_at=item.created_at,
             run_id=item.run_id,
+            run_status=item.run_status,
             citation_count=item.citation_count,
             source_kind=_transcript_source_kind(item.source_kind),
             knowledge_result=item.knowledge_result,

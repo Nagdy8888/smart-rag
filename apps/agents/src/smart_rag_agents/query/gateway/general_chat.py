@@ -19,6 +19,7 @@ from smart_rag_agents.query.gateway.sync_bridge import (
     gateway_timeout_seconds,
     run_coro,
 )
+from smart_rag_agents.query.nodes.answer_attempts import answer_timeout_cap
 from smart_rag_agents.query.nodes.tokens import tokens_from_gateway_response
 
 
@@ -48,7 +49,7 @@ def gateway_general_chat(
 
     from smart_rag_core.gateways.model import GeneralChatModelRequest
 
-    timeout_seconds = gateway_timeout_seconds(context)
+    timeout_seconds = min(gateway_timeout_seconds(context), answer_timeout_cap(45.0))
     request = GeneralChatModelRequest(
         query=query or "query",
         recent_memory=recent_memory,

@@ -731,14 +731,19 @@ class ExaSearchGateway:
             try:
                 async with self._open_client(timeout=timeout) as client:
                     try:
-                        response = await client.post(
-                            path,
-                            json=body,
-                            headers={"x-api-key": self._api_key.get_secret_value()},
-                            timeout=timeout,
+                        response = await asyncio.wait_for(
+                            client.post(
+                                path,
+                                json=body,
+                                headers={"x-api-key": self._api_key.get_secret_value()},
+                                timeout=timeout,
+                            ),
+                            timeout=remaining,
                         )
                     except asyncio.CancelledError:
                         raise
+                    except TimeoutError:
+                        raise ExaSearchError("web_search_timeout") from None
                     except RuntimeError:
                         last_reason = "web_search_transport_failed"
                         raise ExaSearchError(last_reason) from None

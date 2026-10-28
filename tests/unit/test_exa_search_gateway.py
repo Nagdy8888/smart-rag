@@ -27,6 +27,34 @@ from smart_rag_core.settings.base import SharedSettings
 CANARY_KEY = "exa-unit-canary-key-do-not-log"
 
 
+def test_wall_deadline_cancels_transport_even_when_phase_timeouts_do_not() -> None:
+    """A total operation timeout includes connect/read and cancels the sent task."""
+    cancelled: list[bool] = []
+    calls: list[bool] = []
+
+    async def transport(_request: httpx.Request) -> httpx.Response:
+        """Simulate a hanging transport without an external provider."""
+        calls.append(True)
+        try:
+            await asyncio.sleep(10)
+        finally:
+            cancelled.append(True)
+        return httpx.Response(200, json={})
+
+    async def invoke() -> None:
+        """Expect one bounded request and no retry after the deadline."""
+        gateway = ExaSearchGateway(
+            api_key=SecretStr(CANARY_KEY), transport=httpx.MockTransport(transport)
+        )
+        with pytest.raises(ExaSearchError, match="web_search_timeout"):
+            await gateway.search(
+                query="public rainfall", remaining_deadline_seconds=0.02, num_results=2
+            )
+
+    asyncio.run(invoke())
+    assert calls == cancelled == [True]
+
+
 def _ok_response(_request: httpx.Request) -> httpx.Response:
     """Return a successful Exa-shaped HTTP response.
 

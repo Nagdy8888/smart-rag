@@ -12,6 +12,53 @@ _STOP = frozenset(
 )
 
 
+def _unique_phrase_window(
+    claim: str, fusion: FusionResult, *, current: float
+) -> tuple[float, str, str] | None:
+    """Find one unique long verbatim anchor before the unchanged semantic verifier.
+
+    Lexical coverage alone cannot repair a paraphrase. This fallback additionally
+    requires a five-word literal with three content words in exactly one fitted
+    prose passage. It never changes the claim or authorizes an absent source.
+    """
+    words = _terms(claim)
+    tokens = re.findall(r"[A-Za-z]+", claim)
+    choices: dict[str, tuple[float, str, str]] = {}
+    examined: set[str] = set()
+    for offset in range(len(tokens) - 4):
+        phrase = tokens[offset : offset + 5]
+        if len(_terms(" ".join(phrase))) < 3:
+            continue
+        key = " ".join(phrase).casefold()
+        if key in examined:
+            continue
+        if len(examined) >= 32:
+            break
+        examined.add(key)
+        pattern = re.compile(
+            r"\b" + r"\s+".join(re.escape(x) for x in phrase) + r"\b", re.IGNORECASE
+        )
+        holders = [
+            (source, match)
+            for source in fusion.evidence
+            if source.content_kind is None
+            and (match := pattern.search(source.citation_text)) is not None
+        ]
+        if len(holders) != 1:
+            continue
+        source, match = holders[0]
+        score = len(words & _terms(source.citation_text)) / max(1, len(words))
+        if score < 0.5 or score < current + 0.25:
+            continue
+        # Keep the literal and its surrounding statement, as an exact slice.
+        start = max(0, match.start() - 350)
+        span = source.citation_text[start : start + 1000].strip()
+        choices[source.chunk_id] = (score, source.chunk_id, span)
+    if len(choices) != 1:
+        return None
+    return next(iter(choices.values()))
+
+
 def _terms(text: str) -> frozenset[str]:
     """Use content words only; identifiers and very short claims keep existing binding."""
     return frozenset(
@@ -68,6 +115,8 @@ def rebind_high_coverage_prose(
                     and (best is None or score > best[0])
                 ):
                     best = (score, source.chunk_id, span)
+        if best is None:
+            best = _unique_phrase_window(link.claim, fusion, current=current)
         if best is None:
             continue
         _, chunk_id, span = best

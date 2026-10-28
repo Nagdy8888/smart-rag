@@ -42,7 +42,10 @@ from smart_rag_agents.query.gateway.sync_bridge import (
     attempt_timeout_seconds,
     run_coro,
 )
-from smart_rag_agents.query.nodes.answer_attempts import ANSWER_ATTEMPT_CAP_SECONDS
+from smart_rag_agents.query.nodes.answer_attempts import (
+    ANSWER_ATTEMPT_CAP_SECONDS,
+    answer_timeout_cap,
+)
 from smart_rag_agents.query.nodes.tokens import tokens_from_gateway_response
 
 
@@ -156,7 +159,8 @@ def gateway_answer(
         re.search(r"(?i)\b(?:explain|describe|how|why)\b|اشرح", query)
     )
     timeout_seconds = attempt_timeout_seconds(
-        context, 20.0 if complex_code else ANSWER_ATTEMPT_CAP_SECONDS
+        context,
+        answer_timeout_cap(20.0 if complex_code else ANSWER_ATTEMPT_CAP_SECONDS),
     )
     if context is not None:
         # Use the existing envelope, leaving verification time after a long snippet.

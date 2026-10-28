@@ -14,6 +14,7 @@ from smart_rag_core.query_answer.versions import (
     WEB_ANSWER_PROMPT_VERSION,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+from smart_rag_core.web_research.excerpt_window import query_excerpt_window
 from smart_rag_core.web_research.models import WebSourceRecord
 from smart_rag_core.web_research.synthesis import (
     citations_from_persisted_ids,
@@ -174,8 +175,10 @@ def gateway_web_answer(
         if size < 80:
             raise AnswerError("web_answer_input_bound")
         fitted = tuple(
-            source.model_copy(update={"excerpt": source.excerpt[:size]})
-            for source in fitted
+            source.model_copy(
+                update={"excerpt": query_excerpt_window(source.excerpt, query, size)}
+            )
+            for source in sources
         )
         records = isolate_web_sources(fitted)
     request = WebAnswerModelRequest(

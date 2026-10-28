@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from smart_rag_core.query_answer.comparative_guard import explicit_comparative_conflict
+from smart_rag_core.query_answer.figure_availability import unavailable_figure_links
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload, AtomicLink
-from smart_rag_core.query_answer.paragraphs import apply_paragraph_contract
+from smart_rag_core.query_answer.paragraphs import (
+    apply_paragraph_contract,
+    drop_unsupported_paragraphs,
+)
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.web_research.models import WebCitation
@@ -180,6 +184,10 @@ def deterministic_check_answer(
     )
     if excerpts:
         return filtered, tuple(dict.fromkeys(failures))
+    unavailable = unavailable_figure_links(filtered, fusion)
+    if unavailable:
+        filtered = drop_unsupported_paragraphs(filtered, unavailable)
+        failures.append("figure_availability_mismatch")
     contracted, paragraph_failures = apply_paragraph_contract(
         filtered,
         fusion=fusion,

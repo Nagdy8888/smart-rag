@@ -18,6 +18,8 @@ export type ConversationResponse = {
 
 /** One `GET /conversations/{id}/messages` item. Content is escaped text. */
 export type ConversationMessage = {
+  /** Recorded operational state; never inferred from answer content. */
+  run_status?: string | null;
   knowledge_result?: import("../knowledge-result").KnowledgeResult | null;
   message_id: string;
   role: "user" | "assistant";

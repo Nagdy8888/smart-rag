@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from smart_rag_core.query_profile.extract import extract_deterministic
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
@@ -17,6 +19,30 @@ from smart_rag_core.query_routing.signals import (
     is_user_text_transform,
 )
 from smart_rag_core.search_scope import RequestedSearchScope
+
+
+def _public_comparison(query: str) -> bool:
+    """Recognize a standalone public-source comparison, not a private follow-up.
+
+    Comparison/table shape alone is not a disclosure risk. Explicit company
+    references, identifiers, document scope, secrets and referential follow-ups
+    retain the existing clarification guard.
+    """
+    extract = extract_deterministic(query)
+    return (
+        query.lstrip().lower().startswith("compare ")
+        and re.search(r"(?i)\b(?:cite|official|public|documentation|standard)\b", query)
+        is not None
+        and re.search(
+            r"(?i)\b(?:our|internal|uploaded|attached|previous|earlier|those|these|them)\b",
+            query,
+        )
+        is None
+        and not extract.codes
+        and extract.document_scope == "none"
+        and not has_company_phrase(query)
+        and not has_web_privacy_risk(query)
+    )
 
 
 def _social_opener(query: str) -> bool:
@@ -88,6 +114,13 @@ def apply_requested_search_scope(
             general_signal=automatic.general_signal,
         )
     if requested is RequestedSearchScope.WEB:
+        if _public_comparison(query):
+            return KnowledgeScopeDecision(
+                knowledge_scope=KnowledgeScope.WEB,
+                confidence=1.0,
+                company_signal=False,
+                general_signal=False,
+            )
         if (
             query_company
             or automatic.company_signal

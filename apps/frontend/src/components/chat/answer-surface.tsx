@@ -657,6 +657,11 @@ export const AnswerSurface = memo(function AnswerSurface({
             <p className={styles.userBubble} dir="auto">
               <UserText value={item.content} />
             </p>
+            {item.run_id && !messages.some((answer) => answer.role === "assistant" && answer.run_id === item.run_id) && (item.run_status === "failed" || item.run_status === "cancelled") ? (
+              <p className={styles.messageMeta}>
+                {item.run_status === "cancelled" ? "This question was cancelled. No answer was saved." : "This question could not be completed. No answer was saved."}
+              </p>
+            ) : null}
           </div>
         ) : (
           <div key={item.message_id} className={styles.turnAssistant}>

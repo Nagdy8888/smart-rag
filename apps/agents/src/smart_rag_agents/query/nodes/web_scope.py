@@ -348,7 +348,10 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             Grounded ``AnswerPayload``.
         """
 
-        return counted_web_answer(state, deps, query=query, sources=sources)
+        # Search rewrites may translate Arabic for discovery. Synthesis must
+        # retain the employee's original language and presentation request.
+        original = str(state.get("user_query") or query)
+        return counted_web_answer(state, deps, query=original, sources=sources)
 
     synthesize = None
     if deps.model_gateway is not None and deps.web_answer_prompt_text:
@@ -411,7 +414,9 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
         {
             **state,
             "status": "answered",
-            "detail": "web_research_draft",
+            "detail": "web_research_partial"
+            if getattr(result, "limitations", ())
+            else "web_research_draft",
             "answer": answer.model_dump(mode="json"),
             "web_sources": [item.model_dump(mode="json") for item in result.sources],
             "answer_call_count": 1,

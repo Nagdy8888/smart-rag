@@ -163,6 +163,7 @@ function parseConversationMessage(item: unknown): ConversationMessage | null {
         ? row.run_id
         : null,
     citation_count: clampCitationCount(row.citation_count),
+    run_status: typeof row.run_status === "string" ? row.run_status : null,
     source_kind: parseTranscriptSourceKind(row.source_kind),
     knowledge_result: parseKnowledgeResult(row.knowledge_result),
     citations: [],
